@@ -1,3 +1,4 @@
+import 'package:anycast/widgets/detail.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist.dart';
@@ -64,7 +65,8 @@ class PlaylistEpisodesList extends StatefulWidget {
   State<PlaylistEpisodesList> createState() => _PlaylistEpisodesListState();
 }
 
-class _PlaylistEpisodesListState extends State<PlaylistEpisodesList> {
+class _PlaylistEpisodesListState extends State<PlaylistEpisodesList>
+    with AutomaticKeepAliveClientMixin {
   DatabaseHelper helper = DatabaseHelper();
 
   @override
@@ -84,7 +86,7 @@ class _PlaylistEpisodesListState extends State<PlaylistEpisodesList> {
 
   @override
   Widget build(BuildContext context) {
-    print("rebuilding playlist episodes list ${widget.playlist.id}");
+    super.build(context);
     return Consumer<PlaylistEpisodeProvider>(
       builder: (context, value, child) {
         var episodes = value.episodes[widget.playlist.id!] ?? [];
@@ -93,11 +95,22 @@ class _PlaylistEpisodesListState extends State<PlaylistEpisodesList> {
           itemBuilder: (context, index) {
             return ListTile(
               leading: episodes[index].imageUrl != null
-                  ? Image.network(episodes[index].imageUrl!,
-                      width: 50, height: 50)
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: GestureDetector(
+                        onTap: () {
+                          showModalBottomSheet(
+                              context: context,
+                              builder: (context) =>
+                                  DetailWidget(episodes[index]));
+                        },
+                        child: Image.network(episodes[index].imageUrl!,
+                            width: 48, height: 48),
+                      ),
+                    )
                   : const SizedBox(
-                      width: 50,
-                      height: 50,
+                      width: 48,
+                      height: 48,
                       child: Icon(Icons.image),
                     ),
               title: Text(episodes[index].title!,
@@ -116,4 +129,7 @@ class _PlaylistEpisodesListState extends State<PlaylistEpisodesList> {
       },
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }

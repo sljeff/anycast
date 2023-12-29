@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:anycast/states/tab.dart';
+import 'package:anycast/widgets/detail.dart';
 import 'package:http/http.dart' as http;
 import 'package:anycast/models/player.dart';
 import 'package:anycast/models/playlist_episode.dart';
@@ -8,7 +10,7 @@ import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:provider/provider.dart';
-import 'package:webfeed/webfeed.dart';
+import 'package:webfeed_plus/webfeed_plus.dart';
 
 import 'package:flutter/material.dart';
 import 'package:anycast/models/feed_episode.dart';
@@ -26,7 +28,7 @@ class Feeds extends StatefulWidget {
   State<Feeds> createState() => _FeedsState();
 }
 
-class _FeedsState extends State<Feeds> {
+class _FeedsState extends State<Feeds> with AutomaticKeepAliveClientMixin {
   final DatabaseHelper databaseHelper = DatabaseHelper();
 
   @override
@@ -44,6 +46,7 @@ class _FeedsState extends State<Feeds> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Consumer<FeedEpisodeProvider>(
       builder: (context, value, child) {
         if (value.episodes.isEmpty) {
@@ -54,19 +57,22 @@ class _FeedsState extends State<Feeds> {
           itemBuilder: (context, index) {
             return ExpansionTile(
               controlAffinity: ListTileControlAffinity.leading,
-              leading: Column(
-                children: [
-                  const SizedBox(
-                    height: 1,
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8.0),
+                child: GestureDetector(
+                  onTap: () {
+                    // show bottom sheet
+                    showModalBottomSheet(
+                        context: context,
+                        builder: (context) =>
+                            DetailWidget(value.episodes[index]));
+                  },
+                  child: Image.network(
+                    value.episodes[index].imageUrl!,
+                    fit: BoxFit.cover,
+                    width: 48,
                   ),
-                  SizedBox(
-                    width: 47,
-                    child: Image.network(
-                      value.episodes[index].imageUrl!,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                ],
+                ),
               ),
               title: Text(
                 value.episodes[index].title!,
@@ -82,7 +88,7 @@ class _FeedsState extends State<Feeds> {
                   Row(
                     children: [
                       Text(
-                        value.episodes[index].subscriptionTitle!,
+                        value.episodes[index].channelTitle!,
                         style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 9,
@@ -165,6 +171,9 @@ class _FeedsState extends State<Feeds> {
       },
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }
 
 class ImportBlock extends StatefulWidget {
@@ -224,8 +233,7 @@ class _ImportBlockState extends State<ImportBlock> {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () {
-                  // navigate to discover page
-                  Navigator.pushNamed(context, '/discover');
+                  Provider.of<TabProvider>(context, listen: false).setIndex(2);
                 },
                 child: const Text('Search Podcasts'),
               ),
@@ -323,13 +331,15 @@ Future<List<PodcastImportData>> fetchPodcastsByOMPL(String? path) async {
       var latestItem = channel.items![latestIndex];
       var feedEpisode = FeedEpisodeModel.fromMap(Map<String, dynamic>.from({
         'title': latestItem.title?.trim(),
-        'description': latestItem.description?.trim(),
+        'description': latestItem.itunes?.summary?.trim() ??
+            latestItem.description?.trim(),
         'guid': latestItem.guid,
         'duration': latestItem.itunes?.duration?.inMilliseconds,
         'enclosureUrl': latestItem.enclosure?.url,
         'pubDate': latestItem.pubDate?.millisecondsSinceEpoch,
         'imageUrl': latestItem.itunes?.image?.href ?? subscription.imageUrl,
-        'subscriptionTitle': subscription.title,
+        'channelTitle': subscription.title,
+        'rssFeedUrl': subscription.rssFeedUrl,
       }));
       return PodcastImportData(subscription, feedEpisode);
     }).catchError((error) {
@@ -407,6 +417,8 @@ PlaylistEpisodeModel addToPlaylist(
     'enclosureUrl': episode.enclosureUrl,
     'pubDate': episode.pubDate,
     'imageUrl': episode.imageUrl,
+    'channelTitle': episode.channelTitle,
+    'rssFeedUrl': episode.rssFeedUrl,
     'playlistId': 1,
     'position': double.infinity,
     'playedDuration': 0,

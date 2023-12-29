@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'states/player.dart';
 import 'states/playlist.dart';
 import 'states/playlist_episode.dart';
+import 'states/tab.dart';
 import 'widgets/discover.dart';
 import 'widgets/player.dart';
 import 'widgets/playlists.dart';
@@ -20,8 +21,6 @@ class NavigationBarApp extends StatefulWidget {
 }
 
 class _NavigationBarAppState extends State<NavigationBarApp> {
-  int _selectedIndex = 0;
-
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -29,41 +28,46 @@ class _NavigationBarAppState extends State<NavigationBarApp> {
         ChangeNotifierProvider(create: (_) => PlaylistProvider()),
         ChangeNotifierProvider(create: (_) => PlaylistEpisodeProvider()),
         ChangeNotifierProvider(create: (_) => PlayerProvider()),
+        ChangeNotifierProvider(create: (_) => TabProvider()),
       ],
       child: MaterialApp(
-        home: Scaffold(
-          floatingActionButton: const PlayerWidget(),
-          body: Center(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: <Widget>[
-                const PodcastsPage(),
-                const Playlists(),
-                Discover(),
+        home: Consumer<TabProvider>(builder: (context, value, child) {
+          var selectedIndex = value.selectedIndex;
+          return Scaffold(
+            floatingActionButton: const PlayerWidget(),
+            body: Center(
+              child: IndexedStack(
+                index: selectedIndex,
+                children: <Widget>[
+                  const PodcastsPage(),
+                  const Playlists(),
+                  Discover(),
+                ],
+              ),
+            ),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: selectedIndex,
+              onDestinationSelected: (value) {
+                Provider.of<TabProvider>(context, listen: false)
+                    .setIndex(value);
+              },
+              destinations: const <Widget>[
+                NavigationDestination(
+                  label: 'Podcasts',
+                  icon: Icon(Icons.podcasts),
+                ),
+                NavigationDestination(
+                  label: 'Playlists',
+                  icon: Icon(Icons.playlist_play),
+                ),
+                NavigationDestination(
+                  label: 'Discover',
+                  icon: Icon(Icons.explore),
+                ),
               ],
             ),
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (value) => setState(() {
-              _selectedIndex = value;
-            }),
-            destinations: const <Widget>[
-              NavigationDestination(
-                label: 'Podcasts',
-                icon: Icon(Icons.podcasts),
-              ),
-              NavigationDestination(
-                label: 'Playlists',
-                icon: Icon(Icons.playlist_play),
-              ),
-              NavigationDestination(
-                label: 'Discover',
-                icon: Icon(Icons.explore),
-              ),
-            ],
-          ),
-        ),
+          );
+        }),
       ),
     );
   }

@@ -14,18 +14,17 @@ Future<void> feedEpisodeTableCreator(DatabaseExecutor db) {
       enclosureUrl TEXT,
       pubDate INTEGER,
       imageUrl TEXT,
-      subscriptionTitle TEXT
+      channelTitle TEXT,
+      rssFeedUrl TEXT
     )
   """);
 }
 
 class FeedEpisodeModel extends Episode {
-  // fields
-  String? subscriptionTitle;
-
   Map<String, dynamic> toMap() {
     var map = <String, dynamic>{
-      'subscriptionTitle': subscriptionTitle,
+      'channelTitle': channelTitle,
+      'rssFeedUrl': rssFeedUrl,
       'title': title,
       'description': description,
       'guid': guid,
@@ -43,7 +42,8 @@ class FeedEpisodeModel extends Episode {
 
   FeedEpisodeModel.fromMap(Map<String, dynamic> map) {
     id = map['id'];
-    subscriptionTitle = map['subscriptionTitle'];
+    channelTitle = map['channelTitle'];
+    rssFeedUrl = map['rssFeedUrl'];
     title = map['title'];
     description = map['description'];
     guid = map['guid'];

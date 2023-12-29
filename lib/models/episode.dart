@@ -8,4 +8,6 @@ class Episode {
   String? enclosureUrl;
   int? pubDate; // unix timestamp
   String? imageUrl;
+  String? channelTitle;
+  String? rssFeedUrl;
 }

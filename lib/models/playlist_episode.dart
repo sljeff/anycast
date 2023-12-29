@@ -14,6 +14,8 @@ Future<void> playlistEpisodeTableCreator(DatabaseExecutor db) {
       enclosureUrl TEXT,
       pubDate INTEGER,
       imageUrl TEXT,
+      channelTitle TEXT,
+      rssFeedUrl TEXT,
       playlistId INTEGER,
       position REAL,
       playedDuration INTEGER
@@ -40,6 +42,8 @@ class PlaylistEpisodeModel extends Episode {
       'enclosureUrl': enclosureUrl,
       'pubDate': pubDate,
       'imageUrl': imageUrl,
+      'channelTitle': channelTitle,
+      'rssFeedUrl': rssFeedUrl,
     };
     if (id != null) {
       map['id'] = id;
@@ -60,6 +64,8 @@ class PlaylistEpisodeModel extends Episode {
     enclosureUrl = map['enclosureUrl'];
     pubDate = map['pubDate'];
     imageUrl = map['imageUrl'];
+    channelTitle = map['channelTitle'];
+    rssFeedUrl = map['rssFeedUrl'];
   }
 
   static Future<List<PlaylistEpisodeModel>> listByPlaylistId(

@@ -11,7 +11,8 @@ class Subscriptions extends StatefulWidget {
   State<Subscriptions> createState() => _SubscriptionsState();
 }
 
-class _SubscriptionsState extends State<Subscriptions> {
+class _SubscriptionsState extends State<Subscriptions>
+    with AutomaticKeepAliveClientMixin {
   final DatabaseHelper databaseHelper = DatabaseHelper();
 
   @override
@@ -29,6 +30,7 @@ class _SubscriptionsState extends State<Subscriptions> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Consumer(builder: (context, SubscriptionProvider value, child) {
       if (value.subscriptions.isEmpty) {
         return const Center(
@@ -40,8 +42,11 @@ class _SubscriptionsState extends State<Subscriptions> {
         itemBuilder: (context, index) {
           return ListTile(
             leading: value.subscriptions[index].imageUrl != null
-                ? Image.network(value.subscriptions[index].imageUrl!,
-                    width: 50, height: 50)
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(value.subscriptions[index].imageUrl!,
+                        width: 50, height: 50),
+                  )
                 : const SizedBox(
                     width: 50,
                     height: 50,
@@ -58,4 +63,7 @@ class _SubscriptionsState extends State<Subscriptions> {
       );
     });
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }

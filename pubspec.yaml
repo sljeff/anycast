@@ -39,10 +39,12 @@ dependencies:
   provider: ^6.1.1
   http: ^1.1.2
   file_picker: ^6.1.1
-  xml: ^5.0.2
   html: ^0.15.4
-  webfeed: ^0.7.0
   timeago: ^3.3.0
+  webfeed_plus: ^1.0.1+1
+  xml: ^6.5.0
+  flutter_html: ^3.0.0-beta.2
+  sanitize_html: ^2.1.0
 
 dev_dependencies:
   flutter_test:
