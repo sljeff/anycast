@@ -1,3 +1,4 @@
+import 'package:anycast/widgets/channel.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/subscription.dart';
@@ -41,17 +42,26 @@ class _SubscriptionsState extends State<Subscriptions>
         itemCount: value.subscriptions.length,
         itemBuilder: (context, index) {
           return ListTile(
-            leading: value.subscriptions[index].imageUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(value.subscriptions[index].imageUrl!,
-                        width: 50, height: 50),
-                  )
-                : const SizedBox(
-                    width: 50,
-                    height: 50,
-                    child: Icon(Icons.image),
-                  ),
+            leading: GestureDetector(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) {
+                    return const Channel();
+                  },
+                ));
+              },
+              child: value.subscriptions[index].imageUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(value.subscriptions[index].imageUrl!,
+                          width: 50, height: 50),
+                    )
+                  : const SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: Icon(Icons.image),
+                    ),
+            ),
             title: Text(value.subscriptions[index].title!),
             subtitle: Text(
               value.subscriptions[index].description!,

@@ -193,6 +193,9 @@ class _ImportBlockState extends State<ImportBlock> {
         child: CircularProgressIndicator(),
       );
     }
+
+    var controller = TextEditingController();
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -213,16 +216,19 @@ class _ImportBlockState extends State<ImportBlock> {
                       setState(() {
                         isLoading = true;
                       });
-                      fetchPodcastsByOMPL(value.files.single.path)
-                          .then((value) {
-                        Provider.of<FeedEpisodeProvider>(context, listen: false)
-                            .addMany(value.map((e) => e.feedEpisode!).toList());
-                        Provider.of<SubscriptionProvider>(context,
-                                listen: false)
-                            .addMany(
-                                value.map((e) => e.subscription!).toList());
-                        setState(() {
-                          isLoading = false;
+                      parseOMPL(value.files.single.path).then((value) {
+                        fetchPodcastsByUrls(value).then((value) {
+                          Provider.of<FeedEpisodeProvider>(context,
+                                  listen: false)
+                              .addMany(
+                                  value.map((e) => e.feedEpisode!).toList());
+                          Provider.of<SubscriptionProvider>(context,
+                                  listen: false)
+                              .addMany(
+                                  value.map((e) => e.subscription!).toList());
+                          setState(() {
+                            isLoading = false;
+                          });
                         });
                       });
                     }
@@ -242,11 +248,31 @@ class _ImportBlockState extends State<ImportBlock> {
                 width: 200,
                 height: 50,
                 child: TextField(
+                  style: const TextStyle(fontSize: 10),
+                  controller: controller,
                   decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.all(1),
                     border: const OutlineInputBorder(),
                     labelText: 'Enter a Podcast URL',
                     suffixIcon: IconButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        setState(() {
+                          isLoading = true;
+                        });
+                        fetchPodcastsByUrls([controller.text]).then((value) {
+                          Provider.of<FeedEpisodeProvider>(context,
+                                  listen: false)
+                              .addMany(
+                                  value.map((e) => e.feedEpisode!).toList());
+                          Provider.of<SubscriptionProvider>(context,
+                                  listen: false)
+                              .addMany(
+                                  value.map((e) => e.subscription!).toList());
+                          setState(() {
+                            isLoading = false;
+                          });
+                        });
+                      },
                       icon: const Icon(Icons.add),
                     ),
                   ),
@@ -291,7 +317,8 @@ class PodcastImportData {
   PodcastImportData(this.subscription, this.feedEpisode);
 }
 
-Future<List<PodcastImportData>> fetchPodcastsByOMPL(String? path) async {
+Future<List<PodcastImportData>> fetchPodcastsByUrls(
+    List<String> rssFeedUrls) async {
   var db = await DatabaseHelper().db;
   if (db == null) {
     throw Exception('Unable to open database');
@@ -299,7 +326,6 @@ Future<List<PodcastImportData>> fetchPodcastsByOMPL(String? path) async {
 
   List<PodcastImportData> podcasts = [];
 
-  List<String> rssFeedUrls = await parseOMPL(path);
   var futures = rssFeedUrls.map((rssFeedUrl) {
     return http.get(Uri.parse(rssFeedUrl)).then((response) {
       var body = utf8.decode(response.bodyBytes);
