@@ -1,4 +1,7 @@
+import 'package:anycast/utils/audio_handler.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import 'states/player.dart';
 import 'states/playlist.dart';
 import 'states/playlist_episode.dart';
@@ -9,7 +12,20 @@ import 'widgets/playlists.dart';
 import 'widgets/podcasts.dart';
 import 'package:provider/provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await AudioService.init(
+    builder: () => MyAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.kindjeff.anycast.audio',
+      androidNotificationChannelName: 'Anycast',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+      androidNotificationIcon: 'mipmap/ic_launcher',
+    ),
+  );
+
   runApp(const NavigationBarApp());
 }
 
@@ -23,12 +39,24 @@ class NavigationBarApp extends StatefulWidget {
 class _NavigationBarAppState extends State<NavigationBarApp> {
   @override
   Widget build(BuildContext context) {
+    var audioHandler = MyAudioHandler();
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => PlaylistProvider()),
         ChangeNotifierProvider(create: (_) => PlaylistEpisodeProvider()),
         ChangeNotifierProvider(create: (_) => PlayerProvider()),
         ChangeNotifierProvider(create: (_) => TabProvider()),
+        // player state
+        StreamProvider<PlayerState?>(
+          create: (context) => audioHandler.playbackStateStream,
+          initialData: null,
+        ),
+        // position data
+        StreamProvider(
+          create: (context) => audioHandler.positionDataStream,
+          initialData: null,
+        ),
       ],
       child: MaterialApp(
         home: Consumer<TabProvider>(builder: (context, value, child) {

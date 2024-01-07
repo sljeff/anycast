@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:anycast/states/tab.dart';
+import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:http/http.dart' as http;
 import 'package:anycast/models/player.dart';
@@ -136,10 +137,11 @@ class _FeedsState extends State<Feeds> with AutomaticKeepAliveClientMixin {
                   children: [
                     IconButton(
                         onPressed: () {
-                          addToPlaylist(
-                              databaseHelper, context, value.episodes[index]);
-                          addToPlayer(databaseHelper, context,
-                              value.episodes[index].guid!);
+                          addToPlaylist(databaseHelper, context,
+                                  value.episodes[index])
+                              .then((value) {
+                            addToPlayer(databaseHelper, context, value);
+                          });
                         },
                         icon: const Icon(Icons.play_arrow)),
                     IconButton(
@@ -432,8 +434,10 @@ String formatDuration(int ms) {
   }
 }
 
-PlaylistEpisodeModel addToPlaylist(
-    DatabaseHelper helper, BuildContext context, FeedEpisodeModel episode) {
+Future<PlaylistEpisodeModel> addToPlaylist(DatabaseHelper helper,
+    BuildContext context, FeedEpisodeModel episode) async {
+  var playlistId = 1;
+
   // add to default playlist; remove from feeds
   var playlistEpisode = PlaylistEpisodeModel.fromMap(Map<String, dynamic>.from({
     'title': episode.title,
@@ -445,34 +449,40 @@ PlaylistEpisodeModel addToPlaylist(
     'imageUrl': episode.imageUrl,
     'channelTitle': episode.channelTitle,
     'rssFeedUrl': episode.rssFeedUrl,
-    'playlistId': 1,
+    'playlistId': playlistId,
     'position': double.infinity,
     'playedDuration': 0,
   }));
-  helper.db.then((db) {
+  return helper.db.then((db) {
     if (db == null) {
       throw Exception('Unable to open database');
     }
 
     PlaylistEpisodeModel.insertOrUpdateByIndex(
       db,
-      1,
+      playlistId,
       0,
       playlistEpisode,
     ).then((v) {
       Provider.of<PlaylistEpisodeProvider>(context, listen: false)
-          .addToPlaylist(1, playlistEpisode);
+          .addToPlaylist(playlistId, playlistEpisode);
+      MyAudioHandler().insertQueueItem(
+        0,
+        MyAudioHandler.playlistepisodeToMediaItem(playlistEpisode),
+      );
     });
     FeedEpisodeModel.removeByGuid(db, episode.guid!).then((v) {
       Provider.of<FeedEpisodeProvider>(context, listen: false)
           .removeByGuids([episode.guid!]);
     });
+    return playlistEpisode;
   });
-
-  return playlistEpisode;
 }
 
-void addToPlayer(DatabaseHelper helper, BuildContext context, String guid) {
+void addToPlayer(DatabaseHelper helper, BuildContext context,
+    PlaylistEpisodeModel playlistEpisode) {
+  var playlistId = 1;
+  var guid = playlistEpisode.guid;
   var player = PlayerModel.fromMap(Map<String, dynamic>.from({
     'playlistEpisodeGuid': guid,
     'position': 0,
@@ -484,7 +494,10 @@ void addToPlayer(DatabaseHelper helper, BuildContext context, String guid) {
     }
     PlayerModel.update(db, player).then((value) {
       Provider.of<PlayerProvider>(context, listen: false)
-          .setPlayer(player, true);
+          .setPlayer(player, playlistEpisode);
+      MyAudioHandler.setPlaylistByPlaylistId(playlistId).then((_) {
+        MyAudioHandler().play();
+      });
     });
   });
 }

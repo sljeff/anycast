@@ -1,21 +1,17 @@
+import 'package:anycast/models/playlist_episode.dart';
 import 'package:flutter/foundation.dart';
 import 'package:anycast/models/player.dart';
 
 class PlayerProvider extends ChangeNotifier {
   PlayerModel? _player;
-  bool _isPlaying = false;
+  PlaylistEpisodeModel? _playlistEpisode;
 
   PlayerModel? get player => _player;
-  bool get isPlaying => _isPlaying;
+  PlaylistEpisodeModel? get playlistEpisode => _playlistEpisode;
 
-  void setPlayer(PlayerModel player, bool isPlaying) {
+  void setPlayer(PlayerModel player, PlaylistEpisodeModel playlistEpisode) {
     _player = player;
-    _isPlaying = isPlaying;
-    notifyListeners();
-  }
-
-  void setIsPlaying(bool isPlaying) {
-    _isPlaying = isPlaying;
+    _playlistEpisode = playlistEpisode;
     notifyListeners();
   }
 }
