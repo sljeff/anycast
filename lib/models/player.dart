@@ -31,6 +31,8 @@ class PlayerModel {
     return map;
   }
 
+  PlayerModel.empty();
+
   PlayerModel.fromMap(Map<String, dynamic> map) {
     id = map['id'];
     playlistEpisodeGuid = map['playlistEpisodeGuid'];

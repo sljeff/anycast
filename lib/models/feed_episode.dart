@@ -71,7 +71,20 @@ class FeedEpisodeModel extends Episode {
     }
   }
 
-  static Future<void> removeByGuid(DatabaseExecutor db, String guid) async {
-    await db.delete(tableName, where: 'guid = ?', whereArgs: [guid]);
+  static Future<void> removeByGuids(
+      DatabaseExecutor db, List<String> guids) async {
+    await db.rawDelete(
+        'DELETE FROM $tableName WHERE guid IN (${guids.map((e) => '?').join(',')})',
+        guids);
+  }
+
+  static Future<void> insertMany(
+      DatabaseExecutor db, List<FeedEpisodeModel> episodes) async {
+    var batch = db.batch();
+    for (var episode in episodes) {
+      batch.insert(tableName, episode.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
   }
 }

@@ -1,35 +1,31 @@
-import 'package:flutter/foundation.dart';
+import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/subscription.dart';
+import 'package:get/get.dart';
 
-class SubscriptionProvider extends ChangeNotifier {
-  List<SubscriptionModel> _subscriptions = [];
+class SubscriptionController extends GetxController {
+  final subscriptions = <SubscriptionModel>[].obs;
 
-  List<SubscriptionModel> get subscriptions => _subscriptions;
+  final DatabaseHelper helper = DatabaseHelper();
 
-  void addMany(List<SubscriptionModel> subscriptions) {
-    _subscriptions.addAll(subscriptions);
-    // sort by title
-    _subscriptions.sort((a, b) => a.title!.compareTo(b.title!));
-    notifyListeners();
+  @override
+  void onInit() {
+    super.onInit();
+    load();
   }
 
-  void removeByRssFeedUrls(List<String> rssFeedUrls) {
-    _subscriptions.removeWhere(
-        (subscription) => rssFeedUrls.contains(subscription.rssFeedUrl));
-    notifyListeners();
+  void load() {
+    helper.db.then((db) => {
+          SubscriptionModel.listAll(db!).then((subscriptions) {
+            this.subscriptions.value = subscriptions;
+          })
+        });
   }
 
-  void load(List<SubscriptionModel> subscriptions) {
-    _subscriptions = subscriptions;
-    notifyListeners();
-  }
-
-  void addManyAndRemoveDuplicates(List<SubscriptionModel> subscriptions) {
-    for (SubscriptionModel subscription in subscriptions) {
-      if (!_subscriptions.contains(subscription)) {
-        _subscriptions.add(subscription);
-      }
-    }
-    notifyListeners();
+  void addMany(subscriptions) {
+    helper.db.then((db) => {
+          SubscriptionModel.addMany(db!, subscriptions).then((_) {
+            load();
+          })
+        });
   }
 }

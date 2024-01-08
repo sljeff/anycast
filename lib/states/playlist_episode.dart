@@ -1,40 +1,53 @@
-import 'package:flutter/foundation.dart';
+import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
+import 'package:get/get.dart';
 
-// TODO: optimize with value notifier
-class PlaylistEpisodeProvider extends ChangeNotifier {
-  // playlistId -> episodes
-  final Map<int, List<PlaylistEpisodeModel>> _episodes = {};
+class PlaylistEpisodeController extends GetxController {
+  final episodes = <PlaylistEpisodeModel>[].obs;
 
-  Map<int, List<PlaylistEpisodeModel>> get episodes => _episodes;
+  var playlistId = 0;
+  PlaylistEpisodeController({required this.playlistId});
 
-  void addToPlaylist(int playlistId, PlaylistEpisodeModel episode) {
-    if (_episodes[playlistId] == null) {
-      _episodes[playlistId] = [];
-    }
-    // to the top
-    _episodes[playlistId]!.insert(0, episode);
-    notifyListeners();
+  final DatabaseHelper helper = DatabaseHelper();
+
+  @override
+  void onInit() {
+    super.onInit();
+    load();
   }
 
-  void syncByPlaylistId(int playlistId, List<PlaylistEpisodeModel> episodes) {
-    _episodes[playlistId] = episodes;
-    notifyListeners();
+  void load() {
+    helper.db.then((db) => {
+          PlaylistEpisodeModel.listByPlaylistId(db!, playlistId)
+              .then((episodes) {
+            this.episodes.value = episodes;
+          })
+        });
   }
 
-  void loadByPlaylistId(int playlistId, List<PlaylistEpisodeModel> episodes) {
-    _episodes[playlistId] = episodes;
-    notifyListeners();
+  void add(PlaylistEpisodeModel episode) {
+    helper.db.then((db) => {
+          PlaylistEpisodeModel.insertOrUpdateByIndex(
+                  db!, playlistId, 0, episode)
+              .then((v) {
+            episodes.insert(0, episode);
+          })
+        });
   }
 
-  void removeFromPlaylist(int playlistId, int id) {
-    _episodes[playlistId]!.removeWhere((episode) => episode.id == id);
-    notifyListeners();
+  void removeFromPlaylist(int id) {
+    helper.db.then((db) => {
+          PlaylistEpisodeModel.delete(db!, id).then((v) {
+            episodes.removeWhere((episode) => episode.id == id);
+          })
+        });
   }
 
-  void moveToTop(int playlistId, PlaylistEpisodeModel episode) {
-    _episodes[playlistId]!.removeWhere((e) => e.id == episode.id);
-    _episodes[playlistId]!.insert(0, episode);
-    notifyListeners();
+  Future<void> moveToTop(PlaylistEpisodeModel episode) async {
+    episodes.removeWhere((e) => e.id == episode.id);
+    episodes.insert(0, episode);
+    return await helper.db.then((db) =>
+        PlaylistEpisodeModel.insertOrUpdateByIndex(
+            db!, playlistId, 0, episode));
   }
 }

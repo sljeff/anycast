@@ -75,4 +75,13 @@ class SubscriptionModel {
       });
     });
   }
+
+  static Future<void> addMany(
+      DatabaseExecutor db, List<SubscriptionModel> subscriptions) async {
+    Batch batch = db.batch();
+    for (SubscriptionModel subscription in subscriptions) {
+      batch.insert('subscription', subscription.toMap());
+    }
+    await batch.commit(noResult: true);
+  }
 }

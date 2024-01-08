@@ -3,8 +3,8 @@ import 'package:anycast/utils/audio_handler.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
+import 'package:get/get.dart';
 import 'package:marquee/marquee.dart';
-import 'package:provider/provider.dart';
 
 class PlayerPage extends StatelessWidget {
   const PlayerPage({super.key});
@@ -101,6 +101,7 @@ class SwipeImage extends StatelessWidget {
   SwipeImage({super.key});
 
   final MyAudioHandler myAudioHandler = MyAudioHandler();
+  final PlayerController controller = Get.find();
 
   @override
   Widget build(BuildContext context) {
@@ -116,14 +117,14 @@ class SwipeImage extends StatelessWidget {
           ),
           Container(
               margin: const EdgeInsets.symmetric(horizontal: 10),
-              child: Consumer<PlayerProvider>(builder: (context, value, child) {
-                var episode = value.playlistEpisode;
+              child: Obx(() {
+                var episode = controller.playlistEpisode;
                 return Hero(
                   tag: 'play_image',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
-                      episode?.imageUrl ?? '',
+                      episode.value.imageUrl ?? '',
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -211,13 +212,14 @@ class Titles extends StatelessWidget {
   Titles({super.key});
 
   final MyAudioHandler myAudioHandler = MyAudioHandler();
+  final PlayerController controller = Get.find();
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<PlayerProvider>(
-      builder: (context, value, child) {
-        var episode = value.playlistEpisode;
-        if (episode == null) {
+    return Obx(
+      () {
+        var episode = controller.playlistEpisode;
+        if (episode.value.id == null) {
           // placeholder
           return const SizedBox(
             height: 70,
@@ -232,7 +234,7 @@ class Titles extends StatelessWidget {
               SizedBox(
                 height: 50,
                 child: Marquee(
-                  text: episode.title!,
+                  text: episode.value.title!,
                   blankSpace: 8,
                   style: TextStyle(
                     fontSize: 32,
@@ -244,7 +246,7 @@ class Titles extends StatelessWidget {
               ),
               SizedBox(
                 child: Text(
-                  episode.channelTitle!,
+                  episode.value.channelTitle!,
                   style: TextStyle(
                     fontSize: 12,
                     decoration: TextDecoration.none,

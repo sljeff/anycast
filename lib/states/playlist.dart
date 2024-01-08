@@ -1,23 +1,29 @@
-import 'package:flutter/foundation.dart';
+import 'package:anycast/models/helper.dart';
+import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/models/playlist.dart';
+import 'package:get/get.dart';
 
-class PlaylistProvider extends ChangeNotifier {
-  List<PlaylistModel> _playlists = [];
+class PlaylistController extends GetxController {
+  final playlists = <PlaylistModel>[].obs;
+  var episodesControllers = <PlaylistEpisodeController>[].obs;
 
-  List<PlaylistModel> get playlists => _playlists;
+  final DatabaseHelper helper = DatabaseHelper();
 
-  void addPlaylist(PlaylistModel playlist) {
-    _playlists.add(playlist);
-    notifyListeners();
+  @override
+  void onInit() {
+    super.onInit();
+    load();
   }
 
-  void removePlaylist(PlaylistModel playlist) {
-    _playlists.remove(playlist);
-    notifyListeners();
-  }
-
-  void load(List<PlaylistModel> playlists) {
-    _playlists = playlists;
-    notifyListeners();
+  void load() {
+    helper.db.then((db) => {
+          PlaylistModel.listAll(db!).then((playlists) {
+            this.playlists.value = playlists;
+            for (var playlist in playlists) {
+              episodesControllers
+                  .add(PlaylistEpisodeController(playlistId: playlist.id!));
+            }
+          })
+        });
   }
 }

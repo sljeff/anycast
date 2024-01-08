@@ -52,6 +52,8 @@ class PlaylistEpisodeModel extends Episode {
     return map;
   }
 
+  PlaylistEpisodeModel.empty();
+
   PlaylistEpisodeModel.fromMap(Map<String, dynamic> map) {
     id = map['id'];
     playlistId = map['playlistId'];

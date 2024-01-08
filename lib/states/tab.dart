@@ -1,12 +1,10 @@
-import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 
-class TabProvider extends ChangeNotifier {
-  int _selectedIndex = 0;
+class HomeTabController extends GetxController {
+  int selectedIndex = 0;
 
-  int get selectedIndex => _selectedIndex;
-
-  void setIndex(int index) {
-    _selectedIndex = index;
-    notifyListeners();
+  void onItemTapped(int index) {
+    selectedIndex = index;
+    update();
   }
 }

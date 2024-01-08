@@ -1,11 +1,9 @@
+import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
-import 'states/player.dart';
-import 'states/playlist.dart';
-import 'states/playlist_episode.dart';
-import 'states/tab.dart';
 import 'widgets/discover.dart';
 import 'widgets/player.dart';
 import 'widgets/playlists.dart';
@@ -26,27 +24,20 @@ void main() async {
     ),
   );
 
-  runApp(const NavigationBarApp());
+  runApp(NavigationBarApp());
 }
 
-class NavigationBarApp extends StatefulWidget {
-  const NavigationBarApp({super.key});
+class NavigationBarApp extends StatelessWidget {
+  final HomeTabController homeTabController = Get.put(HomeTabController());
 
-  @override
-  State<NavigationBarApp> createState() => _NavigationBarAppState();
-}
+  NavigationBarApp({super.key});
 
-class _NavigationBarAppState extends State<NavigationBarApp> {
   @override
   Widget build(BuildContext context) {
     var audioHandler = MyAudioHandler();
 
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => PlaylistProvider()),
-        ChangeNotifierProvider(create: (_) => PlaylistEpisodeProvider()),
-        ChangeNotifierProvider(create: (_) => PlayerProvider()),
-        ChangeNotifierProvider(create: (_) => TabProvider()),
         // player state
         StreamProvider<PlayerState?>(
           create: (context) => audioHandler.playbackStateStream,
@@ -58,27 +49,23 @@ class _NavigationBarAppState extends State<NavigationBarApp> {
           initialData: null,
         ),
       ],
-      child: MaterialApp(
-        home: Consumer<TabProvider>(builder: (context, value, child) {
-          var selectedIndex = value.selectedIndex;
-          return Scaffold(
-            floatingActionButton: const PlayerWidget(),
+      child: GetMaterialApp(
+        home: GetBuilder<HomeTabController>(
+          builder: (controller) => Scaffold(
+            floatingActionButton: PlayerWidget(),
             body: Center(
               child: IndexedStack(
-                index: selectedIndex,
+                index: controller.selectedIndex,
                 children: <Widget>[
                   const PodcastsPage(),
-                  const Playlists(),
+                  Playlists(),
                   Discover(),
                 ],
               ),
             ),
             bottomNavigationBar: NavigationBar(
-              selectedIndex: selectedIndex,
-              onDestinationSelected: (value) {
-                Provider.of<TabProvider>(context, listen: false)
-                    .setIndex(value);
-              },
+              selectedIndex: controller.selectedIndex,
+              onDestinationSelected: homeTabController.onItemTapped,
               destinations: const <Widget>[
                 NavigationDestination(
                   label: 'Podcasts',
@@ -94,8 +81,8 @@ class _NavigationBarAppState extends State<NavigationBarApp> {
                 ),
               ],
             ),
-          );
-        }),
+          ),
+        ),
       ),
     );
   }

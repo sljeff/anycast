@@ -1,43 +1,24 @@
+import 'package:anycast/states/player.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/utils/formatters.dart';
-import 'package:anycast/utils/widget_utils.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:flutter/material.dart';
-import 'package:anycast/models/helper.dart';
-import 'package:anycast/models/playlist.dart';
-import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
-import 'package:provider/provider.dart';
+import 'package:get/get.dart';
 
-class Playlists extends StatefulWidget {
-  const Playlists({super.key});
+class Playlists extends StatelessWidget {
+  final PlaylistController controller = Get.put(PlaylistController());
 
-  @override
-  State<Playlists> createState() => _PlaylistsState();
-}
-
-class _PlaylistsState extends State<Playlists> {
-  DatabaseHelper helper = DatabaseHelper();
-
-  @override
-  void initState() {
-    super.initState();
-    helper.db.then((db) {
-      if (db == null) {
-        throw Exception('Unable to open database');
-      }
-      PlaylistModel.listAll(db).then((value) {
-        Provider.of<PlaylistProvider>(context, listen: false).load(value);
-      });
-    });
-  }
+  Playlists({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<PlaylistProvider>(
-      builder: (context, value, child) {
-        var playlists = value.playlists;
+    return Obx(
+      () {
+        var playlists = controller.playlists;
+        var episodesControllers = controller.episodesControllers;
+
         return DefaultTabController(
           length: playlists.length,
           child: Scaffold(
@@ -49,54 +30,31 @@ class _PlaylistsState extends State<Playlists> {
                 }).toList()),
               ),
               body: TabBarView(
-                  children: playlists.map((playlist) {
-                return PlaylistEpisodesList(playlist: playlist);
-              }).toList())),
+                  children: episodesControllers
+                      .map((element) => PlaylistEpisodesList(
+                          key: Key(element.playlistId.toString()),
+                          controller: element))
+                      .toList())),
         );
       },
     );
   }
 }
 
-class PlaylistEpisodesList extends StatefulWidget {
-  final PlaylistModel playlist;
+class PlaylistEpisodesList extends StatelessWidget {
+  final PlaylistEpisodeController controller;
 
-  const PlaylistEpisodesList({Key? key, required this.playlist})
+  const PlaylistEpisodesList({required Key key, required this.controller})
       : super(key: key);
 
   @override
-  State<PlaylistEpisodesList> createState() => _PlaylistEpisodesListState();
-}
-
-class _PlaylistEpisodesListState extends State<PlaylistEpisodesList>
-    with AutomaticKeepAliveClientMixin {
-  final DatabaseHelper helper = DatabaseHelper();
-
-  @override
-  void initState() {
-    super.initState();
-    helper.db.then((db) {
-      if (db == null) {
-        throw Exception('Unable to open database');
-      }
-      var playlistId = widget.playlist.id!;
-      PlaylistEpisodeModel.listByPlaylistId(db, playlistId).then((value) {
-        Provider.of<PlaylistEpisodeProvider>(context, listen: false)
-            .loadByPlaylistId(playlistId, value);
-      });
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    super.build(context);
-    return Consumer<PlaylistEpisodeProvider>(
-      builder: (context, value, child) {
-        var episodes = value.episodes[widget.playlist.id!] ?? [];
+    return Obx(
+      () {
         return ListView.builder(
-          itemCount: episodes.length,
+          itemCount: controller.episodes.length,
           itemBuilder: (context, index) {
-            var episode = episodes[index];
+            var episode = controller.episodes[index];
             return ExpansionTile(
               controlAffinity: ListTileControlAffinity.leading,
               leading: episode.imageUrl != null
@@ -155,39 +113,20 @@ class _PlaylistEpisodesListState extends State<PlaylistEpisodesList>
                     IconButton(
                         onPressed: () {
                           if (index != 0) {
-                            // move to top
-                            helper.db.then((db) {
-                              if (db == null) {
-                                throw Exception('Unable to open database');
-                              }
-                              PlaylistEpisodeModel.insertOrUpdateByIndex(
-                                      db, widget.playlist.id!, 0, episode)
-                                  .then((_) {
-                                Provider.of<PlaylistEpisodeProvider>(context,
-                                        listen: false)
-                                    .moveToTop(widget.playlist.id!, episode);
-                                playByEpisode(context, episode);
-                              });
+                            controller.moveToTop(episode).then((value) {
+                              Get.find<PlayerController>()
+                                  .playByEpisode(episode);
                             });
                           } else {
-                            playByEpisode(context, episode);
+                            Get.find<PlayerController>().playByEpisode(episode);
                           }
                         },
                         icon: Icon(Icons.play_arrow)),
                     IconButton(
                         onPressed: () {
                           // remove from playlist db
-                          helper.db.then((db) {
-                            if (db == null) {
-                              throw Exception('Unable to open database');
-                            }
-                            PlaylistEpisodeModel.delete(db, episode.id!);
-                            Provider.of<PlaylistEpisodeProvider>(context,
-                                    listen: false)
-                                .removeFromPlaylist(
-                                    widget.playlist.id!, episode.id!);
-                            MyAudioHandler().removeQueueItemAt(index);
-                          });
+                          controller.removeFromPlaylist(episode.id!);
+                          MyAudioHandler().removeQueueItemAt(index);
                         },
                         icon: Icon(Icons.delete)),
                   ],
@@ -199,7 +138,4 @@ class _PlaylistEpisodesListState extends State<PlaylistEpisodesList>
       },
     );
   }
-
-  @override
-  bool get wantKeepAlive => true;
 }

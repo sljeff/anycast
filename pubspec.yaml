@@ -50,6 +50,7 @@ dependencies:
   just_audio: ^0.9.36
   marquee: ^2.2.3
   audio_video_progress_bar: ^2.0.1
+  get: ^4.6.6
 
 dev_dependencies:
   flutter_test:

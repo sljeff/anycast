@@ -1,33 +1,27 @@
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/widgets/player_page.dart';
 import 'package:flutter/material.dart';
-import 'package:anycast/models/helper.dart';
 import 'package:anycast/states/player.dart';
-import 'package:provider/provider.dart';
+import 'package:get/get.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 
-class PlayerWidget extends StatefulWidget {
-  const PlayerWidget({super.key});
+class PlayerWidget extends StatelessWidget {
+  final PlayerController controller = Get.put(PlayerController());
 
-  @override
-  State<PlayerWidget> createState() => _PlayerWidgetState();
-}
-
-class _PlayerWidgetState extends State<PlayerWidget> {
-  DatabaseHelper helper = DatabaseHelper();
+  PlayerWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<PlayerProvider>(
-      builder: (context, value, child) {
-        var player = value.player;
-        var episode = value.playlistEpisode;
+    return Obx(
+      () {
+        var player = controller.player;
+        var episode = controller.playlistEpisode;
 
-        if (player == null || player.playlistEpisodeGuid == null) {
+        if (player.value.playlistEpisodeGuid == null) {
           return const SizedBox.shrink();
         }
 
-        var imageUrl = episode?.imageUrl;
+        var imageUrl = episode.value.imageUrl;
 
         return Stack(
           children: [
