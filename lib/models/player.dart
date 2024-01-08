@@ -5,14 +5,13 @@ Future<void> playerTableCreator(DatabaseExecutor db) {
   return db.execute("""
     CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY,
-      playlistEpisodeGuid TEXT,
-      playedDuration INTEGER
+      playlistEpisodeGuid TEXT
     )
   """).then((v) {
     // create default 1 if not exists
     db.rawInsert("""
-      INSERT OR IGNORE INTO $tableName (id, playlistEpisodeGuid, playedDuration)
-      VALUES (1, NULL, 0)
+      INSERT OR IGNORE INTO $tableName (id, playlistEpisodeGuid)
+      VALUES (1, NULL)
     """);
   });
 }
@@ -20,12 +19,10 @@ Future<void> playerTableCreator(DatabaseExecutor db) {
 class PlayerModel {
   int? id;
   String? playlistEpisodeGuid;
-  int? playedDuration; // in milliseconds
 
   Map<String, dynamic> toMap() {
     var map = <String, dynamic>{
       'playlistEpisodeGuid': playlistEpisodeGuid,
-      'playedDuration': playedDuration,
     };
     if (id != null) {
       map['id'] = id;
@@ -37,7 +34,6 @@ class PlayerModel {
   PlayerModel.fromMap(Map<String, dynamic> map) {
     id = map['id'];
     playlistEpisodeGuid = map['playlistEpisodeGuid'];
-    playedDuration = map['playedDuration'];
   }
 
   static Future<void> update(DatabaseExecutor db, PlayerModel player) async {

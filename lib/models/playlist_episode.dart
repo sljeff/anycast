@@ -9,9 +9,9 @@ Future<void> playlistEpisodeTableCreator(DatabaseExecutor db) {
       id INTEGER PRIMARY KEY,
       title TEXT,
       description TEXT,
-      guid TEXT,
+      guid TEXT UNIQUE,
       duration INTEGER,
-      enclosureUrl TEXT,
+      enclosureUrl TEXT UNIQUE,
       pubDate INTEGER,
       imageUrl TEXT,
       channelTitle TEXT,
@@ -136,5 +136,17 @@ class PlaylistEpisodeModel extends Episode {
         (List<Map<String, dynamic>> maps) {
       return PlaylistEpisodeModel.fromMap(maps[0]);
     });
+  }
+
+  static Future<PlaylistEpisodeModel> getByEnclosureUrl(
+      DatabaseExecutor db, String enclosureUrl) async {
+    return db.rawQuery('SELECT * FROM $tableName WHERE enclosureUrl = ?',
+        [enclosureUrl]).then((List<Map<String, dynamic>> maps) {
+      return PlaylistEpisodeModel.fromMap(maps[0]);
+    });
+  }
+
+  static Future<void> delete(DatabaseExecutor db, int id) async {
+    await db.delete(tableName, where: 'id = ?', whereArgs: [id]);
   }
 }

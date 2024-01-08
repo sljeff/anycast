@@ -1,3 +1,6 @@
+import 'package:anycast/utils/audio_handler.dart';
+import 'package:anycast/utils/formatters.dart';
+import 'package:anycast/utils/widget_utils.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/models/helper.dart';
@@ -67,7 +70,7 @@ class PlaylistEpisodesList extends StatefulWidget {
 
 class _PlaylistEpisodesListState extends State<PlaylistEpisodesList>
     with AutomaticKeepAliveClientMixin {
-  DatabaseHelper helper = DatabaseHelper();
+  final DatabaseHelper helper = DatabaseHelper();
 
   @override
   void initState() {
@@ -93,18 +96,19 @@ class _PlaylistEpisodesListState extends State<PlaylistEpisodesList>
         return ListView.builder(
           itemCount: episodes.length,
           itemBuilder: (context, index) {
-            return ListTile(
-              leading: episodes[index].imageUrl != null
+            var episode = episodes[index];
+            return ExpansionTile(
+              controlAffinity: ListTileControlAffinity.leading,
+              leading: episode.imageUrl != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: GestureDetector(
                         onTap: () {
                           showModalBottomSheet(
                               context: context,
-                              builder: (context) =>
-                                  DetailWidget(episodes[index]));
+                              builder: (context) => DetailWidget(episode));
                         },
-                        child: Image.network(episodes[index].imageUrl!,
+                        child: Image.network(episode.imageUrl!,
                             width: 48, height: 48),
                       ),
                     )
@@ -113,16 +117,82 @@ class _PlaylistEpisodesListState extends State<PlaylistEpisodesList>
                       height: 48,
                       child: Icon(Icons.image),
                     ),
-              title: Text(episodes[index].title!,
-                  style: const TextStyle(fontSize: 14)),
-              // subtitle: Row(
-              //   children: [
-              //     Text(
-              //       episodes[index].duration!.toString(),
-              //       style: const TextStyle(fontSize: 9),
-              //     ),
-              //   ],
-              // ),
+              title: Text(episode.title!, style: const TextStyle(fontSize: 14)),
+              subtitle: Row(
+                children: [
+                  Text(
+                    episode.channelTitle!,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 9,
+                        color: Colors.brown),
+                  ),
+                  const Text(
+                    " • ",
+                    style: TextStyle(fontSize: 9),
+                  ),
+                  Text(
+                    formatRemainingTime(
+                      Duration(milliseconds: episode.duration!),
+                      Duration(milliseconds: episode.playedDuration ?? 0),
+                    ),
+                    style: const TextStyle(fontSize: 9),
+                  ),
+                  const Text(
+                    " • ",
+                    style: TextStyle(fontSize: 9),
+                  ),
+                  Text(
+                    formatDatetime(episode.pubDate!),
+                    style: const TextStyle(fontSize: 9),
+                  ),
+                ],
+              ),
+              children: [
+                ButtonBar(
+                  alignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    IconButton(
+                        onPressed: () {
+                          if (index != 0) {
+                            // move to top
+                            helper.db.then((db) {
+                              if (db == null) {
+                                throw Exception('Unable to open database');
+                              }
+                              PlaylistEpisodeModel.insertOrUpdateByIndex(
+                                      db, widget.playlist.id!, 0, episode)
+                                  .then((_) {
+                                Provider.of<PlaylistEpisodeProvider>(context,
+                                        listen: false)
+                                    .moveToTop(widget.playlist.id!, episode);
+                                playByEpisode(context, episode);
+                              });
+                            });
+                          } else {
+                            playByEpisode(context, episode);
+                          }
+                        },
+                        icon: Icon(Icons.play_arrow)),
+                    IconButton(
+                        onPressed: () {
+                          // remove from playlist db
+                          helper.db.then((db) {
+                            if (db == null) {
+                              throw Exception('Unable to open database');
+                            }
+                            PlaylistEpisodeModel.delete(db, episode.id!);
+                            Provider.of<PlaylistEpisodeProvider>(context,
+                                    listen: false)
+                                .removeFromPlaylist(
+                                    widget.playlist.id!, episode.id!);
+                            MyAudioHandler().removeQueueItemAt(index);
+                          });
+                        },
+                        icon: Icon(Icons.delete)),
+                  ],
+                ),
+              ],
             );
           },
         );

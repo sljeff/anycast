@@ -4,7 +4,7 @@ class Episode {
   String? title;
   String? description;
   String? guid;
-  int? duration; // in seconds
+  int? duration; // in milliseconds
   String? enclosureUrl;
   int? pubDate; // unix timestamp
   String? imageUrl;

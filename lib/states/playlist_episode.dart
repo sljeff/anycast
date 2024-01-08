@@ -26,4 +26,15 @@ class PlaylistEpisodeProvider extends ChangeNotifier {
     _episodes[playlistId] = episodes;
     notifyListeners();
   }
+
+  void removeFromPlaylist(int playlistId, int id) {
+    _episodes[playlistId]!.removeWhere((episode) => episode.id == id);
+    notifyListeners();
+  }
+
+  void moveToTop(int playlistId, PlaylistEpisodeModel episode) {
+    _episodes[playlistId]!.removeWhere((e) => e.id == episode.id);
+    _episodes[playlistId]!.insert(0, episode);
+    notifyListeners();
+  }
 }

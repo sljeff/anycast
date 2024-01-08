@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:audio_service/audio_service.dart';
@@ -18,7 +20,12 @@ class PositionData {
 class MyAudioHandler extends BaseAudioHandler {
   static final _instance = MyAudioHandler._internal();
   factory MyAudioHandler() => _instance;
-  MyAudioHandler._internal();
+  MyAudioHandler._internal() {
+    Timer.periodic(const Duration(seconds: 10), (timer) {
+      print(111);
+      updatePosition();
+    });
+  }
 
   final _player = AudioPlayer();
   final _playlist = ConcatenatingAudioSource(children: []);
@@ -168,5 +175,25 @@ class MyAudioHandler extends BaseAudioHandler {
   Future<void> setCaptioningEnabled(bool enabled) async {
     // TODO: implement setCaptioningEnabled
     await super.setCaptioningEnabled(enabled);
+  }
+
+  void updatePosition() {
+    if (!_player.playerState.playing) {
+      return;
+    }
+    var playedDuration = _player.position.inMicroseconds;
+    var audioSource = _playlist[0] as UriAudioSource;
+    print(audioSource.uri.toString());
+    DatabaseHelper().db.then((db) {
+      if (db == null) {
+        throw Exception('Unable to open database');
+      }
+      PlaylistEpisodeModel.getByEnclosureUrl(db, audioSource.uri.toString())
+          .then((episode) {
+        print(playedDuration);
+        episode.playedDuration = playedDuration;
+        episode.save(db);
+      });
+    });
   }
 }

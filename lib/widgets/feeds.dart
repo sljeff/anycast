@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/audio_handler.dart';
+import 'package:anycast/utils/formatters.dart';
+import 'package:anycast/utils/widget_utils.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:http/http.dart' as http;
-import 'package:anycast/models/player.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/states/feed_episode.dart';
-import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:provider/provider.dart';
@@ -20,7 +20,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:xml/xml.dart';
 import 'package:html/parser.dart' as html_parser;
-import 'package:timeago/timeago.dart' as timeago;
 
 class Feeds extends StatefulWidget {
   const Feeds({Key? key}) : super(key: key);
@@ -140,7 +139,7 @@ class _FeedsState extends State<Feeds> with AutomaticKeepAliveClientMixin {
                           addToPlaylist(databaseHelper, context,
                                   value.episodes[index])
                               .then((value) {
-                            addToPlayer(databaseHelper, context, value);
+                            playByEpisode(context, value);
                           });
                         },
                         icon: const Icon(Icons.play_arrow)),
@@ -411,29 +410,6 @@ String? htmlToText(String? html) {
   }
 }
 
-String formatDatetime(int ts) {
-  var dt = DateTime.fromMillisecondsSinceEpoch(ts);
-  // in a week: use timeago; in this year: use month and day; else: use yyyy-mm-dd
-  var now = DateTime.now();
-  if (dt.isAfter(now.subtract(const Duration(days: 7)))) {
-    return timeago.format(dt);
-  } else if (dt.year == now.year) {
-    return '${dt.month}-${dt.day}';
-  } else {
-    return '${dt.year}-${dt.month}-${dt.day}';
-  }
-}
-
-String formatDuration(int ms) {
-  var d = Duration(milliseconds: ms);
-  // in 100m: show {n}m; else: show {n}h {m}m
-  if (d.inMinutes < 100) {
-    return '${d.inMinutes}m';
-  } else {
-    return '${d.inHours}h ${d.inMinutes.remainder(60)}m';
-  }
-}
-
 Future<PlaylistEpisodeModel> addToPlaylist(DatabaseHelper helper,
     BuildContext context, FeedEpisodeModel episode) async {
   var playlistId = 1;
@@ -476,28 +452,5 @@ Future<PlaylistEpisodeModel> addToPlaylist(DatabaseHelper helper,
           .removeByGuids([episode.guid!]);
     });
     return playlistEpisode;
-  });
-}
-
-void addToPlayer(DatabaseHelper helper, BuildContext context,
-    PlaylistEpisodeModel playlistEpisode) {
-  var playlistId = 1;
-  var guid = playlistEpisode.guid;
-  var player = PlayerModel.fromMap(Map<String, dynamic>.from({
-    'playlistEpisodeGuid': guid,
-    'position': 0,
-    'playedDuration': 0,
-  }));
-  helper.db.then((db) {
-    if (db == null) {
-      throw Exception('Unable to open database');
-    }
-    PlayerModel.update(db, player).then((value) {
-      Provider.of<PlayerProvider>(context, listen: false)
-          .setPlayer(player, playlistEpisode);
-      MyAudioHandler.setPlaylistByPlaylistId(playlistId).then((_) {
-        MyAudioHandler().play();
-      });
-    });
   });
 }
