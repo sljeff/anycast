@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
@@ -20,15 +19,12 @@ class PositionData {
 class MyAudioHandler extends BaseAudioHandler {
   static final _instance = MyAudioHandler._internal();
   factory MyAudioHandler() => _instance;
-  MyAudioHandler._internal() {
-    Timer.periodic(const Duration(seconds: 10), (timer) {
-      print(111);
-      updatePosition();
-    });
-  }
+  MyAudioHandler._internal();
 
   final _player = AudioPlayer();
   final _playlist = ConcatenatingAudioSource(children: []);
+
+  bool get isPlaying => _player.playing;
 
   Stream<PlayerState> get playbackStateStream => _player.playerStateStream;
   Stream<PositionData> get positionDataStream =>
@@ -50,38 +46,23 @@ class MyAudioHandler extends BaseAudioHandler {
     );
   }
 
-  static Future<void> setPlaylistByPlaylistId(int playlistId) async {
-    DatabaseHelper helper = DatabaseHelper();
-    var db = await helper.db;
-    if (db == null) {
-      throw Exception('Unable to open database');
-    }
-    var playlistEpisodeList =
-        await PlaylistEpisodeModel.listByPlaylistId(db, playlistId);
-
-    var mediaItemList =
-        playlistEpisodeList.map((e) => playlistepisodeToMediaItem(e)).toList();
-
-    await _instance.updateQueue(mediaItemList);
-  }
-
-  // if empty, return null
-  // if exists and no change, play
-  // if exists and change, set playlist and play
+  // always play the first episode
+  // if the first episode is played, do nothing
   @override
   Future<void> play() async {
     if (_playlist.children.isEmpty) {
       return;
     }
-    if (_player.audioSource == _playlist) {
+    if (_player.playing) {
+      return;
+    }
+    if (_player.currentIndex == 0) {
       await _player.play();
       return;
     }
-    if (_player.audioSource != _playlist) {
-      await _player.setAudioSource(_playlist);
-      await _player.play();
-      return;
-    }
+    await _player.setAudioSource(_playlist);
+    await _player.play();
+    return super.play();
   }
 
   @override
@@ -133,6 +114,12 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 
   @override
+  Future<void> removeQueueItemAt(int index) async {
+    _playlist.removeAt(index);
+    await super.removeQueueItemAt(index);
+  }
+
+  @override
   Future<void> addQueueItems(List<MediaItem> mediaItems) async {
     _playlist.addAll(
         mediaItems.map((e) => AudioSource.uri(Uri.parse(e.id))).toList());
@@ -175,25 +162,5 @@ class MyAudioHandler extends BaseAudioHandler {
   Future<void> setCaptioningEnabled(bool enabled) async {
     // TODO: implement setCaptioningEnabled
     await super.setCaptioningEnabled(enabled);
-  }
-
-  void updatePosition() {
-    if (!_player.playerState.playing) {
-      return;
-    }
-    var playedDuration = _player.position.inMicroseconds;
-    var audioSource = _playlist[0] as UriAudioSource;
-    print(audioSource.uri.toString());
-    DatabaseHelper().db.then((db) {
-      if (db == null) {
-        throw Exception('Unable to open database');
-      }
-      PlaylistEpisodeModel.getByEnclosureUrl(db, audioSource.uri.toString())
-          .then((episode) {
-        print(playedDuration);
-        episode.playedDuration = playedDuration;
-        episode.save(db);
-      });
-    });
   }
 }

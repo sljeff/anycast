@@ -1,8 +1,8 @@
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
+import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
-import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:get/get.dart';
 
@@ -20,18 +20,15 @@ class FeedEpisodeController extends GetxController {
 
   void addMany(List<FeedEpisodeModel> episodes) {
     helper.db.then((db) => {
-          FeedEpisodeModel.insertMany(db!, episodes).then((v) {
+          FeedEpisodeModel.insertMany(db!, episodes).then((db) {
             load(episodes);
           })
         });
   }
 
   Future<void> removeByGuids(List<String> guids) async {
-    helper.db.then((db) => {
-          FeedEpisodeModel.removeByGuids(db!, guids).then((v) {
-            episodes.removeWhere((episode) => guids.contains(episode.guid));
-          })
-        });
+    episodes.removeWhere((episode) => guids.contains(episode.guid));
+    helper.db.then((db) => {FeedEpisodeModel.removeByGuids(db!, guids)});
   }
 
   void load(List<FeedEpisodeModel> episodes) {
@@ -42,9 +39,7 @@ class FeedEpisodeController extends GetxController {
         });
   }
 
-  Future<PlaylistEpisodeModel> addToPlaylist(FeedEpisodeModel episode) async {
-    var playlistId = 1;
-
+  PlaylistEpisodeModel addToPlaylist(int playlistId, FeedEpisodeModel episode) {
     // add to default playlist; remove from feeds
     var playlistEpisode =
         PlaylistEpisodeModel.fromMap(Map<String, dynamic>.from({
@@ -61,28 +56,17 @@ class FeedEpisodeController extends GetxController {
       'position': double.infinity,
       'playedDuration': 0,
     }));
-    return helper.db.then((db) {
-      if (db == null) {
-        throw Exception('Unable to open database');
-      }
 
-      PlaylistEpisodeController? playlistEpisodeController;
-      var playlists = Get.find<PlaylistController>().playlists;
-      var controllers = Get.find<PlaylistController>().episodesControllers;
-      for (var i = 0; i < playlists.length; i++) {
-        if (playlists[i].id == playlistId) {
-          playlistEpisodeController = controllers[i];
-          break;
-        }
-      }
-      playlistEpisodeController!.add(playlistEpisode);
+    var position = 0;
+    if (Get.find<PlayerController>().isPlaying(playlistId)) {
+      position = 1;
+    }
 
-      MyAudioHandler().insertQueueItem(
-        0,
-        MyAudioHandler.playlistepisodeToMediaItem(playlistEpisode),
-      );
-      removeByGuids([episode.guid!]);
-      return playlistEpisode;
-    });
+    var playlistEpisodeController = Get.find<PlaylistController>()
+        .getEpisodeControllerByPlaylistId(playlistId);
+    playlistEpisodeController.add(position, playlistEpisode);
+
+    removeByGuids([episode.guid!]);
+    return playlistEpisode;
   }
 }

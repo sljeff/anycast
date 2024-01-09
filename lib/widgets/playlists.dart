@@ -113,10 +113,12 @@ class PlaylistEpisodesList extends StatelessWidget {
                     IconButton(
                         onPressed: () {
                           if (index != 0) {
-                            controller.moveToTop(episode).then((value) {
-                              Get.find<PlayerController>()
-                                  .playByEpisode(episode);
-                            });
+                            var playerController = Get.find<PlayerController>();
+                            playerController.pause().then((value) => {
+                                  controller.moveToTop(episode).then((value) {
+                                    playerController.playByEpisode(episode);
+                                  })
+                                });
                           } else {
                             Get.find<PlayerController>().playByEpisode(episode);
                           }
@@ -125,7 +127,7 @@ class PlaylistEpisodesList extends StatelessWidget {
                     IconButton(
                         onPressed: () {
                           // remove from playlist db
-                          controller.removeFromPlaylist(episode.id!);
+                          controller.remove(episode.id!);
                           MyAudioHandler().removeQueueItemAt(index);
                         },
                         icon: Icon(Icons.delete)),

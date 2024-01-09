@@ -118,13 +118,13 @@ class SwipeImage extends StatelessWidget {
           Container(
               margin: const EdgeInsets.symmetric(horizontal: 10),
               child: Obx(() {
-                var episode = controller.playlistEpisode;
+                var episode = controller.playlistEpisode!;
                 return Hero(
                   tag: 'play_image',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.network(
-                      episode.value.imageUrl ?? '',
+                      episode.imageUrl ?? '',
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -218,8 +218,8 @@ class Titles extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(
       () {
-        var episode = controller.playlistEpisode;
-        if (episode.value.id == null) {
+        var episode = controller.playlistEpisode!;
+        if (episode.id == null) {
           // placeholder
           return const SizedBox(
             height: 70,
@@ -234,7 +234,7 @@ class Titles extends StatelessWidget {
               SizedBox(
                 height: 50,
                 child: Marquee(
-                  text: episode.value.title!,
+                  text: episode.title!,
                   blankSpace: 8,
                   style: TextStyle(
                     fontSize: 32,
@@ -246,7 +246,7 @@ class Titles extends StatelessWidget {
               ),
               SizedBox(
                 child: Text(
-                  episode.value.channelTitle!,
+                  episode.channelTitle!,
                   style: TextStyle(
                     fontSize: 12,
                     decoration: TextDecoration.none,

@@ -14,14 +14,13 @@ class PlayerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(
       () {
-        var player = controller.player;
         var episode = controller.playlistEpisode;
 
-        if (player.value.playlistEpisodeGuid == null) {
+        if (episode == null) {
           return const SizedBox.shrink();
         }
 
-        var imageUrl = episode.value.imageUrl;
+        var imageUrl = episode.imageUrl;
 
         return Stack(
           children: [

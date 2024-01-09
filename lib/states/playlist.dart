@@ -5,7 +5,7 @@ import 'package:get/get.dart';
 
 class PlaylistController extends GetxController {
   final playlists = <PlaylistModel>[].obs;
-  var episodesControllers = <PlaylistEpisodeController>[].obs;
+  final episodesControllers = <PlaylistEpisodeController>[].obs;
 
   final DatabaseHelper helper = DatabaseHelper();
 
@@ -25,5 +25,14 @@ class PlaylistController extends GetxController {
             }
           })
         });
+  }
+
+  PlaylistEpisodeController getEpisodeControllerByPlaylistId(int playlistId) {
+    for (var i = 0; i < playlists.length; i++) {
+      if (playlists[i].id == playlistId) {
+        return episodesControllers[i];
+      }
+    }
+    throw Exception('Playlist not found');
   }
 }
