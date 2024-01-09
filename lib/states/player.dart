@@ -51,7 +51,10 @@ class PlayerController extends GetxController {
 
     setPlayer(player);
 
-    MyAudioHandler().play();
+    var episodes = Get.find<PlaylistController>()
+        .getEpisodeControllerByPlaylistId(playlistId)
+        .episodes;
+    MyAudioHandler().playByEpisodes(episodes);
 
     helper.db.then((db) {
       PlayerModel.update(db!, player);

@@ -115,9 +115,11 @@ class Feeds extends StatelessWidget {
                       onPressed: () {
                         var player = Get.find<PlayerController>();
                         player.pause().then((_) {
-                          var p = controller.addToPlaylist(
-                              1, controller.episodes[index]);
-                          player.playByEpisode(p);
+                          controller
+                              .addToPlaylist(1, controller.episodes[index])
+                              .then((p) {
+                            player.playByEpisode(p);
+                          });
                         });
                       },
                       icon: const Icon(Icons.play_arrow)),

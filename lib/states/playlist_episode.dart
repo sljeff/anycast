@@ -26,15 +26,14 @@ class PlaylistEpisodeController extends GetxController {
         });
   }
 
-  void add(int position, PlaylistEpisodeModel episode) {
+  Future<void> add(int position, PlaylistEpisodeModel episode) async {
     episodes.insert(position, episode);
-    var myAudioHandler = MyAudioHandler();
-    myAudioHandler.insertQueueItem(
-        position, MyAudioHandler.playlistepisodeToMediaItem(episode));
     helper.db.then((db) => {
           PlaylistEpisodeModel.insertOrUpdateByIndex(
               db!, playlistId, position, episode)
         });
+    return await MyAudioHandler().insertQueueItem(
+        position, MyAudioHandler.playlistepisodeToMediaItem(episode));
   }
 
   void remove(int playlistId) {

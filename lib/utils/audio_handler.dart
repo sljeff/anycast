@@ -46,21 +46,26 @@ class MyAudioHandler extends BaseAudioHandler {
     );
   }
 
-  // always play the first episode
-  // if the first episode is played, do nothing
+  Future<void> playByEpisodes(List<PlaylistEpisodeModel> episodes) async {
+    if (episodes.isEmpty) {
+      return;
+    }
+    var playedDuration = episodes[0].playedDuration ?? 0;
+    var playlist = episodes
+        .map((e) => playlistepisodeToMediaItem(e))
+        .toList(growable: false);
+    await updateQueue(playlist);
+    print('playedDuration: $playedDuration');
+    await _player.setAudioSource(_playlist,
+        preload: false,
+        initialIndex: 0,
+        initialPosition: Duration(milliseconds: playedDuration));
+    print("debug");
+    await play();
+  }
+
   @override
   Future<void> play() async {
-    if (_playlist.children.isEmpty) {
-      return;
-    }
-    if (_player.playing) {
-      return;
-    }
-    if (_player.currentIndex == 0) {
-      await _player.play();
-      return;
-    }
-    await _player.setAudioSource(_playlist);
     await _player.play();
     return super.play();
   }
