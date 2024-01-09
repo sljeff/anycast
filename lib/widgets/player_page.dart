@@ -15,7 +15,7 @@ class PlayerPage extends StatelessWidget {
       backgroundColor: Colors.blueGrey,
       direction: DismissiblePageDismissDirection.down,
       onDismissed: () {
-        Navigator.pop(context);
+        Get.back();
       },
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -27,7 +27,7 @@ class PlayerPage extends StatelessWidget {
             children: [
               IconButton(
                 onPressed: () {
-                  Navigator.pop(context);
+                  Get.back();
                 },
                 icon: Icon(Icons.keyboard_arrow_down),
               ),

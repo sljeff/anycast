@@ -22,11 +22,7 @@ class Subscriptions extends StatelessWidget {
           return ListTile(
             leading: GestureDetector(
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) {
-                    return const Channel();
-                  },
-                ));
+                Get.to(() => const Channel());
               },
               child: controller.subscriptions[index].imageUrl != null
                   ? ClipRRect(
