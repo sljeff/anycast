@@ -3,23 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:sanitize_html/sanitize_html.dart' show sanitizeHtml;
 
-class DetailWidget extends StatefulWidget {
+class DetailWidget extends StatelessWidget {
   final Episode episode;
 
   const DetailWidget(this.episode, {super.key});
 
   @override
-  State<DetailWidget> createState() => _DetailWidgetState();
-}
-
-class _DetailWidgetState extends State<DetailWidget> {
-  @override
   Widget build(BuildContext context) {
     return BottomSheet(
+        enableDrag: false,
         onClosing: () {},
         builder: (context) => DraggableScrollableSheet(
-              initialChildSize: 0.8,
-              minChildSize: 0.5,
+              initialChildSize: 1,
+              minChildSize: 0.6,
               expand: false,
               builder:
                   (BuildContext context, ScrollController scrollController) {
@@ -36,7 +32,7 @@ class _DetailWidgetState extends State<DetailWidget> {
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: Image.network(
-                                    widget.episode.imageUrl!,
+                                    episode.imageUrl!,
                                     width: 60,
                                     height: 60,
                                   ),
@@ -46,7 +42,7 @@ class _DetailWidgetState extends State<DetailWidget> {
                                 SizedBox(
                                   width: 60,
                                   child: Text(
-                                    widget.episode.channelTitle!,
+                                    episode.channelTitle!,
                                     style: const TextStyle(fontSize: 8),
                                     maxLines: 2,
                                   ),
@@ -56,12 +52,12 @@ class _DetailWidgetState extends State<DetailWidget> {
                             const SizedBox(width: 16),
                             Expanded(
                                 child: Text(
-                              widget.episode.title!,
+                              episode.title!,
                               style: const TextStyle(fontSize: 16),
                             )),
                           ],
                         ),
-                        renderHtml(context, widget.episode.description!),
+                        renderHtml(context, episode.description!),
                       ],
                     ),
                   ),

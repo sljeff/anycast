@@ -1,3 +1,5 @@
+import 'package:anycast/models/feed_episode.dart';
+import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:sqflite/sqflite.dart';
 
 Future<void> subscriptionTableCreator(DatabaseExecutor db) {
@@ -83,5 +85,18 @@ class SubscriptionModel {
       batch.insert('subscription', subscription.toMap());
     }
     await batch.commit(noResult: true);
+  }
+
+  static Future<void> remove(
+      DatabaseExecutor db, SubscriptionModel subscription) async {
+    await db
+        .delete('subscription', where: 'id = ?', whereArgs: [subscription.id]);
+  }
+
+  Future<List<FeedEpisodeModel>?> listAllEpisodes() async {
+    return fetchPodcastsByUrls([rssFeedUrl!], onlyFistEpisode: false)
+        .then((value) {
+      return value[0].feedEpisodes;
+    });
   }
 }

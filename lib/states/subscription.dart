@@ -28,4 +28,13 @@ class SubscriptionController extends GetxController {
           })
         });
   }
+
+  void remove(subscription) {
+    var index =
+        subscriptions.indexWhere((element) => element.id == subscription.id);
+    subscriptions.removeAt(index);
+    helper.db.then((db) {
+      SubscriptionModel.remove(db!, subscription);
+    });
+  }
 }

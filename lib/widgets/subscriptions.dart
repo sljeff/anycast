@@ -19,18 +19,23 @@ class Subscriptions extends StatelessWidget {
       return ListView.builder(
         itemCount: controller.subscriptions.length,
         itemBuilder: (context, index) {
-          return ListTile(
+          return ExpansionTile(
+            controlAffinity: ListTileControlAffinity.leading,
             leading: GestureDetector(
               onTap: () {
-                Get.to(() => const Channel());
+                Get.to(() =>
+                    Channel(subscription: controller.subscriptions[index]));
               },
               child: controller.subscriptions[index].imageUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                          controller.subscriptions[index].imageUrl!,
-                          width: 50,
-                          height: 50),
+                  ? Hero(
+                      tag: controller.subscriptions[index].imageUrl!,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                            controller.subscriptions[index].imageUrl!,
+                            width: 50,
+                            height: 50),
+                      ),
                     )
                   : const SizedBox(
                       width: 50,
@@ -44,6 +49,20 @@ class Subscriptions extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            children: [
+              ButtonBar(
+                alignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      Get.find<SubscriptionController>()
+                          .remove(controller.subscriptions[index]);
+                    },
+                    icon: const Icon(Icons.delete),
+                  ),
+                ],
+              ),
+            ],
           );
         },
       );

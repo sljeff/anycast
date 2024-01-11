@@ -51,6 +51,7 @@ dependencies:
   marquee: ^2.2.3
   audio_video_progress_bar: ^2.0.1
   get: ^4.6.6
+  expandable_text: ^2.3.0
 
 dev_dependencies:
   flutter_test:
