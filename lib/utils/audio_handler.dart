@@ -19,12 +19,14 @@ class PositionData {
 class MyAudioHandler extends BaseAudioHandler {
   static final _instance = MyAudioHandler._internal();
   factory MyAudioHandler() => _instance;
+
   MyAudioHandler._internal();
 
   final _player = AudioPlayer();
-  final _playlist = ConcatenatingAudioSource(children: []);
 
   bool get isPlaying => _player.playing;
+  Duration get playedDuration => _player.position;
+  AudioSource? get audioSource => _player.audioSource;
 
   Stream<PlayerState> get playbackStateStream => _player.playerStateStream;
   Stream<PositionData> get positionDataStream =>
@@ -34,34 +36,28 @@ class MyAudioHandler extends BaseAudioHandler {
             duration: _player.duration ?? Duration.zero,
           ));
 
-  static MediaItem playlistepisodeToMediaItem(PlaylistEpisodeModel episode) {
-    return MediaItem(
-      id: episode.enclosureUrl!,
-      album: episode.channelTitle,
-      title: episode.title!,
-      artUri: Uri.parse(episode.imageUrl!),
-      duration: episode.duration != null
-          ? Duration(seconds: episode.duration!)
-          : null,
-    );
-  }
-
-  Future<void> playByEpisodes(List<PlaylistEpisodeModel> episodes) async {
-    if (episodes.isEmpty) {
+  Future<void> playByEpisode(PlaylistEpisodeModel episode) async {
+    if (mediaItem.value?.id == episode.enclosureUrl) {
+      play();
       return;
     }
-    var playedDuration = episodes[0].playedDuration ?? 0;
-    var playlist = episodes
-        .map((e) => playlistepisodeToMediaItem(e))
-        .toList(growable: false);
-    await updateQueue(playlist);
-    print('playedDuration: $playedDuration');
-    await _player.setAudioSource(_playlist,
-        preload: false,
-        initialIndex: 0,
-        initialPosition: Duration(milliseconds: playedDuration));
-    print("debug");
-    await play();
+
+    var source = _createAudioSource(episode.toMediaItem());
+
+    await _player.setAudioSource(source,
+        initialPosition: Duration(milliseconds: episode.playedDuration ?? 0));
+
+    play();
+  }
+
+  @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> skipToQueueItem(int index) async {
+    var playedDuration = queue.value[index].extras!['playedDuration'];
+    await _player.seek(Duration(milliseconds: playedDuration), index: index);
+    play();
   }
 
   @override
@@ -82,12 +78,6 @@ class MyAudioHandler extends BaseAudioHandler {
     await super.stop();
   }
 
-  @override
-  Future<void> seek(Duration position) async {
-    await _player.seek(position);
-    await super.seek(position);
-  }
-
   Future<void> seekByRelative(Duration relativePosition) async {
     var newPosition = _player.position + relativePosition;
     if (newPosition < Duration.zero) {
@@ -97,50 +87,6 @@ class MyAudioHandler extends BaseAudioHandler {
       newPosition = _player.duration!;
     }
     await _player.seek(newPosition);
-  }
-
-  @override
-  Future<void> addQueueItem(MediaItem mediaItem) async {
-    _playlist.add(AudioSource.uri(Uri.parse(mediaItem.id)));
-    await super.addQueueItem(mediaItem);
-  }
-
-  @override
-  Future<void> updateQueue(List<MediaItem> queue) async {
-    _playlist.clear();
-    addQueueItems(queue);
-    await super.updateQueue(queue);
-  }
-
-  @override
-  Future<void> insertQueueItem(int index, MediaItem mediaItem) async {
-    _playlist.insert(index, AudioSource.uri(Uri.parse(mediaItem.id)));
-    await super.insertQueueItem(index, mediaItem);
-  }
-
-  @override
-  Future<void> removeQueueItemAt(int index) async {
-    _playlist.removeAt(index);
-    await super.removeQueueItemAt(index);
-  }
-
-  @override
-  Future<void> addQueueItems(List<MediaItem> mediaItems) async {
-    _playlist.addAll(
-        mediaItems.map((e) => AudioSource.uri(Uri.parse(e.id))).toList());
-    await super.addQueueItems(mediaItems);
-  }
-
-  @override
-  Future<void> skipToNext() async {
-    await _player.seekToNext();
-    await super.skipToNext();
-  }
-
-  @override
-  Future<void> skipToPrevious() async {
-    await _player.seekToPrevious();
-    await super.skipToPrevious();
   }
 
   @override
@@ -163,9 +109,7 @@ class MyAudioHandler extends BaseAudioHandler {
     await super.setSpeed(speed);
   }
 
-  @override
-  Future<void> setCaptioningEnabled(bool enabled) async {
-    // TODO: implement setCaptioningEnabled
-    await super.setCaptioningEnabled(enabled);
+  UriAudioSource _createAudioSource(MediaItem item) {
+    return ProgressiveAudioSource(Uri.parse(item.id));
   }
 }

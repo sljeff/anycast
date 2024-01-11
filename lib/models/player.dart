@@ -5,12 +5,12 @@ Future<void> playerTableCreator(DatabaseExecutor db) {
   return db.execute("""
     CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY,
-      currentPLaylistId INTEGER
+      currentPlaylistId INTEGER
     )
   """).then((v) {
     // create default 1 if not exists
     db.rawInsert("""
-      INSERT OR IGNORE INTO $tableName (id, currentPLaylistId)
+      INSERT OR IGNORE INTO $tableName (id, currentPlaylistId)
       VALUES (1, NULL)
     """);
   });

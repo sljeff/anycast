@@ -33,7 +33,7 @@ class DatabaseHelper {
     String path = join(databasesPath, 'anycast.db');
 
     // delete existing if any
-    await deleteDatabase(path);
+    // await deleteDatabase(path);
 
     // create new
     Database db = await openDatabase(path, version: 1,

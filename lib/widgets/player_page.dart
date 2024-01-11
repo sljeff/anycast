@@ -177,7 +177,7 @@ class Controls extends StatelessWidget {
                   child: isPlaying
                       ? IconButton(
                           onPressed: () {
-                            myAudioHandler.pause();
+                            Get.find<PlayerController>().pause();
                           },
                           icon: const Icon(
                             Icons.pause,
@@ -186,7 +186,7 @@ class Controls extends StatelessWidget {
                         )
                       : IconButton(
                           onPressed: () {
-                            myAudioHandler.play();
+                            Get.find<PlayerController>().play();
                           },
                           icon: const Icon(Icons.play_arrow, size: 48),
                         ),

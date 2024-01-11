@@ -39,9 +39,8 @@ class FeedEpisodeController extends GetxController {
         });
   }
 
-  Future<PlaylistEpisodeModel> addToPlaylist(
-      int playlistId, FeedEpisodeModel episode) async {
-    // add to default playlist; remove from feeds
+  static PlaylistEpisodeModel feed2playlist(
+      int playlistId, FeedEpisodeModel episode) {
     var playlistEpisode =
         PlaylistEpisodeModel.fromMap(Map<String, dynamic>.from({
       'title': episode.title,
@@ -58,6 +57,14 @@ class FeedEpisodeController extends GetxController {
       'playedDuration': 0,
     }));
 
+    return playlistEpisode;
+  }
+
+  Future<PlaylistEpisodeModel> addToPlaylist(
+      int playlistId, FeedEpisodeModel episode) async {
+    // add to default playlist; remove from feeds
+    var playlistEpisode = feed2playlist(playlistId, episode);
+
     var position = 0;
     if (Get.find<PlayerController>().isPlaying(playlistId)) {
       position = 1;
@@ -69,6 +76,16 @@ class FeedEpisodeController extends GetxController {
         .getEpisodeControllerByPlaylistId(playlistId);
     await playlistEpisodeController.add(position, playlistEpisode);
 
+    return playlistEpisode;
+  }
+
+  Future<PlaylistEpisodeModel> addToTop(
+      int playlistId, FeedEpisodeModel episode) async {
+    var playlistEpisode = feed2playlist(playlistId, episode);
+    var playlistEpisodeController = Get.find<PlaylistController>()
+        .getEpisodeControllerByPlaylistId(playlistId);
+    removeByGuids([episode.guid!]);
+    await playlistEpisodeController.add(0, playlistEpisode);
     return playlistEpisode;
   }
 }

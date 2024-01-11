@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 class PlaylistController extends GetxController {
   final playlists = <PlaylistModel>[].obs;
   final episodesControllers = <PlaylistEpisodeController>[].obs;
+  final isLoading = true.obs;
 
   final DatabaseHelper helper = DatabaseHelper();
 
@@ -16,13 +17,19 @@ class PlaylistController extends GetxController {
   }
 
   void load() {
+    isLoading.value = true;
     helper.db.then((db) => {
           PlaylistModel.listAll(db!).then((playlists) {
             this.playlists.value = playlists;
+            List<Future> futures = [];
             for (var playlist in playlists) {
-              episodesControllers
-                  .add(PlaylistEpisodeController(playlistId: playlist.id!));
+              var c = PlaylistEpisodeController(playlistId: playlist.id!);
+              episodesControllers.add(c);
+              futures.add(c.loadManually());
             }
+            Future.wait(futures).then((value) {
+              isLoading.value = false;
+            });
           })
         });
   }

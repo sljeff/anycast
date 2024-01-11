@@ -116,7 +116,7 @@ class Feeds extends StatelessWidget {
                         var player = Get.find<PlayerController>();
                         player.pause().then((_) {
                           controller
-                              .addToPlaylist(1, controller.episodes[index])
+                              .addToTop(1, controller.episodes[index])
                               .then((p) {
                             player.playByEpisode(p);
                           });

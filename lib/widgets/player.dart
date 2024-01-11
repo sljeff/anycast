@@ -1,3 +1,4 @@
+import 'package:anycast/states/playlist.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/widgets/player_page.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,12 @@ class PlayerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(
       () {
+        // if playlists not loaded, return empty
+        var playlistController = Get.find<PlaylistController>();
+        if (playlistController.isLoading.value) {
+          return const SizedBox.shrink();
+        }
+
         var episode = controller.playlistEpisode;
 
         if (episode == null) {
@@ -77,9 +84,9 @@ class PlayerButton extends StatelessWidget {
           return GestureDetector(
             onTap: () {
               if (isPlaying) {
-                audioHandler.pause();
+                Get.find<PlayerController>().pause();
               } else {
-                audioHandler.play();
+                Get.find<PlayerController>().play();
               }
             },
             child: SizedBox(

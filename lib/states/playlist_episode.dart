@@ -1,6 +1,5 @@
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
-import 'package:anycast/utils/audio_handler.dart';
 import 'package:get/get.dart';
 
 class PlaylistEpisodeController extends GetxController {
@@ -11,19 +10,12 @@ class PlaylistEpisodeController extends GetxController {
 
   final DatabaseHelper helper = DatabaseHelper();
 
-  @override
-  void onInit() {
-    super.onInit();
-    load();
-  }
-
-  void load() {
-    helper.db.then((db) => {
-          PlaylistEpisodeModel.listByPlaylistId(db!, playlistId)
-              .then((episodes) {
-            this.episodes.value = episodes;
-          })
-        });
+  Future<void> loadManually() async {
+    return helper.db.then((db) {
+      PlaylistEpisodeModel.listByPlaylistId(db!, playlistId).then((episodes) {
+        this.episodes.value = episodes;
+      });
+    });
   }
 
   Future<void> add(int position, PlaylistEpisodeModel episode) async {
@@ -32,17 +24,18 @@ class PlaylistEpisodeController extends GetxController {
           PlaylistEpisodeModel.insertOrUpdateByIndex(
               db!, playlistId, position, episode)
         });
-    return await MyAudioHandler().insertQueueItem(
-        position, MyAudioHandler.playlistepisodeToMediaItem(episode));
   }
 
-  void remove(int playlistId) {
-    var oldIndex = episodes.indexWhere((e) => e.id == playlistId);
+  void remove(int id) {
+    var oldIndex = episodes.indexWhere((e) => e.id == id);
     episodes.removeAt(oldIndex);
-    var myAudioHandler = MyAudioHandler();
-    myAudioHandler.removeQueueItemAt(oldIndex);
 
-    helper.db.then((db) => {PlaylistEpisodeModel.delete(db!, playlistId)});
+    helper.db.then((db) => {PlaylistEpisodeModel.delete(db!, id)});
+  }
+
+  void removeTop() {
+    helper.db.then((db) => {PlaylistEpisodeModel.delete(db!, episodes[0].id!)});
+    episodes.removeAt(0);
   }
 
   Future<void> moveToTop(PlaylistEpisodeModel episode) async {
@@ -50,12 +43,16 @@ class PlaylistEpisodeController extends GetxController {
     episodes.removeAt(oldIndex);
     episodes.insert(0, episode);
 
-    var myAudioHandler = MyAudioHandler();
-    var mediaItem = MyAudioHandler.playlistepisodeToMediaItem(episode);
-    myAudioHandler.removeQueueItemAt(oldIndex);
-    myAudioHandler.insertQueueItem(0, mediaItem);
-
     return helper.db.then((db) => PlaylistEpisodeModel.insertOrUpdateByIndex(
         db!, playlistId, 0, episode));
+  }
+
+  Future<void> updatePlayedDuration(Duration duration) async {
+    var episode = episodes[0];
+    episode.playedDuration = duration.inMilliseconds;
+    episodes[0] = PlaylistEpisodeModel.fromMap(episode.toMap());
+    return helper.db.then((db) {
+      episode.updatePlayedDuration(db!);
+    });
   }
 }

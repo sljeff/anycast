@@ -1,22 +1,33 @@
+import 'dart:async';
+
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/player.dart';
 import 'package:anycast/states/playlist.dart';
+import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:get/get.dart';
+import 'package:just_audio/just_audio.dart';
 
 class PlayerController extends GetxController {
   var player = PlayerModel.empty().obs;
 
   final DatabaseHelper helper = DatabaseHelper();
+  final MyAudioHandler myAudioHandler = MyAudioHandler();
+
+  PlaylistEpisodeController? get playlistEpisodeController {
+    if (player.value.currentPlaylistId == null) {
+      return null;
+    }
+    return Get.find<PlaylistController>()
+        .getEpisodeControllerByPlaylistId(player.value.currentPlaylistId!);
+  }
 
   PlaylistEpisodeModel? get playlistEpisode {
     if (player.value.currentPlaylistId == null) {
       return null;
     }
-    var es = Get.find<PlaylistController>()
-        .getEpisodeControllerByPlaylistId(player.value.currentPlaylistId!)
-        .episodes;
+    var es = playlistEpisodeController!.episodes;
     if (es.isEmpty) {
       return null;
     }
@@ -27,6 +38,35 @@ class PlayerController extends GetxController {
   void onInit() {
     super.onInit();
     load();
+
+    // interval 2 seconds to save playedDuration
+    Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (!myAudioHandler.isPlaying) return;
+      var peController = playlistEpisodeController;
+      if (peController == null) {
+        return;
+      }
+      var pe = playlistEpisode;
+      if (pe == null) {
+        return;
+      }
+      peController.updatePlayedDuration(myAudioHandler.playedDuration);
+    });
+
+    myAudioHandler.playbackStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        var peController = playlistEpisodeController;
+        if (peController == null) {
+          return;
+        }
+        peController.removeTop();
+        if (peController.episodes.isEmpty) {
+          pause();
+        } else {
+          playByEpisode(peController.episodes[0]);
+        }
+      }
+    });
   }
 
   void load() {
@@ -37,24 +77,15 @@ class PlayerController extends GetxController {
         });
   }
 
-  void setPlayer(PlayerModel player) {
-    this.player.value = player;
-
-    helper.db.then((db) => {PlayerModel.update(db!, player)});
-  }
-
-  void playByEpisode(PlaylistEpisodeModel episode) {
+  void playByEpisode(PlaylistEpisodeModel episode) async {
     var playlistId = episode.playlistId!;
     var player = PlayerModel.fromMap({
       'currentPlaylistId': playlistId,
     });
 
-    setPlayer(player);
+    this.player.value = player;
 
-    var episodes = Get.find<PlaylistController>()
-        .getEpisodeControllerByPlaylistId(playlistId)
-        .episodes;
-    MyAudioHandler().playByEpisodes(episodes);
+    myAudioHandler.playByEpisode(episode);
 
     helper.db.then((db) {
       PlayerModel.update(db!, player);
@@ -62,18 +93,22 @@ class PlayerController extends GetxController {
   }
 
   Future<void> pause() async {
-    // var player = PlayerModel.fromMap({
-    //   'currentPlaylistId': null,
-    // });
-
-    // setPlayer(player);
-
-    var myAudioHandler = MyAudioHandler();
     return myAudioHandler.pause();
   }
 
+  Future<void> play() async {
+    if (myAudioHandler.audioSource == null) {
+      var pe = playlistEpisode;
+      if (pe == null) {
+        return;
+      }
+      playByEpisode(pe);
+      return;
+    }
+    return myAudioHandler.play();
+  }
+
   bool isPlaying(int playlistId) {
-    return MyAudioHandler().isPlaying &&
-        player.value.currentPlaylistId == playlistId;
+    return player.value.currentPlaylistId == playlistId;
   }
 }

@@ -1,5 +1,4 @@
 import 'package:anycast/states/player.dart';
-import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:flutter/material.dart';
@@ -128,7 +127,6 @@ class PlaylistEpisodesList extends StatelessWidget {
                         onPressed: () {
                           // remove from playlist db
                           controller.remove(episode.id!);
-                          MyAudioHandler().removeQueueItemAt(index);
                         },
                         icon: Icon(Icons.delete)),
                   ],

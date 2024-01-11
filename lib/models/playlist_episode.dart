@@ -1,3 +1,4 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'episode.dart';
@@ -150,5 +151,20 @@ class PlaylistEpisodeModel extends Episode {
 
   static Future<void> delete(DatabaseExecutor db, int id) async {
     await db.delete(tableName, where: 'id = ?', whereArgs: [id]);
+  }
+
+  void updatePlayedDuration(DatabaseExecutor db) async {
+    await db.update(tableName, {'playedDuration': playedDuration},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  MediaItem toMediaItem() {
+    return MediaItem(
+      id: enclosureUrl!,
+      album: channelTitle,
+      title: title!,
+      artUri: Uri.parse(imageUrl!),
+      duration: duration != null ? Duration(seconds: duration!) : null,
+    );
   }
 }
