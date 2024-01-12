@@ -245,6 +245,7 @@ class Titles extends StatelessWidget {
                 ),
               ),
               SizedBox(
+                height: 20,
                 child: Text(
                   episode.channelTitle!,
                   style: TextStyle(
@@ -253,7 +254,6 @@ class Titles extends StatelessWidget {
                     color: Colors.white.withOpacity(0.64),
                   ),
                 ),
-                height: 20,
               ),
             ],
           ),

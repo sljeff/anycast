@@ -1,4 +1,5 @@
 import 'package:anycast/widgets/channel.dart';
+import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:get/get.dart';
@@ -23,8 +24,15 @@ class Subscriptions extends StatelessWidget {
             controlAffinity: ListTileControlAffinity.leading,
             leading: GestureDetector(
               onTap: () {
-                Get.to(() =>
-                    Channel(subscription: controller.subscriptions[index]));
+                context.pushTransparentRoute(DismissiblePage(
+                  direction: DismissiblePageDismissDirection.down,
+                  onDismissed: () {
+                    Get.back();
+                  },
+                  child: Channel(
+                    subscription: controller.subscriptions[index],
+                  ),
+                ));
               },
               child: controller.subscriptions[index].imageUrl != null
                   ? Hero(

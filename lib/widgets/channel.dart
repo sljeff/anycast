@@ -37,17 +37,35 @@ class Channel extends StatelessWidget {
                     ),
                   ),
                 ),
-                Column(
-                  children: [
-                    Text(subscription.title!,
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  width: screenSize.width - 200,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subscription.title!,
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
-                    Text(subscription.author!),
-                  ],
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                      ),
+                      Text(subscription.author!),
+                    ],
+                  ),
                 ),
-                IconButton(
-                  onPressed: () {},
-                  icon: Icon(subscribed ? Icons.check : Icons.add),
+                SizedBox(
+                  width: 48,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        onPressed: () {},
+                        icon: Icon(subscribed ? Icons.check : Icons.add),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
