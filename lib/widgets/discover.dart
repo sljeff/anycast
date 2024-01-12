@@ -1,13 +1,10 @@
-import 'dart:convert';
-
-import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/discover.dart';
+import 'package:anycast/utils/api.dart';
 import 'package:anycast/widgets/channel.dart';
 import 'package:anycast/widgets/player.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 class Discover extends StatelessWidget {
   final DiscoverController controller = Get.put(DiscoverController());
@@ -18,41 +15,42 @@ class Discover extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Discover'),
-      ),
-      body: Column(
-        children: [
-          // search bar, onclick jump to search page
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    onChanged: (value) {
-                      controller.searchText.value = value;
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: MediaQuery.of(context).size.width - 100,
+              height: 50,
+              child: TextField(
+                onChanged: (value) {
+                  controller.searchText.value = value;
+                },
+                controller: controller.searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  suffixIcon: IconButton(
+                    onPressed: () {
+                      controller.searchController.clear();
                     },
-                    controller: controller.searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+                    icon: Icon(Icons.clear),
                   ),
                 ),
-                IconButton(
-                  onPressed: () {
-                    context.pushTransparentRoute(SearchPage());
-                  },
-                  icon: const Icon(Icons.search),
-                ),
-              ],
+              ),
             ),
-          ),
-          DiscoverBody(),
-        ],
+            IconButton(
+              onPressed: () {
+                context.pushTransparentRoute(SearchPage());
+              },
+              icon: const Icon(Icons.search),
+            ),
+          ],
+        ),
       ),
+      body: DiscoverBody(),
     );
   }
 }
@@ -62,7 +60,87 @@ class DiscoverBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container();
+    return FutureBuilder(
+      future: listCategories(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+        var categories = snapshot.data!;
+        return DefaultTabController(
+          length: categories.length,
+          child: Column(children: [
+            TabBar(
+              isScrollable: true,
+              tabs: categories.map((c) => Tab(text: c.name)).toList(),
+            ),
+            Expanded(
+              child: TabBarView(
+                  children: categories.map((c) {
+                return FutureBuilder(
+                  future: listChannelsByCategoryId(c.id),
+                  builder: ((context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+                    var channels = snapshot.data!;
+                    return ListView.builder(
+                        itemCount: channels.length,
+                        itemBuilder: (context, index) {
+                          return ExpansionTile(
+                            controlAffinity: ListTileControlAffinity.leading,
+                            leading: GestureDetector(
+                              onTap: () {
+                                context.pushTransparentRoute(DismissiblePage(
+                                  direction:
+                                      DismissiblePageDismissDirection.down,
+                                  onDismissed: () {
+                                    Get.back();
+                                  },
+                                  child: Channel(
+                                    subscription: channels[index],
+                                  ),
+                                ));
+                              },
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  channels[index].imageUrl!,
+                                  width: 50,
+                                  height: 50,
+                                ),
+                              ),
+                            ),
+                            title: Text(channels[index].title!),
+                            subtitle: Text(
+                              channels[index].description!,
+                              maxLines: 2,
+                            ),
+                            children: [
+                              ButtonBar(
+                                alignment: MainAxisAlignment.center,
+                                children: [
+                                  IconButton(
+                                    onPressed: () {},
+                                    icon: Icon(Icons.add),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        });
+                  }),
+                );
+              }).toList()),
+            ),
+          ]),
+        );
+      },
+    );
   }
 }
 
@@ -78,9 +156,17 @@ class SearchPage extends GetView<DiscoverController> {
       },
       child: Scaffold(
         floatingActionButton: PlayerWidget(),
+        appBar: AppBar(
+            leading: SizedBox.shrink(),
+            title: IconButton(
+              onPressed: () {
+                Get.back();
+              },
+              icon: Icon(Icons.keyboard_arrow_down),
+            )),
         body: Obx(
           () => FutureBuilder(
-            future: get(),
+            future: searchChannels(controller.searchText.value),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(
@@ -137,42 +223,5 @@ class SearchPage extends GetView<DiscoverController> {
         ),
       ),
     );
-  }
-
-  Future<List<SubscriptionModel>> get() async {
-    var searchText = controller.searchText.value;
-    // url encode
-    var url = Uri(
-      host: 'podcast-api1.p.rapidapi.com',
-      scheme: 'https',
-      path: '/search_channel/v2',
-      queryParameters: {
-        'keyword': searchText,
-        'limit': '20',
-      },
-    );
-    var headers = {
-      'x-rapidapi-key': '4188f37e0dmsh6f57cb3e9804782p1f968ejsnec06e0a349b6',
-      'x-rapidapi-host': 'podcast-api1.p.rapidapi.com',
-    };
-
-    var response = await http.get(url, headers: headers);
-    var body = utf8.decode(response.bodyBytes);
-    Map<String, dynamic> data = jsonDecode(body);
-
-    List<SubscriptionModel> subscriptions = [];
-    for (var item in data['data']['channel_list']) {
-      subscriptions.add(SubscriptionModel.fromMap({
-        'rssFeedUrl': item['rss_url'],
-        'title': item['title'],
-        'description': item['description'],
-        'imageUrl': item['small_cover_url'],
-        'link': item['link'],
-        'categories': item['keywords'].join(','),
-        'author': item['author'],
-        'email': '',
-      }));
-    }
-    return subscriptions;
   }
 }

@@ -51,7 +51,12 @@ class FeedsEpisodesListView extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    episodes[index].channelTitle!,
+                    episodes[index].channelTitle!.substring(
+                          0,
+                          episodes[index].channelTitle!.length > 20
+                              ? 20
+                              : episodes[index].channelTitle!.length,
+                        ),
                     style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 9,

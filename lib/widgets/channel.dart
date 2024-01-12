@@ -3,6 +3,7 @@ import 'package:anycast/widgets/feeds_episodes_list.dart';
 import 'package:anycast/widgets/player.dart';
 import 'package:flutter/material.dart';
 import 'package:expandable_text/expandable_text.dart';
+import 'package:get/get.dart';
 
 class Channel extends StatelessWidget {
   final SubscriptionModel subscription;
@@ -17,7 +18,13 @@ class Channel extends StatelessWidget {
     return Scaffold(
       floatingActionButton: PlayerWidget(),
       appBar: AppBar(
-        title: Text(subscription.title!),
+        leading: SizedBox.shrink(),
+        title: IconButton(
+          onPressed: () {
+            Get.back();
+          },
+          icon: Icon(Icons.keyboard_arrow_down),
+        ),
       ),
       body: Column(
         children: [
