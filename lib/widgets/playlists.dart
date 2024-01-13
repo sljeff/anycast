@@ -125,6 +125,13 @@ class PlaylistEpisodesList extends StatelessWidget {
                         icon: Icon(Icons.play_arrow)),
                     IconButton(
                         onPressed: () {
+                          if (index == 0) {
+                            Get.find<PlayerController>().pause();
+                            controller.removeTop();
+                            Get.find<PlayerController>()
+                                .playByEpisode(controller.episodes[0]);
+                            return;
+                          }
                           // remove from playlist db
                           controller.remove(episode.id!);
                         },

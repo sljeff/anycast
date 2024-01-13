@@ -16,7 +16,7 @@ class Discover extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(
@@ -26,9 +26,13 @@ class Discover extends StatelessWidget {
                 onChanged: (value) {
                   controller.searchText.value = value;
                 },
+                onSubmitted: (value) {
+                  controller.searchText.value = value;
+                  context.pushTransparentRoute(SearchPage());
+                },
                 controller: controller.searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search',
+                  hintText: 'Search title',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -157,6 +161,7 @@ class SearchPage extends GetView<DiscoverController> {
       child: Scaffold(
         floatingActionButton: PlayerWidget(),
         appBar: AppBar(
+            centerTitle: true,
             leading: SizedBox.shrink(),
             title: IconButton(
               onPressed: () {
@@ -174,30 +179,32 @@ class SearchPage extends GetView<DiscoverController> {
                 );
               }
               var subscriptions = snapshot.data!;
+              if (subscriptions.isEmpty) {
+                return const Center(
+                  child: Text('No results'),
+                );
+              }
               return ListView.builder(
                   itemCount: subscriptions.length,
                   itemBuilder: (context, index) {
-                    return ExpansionTile(
-                      controlAffinity: ListTileControlAffinity.leading,
-                      leading: GestureDetector(
-                        onTap: () {
-                          context.pushTransparentRoute(DismissiblePage(
-                            direction: DismissiblePageDismissDirection.down,
-                            onDismissed: () {
-                              Get.back();
-                            },
-                            child: Channel(
-                              subscription: subscriptions[index],
-                            ),
-                          ));
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            subscriptions[index].imageUrl!,
-                            width: 50,
-                            height: 50,
+                    return ListTile(
+                      onTap: () {
+                        context.pushTransparentRoute(DismissiblePage(
+                          direction: DismissiblePageDismissDirection.down,
+                          onDismissed: () {
+                            Get.back();
+                          },
+                          child: Channel(
+                            subscription: subscriptions[index],
                           ),
+                        ));
+                      },
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          subscriptions[index].imageUrl!,
+                          width: 50,
+                          height: 50,
                         ),
                       ),
                       title: Text(subscriptions[index].title!),
@@ -205,17 +212,6 @@ class SearchPage extends GetView<DiscoverController> {
                         subscriptions[index].description!,
                         maxLines: 2,
                       ),
-                      children: [
-                        ButtonBar(
-                          alignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              onPressed: () {},
-                              icon: Icon(Icons.add),
-                            ),
-                          ],
-                        ),
-                      ],
                     );
                   });
             },

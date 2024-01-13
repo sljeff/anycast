@@ -18,6 +18,7 @@ class Channel extends StatelessWidget {
     return Scaffold(
       floatingActionButton: PlayerWidget(),
       appBar: AppBar(
+        centerTitle: true,
         leading: SizedBox.shrink(),
         title: IconButton(
           onPressed: () {

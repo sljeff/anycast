@@ -1,4 +1,5 @@
 import 'package:anycast/models/episode.dart';
+import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:sanitize_html/sanitize_html.dart' show sanitizeHtml;
@@ -70,8 +71,12 @@ class DetailWidget extends StatelessWidget {
 Widget renderHtml(context, String html) {
   // if starts with <
   if (html.trim().startsWith('<')) {
+    var sanitized = sanitizeHtml(html).trim();
+    if (sanitized.isEmpty) {
+      sanitized = htmlToText(html)!;
+    }
     return Html(
-      data: sanitizeHtml(html),
+      data: sanitized,
     );
   }
 
