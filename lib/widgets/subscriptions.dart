@@ -1,3 +1,4 @@
+import 'package:anycast/states/channel.dart';
 import 'package:anycast/widgets/channel.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
@@ -22,14 +23,12 @@ class Subscriptions extends StatelessWidget {
         itemBuilder: (context, index) {
           return ListTile(
             onTap: () {
-              context.pushTransparentRoute(DismissiblePage(
-                direction: DismissiblePageDismissDirection.down,
-                onDismissed: () {
-                  Get.back();
-                },
-                child: Channel(
-                  subscription: controller.subscriptions[index],
-                ),
+              Get.lazyPut(
+                  () => ChannelController(
+                      channel: controller.subscriptions[index]),
+                  tag: controller.subscriptions[index].rssFeedUrl);
+              context.pushTransparentRoute(Channel(
+                subscription: controller.subscriptions[index],
               ));
             },
             leading: controller.subscriptions[index].imageUrl != null

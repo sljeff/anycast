@@ -1,3 +1,4 @@
+import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/discover.dart';
 import 'package:anycast/utils/api.dart';
 import 'package:anycast/widgets/channel.dart';
@@ -95,28 +96,22 @@ class DiscoverBody extends StatelessWidget {
                     return ListView.builder(
                         itemCount: channels.length,
                         itemBuilder: (context, index) {
-                          return ExpansionTile(
-                            controlAffinity: ListTileControlAffinity.leading,
-                            leading: GestureDetector(
-                              onTap: () {
-                                context.pushTransparentRoute(DismissiblePage(
-                                  direction:
-                                      DismissiblePageDismissDirection.down,
-                                  onDismissed: () {
-                                    Get.back();
-                                  },
-                                  child: Channel(
-                                    subscription: channels[index],
-                                  ),
-                                ));
-                              },
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  channels[index].imageUrl!,
-                                  width: 50,
-                                  height: 50,
-                                ),
+                          return ListTile(
+                            onTap: () {
+                              Get.lazyPut(
+                                  () => ChannelController(
+                                      channel: channels[index]),
+                                  tag: channels[index].rssFeedUrl);
+                              context.pushTransparentRoute(Channel(
+                                subscription: channels[index],
+                              ));
+                            },
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                channels[index].imageUrl!,
+                                width: 50,
+                                height: 50,
                               ),
                             ),
                             title: Text(channels[index].title!),
@@ -124,17 +119,6 @@ class DiscoverBody extends StatelessWidget {
                               channels[index].description!,
                               maxLines: 2,
                             ),
-                            children: [
-                              ButtonBar(
-                                alignment: MainAxisAlignment.center,
-                                children: [
-                                  IconButton(
-                                    onPressed: () {},
-                                    icon: Icon(Icons.add),
-                                  ),
-                                ],
-                              ),
-                            ],
                           );
                         });
                   }),
@@ -189,14 +173,12 @@ class SearchPage extends GetView<DiscoverController> {
                   itemBuilder: (context, index) {
                     return ListTile(
                       onTap: () {
-                        context.pushTransparentRoute(DismissiblePage(
-                          direction: DismissiblePageDismissDirection.down,
-                          onDismissed: () {
-                            Get.back();
-                          },
-                          child: Channel(
-                            subscription: subscriptions[index],
-                          ),
+                        Get.lazyPut(
+                            () => ChannelController(
+                                channel: subscriptions[index]),
+                            tag: subscriptions[index].rssFeedUrl);
+                        context.pushTransparentRoute(Channel(
+                          subscription: subscriptions[index],
                         ));
                       },
                       leading: ClipRRect(

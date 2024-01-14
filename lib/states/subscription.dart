@@ -29,12 +29,22 @@ class SubscriptionController extends GetxController {
         });
   }
 
-  void remove(subscription) {
-    var index =
-        subscriptions.indexWhere((element) => element.id == subscription.id);
+  void remove(SubscriptionModel subscription) {
+    var index = subscriptions
+        .indexWhere((element) => element.title == subscription.title);
     subscriptions.removeAt(index);
     helper.db.then((db) {
       SubscriptionModel.remove(db!, subscription);
     });
+  }
+
+  bool exists(SubscriptionModel m) {
+    // rssFeedUrl or title or id exists
+    for (var s in subscriptions) {
+      if (s.rssFeedUrl == m.rssFeedUrl || s.title == m.title || s.id == m.id) {
+        return true;
+      }
+    }
+    return false;
   }
 }

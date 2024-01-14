@@ -7,7 +7,7 @@ Future<void> subscriptionTableCreator(DatabaseExecutor db) {
     CREATE TABLE IF NOT EXISTS subscription (
       id INTEGER PRIMARY KEY,
       rssFeedUrl TEXT UNIQUE,
-      title TEXT,
+      title TEXT UNIQUE,
       description TEXT,
       imageUrl TEXT,
       link TEXT,
@@ -30,6 +30,8 @@ class SubscriptionModel {
   String? author;
   String? email;
   int? lastUpdated; // unix timestamp
+
+  SubscriptionModel.empty();
 
   Map<String, dynamic> toMap() {
     var map = <String, dynamic>{
@@ -96,7 +98,8 @@ class SubscriptionModel {
   static Future<void> remove(
       DatabaseExecutor db, SubscriptionModel subscription) async {
     await db.delete('subscription',
-        where: 'rssFeedUrl = ?', whereArgs: [subscription.rssFeedUrl]);
+        where: 'rssFeedUrl = ? or title = ?',
+        whereArgs: [subscription.rssFeedUrl, subscription.title]);
   }
 
   Future<List<FeedEpisodeModel>?> listAllEpisodes() async {
