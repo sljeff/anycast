@@ -13,6 +13,11 @@ class PlayerController extends GetxController {
   var player = PlayerModel.empty().obs;
   var isPlaying = false.obs;
   var isLoading = false.obs;
+  var positionData = PositionData(
+    position: Duration.zero,
+    bufferedPosition: Duration.zero,
+    duration: Duration.zero,
+  ).obs;
 
   final DatabaseHelper helper = DatabaseHelper();
   final MyAudioHandler myAudioHandler = MyAudioHandler();
@@ -75,6 +80,10 @@ class PlayerController extends GetxController {
         }
       }
     });
+
+    myAudioHandler.positionDataStream.listen((event) {
+      positionData.value = event;
+    });
   }
 
   void load() {
@@ -114,5 +123,17 @@ class PlayerController extends GetxController {
       return;
     }
     return myAudioHandler.play();
+  }
+
+  void initProgress() {
+    var pe = playlistEpisode;
+    if (pe == null) {
+      return;
+    }
+    positionData.value = PositionData(
+      position: Duration(milliseconds: pe.playedDuration ?? 0),
+      bufferedPosition: Duration.zero,
+      duration: Duration(milliseconds: pe.duration ?? 0),
+    );
   }
 }

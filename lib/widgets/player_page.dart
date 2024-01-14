@@ -49,7 +49,7 @@ class PlayerPage extends StatelessWidget {
   }
 }
 
-class MyProgressBar extends StatelessWidget {
+class MyProgressBar extends GetView<PlayerController> {
   MyProgressBar({super.key});
 
   // myAudioHandler
@@ -57,16 +57,15 @@ class MyProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: myAudioHandler.positionDataStream,
-      builder: (BuildContext context, positionData) {
-        if (positionData.data == null) {
-          return const SizedBox.shrink();
-        }
-        var duration = positionData.data?.duration ?? Duration.zero;
-        var position = positionData.data?.position ?? Duration.zero;
-        var bufferedPosition =
-            positionData.data?.bufferedPosition ?? Duration.zero;
+    if (controller.playlistEpisode != null &&
+        controller.positionData.value.duration == Duration.zero) {
+      controller.initProgress();
+    }
+    return Obx(
+      () {
+        var duration = controller.positionData.value.duration;
+        var position = controller.positionData.value.position;
+        var bufferedPosition = controller.positionData.value.bufferedPosition;
         return ProgressBar(
           progress: position,
           buffered: bufferedPosition,
