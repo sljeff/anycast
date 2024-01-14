@@ -66,7 +66,8 @@ class FeedEpisodeController extends GetxController {
     var playlistEpisode = feed2playlist(playlistId, episode);
 
     var position = 0;
-    if (Get.find<PlayerController>().isPlaying(playlistId)) {
+    if (Get.find<PlayerController>().player.value.currentPlaylistId ==
+        playlistId) {
       position = 1;
     }
 

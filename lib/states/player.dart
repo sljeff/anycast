@@ -11,6 +11,8 @@ import 'package:just_audio/just_audio.dart';
 
 class PlayerController extends GetxController {
   var player = PlayerModel.empty().obs;
+  var isPlaying = false.obs;
+  var isLoading = false.obs;
 
   final DatabaseHelper helper = DatabaseHelper();
   final MyAudioHandler myAudioHandler = MyAudioHandler();
@@ -54,6 +56,12 @@ class PlayerController extends GetxController {
     });
 
     myAudioHandler.playbackStateStream.listen((state) {
+      isPlaying.value = state.playing;
+      // loading or buffering
+      isLoading.value = [
+        ProcessingState.loading,
+        ProcessingState.buffering,
+      ].contains(state.processingState);
       if (state.processingState == ProcessingState.completed) {
         var peController = playlistEpisodeController;
         if (peController == null) {
@@ -106,9 +114,5 @@ class PlayerController extends GetxController {
       return;
     }
     return myAudioHandler.play();
-  }
-
-  bool isPlaying(int playlistId) {
-    return player.value.currentPlaylistId == playlistId;
   }
 }

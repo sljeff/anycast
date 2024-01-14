@@ -20,57 +20,40 @@ class Subscriptions extends StatelessWidget {
       return ListView.builder(
         itemCount: controller.subscriptions.length,
         itemBuilder: (context, index) {
-          return ExpansionTile(
-            controlAffinity: ListTileControlAffinity.leading,
-            leading: GestureDetector(
-              onTap: () {
-                context.pushTransparentRoute(DismissiblePage(
-                  direction: DismissiblePageDismissDirection.down,
-                  onDismissed: () {
-                    Get.back();
-                  },
-                  child: Channel(
-                    subscription: controller.subscriptions[index],
-                  ),
-                ));
-              },
-              child: controller.subscriptions[index].imageUrl != null
-                  ? Hero(
-                      tag: controller.subscriptions[index].imageUrl!,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                            controller.subscriptions[index].imageUrl!,
-                            width: 50,
-                            height: 50),
-                      ),
-                    )
-                  : const SizedBox(
-                      width: 50,
-                      height: 50,
-                      child: Icon(Icons.image),
+          return ListTile(
+            onTap: () {
+              context.pushTransparentRoute(DismissiblePage(
+                direction: DismissiblePageDismissDirection.down,
+                onDismissed: () {
+                  Get.back();
+                },
+                child: Channel(
+                  subscription: controller.subscriptions[index],
+                ),
+              ));
+            },
+            leading: controller.subscriptions[index].imageUrl != null
+                ? Hero(
+                    tag: controller.subscriptions[index].imageUrl!,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                          controller.subscriptions[index].imageUrl!,
+                          width: 50,
+                          height: 50),
                     ),
-            ),
+                  )
+                : const SizedBox(
+                    width: 50,
+                    height: 50,
+                    child: Icon(Icons.image),
+                  ),
             title: Text(controller.subscriptions[index].title!),
             subtitle: Text(
               controller.subscriptions[index].description!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            children: [
-              ButtonBar(
-                alignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      Get.find<SubscriptionController>()
-                          .remove(controller.subscriptions[index]);
-                    },
-                    icon: const Icon(Icons.delete),
-                  ),
-                ],
-              ),
-            ],
           );
         },
       );

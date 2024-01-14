@@ -1,6 +1,7 @@
 import 'package:anycast/states/player.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/detail.dart';
+import 'package:anycast/widgets/play_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
@@ -50,6 +51,10 @@ class PlaylistEpisodesList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(
       () {
+        var playerController = Get.find<PlayerController>();
+        var isPlaying = playerController.isPlaying.value &&
+            playerController.player.value.currentPlaylistId ==
+                controller.playlistId;
         return ListView.builder(
           itemCount: controller.episodes.length,
           itemBuilder: (context, index) {
@@ -112,29 +117,32 @@ class PlaylistEpisodesList extends StatelessWidget {
                     IconButton(
                         onPressed: () {
                           if (index != 0) {
-                            var playerController = Get.find<PlayerController>();
                             playerController.pause().then((value) => {
                                   controller.moveToTop(episode).then((value) {
                                     playerController.playByEpisode(episode);
                                   })
                                 });
                           } else {
-                            Get.find<PlayerController>().playByEpisode(episode);
+                            if (isPlaying) {
+                              playerController.pause();
+                              return;
+                            }
+                            playerController.playByEpisode(episode);
                           }
                         },
-                        icon: Icon(Icons.play_arrow)),
+                        icon: index != 0
+                            ? const Icon(Icons.play_arrow)
+                            : const PlayIcon()),
                     IconButton(
                         onPressed: () {
                           if (index != 0) {
                             controller.remove(episode.guid!);
                             return;
                           }
-                          var playerController = Get.find<PlayerController>();
                           playerController.pause();
                           controller.removeTop();
                           // if playing, play next
-                          if (playerController
-                              .isPlaying(controller.playlistId)) {
+                          if (isPlaying) {
                             playerController
                                 .playByEpisode(controller.episodes[0]);
                           }

@@ -140,71 +140,67 @@ class SwipeImage extends StatelessWidget {
   }
 }
 
-class Controls extends StatelessWidget {
+class Controls extends GetView<PlayerController> {
   Controls({super.key});
 
   final MyAudioHandler myAudioHandler = MyAudioHandler();
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-        stream: myAudioHandler.playbackStateStream,
-        builder: (context, snapshot) {
-          var isPlaying = snapshot.data?.playing ?? false;
-
-          return SizedBox(
-            height: 96,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  onPressed: () {
-                    myAudioHandler.seekByRelative(const Duration(seconds: -10));
-                  },
-                  icon: const Icon(
-                    Icons.replay_10,
-                    size: 48,
-                    color: Colors.white,
-                  ),
-                ),
-                Container(
-                  height: 64,
-                  width: 64,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                  ),
-                  child: isPlaying
-                      ? IconButton(
-                          onPressed: () {
-                            Get.find<PlayerController>().pause();
-                          },
-                          icon: const Icon(
-                            Icons.pause,
-                            size: 48,
-                          ),
-                        )
-                      : IconButton(
-                          onPressed: () {
-                            Get.find<PlayerController>().play();
-                          },
-                          icon: const Icon(Icons.play_arrow, size: 48),
-                        ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    myAudioHandler.seekByRelative(const Duration(seconds: 30));
-                  },
-                  icon: const Icon(
-                    Icons.forward_30,
-                    color: Colors.white,
-                    size: 48,
-                  ),
-                ),
-              ],
+    return SizedBox(
+      height: 96,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          IconButton(
+            onPressed: () {
+              myAudioHandler.seekByRelative(const Duration(seconds: -10));
+            },
+            icon: const Icon(
+              Icons.replay_10,
+              size: 48,
+              color: Colors.white,
             ),
-          );
-        });
+          ),
+          Container(
+            height: 64,
+            width: 64,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+            ),
+            child: Obx(() {
+              return controller.isPlaying.value
+                  ? IconButton(
+                      onPressed: () {
+                        Get.find<PlayerController>().pause();
+                      },
+                      icon: const Icon(
+                        Icons.pause,
+                        size: 48,
+                      ),
+                    )
+                  : IconButton(
+                      onPressed: () {
+                        Get.find<PlayerController>().play();
+                      },
+                      icon: const Icon(Icons.play_arrow, size: 48),
+                    );
+            }),
+          ),
+          IconButton(
+            onPressed: () {
+              myAudioHandler.seekByRelative(const Duration(seconds: 30));
+            },
+            icon: const Icon(
+              Icons.forward_30,
+              color: Colors.white,
+              size: 48,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -1,5 +1,5 @@
 import 'package:anycast/states/playlist.dart';
-import 'package:anycast/utils/audio_handler.dart';
+import 'package:anycast/widgets/play_icon.dart';
 import 'package:anycast/widgets/player_page.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/player.dart';
@@ -69,38 +69,30 @@ class PlayerWidget extends StatelessWidget {
   }
 }
 
-class PlayerButton extends StatelessWidget {
+class PlayerButton extends GetView<PlayerController> {
   const PlayerButton({
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
-    var audioHandler = MyAudioHandler();
-    return StreamBuilder(
-        stream: audioHandler.playbackStateStream,
-        builder: (context, snapshot) {
-          var isPlaying = snapshot.data?.playing ?? false;
-          return GestureDetector(
-            onTap: () {
-              if (isPlaying) {
-                Get.find<PlayerController>().pause();
-              } else {
-                Get.find<PlayerController>().play();
-              }
-            },
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: Hero(
-                tag: 'play_button',
-                child: isPlaying
-                    ? const Icon(Icons.pause)
-                    : const Icon(Icons.play_arrow),
-              ),
-            ),
-          );
-        });
+    return GestureDetector(
+      onTap: () {
+        if (controller.isPlaying.value) {
+          Get.find<PlayerController>().pause();
+        } else {
+          Get.find<PlayerController>().play();
+        }
+      },
+      child: const SizedBox(
+        width: 40,
+        height: 40,
+        child: Hero(
+          tag: 'play_button',
+          child: PlayIcon(),
+        ),
+      ),
+    );
   }
 }
 
