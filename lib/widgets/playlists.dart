@@ -2,6 +2,7 @@ import 'package:anycast/states/player.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:anycast/widgets/play_icon.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
@@ -70,8 +71,17 @@ class PlaylistEpisodesList extends StatelessWidget {
                               context: context,
                               builder: (context) => DetailWidget(episode));
                         },
-                        child: Image.network(episode.imageUrl!,
-                            width: 48, height: 48),
+                        child: CachedNetworkImage(
+                          imageUrl: episode.imageUrl!,
+                          width: 48,
+                          height: 48,
+                          placeholder: (context, url) => const Icon(
+                            Icons.image,
+                          ),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.image_not_supported,
+                          ),
+                        ),
                       ),
                     )
                   : const SizedBox(

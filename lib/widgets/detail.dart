@@ -3,6 +3,7 @@ import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/channel.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -38,10 +39,17 @@ class DetailWidget extends StatelessWidget {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    episode.imageUrl!,
+                                  child: CachedNetworkImage(
+                                    imageUrl: episode.imageUrl!,
                                     width: 60,
                                     height: 60,
+                                    placeholder: (context, url) => const Icon(
+                                      Icons.image,
+                                    ),
+                                    errorWidget: (context, url, error) =>
+                                        const Icon(
+                                      Icons.image_not_supported,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 6),

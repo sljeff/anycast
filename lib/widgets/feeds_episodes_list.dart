@@ -4,6 +4,7 @@ import 'package:anycast/states/player.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/detail.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -30,10 +31,16 @@ class FeedsEpisodesListView extends StatelessWidget {
                     context: context,
                     builder: (context) => DetailWidget(episodes[index]));
               },
-              child: Image.network(
-                episodes[index].imageUrl!,
+              child: CachedNetworkImage(
+                imageUrl: episodes[index].imageUrl!,
                 fit: BoxFit.cover,
                 width: 48,
+                placeholder: (context, url) => const Icon(
+                  Icons.image,
+                ),
+                errorWidget: (context, url, error) => const Icon(
+                  Icons.image_not_supported,
+                ),
               ),
             ),
           ),

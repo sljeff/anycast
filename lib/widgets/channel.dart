@@ -6,6 +6,7 @@ import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:expandable_text/expandable_text.dart';
 import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class Channel extends StatelessWidget {
   final SubscriptionModel subscription;
@@ -52,7 +53,15 @@ class Channel extends StatelessWidget {
                         height: 80,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.network(subscription.imageUrl!),
+                          child: CachedNetworkImage(
+                            imageUrl: subscription.imageUrl!,
+                            placeholder: (context, url) => const Icon(
+                              Icons.image,
+                            ),
+                            errorWidget: (context, url, error) => const Icon(
+                              Icons.image_not_supported,
+                            ),
+                          ),
                         ),
                       ),
                     ),

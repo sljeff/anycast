@@ -52,6 +52,7 @@ dependencies:
   audio_video_progress_bar: ^2.0.1
   get: ^4.6.6
   expandable_text: ^2.3.0
+  cached_network_image: ^3.3.1
 
 dev_dependencies:
   flutter_test:

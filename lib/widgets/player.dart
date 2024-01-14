@@ -1,6 +1,7 @@
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:anycast/widgets/player_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/player.dart';
 import 'package:get/get.dart';
@@ -116,7 +117,17 @@ class PlayerImage extends StatelessWidget {
     } else {
       child = ClipRRect(
           borderRadius: BorderRadius.circular(20),
-          child: Image.network(imageUrl!, width: 40, height: 40));
+          child: CachedNetworkImage(
+            imageUrl: imageUrl!,
+            width: 40,
+            height: 40,
+            placeholder: (context, url) => const Icon(
+              Icons.image,
+            ),
+            errorWidget: (context, url, error) => const Icon(
+              Icons.image_not_supported,
+            ),
+          ));
     }
 
     return GestureDetector(

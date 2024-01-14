@@ -3,6 +3,7 @@ import 'package:anycast/states/discover.dart';
 import 'package:anycast/utils/api.dart';
 import 'package:anycast/widgets/channel.dart';
 import 'package:anycast/widgets/player.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -108,10 +109,17 @@ class DiscoverBody extends StatelessWidget {
                             },
                             leading: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                channels[index].imageUrl!,
+                              child: CachedNetworkImage(
+                                imageUrl: channels[index].imageUrl!,
                                 width: 50,
                                 height: 50,
+                                placeholder: (context, url) => const Icon(
+                                  Icons.image,
+                                ),
+                                errorWidget: (context, url, error) =>
+                                    const Icon(
+                                  Icons.image_not_supported,
+                                ),
                               ),
                             ),
                             title: Text(channels[index].title!),
@@ -183,10 +191,16 @@ class SearchPage extends GetView<DiscoverController> {
                       },
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          subscriptions[index].imageUrl!,
+                        child: CachedNetworkImage(
+                          imageUrl: subscriptions[index].imageUrl!,
                           width: 50,
                           height: 50,
+                          placeholder: (context, url) => const Icon(
+                            Icons.image,
+                          ),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.image_not_supported,
+                          ),
                         ),
                       ),
                       title: Text(subscriptions[index].title!),

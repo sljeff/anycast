@@ -1,5 +1,6 @@
 import 'package:anycast/states/player.dart';
 import 'package:anycast/utils/audio_handler.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
@@ -122,9 +123,15 @@ class SwipeImage extends StatelessWidget {
                   tag: 'play_image',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      episode.imageUrl ?? '',
+                    child: CachedNetworkImage(
+                      imageUrl: episode.imageUrl ?? '',
                       fit: BoxFit.cover,
+                      placeholder: (context, url) => const Icon(
+                        Icons.image,
+                      ),
+                      errorWidget: (context, url, error) => const Icon(
+                        Icons.image_not_supported,
+                      ),
                     ),
                   ),
                 );
