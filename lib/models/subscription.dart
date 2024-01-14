@@ -6,14 +6,15 @@ Future<void> subscriptionTableCreator(DatabaseExecutor db) {
   return db.execute("""
     CREATE TABLE IF NOT EXISTS subscription (
       id INTEGER PRIMARY KEY,
-      rssFeedUrl TEXT,
+      rssFeedUrl TEXT UNIQUE,
       title TEXT,
       description TEXT,
       imageUrl TEXT,
       link TEXT,
       categories TEXT,
       author TEXT,
-      email TEXT
+      email TEXT,
+      lastUpdated INTEGER
     )
   """);
 }
@@ -28,6 +29,7 @@ class SubscriptionModel {
   String? categories; // comma separated list of categories
   String? author;
   String? email;
+  int? lastUpdated; // unix timestamp
 
   Map<String, dynamic> toMap() {
     var map = <String, dynamic>{
@@ -39,6 +41,7 @@ class SubscriptionModel {
       'categories': categories,
       'author': author,
       'email': email,
+      'lastUpdated': lastUpdated,
     };
     if (id != null) {
       map['id'] = id;
@@ -57,6 +60,7 @@ class SubscriptionModel {
     categories = map['categories'];
     author = map['author'];
     email = map['email'];
+    lastUpdated = map['lastUpdated'];
   }
 
   Future<void> save(DatabaseExecutor db) async {
@@ -81,16 +85,18 @@ class SubscriptionModel {
   static Future<void> addMany(
       DatabaseExecutor db, List<SubscriptionModel> subscriptions) async {
     Batch batch = db.batch();
-    for (SubscriptionModel subscription in subscriptions) {
-      batch.insert('subscription', subscription.toMap());
+    // insert or update
+    for (var subscription in subscriptions) {
+      batch.insert('subscription', subscription.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
   }
 
   static Future<void> remove(
       DatabaseExecutor db, SubscriptionModel subscription) async {
-    await db
-        .delete('subscription', where: 'id = ?', whereArgs: [subscription.id]);
+    await db.delete('subscription',
+        where: 'rssFeedUrl = ?', whereArgs: [subscription.rssFeedUrl]);
   }
 
   Future<List<FeedEpisodeModel>?> listAllEpisodes() async {

@@ -58,6 +58,7 @@ Future<List<PodcastImportData>> fetchPodcastsByUrls(List<String> rssFeedUrls,
         }));
         feedEpisodes.add(feedEpisode);
       }
+      subscription.lastUpdated = feedEpisodes[0].pubDate;
       return PodcastImportData(subscription, feedEpisodes);
     }).catchError((error) {
       print(error);

@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:anycast/models/feed_episode.dart';
+import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/import_block.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
@@ -22,7 +24,10 @@ class Feeds extends StatelessWidget {
       if (controller.episodes.isEmpty) {
         return ImportBlock();
       }
-      return FeedsEpisodesListView(controller.episodes, true);
+      return RefreshIndicator(
+        onRefresh: fetchNewEpisodes,
+        child: FeedsEpisodesListView(controller.episodes, true),
+      );
     });
   }
 }
@@ -138,4 +143,44 @@ Future<List<String>> parseOMPL(String? path) async {
   );
 
   return rssFeedUrls;
+}
+
+Future<void> fetchNewEpisodes() async {
+  var subscriptions = Get.find<SubscriptionController>().subscriptions;
+  var urls = subscriptions.map((e) => e.rssFeedUrl!).toList();
+
+  var episodes = await fetchPodcastsByUrls(urls, onlyFistEpisode: false);
+  var fetchedMap = <String, PodcastImportData>{};
+  for (var episode in episodes) {
+    fetchedMap[episode.subscription!.rssFeedUrl!] = episode;
+  }
+
+  var updatedSubscriptions = <SubscriptionModel>[];
+  var updatedEpisodes = <FeedEpisodeModel>[];
+  for (var subscription in subscriptions) {
+    var fetched = fetchedMap[subscription.rssFeedUrl!];
+    if (fetched == null) {
+      continue;
+    }
+    if (subscription.lastUpdated != null &&
+        subscription.lastUpdated! >= fetched.subscription!.lastUpdated!) {
+      continue;
+    }
+    updatedSubscriptions.add(fetched.subscription!);
+    // if lastUpdated is null, add the first episode
+    if (subscription.lastUpdated == null) {
+      updatedEpisodes.add(fetched.feedEpisodes![0]);
+      continue;
+    }
+    updatedEpisodes.addAll(fetched.feedEpisodes!.where((element) {
+      return element.pubDate! > subscription.lastUpdated!;
+    }));
+  }
+
+  if (updatedSubscriptions.isNotEmpty) {
+    Get.find<SubscriptionController>().addMany(updatedSubscriptions);
+  }
+  if (updatedEpisodes.isNotEmpty) {
+    Get.find<FeedEpisodeController>().addMany(updatedEpisodes);
+  }
 }
