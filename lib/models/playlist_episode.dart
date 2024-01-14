@@ -149,13 +149,13 @@ class PlaylistEpisodeModel extends Episode {
     });
   }
 
-  static Future<void> delete(DatabaseExecutor db, int id) async {
-    await db.delete(tableName, where: 'id = ?', whereArgs: [id]);
+  static Future<void> deleteByGuid(DatabaseExecutor db, String guid) async {
+    await db.delete(tableName, where: 'guid = ?', whereArgs: [guid]);
   }
 
   void updatePlayedDuration(DatabaseExecutor db) async {
     await db.update(tableName, {'playedDuration': playedDuration},
-        where: 'id = ?', whereArgs: [id]);
+        where: 'guid = ?', whereArgs: [guid]);
   }
 
   MediaItem toMediaItem() {

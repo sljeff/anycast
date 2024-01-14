@@ -126,7 +126,7 @@ class PlaylistEpisodesList extends StatelessWidget {
                     IconButton(
                         onPressed: () {
                           if (index != 0) {
-                            controller.remove(episode.id!);
+                            controller.remove(episode.guid!);
                             return;
                           }
                           var playerController = Get.find<PlayerController>();

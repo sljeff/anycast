@@ -26,16 +26,16 @@ class PlaylistEpisodeController extends GetxController {
         });
   }
 
-  void remove(int id) {
-    var oldIndex = episodes.indexWhere((e) => e.id == id);
+  void remove(String guid) {
+    var oldIndex = episodes.indexWhere((e) => e.guid == guid);
     episodes.removeAt(oldIndex);
 
-    helper.db.then((db) => {PlaylistEpisodeModel.delete(db!, id)});
+    helper.db.then((db) => {PlaylistEpisodeModel.deleteByGuid(db!, guid)});
   }
 
   void removeTop() {
-    helper.db.then((db) => {PlaylistEpisodeModel.delete(db!, episodes[0].id!)});
-    episodes.removeAt(0);
+    var guid = episodes[0].guid;
+    remove(guid!);
   }
 
   Future<void> moveToTop(PlaylistEpisodeModel episode) async {
