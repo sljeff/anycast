@@ -47,4 +47,13 @@ class SubscriptionController extends GetxController {
     }
     return false;
   }
+
+  SubscriptionModel? getByTitle(String title) {
+    for (var s in subscriptions) {
+      if (s.title == title) {
+        return s;
+      }
+    }
+    return null;
+  }
 }

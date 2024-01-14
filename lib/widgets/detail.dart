@@ -1,7 +1,12 @@
 import 'package:anycast/models/episode.dart';
+import 'package:anycast/states/channel.dart';
+import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
+import 'package:anycast/widgets/channel.dart';
+import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:get/get.dart';
 import 'package:sanitize_html/sanitize_html.dart' show sanitizeHtml;
 
 class DetailWidget extends StatelessWidget {
@@ -11,6 +16,7 @@ class DetailWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var subscriptionController = Get.find<SubscriptionController>();
     return BottomSheet(
         enableDrag: false,
         onClosing: () {},
@@ -42,10 +48,24 @@ class DetailWidget extends StatelessWidget {
                                 // link text channelTitle
                                 SizedBox(
                                   width: 60,
-                                  child: Text(
-                                    episode.channelTitle!,
-                                    style: const TextStyle(fontSize: 8),
-                                    maxLines: 2,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      var s = subscriptionController
+                                          .getByTitle(episode.channelTitle!);
+                                      if (s != null) {
+                                        Get.lazyPut(
+                                            () => ChannelController(channel: s),
+                                            tag: s.rssFeedUrl);
+                                        context.pushTransparentRoute(
+                                            Channel(subscription: s));
+                                      }
+                                    },
+                                    child: Text(
+                                      episode.channelTitle!,
+                                      style: const TextStyle(
+                                          fontSize: 8, color: Colors.blue),
+                                      maxLines: 2,
+                                    ),
                                   ),
                                 ),
                               ],
