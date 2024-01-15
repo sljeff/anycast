@@ -164,7 +164,7 @@ class PlaylistEpisodeModel extends Episode {
       album: channelTitle,
       title: title!,
       artUri: Uri.parse(imageUrl!),
-      duration: duration != null ? Duration(seconds: duration!) : null,
+      duration: duration != null ? Duration(milliseconds: duration!) : null,
     );
   }
 }

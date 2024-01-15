@@ -20,7 +20,30 @@ class MyAudioHandler extends BaseAudioHandler {
   static final _instance = MyAudioHandler._internal();
   factory MyAudioHandler() => _instance;
 
-  MyAudioHandler._internal();
+  MyAudioHandler._internal() {
+    // pipe to audio_service
+    _player.playbackEventStream.listen((event) {
+      var isPlaying = _player.playing;
+      playbackState.add(PlaybackState(
+        controls: [
+          MediaControl.rewind,
+          isPlaying ? MediaControl.pause : MediaControl.play,
+          MediaControl.fastForward,
+        ],
+        systemActions: const {
+          MediaAction.seek,
+        },
+        androidCompactActionIndices: const [0, 1, 2],
+        processingState:
+            AudioProcessingState.values[event.processingState.index],
+        playing: isPlaying,
+        updateTime: event.updateTime,
+        updatePosition: event.updatePosition,
+        bufferedPosition: event.bufferedPosition,
+        speed: _player.speed,
+      ));
+    });
+  }
 
   final _player = AudioPlayer();
 
@@ -47,6 +70,7 @@ class MyAudioHandler extends BaseAudioHandler {
 
     await _player.setAudioSource(source,
         initialPosition: Duration(milliseconds: episode.playedDuration ?? 0));
+    mediaItem.add(source.tag as MediaItem);
 
     play();
   }
@@ -110,7 +134,31 @@ class MyAudioHandler extends BaseAudioHandler {
     await super.setSpeed(speed);
   }
 
+  @override
+  Future<void> fastForward() async {
+    await seekByRelative(const Duration(seconds: 10));
+    await super.fastForward();
+  }
+
+  @override
+  Future<void> rewind() async {
+    await seekByRelative(const Duration(seconds: -10));
+    await super.rewind();
+  }
+
+  @override
+  Future<void> skipToNext() async {
+    fastForward();
+    await super.skipToNext();
+  }
+
+  @override
+  Future<void> skipToPrevious() async {
+    rewind();
+    await super.skipToPrevious();
+  }
+
   UriAudioSource _createAudioSource(MediaItem item) {
-    return ProgressiveAudioSource(Uri.parse(item.id));
+    return ProgressiveAudioSource(Uri.parse(item.id), tag: item);
   }
 }
