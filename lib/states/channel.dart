@@ -9,6 +9,7 @@ class ChannelController extends GetxController {
   var episodes = <FeedEpisodeModel>[].obs;
   var isLoading = true.obs;
   var subscribed = false.obs;
+  var isReversed = false.obs;
 
   var helper = DatabaseHelper();
   var subscriptionController = Get.find<SubscriptionController>();
@@ -39,5 +40,10 @@ class ChannelController extends GetxController {
   void unsubscribe() {
     subscribed.value = false;
     subscriptionController.remove(channel.value);
+  }
+
+  void reverseEpisodes() {
+    isReversed.value = !isReversed.value;
+    episodes.value = episodes.reversed.toList();
   }
 }

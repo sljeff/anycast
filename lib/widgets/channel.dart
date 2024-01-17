@@ -5,6 +5,7 @@ import 'package:anycast/widgets/player.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:expandable_text/expandable_text.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -30,13 +31,13 @@ class Channel extends StatelessWidget {
           floatingActionButton: PlayerWidget(),
           appBar: AppBar(
             centerTitle: true,
-            leading: SizedBox.shrink(),
+            leading: const SizedBox.shrink(),
             title: IconButton(
               onPressed: () {
                 Get.back();
                 Get.delete<ChannelController>(tag: subscription.rssFeedUrl);
               },
-              icon: Icon(Icons.keyboard_arrow_down),
+              icon: const Icon(Icons.keyboard_arrow_down),
             ),
           ),
           body: Column(
@@ -73,7 +74,7 @@ class Channel extends StatelessWidget {
                         children: [
                           Text(
                             subscription.title!,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -119,7 +120,46 @@ class Channel extends StatelessWidget {
                   linkColor: Colors.blue,
                 ),
               ),
-              const SizedBox(height: 16),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(
+                            text: controller.channel.value.rssFeedUrl!));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Copied to clipboard'),
+                          ),
+                        );
+                      },
+                      child: SizedBox(
+                        width: screenSize.width - 100,
+                        child: Text(
+                          controller.channel.value.rssFeedUrl!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        controller.reverseEpisodes();
+                      },
+                      icon: Transform.rotate(
+                        angle: controller.isReversed.value ? 3.14 : 0,
+                        child: const Icon(Icons.sort),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Expanded(
                   child: controller.isLoading.value
                       ? const Center(child: CircularProgressIndicator())
