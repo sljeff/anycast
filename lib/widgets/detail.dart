@@ -53,11 +53,14 @@ class DetailWidget extends StatelessWidget {
                             Expanded(
                                 child: Column(
                               children: [
-                                Text(
-                                  episode.title!,
-                                  style: const TextStyle(fontSize: 16),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                Container(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    episode.title!,
+                                    style: const TextStyle(fontSize: 16),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                                 Container(
                                   alignment: Alignment.centerLeft,
