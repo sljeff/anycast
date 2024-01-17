@@ -78,3 +78,9 @@ Widget renderHtml(context, String html) {
 
   return Text(html, style: const TextStyle(fontSize: 14));
 }
+
+String formatCountdown(Duration duration) {
+  var minutes = duration.inMinutes.remainder(60);
+  var seconds = duration.inSeconds.remainder(60);
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+}

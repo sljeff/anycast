@@ -19,9 +19,12 @@ class PlayerController extends GetxController {
     bufferedPosition: Duration.zero,
     duration: Duration.zero,
   ).obs;
-  var pageController = PageController(viewportFraction: 1, initialPage: 2);
   var pageIndex = 2.obs;
 
+  var pageController = PageController(
+    viewportFraction: 1,
+    initialPage: 2,
+  );
   final DatabaseHelper helper = DatabaseHelper();
   final MyAudioHandler myAudioHandler = MyAudioHandler();
 
@@ -85,6 +88,13 @@ class PlayerController extends GetxController {
     });
 
     myAudioHandler.positionDataStream.listen((event) {
+      if (isLoading.value ||
+          [
+            event.bufferedPosition,
+            event.position,
+          ].contains(Duration.zero)) {
+        return;
+      }
       positionData.value = event;
     });
   }
@@ -138,5 +148,50 @@ class PlayerController extends GetxController {
       bufferedPosition: Duration.zero,
       duration: Duration(milliseconds: pe.duration ?? 0),
     );
+  }
+}
+
+class SettinigsController extends GetxController {
+  var isCounting = false.obs;
+  var countdownDuration = Duration.zero.obs;
+  var speed = 1.0.obs;
+  Timer? timer;
+
+  final MyAudioHandler myAudioHandler = MyAudioHandler();
+
+  @override
+  void onInit() {
+    super.onInit();
+    timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!isCounting.value) {
+        return;
+      }
+      if (countdownDuration.value.inSeconds <= 0) {
+        Get.find<PlayerController>().pause();
+        isCounting.value = false;
+        return;
+      }
+      countdownDuration.value =
+          countdownDuration.value - const Duration(seconds: 1);
+    });
+
+    myAudioHandler.speedStream.listen((event) {
+      speed.value = event;
+    });
+  }
+
+  void start(Duration duration) {
+    countdownDuration.value = duration;
+    isCounting.value = true;
+  }
+
+  void stop() {
+    countdownDuration.value = Duration.zero;
+    isCounting.value = false;
+  }
+
+  void setSpeed(double speed) {
+    this.speed.value = speed;
+    myAudioHandler.setSpeed(speed);
   }
 }

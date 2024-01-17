@@ -1,6 +1,7 @@
 import 'package:anycast/states/player.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/utils/formatters.dart';
+import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
@@ -35,7 +36,7 @@ class PlayerPage extends StatelessWidget {
               ],
             ),
             const SwipeImage(),
-            Titles(),
+            const Titles(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: MyProgressBar(),
@@ -102,6 +103,7 @@ class SwipeImage extends GetView<PlayerController> {
   Widget build(BuildContext context) {
     var size = MediaQuery.of(context).size;
     var height = size.height * 0.4;
+    controller.pageIndex.value = 2;
     return DefaultTextStyle(
       style: const TextStyle(fontSize: 16, color: Colors.white),
       child: Column(
@@ -121,10 +123,7 @@ class SwipeImage extends GetView<PlayerController> {
                       child: renderHtml(
                           context, controller.playlistEpisode!.description!)),
                 ),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Center(child: Icon(Icons.abc)),
-                ),
+                const Settings(),
                 Container(
                     margin: const EdgeInsets.symmetric(horizontal: 10),
                     child: Obx(() {
@@ -264,24 +263,16 @@ class Controls extends GetView<PlayerController> {
               shape: BoxShape.circle,
               color: Colors.white,
             ),
-            child: Obx(() {
-              return controller.isPlaying.value
-                  ? IconButton(
-                      onPressed: () {
-                        Get.find<PlayerController>().pause();
-                      },
-                      icon: const Icon(
-                        Icons.pause,
-                        size: 48,
-                      ),
-                    )
-                  : IconButton(
-                      onPressed: () {
-                        Get.find<PlayerController>().play();
-                      },
-                      icon: const Icon(Icons.play_arrow, size: 48),
-                    );
-            }),
+            child: IconButton(
+              onPressed: () {
+                if (controller.isPlaying.value) {
+                  controller.pause();
+                } else {
+                  controller.play();
+                }
+              },
+              icon: const PlayIcon(size: 48),
+            ),
           ),
           IconButton(
             onPressed: () {
@@ -299,11 +290,8 @@ class Controls extends GetView<PlayerController> {
   }
 }
 
-class Titles extends StatelessWidget {
-  Titles({super.key});
-
-  final MyAudioHandler myAudioHandler = MyAudioHandler();
-  final PlayerController controller = Get.find();
+class Titles extends GetView<PlayerController> {
+  const Titles({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -350,6 +338,93 @@ class Titles extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class Settings extends GetView<SettinigsController> {
+  const Settings({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // speed / sleep countdown
+        const Text(
+          'Speed',
+          style: TextStyle(
+            fontSize: 16,
+            decoration: TextDecoration.none,
+            color: Colors.white,
+          ),
+        ),
+        // current speed
+        Obx(() {
+          var speed = controller.speed.value;
+          return Text(
+            speed.toStringAsFixed(1),
+            style: TextStyle(
+              fontSize: 32,
+              decoration: TextDecoration.none,
+              color: Colors.white,
+            ),
+          );
+        }),
+        Obx(
+          () => Material(
+            color: Colors.transparent,
+            child: Slider(
+              value: controller.speed.value,
+              onChanged: (value) {
+                controller.setSpeed(value);
+              },
+              min: 0.5,
+              max: 2.0,
+              divisions: 6,
+              label: controller.speed.value.toStringAsFixed(1),
+            ),
+          ),
+        ),
+        Text(
+          'Sleep Countdown',
+          style: TextStyle(
+            fontSize: 16,
+            decoration: TextDecoration.none,
+            color: Colors.white,
+          ),
+        ),
+        Obx(() {
+          var duration = controller.countdownDuration.value;
+          return Text(
+            formatCountdown(duration),
+            style: TextStyle(
+              fontSize: 32,
+              decoration: TextDecoration.none,
+              color: Colors.white,
+            ),
+          );
+        }),
+        Obx(
+          () => Material(
+            color: Colors.transparent,
+            child: Slider(
+              value: controller.countdownDuration.value.inMinutes.toDouble(),
+              onChanged: (value) {
+                if (value == 0) {
+                  controller.stop();
+                } else {
+                  controller.start(Duration(minutes: value.toInt()));
+                }
+              },
+              min: 0,
+              max: 60,
+              divisions: 21,
+              label: controller.countdownDuration.value.inMinutes.toString(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

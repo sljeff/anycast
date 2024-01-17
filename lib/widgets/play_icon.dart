@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class PlayIcon extends GetView<PlayerController> {
-  const PlayIcon({Key? key}) : super(key: key);
+  final double size;
+
+  const PlayIcon({Key? key, this.size = 24}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -11,12 +13,12 @@ class PlayIcon extends GetView<PlayerController> {
       var isPlaying = controller.isPlaying.value;
       var isLoading = controller.isLoading.value;
       if (isLoading) {
-        return const Icon(Icons.hourglass_bottom);
+        return Icon(Icons.hourglass_bottom, size: size);
       }
       if (isPlaying) {
-        return const Icon(Icons.pause);
+        return Icon(Icons.pause, size: size);
       }
-      return const Icon(Icons.play_arrow);
+      return Icon(Icons.play_arrow, size: size);
     });
   }
 }

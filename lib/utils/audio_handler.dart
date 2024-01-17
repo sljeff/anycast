@@ -59,6 +59,7 @@ class MyAudioHandler extends BaseAudioHandler {
             duration: _player.duration ?? Duration.zero,
           ));
   Stream<bool> get playingStream => _player.playingStream;
+  Stream<double> get speedStream => _player.speedStream;
 
   Future<void> playByEpisode(PlaylistEpisodeModel episode) async {
     if (mediaItem.value?.id == episode.enclosureUrl) {
