@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:get/get.dart';
 import 'package:sanitize_html/sanitize_html.dart' show sanitizeHtml;
+import 'package:url_launcher/url_launcher.dart';
 
 class DetailWidget extends StatelessWidget {
   final Episode episode;
@@ -34,28 +35,35 @@ class DetailWidget extends StatelessWidget {
                     child: Column(
                       children: [
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            Column(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: CachedNetworkImage(
-                                    imageUrl: episode.imageUrl!,
-                                    width: 60,
-                                    height: 60,
-                                    placeholder: (context, url) => const Icon(
-                                      Icons.image,
-                                    ),
-                                    errorWidget: (context, url, error) =>
-                                        const Icon(
-                                      Icons.image_not_supported,
-                                    ),
-                                  ),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: CachedNetworkImage(
+                                imageUrl: episode.imageUrl!,
+                                width: 60,
+                                height: 60,
+                                placeholder: (context, url) => const Icon(
+                                  Icons.image,
                                 ),
-                                const SizedBox(height: 6),
-                                // link text channelTitle
-                                SizedBox(
-                                  width: 60,
+                                errorWidget: (context, url, error) =>
+                                    const Icon(
+                                  Icons.image_not_supported,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                                child: Column(
+                              children: [
+                                Text(
+                                  episode.title!,
+                                  style: const TextStyle(fontSize: 16),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Container(
+                                  alignment: Alignment.centerLeft,
                                   child: GestureDetector(
                                     onTap: () {
                                       var s = subscriptionController
@@ -71,21 +79,18 @@ class DetailWidget extends StatelessWidget {
                                     child: Text(
                                       episode.channelTitle!,
                                       style: const TextStyle(
-                                          fontSize: 8, color: Colors.blue),
-                                      maxLines: 2,
+                                          fontSize: 10, color: Colors.blue),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ),
                               ],
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                                child: Text(
-                              episode.title!,
-                              style: const TextStyle(fontSize: 16),
                             )),
+                            const SizedBox(width: 16),
                           ],
                         ),
+                        const SizedBox(width: 16),
                         renderHtml(context, episode.description!),
                       ],
                     ),
@@ -105,6 +110,36 @@ Widget renderHtml(context, String html) {
     }
     return Html(
       data: sanitized,
+      onLinkTap: (url, attributes, element) async {
+        if (url == null) {
+          return;
+        }
+        var uri = Uri.parse(url);
+        var can = await canLaunchUrl(uri);
+        if (can) {
+          await launchUrl(
+            uri,
+            mode: LaunchMode.inAppBrowserView,
+          );
+        } else {
+          // modal
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Cannot open link'),
+              content: Text(url),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          );
+        }
+      },
     );
   }
 

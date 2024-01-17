@@ -30,7 +30,7 @@ class Discover extends StatelessWidget {
                 },
                 onSubmitted: (value) {
                   controller.searchText.value = value;
-                  context.pushTransparentRoute(SearchPage());
+                  context.pushTransparentRoute(const SearchPage());
                 },
                 controller: controller.searchController,
                 decoration: InputDecoration(
@@ -42,21 +42,21 @@ class Discover extends StatelessWidget {
                     onPressed: () {
                       controller.searchController.clear();
                     },
-                    icon: Icon(Icons.clear),
+                    icon: const Icon(Icons.clear),
                   ),
                 ),
               ),
             ),
             IconButton(
               onPressed: () {
-                context.pushTransparentRoute(SearchPage());
+                context.pushTransparentRoute(const SearchPage());
               },
               icon: const Icon(Icons.search),
             ),
           ],
         ),
       ),
-      body: DiscoverBody(),
+      body: const DiscoverBody(),
     );
   }
 }
@@ -154,12 +154,12 @@ class SearchPage extends GetView<DiscoverController> {
         floatingActionButton: PlayerWidget(),
         appBar: AppBar(
             centerTitle: true,
-            leading: SizedBox.shrink(),
+            leading: const SizedBox.shrink(),
             title: IconButton(
               onPressed: () {
                 Get.back();
               },
-              icon: Icon(Icons.keyboard_arrow_down),
+              icon: const Icon(Icons.keyboard_arrow_down),
             )),
         body: Obx(
           () => FutureBuilder(

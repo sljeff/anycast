@@ -30,12 +30,12 @@ Future<List<SubscriptionModel>> searchChannels(String searchText) async {
   for (var item in data['data']['channel_list']) {
     subscriptions.add(SubscriptionModel.fromMap({
       'rssFeedUrl': item['rss_url'],
-      'title': item['title'],
-      'description': item['description'],
+      'title': item['title'].trim(),
+      'description': item['description'].trim(),
       'imageUrl': item['small_cover_url'],
       'link': item['link'],
       'categories': item['keywords'].join(','),
-      'author': item['author'],
+      'author': item['author'].trim(),
       'email': '',
     }));
   }
@@ -94,12 +94,12 @@ Future<List<SubscriptionModel>> listChannelsByCategoryId(
   for (var item in data['data']['list']) {
     subscriptions.add(SubscriptionModel.fromMap({
       'rssFeedUrl': item['rss_url'],
-      'title': item['title'],
-      'description': item['description'],
+      'title': item['title'].trim(),
+      'description': item['description'].trim(),
       'imageUrl': item['small_cover_url'],
       'link': item['link'],
       'categories': item['keywords'].join(','),
-      'author': item['author'],
+      'author': item['author'].trim(),
       'email': '',
     }));
   }

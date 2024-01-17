@@ -66,9 +66,8 @@ class Channel extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Container(
-                      margin: const EdgeInsets.only(left: 8),
-                      width: screenSize.width - 200,
+                    const SizedBox(width: 16),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -84,26 +83,33 @@ class Channel extends StatelessWidget {
                         ],
                       ),
                     ),
-                    SizedBox(
-                      width: 48,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          IconButton(
-                            onPressed: () {
-                              if (controller.subscribed.value) {
-                                controller.unsubscribe();
-                              } else {
-                                controller.subscribe();
-                              }
-                            },
-                            icon: Icon(controller.subscribed.value
-                                ? Icons.check
-                                : Icons.add),
-                          ),
-                        ],
+                    const SizedBox(width: 16),
+                    TextButton(
+                      onPressed: () {
+                        if (controller.subscribed.value) {
+                          controller.unsubscribe();
+                        } else {
+                          controller.subscribe();
+                        }
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: controller.subscribed.value
+                            ? Colors.grey
+                            : Colors.blue,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        controller.subscribed.value
+                            ? 'Unsubscribe'
+                            : 'Subscribe',
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
+                    const SizedBox(width: 12),
                   ],
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/subscription.dart';
+import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:get/get.dart';
 
@@ -35,6 +36,10 @@ class ChannelController extends GetxController {
   void subscribe() {
     subscribed.value = true;
     subscriptionController.addMany([channel.value]);
+    // add newest episode to feed
+    if (episodes.isNotEmpty) {
+      Get.find<FeedEpisodeController>().addMany([episodes.first]);
+    }
   }
 
   void unsubscribe() {
