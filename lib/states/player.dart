@@ -6,6 +6,7 @@ import 'package:anycast/models/player.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/utils/audio_handler.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -18,6 +19,8 @@ class PlayerController extends GetxController {
     bufferedPosition: Duration.zero,
     duration: Duration.zero,
   ).obs;
+  var pageController = PageController(viewportFraction: 1, initialPage: 2);
+  var pageIndex = 2.obs;
 
   final DatabaseHelper helper = DatabaseHelper();
   final MyAudioHandler myAudioHandler = MyAudioHandler();

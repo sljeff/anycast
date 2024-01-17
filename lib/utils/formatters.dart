@@ -1,4 +1,9 @@
+import 'package:anycast/utils/rss_fetcher.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart';
+import 'package:sanitize_html/sanitize_html.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:url_launcher/url_launcher.dart';
 
 String formatDatetime(int ts) {
   var dt = DateTime.fromMillisecondsSinceEpoch(ts);
@@ -42,4 +47,34 @@ String formatRemainingTime(Duration duration, Duration playedDuration) {
   } else {
     return remainingTime;
   }
+}
+
+Widget renderHtml(context, String html) {
+  // if starts with <
+  if (html.trim().startsWith('<')) {
+    var sanitized = sanitizeHtml(html).trim();
+    if (sanitized.isEmpty) {
+      sanitized = htmlToText(html)!;
+    }
+    return Html(
+      data: sanitized,
+      onLinkTap: (url, attributes, element) async {
+        if (url == null) {
+          return;
+        }
+        var uri = Uri.parse(url);
+        var can = await canLaunchUrl(uri);
+        if (can) {
+          await launchUrl(
+            uri,
+            mode: LaunchMode.inAppBrowserView,
+          );
+        } else {
+          print("cannot launch $url");
+        }
+      },
+    );
+  }
+
+  return Text(html, style: const TextStyle(fontSize: 14));
 }

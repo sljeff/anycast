@@ -1,15 +1,12 @@
 import 'package:anycast/models/episode.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/subscription.dart';
-import 'package:anycast/utils/rss_fetcher.dart';
+import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/channel.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:get/get.dart';
-import 'package:sanitize_html/sanitize_html.dart' show sanitizeHtml;
-import 'package:url_launcher/url_launcher.dart';
 
 class DetailWidget extends StatelessWidget {
   final Episode episode;
@@ -99,49 +96,4 @@ class DetailWidget extends StatelessWidget {
               },
             ));
   }
-}
-
-Widget renderHtml(context, String html) {
-  // if starts with <
-  if (html.trim().startsWith('<')) {
-    var sanitized = sanitizeHtml(html).trim();
-    if (sanitized.isEmpty) {
-      sanitized = htmlToText(html)!;
-    }
-    return Html(
-      data: sanitized,
-      onLinkTap: (url, attributes, element) async {
-        if (url == null) {
-          return;
-        }
-        var uri = Uri.parse(url);
-        var can = await canLaunchUrl(uri);
-        if (can) {
-          await launchUrl(
-            uri,
-            mode: LaunchMode.inAppBrowserView,
-          );
-        } else {
-          // modal
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Cannot open link'),
-              content: Text(url),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Close'),
-                ),
-              ],
-            ),
-          );
-        }
-      },
-    );
-  }
-
-  return Text(html, style: const TextStyle(fontSize: 14));
 }

@@ -1,5 +1,6 @@
 import 'package:anycast/states/player.dart';
 import 'package:anycast/utils/audio_handler.dart';
+import 'package:anycast/utils/formatters.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
@@ -18,33 +19,30 @@ class PlayerPage extends StatelessWidget {
       onDismissed: () {
         Get.back();
       },
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // draggable arrow (left)
-          const SizedBox(height: 32),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                onPressed: () {
-                  Get.back();
-                },
-                icon: Icon(Icons.keyboard_arrow_down),
-              ),
-            ],
-          ),
-          SwipeImage(),
-          Titles(),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: MyProgressBar(),
-          ),
-          const SizedBox(height: 8),
-          Controls(),
-          const SizedBox(height: 32),
-        ],
+      child: SafeArea(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    Get.back();
+                  },
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                ),
+              ],
+            ),
+            const SwipeImage(),
+            Titles(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: MyProgressBar(),
+            ),
+            Controls(),
+          ],
+        ),
       ),
     );
   }
@@ -97,51 +95,142 @@ class MyProgressBar extends GetView<PlayerController> {
   }
 }
 
-class SwipeImage extends StatelessWidget {
-  SwipeImage({super.key});
-
-  final MyAudioHandler myAudioHandler = MyAudioHandler();
-  final PlayerController controller = Get.find();
+class SwipeImage extends GetView<PlayerController> {
+  const SwipeImage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 300,
-      child: PageView(
-        controller: PageController(viewportFraction: 0.8, initialPage: 1),
-        // settings / image / description
+    var size = MediaQuery.of(context).size;
+    var height = size.height * 0.4;
+    return DefaultTextStyle(
+      style: const TextStyle(fontSize: 16, color: Colors.white),
+      child: Column(
         children: [
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            color: Colors.red,
+          SizedBox(
+            height: height,
+            width: height + 16,
+            child: PageView(
+              onPageChanged: (value) {
+                controller.pageIndex.value = value;
+              },
+              controller: controller.pageController,
+              // descrption / settings / image / subtitle / ai summary
+              children: [
+                Scrollbar(
+                  child: SingleChildScrollView(
+                      child: renderHtml(
+                          context, controller.playlistEpisode!.description!)),
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Center(child: Icon(Icons.abc)),
+                ),
+                Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Obx(() {
+                      var episode = controller.playlistEpisode!;
+                      return Hero(
+                        tag: 'play_image',
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl: episode.imageUrl ?? '',
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const Icon(
+                              Icons.image,
+                            ),
+                            errorWidget: (context, url, error) => const Icon(
+                              Icons.image_not_supported,
+                            ),
+                          ),
+                        ),
+                      );
+                    })),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Center(child: Icon(Icons.abc)),
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Center(child: Icon(Icons.abc)),
+                ),
+              ],
+            ),
           ),
-          Container(
-              margin: const EdgeInsets.symmetric(horizontal: 10),
-              child: Obx(() {
-                var episode = controller.playlistEpisode!;
-                return Hero(
-                  tag: 'play_image',
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: episode.imageUrl ?? '',
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => const Icon(
-                        Icons.image,
-                      ),
-                      errorWidget: (context, url, error) => const Icon(
-                        Icons.image_not_supported,
-                      ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white.withOpacity(0.2),
+                ),
+                child: const ButtonBar(
+                  buttonPadding: EdgeInsets.all(0),
+                  children: [
+                    PageTabButton(
+                      icon: Icons.description,
+                      index: 0,
                     ),
-                  ),
-                );
-              })),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            color: Colors.green,
+                    PageTabButton(
+                      icon: Icons.settings,
+                      index: 1,
+                    ),
+                    PageTabButton(
+                      icon: Icons.image,
+                      index: 2,
+                    ),
+                    PageTabButton(
+                      icon: Icons.subtitles,
+                      index: 3,
+                    ),
+                    PageTabButton(
+                      icon: Icons.auto_awesome,
+                      index: 4,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class PageTabButton extends GetView<PlayerController> {
+  final IconData icon;
+  final int index;
+
+  const PageTabButton({super.key, required this.icon, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(
+      () {
+        var isSelect = controller.pageIndex.value == index;
+        return Container(
+          decoration: isSelect
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white.withOpacity(0.2),
+                )
+              : null,
+          child: IconButton(
+            onPressed: () {
+              controller.pageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
+            icon: Icon(icon),
+            isSelected: isSelect,
+          ),
+        );
+      },
     );
   }
 }
@@ -238,7 +327,7 @@ class Titles extends StatelessWidget {
                 child: Marquee(
                   text: episode.title!,
                   blankSpace: 8,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 32,
                     decoration: TextDecoration.none,
                     color: Colors.white,
