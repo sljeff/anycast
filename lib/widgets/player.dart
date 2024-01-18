@@ -22,9 +22,9 @@ class PlayerWidget extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        var episode = controller.playlistEpisode;
+        var episode = controller.playlistEpisode.value;
 
-        if (episode == null) {
+        if (episode.guid == null) {
           return const SizedBox.shrink();
         }
 

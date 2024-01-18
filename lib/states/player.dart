@@ -20,6 +20,7 @@ class PlayerController extends GetxController {
     duration: Duration.zero,
   ).obs;
   var pageIndex = 2.obs;
+  var playlistEpisode = PlaylistEpisodeModel.empty().obs;
 
   var pageController = PageController(
     viewportFraction: 1,
@@ -36,17 +37,6 @@ class PlayerController extends GetxController {
         .getEpisodeControllerByPlaylistId(player.value.currentPlaylistId!);
   }
 
-  PlaylistEpisodeModel? get playlistEpisode {
-    if (player.value.currentPlaylistId == null) {
-      return null;
-    }
-    var es = playlistEpisodeController!.episodes;
-    if (es.isEmpty) {
-      return null;
-    }
-    return es[0];
-  }
-
   @override
   void onInit() {
     super.onInit();
@@ -59,8 +49,7 @@ class PlayerController extends GetxController {
       if (peController == null) {
         return;
       }
-      var pe = playlistEpisode;
-      if (pe == null) {
+      if (playlistEpisode.value.guid == null) {
         return;
       }
       peController.updatePlayedDuration(myAudioHandler.playedDuration);
@@ -114,6 +103,7 @@ class PlayerController extends GetxController {
     });
 
     this.player.value = player;
+    playlistEpisode.value = episode;
 
     myAudioHandler.playByEpisode(episode);
 
@@ -128,19 +118,18 @@ class PlayerController extends GetxController {
 
   Future<void> play() async {
     if (myAudioHandler.audioSource == null) {
-      var pe = playlistEpisode;
-      if (pe == null) {
+      if (playlistEpisode.value.guid == null) {
         return;
       }
-      playByEpisode(pe);
+      playByEpisode(playlistEpisode.value);
       return;
     }
     return myAudioHandler.play();
   }
 
   void initProgress() {
-    var pe = playlistEpisode;
-    if (pe == null) {
+    var pe = playlistEpisode.value;
+    if (pe.guid == null) {
       return;
     }
     positionData.value = PositionData(
@@ -155,6 +144,7 @@ class SettinigsController extends GetxController {
   var isCounting = false.obs;
   var countdownDuration = Duration.zero.obs;
   var speed = 1.0.obs;
+  var skipSilence = false.obs;
   Timer? timer;
 
   final MyAudioHandler myAudioHandler = MyAudioHandler();
@@ -178,6 +168,10 @@ class SettinigsController extends GetxController {
     myAudioHandler.speedStream.listen((event) {
       speed.value = event;
     });
+
+    myAudioHandler.skipSilenceEnabledStream.listen((event) {
+      skipSilence.value = event;
+    });
   }
 
   void start(Duration duration) {
@@ -190,8 +184,18 @@ class SettinigsController extends GetxController {
     isCounting.value = false;
   }
 
+  void onChangeCountdown(Duration duration) {
+    countdownDuration.value = duration;
+    isCounting.value = false;
+  }
+
   void setSpeed(double speed) {
     this.speed.value = speed;
     myAudioHandler.setSpeed(speed);
+  }
+
+  void setSkipSilence(bool skipSilence) {
+    this.skipSilence.value = skipSilence;
+    myAudioHandler.setSkipSilence(skipSilence);
   }
 }

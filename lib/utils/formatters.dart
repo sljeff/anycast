@@ -80,6 +80,13 @@ Widget renderHtml(context, String html) {
 }
 
 String formatCountdown(Duration duration) {
+  if (duration.inSeconds <= 0) {
+    return 'OFF';
+  }
+  if (duration.inMinutes == 60) {
+    return '1h';
+  }
+
   var minutes = duration.inMinutes.remainder(60);
   var seconds = duration.inSeconds.remainder(60);
   return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';

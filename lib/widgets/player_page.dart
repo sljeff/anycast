@@ -57,7 +57,7 @@ class MyProgressBar extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    if (controller.playlistEpisode != null &&
+    if (controller.playlistEpisode.value.guid != null &&
         controller.positionData.value.duration == Duration.zero) {
       controller.initProgress();
     }
@@ -74,7 +74,7 @@ class MyProgressBar extends GetView<PlayerController> {
             myAudioHandler.seek(duration);
           },
           timeLabelLocation: TimeLabelLocation.above,
-          timeLabelType: TimeLabelType.totalTime,
+          timeLabelType: TimeLabelType.remainingTime,
           timeLabelPadding: 6,
           timeLabelTextStyle: TextStyle(
             color: Colors.white.withOpacity(0.64),
@@ -104,6 +104,12 @@ class SwipeImage extends GetView<PlayerController> {
     var size = MediaQuery.of(context).size;
     var height = size.height * 0.4;
     controller.pageIndex.value = 2;
+
+    var episode = controller.playlistEpisode.value;
+    if (episode.guid == null) {
+      return const SizedBox.shrink();
+    }
+
     return DefaultTextStyle(
       style: const TextStyle(fontSize: 16, color: Colors.white),
       child: Column(
@@ -119,21 +125,23 @@ class SwipeImage extends GetView<PlayerController> {
               // descrption / settings / image / subtitle / ai summary
               children: [
                 Scrollbar(
-                  child: SingleChildScrollView(
-                      child: renderHtml(
-                          context, controller.playlistEpisode!.description!)),
+                  child: Obx(
+                    () => SingleChildScrollView(
+                        child: renderHtml(context,
+                            controller.playlistEpisode.value.description!)),
+                  ),
                 ),
                 const Settings(),
                 Container(
                     margin: const EdgeInsets.symmetric(horizontal: 10),
                     child: Obx(() {
-                      var episode = controller.playlistEpisode!;
                       return Hero(
                         tag: 'play_image',
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: CachedNetworkImage(
-                            imageUrl: episode.imageUrl ?? '',
+                            imageUrl:
+                                controller.playlistEpisode.value.imageUrl ?? '',
                             fit: BoxFit.cover,
                             placeholder: (context, url) => const Icon(
                               Icons.image,
@@ -297,8 +305,8 @@ class Titles extends GetView<PlayerController> {
   Widget build(BuildContext context) {
     return Obx(
       () {
-        var episode = controller.playlistEpisode!;
-        if (episode.id == null) {
+        var episode = controller.playlistEpisode.value;
+        if (episode.guid == null) {
           // placeholder
           return const SizedBox(
             height: 70,
@@ -342,87 +350,211 @@ class Titles extends GetView<PlayerController> {
   }
 }
 
+class CustomSliderThumbCircle extends SliderComponentShape {
+  final double thumbRadius;
+
+  const CustomSliderThumbCircle({required this.thumbRadius});
+
+  @override
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) {
+    return Size.fromRadius(thumbRadius);
+  }
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
+  }) {
+    final Canvas canvas = context.canvas;
+
+    final paint = Paint()
+      ..color = sliderTheme.thumbColor! // Thumb background color
+      ..style = PaintingStyle.fill;
+
+    // Draw the thumb circle
+    canvas.drawCircle(center, thumbRadius, paint);
+
+    // Text style for the value inside the thumb
+    TextStyle textStyle = TextStyle(
+      color: sliderTheme.valueIndicatorColor, // Text color
+      fontSize: thumbRadius * 0.6,
+      fontWeight: FontWeight.bold,
+    );
+
+    // Create a TextPainter to paint the value text
+    final textSpan = TextSpan(
+      style: textStyle,
+      text: labelPainter.text!.toPlainText(),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textAlign: TextAlign.center,
+      textDirection: textDirection,
+    );
+
+    // Layout the text painter and calculate the offset for the text's position
+    textPainter.layout();
+    final textCenter = Offset(
+      center.dx - (textPainter.width / 2),
+      center.dy - (textPainter.height / 2),
+    );
+
+    // Paint the value text inside the thumb
+    textPainter.paint(canvas, textCenter);
+  }
+}
+
 class Settings extends GetView<SettinigsController> {
   const Settings({super.key});
 
   @override
   Widget build(BuildContext context) {
+    SliderThemeData sliderThemeData = SliderTheme.of(context).copyWith(
+      activeTrackColor: Colors.blue,
+      inactiveTrackColor: Colors.blue.withOpacity(0.3),
+      trackHeight: 0,
+      trackShape: const RoundedRectSliderTrackShape(),
+      thumbColor: Colors.white,
+      thumbShape: CustomSliderThumbCircle(thumbRadius: 20),
+      overlayColor: Colors.transparent,
+      overlayShape: RoundSliderOverlayShape(overlayRadius: 12.0),
+      showValueIndicator: ShowValueIndicator.never,
+      tickMarkShape: RoundSliderTickMarkShape(tickMarkRadius: 4),
+      activeTickMarkColor: Colors.white,
+      inactiveTickMarkColor: Colors.orange.withOpacity(0.5),
+      valueIndicatorShape: PaddleSliderValueIndicatorShape(),
+      valueIndicatorColor: Colors.orange,
+      valueIndicatorTextStyle: TextStyle(
+        color: Colors.white,
+      ),
+    );
+
     return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // speed / sleep countdown
-        const Text(
-          'Speed',
-          style: TextStyle(
-            fontSize: 16,
-            decoration: TextDecoration.none,
-            color: Colors.white,
+        Column(children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Text(
+                'Speed',
+                style: TextStyle(
+                  fontSize: 16,
+                ),
+              ),
+            ],
           ),
-        ),
-        // current speed
-        Obx(() {
-          var speed = controller.speed.value;
-          return Text(
-            speed.toStringAsFixed(1),
-            style: TextStyle(
-              fontSize: 32,
-              decoration: TextDecoration.none,
-              color: Colors.white,
-            ),
-          );
-        }),
-        Obx(
-          () => Material(
-            color: Colors.transparent,
-            child: Slider(
-              value: controller.speed.value,
-              onChanged: (value) {
-                controller.setSpeed(value);
-              },
-              min: 0.5,
-              max: 2.0,
-              divisions: 6,
-              label: controller.speed.value.toStringAsFixed(1),
-            ),
-          ),
-        ),
-        Text(
-          'Sleep Countdown',
-          style: TextStyle(
-            fontSize: 16,
-            decoration: TextDecoration.none,
-            color: Colors.white,
-          ),
-        ),
-        Obx(() {
-          var duration = controller.countdownDuration.value;
-          return Text(
-            formatCountdown(duration),
-            style: TextStyle(
-              fontSize: 32,
-              decoration: TextDecoration.none,
-              color: Colors.white,
-            ),
-          );
-        }),
-        Obx(
-          () => Material(
-            color: Colors.transparent,
-            child: Slider(
-              value: controller.countdownDuration.value.inMinutes.toDouble(),
-              onChanged: (value) {
-                if (value == 0) {
-                  controller.stop();
-                } else {
-                  controller.start(Duration(minutes: value.toInt()));
-                }
-              },
-              min: 0,
-              max: 60,
-              divisions: 21,
-              label: controller.countdownDuration.value.inMinutes.toString(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Obx(
+              () => Material(
+                shape: const StadiumBorder(),
+                color: Colors.blue,
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: SliderTheme(
+                    data: sliderThemeData.copyWith(
+                      activeTrackColor: Colors.blue,
+                      inactiveTrackColor: Colors.blue,
+                      inactiveTickMarkColor: Colors.white,
+                    ),
+                    child: Slider(
+                      value: controller.speed.value,
+                      onChanged: (value) {
+                        controller.setSpeed(value);
+                      },
+                      min: 0.5,
+                      max: 2.0,
+                      divisions: 6,
+                      label: controller.speed.value.toStringAsFixed(1),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
+        ]),
+        Column(children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Text(
+                'Countdown',
+                style: TextStyle(
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Obx(
+              () => Material(
+                color: Colors.blue,
+                shape: const StadiumBorder(),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: SliderTheme(
+                    data: sliderThemeData,
+                    child: Slider(
+                      value: controller.countdownDuration.value.inMinutes
+                          .toDouble(),
+                      onChanged: (value) {
+                        controller.onChangeCountdown(
+                            Duration(minutes: value.toInt()));
+                      },
+                      onChangeEnd: (value) {
+                        if (value == 0) {
+                          controller.stop();
+                        } else {
+                          controller.start(Duration(minutes: value.toInt()));
+                        }
+                      },
+                      min: 0,
+                      max: 60,
+                      divisions: 6,
+                      label:
+                          formatCountdown(controller.countdownDuration.value),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          )
+        ]),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // switch skip silence
+            Text(
+              'Skip Silence',
+              style: TextStyle(
+                fontSize: 16,
+              ),
+            ),
+            SizedBox(width: 8),
+            Obx(
+              () => Material(
+                color: Colors.transparent,
+                child: Switch(
+                  activeColor: Colors.blue,
+                  value: controller.skipSilence.value,
+                  onChanged: (value) {
+                    controller.setSkipSilence(value);
+                  },
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

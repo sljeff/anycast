@@ -19,8 +19,24 @@ class PositionData {
 class MyAudioHandler extends BaseAudioHandler {
   static final _instance = MyAudioHandler._internal();
   factory MyAudioHandler() => _instance;
+  final _player = AudioPlayer();
 
   MyAudioHandler._internal() {
+    // set vocal enhancer
+    // var equalizer = AndroidEqualizer();
+    // equalizer.parameters.then((params) {
+    //   print(params.bands.length);
+    //   params.bands.map((e) {
+    //     print(e.gain);
+    //   });
+    // });
+    // _player = AudioPlayer(
+    //     audioPipeline: AudioPipeline(
+    //   androidAudioEffects: [
+    //     equalizer,
+    //   ],
+    // ));
+
     // pipe to audio_service
     _player.playbackEventStream.listen((event) {
       var isPlaying = _player.playing;
@@ -45,8 +61,6 @@ class MyAudioHandler extends BaseAudioHandler {
     });
   }
 
-  final _player = AudioPlayer();
-
   bool get isPlaying => _player.playing;
   Duration get playedDuration => _player.position;
   AudioSource? get audioSource => _player.audioSource;
@@ -60,6 +74,7 @@ class MyAudioHandler extends BaseAudioHandler {
           ));
   Stream<bool> get playingStream => _player.playingStream;
   Stream<double> get speedStream => _player.speedStream;
+  Stream<bool> get skipSilenceEnabledStream => _player.skipSilenceEnabledStream;
 
   Future<void> playByEpisode(PlaylistEpisodeModel episode) async {
     if (mediaItem.value?.id == episode.enclosureUrl) {
@@ -161,5 +176,9 @@ class MyAudioHandler extends BaseAudioHandler {
 
   UriAudioSource _createAudioSource(MediaItem item) {
     return ProgressiveAudioSource(Uri.parse(item.id), tag: item);
+  }
+
+  void setSkipSilence(bool skipSilence) {
+    _player.setSkipSilenceEnabled(skipSilence);
   }
 }

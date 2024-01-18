@@ -86,6 +86,9 @@ class Channel extends StatelessWidget {
                     const SizedBox(width: 16),
                     TextButton(
                       onPressed: () {
+                        if (controller.isLoading.value) {
+                          return;
+                        }
                         if (controller.subscribed.value) {
                           controller.unsubscribe();
                         } else {
@@ -101,13 +104,20 @@ class Channel extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: Text(
-                        controller.subscribed.value
-                            ? 'Unsubscribe'
-                            : 'Subscribe',
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
+                      child: controller.isLoading.value
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ))
+                          : Text(
+                              controller.subscribed.value
+                                  ? 'Unsubscribe'
+                                  : 'Subscribe',
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
                     ),
                     const SizedBox(width: 12),
                   ],
