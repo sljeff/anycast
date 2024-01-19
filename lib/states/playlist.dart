@@ -1,4 +1,5 @@
 import 'package:anycast/models/helper.dart';
+import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/models/playlist.dart';
 import 'package:get/get.dart';
@@ -29,6 +30,14 @@ class PlaylistController extends GetxController {
             }
             Future.wait(futures).then((value) {
               isLoading.value = false;
+              var playerController = Get.find<PlayerController>();
+              if (playerController.player.value.currentPlaylistId != null) {
+                var episodes =
+                    playerController.playlistEpisodeController!.episodes;
+                if (episodes.isNotEmpty) {
+                  playerController.playlistEpisode.value = episodes[0];
+                }
+              }
             });
           })
         });

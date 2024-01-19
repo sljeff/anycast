@@ -11,11 +11,9 @@ class PlaylistEpisodeController extends GetxController {
   final DatabaseHelper helper = DatabaseHelper();
 
   Future<void> loadManually() async {
-    return helper.db.then((db) {
-      PlaylistEpisodeModel.listByPlaylistId(db!, playlistId).then((episodes) {
-        this.episodes.value = episodes;
-      });
-    });
+    var db = await helper.db;
+    var episodes = await PlaylistEpisodeModel.listByPlaylistId(db!, playlistId);
+    this.episodes.value = episodes;
   }
 
   Future<void> add(int position, PlaylistEpisodeModel episode) async {

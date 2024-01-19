@@ -33,7 +33,7 @@ class NavigationBarApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Get.put(SettinigsController());
+    Get.put(SettingsController());
     return GetMaterialApp(
       home: GetBuilder<HomeTabController>(
         builder: (controller) => Scaffold(

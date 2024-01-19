@@ -415,7 +415,7 @@ class CustomSliderThumbCircle extends SliderComponentShape {
   }
 }
 
-class Settings extends GetView<SettinigsController> {
+class Settings extends GetView<SettingsController> {
   const Settings({super.key});
 
   @override
@@ -638,7 +638,7 @@ class Settings extends GetView<SettinigsController> {
   }
 }
 
-class AutoSleepPicker extends GetView<SettinigsController> {
+class AutoSleepPicker extends GetView<SettingsController> {
   const AutoSleepPicker({super.key});
 
   @override

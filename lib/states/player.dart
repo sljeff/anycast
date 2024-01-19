@@ -96,39 +96,6 @@ class PlayerController extends GetxController {
         });
   }
 
-  void _autoSetCountdown() {
-    var settingsController = Get.find<SettinigsController>();
-    if (settingsController.isCounting.value) {
-      return;
-    }
-    var startHour = settingsController.autoSleepStartHourIndex.value;
-    var endHour = settingsController.autoSleepEndHourIndex.value;
-    var countdownMin = settingsController.autoSleepCountdownMinIndex.value;
-    if (countdownMin == 0) {
-      return;
-    }
-    var now = DateTime.now();
-    // if not in range, return
-    var small = startHour < endHour ? startHour : endHour;
-    var big = startHour > endHour ? startHour : endHour;
-    var exchanged = startHour > endHour;
-    if (exchanged) {
-      if (now.hour > small && now.hour < big) {
-        return;
-      }
-    } else {
-      if (now.hour < small || now.hour > big) {
-        return;
-      }
-    }
-
-    var duration = settingsController.sleepMins[countdownMin];
-    if (duration == 0) {
-      return;
-    }
-    settingsController.start(Duration(minutes: duration));
-  }
-
   void playByEpisode(PlaylistEpisodeModel episode) async {
     var playlistId = episode.playlistId!;
     var player = PlayerModel.fromMap({
@@ -137,8 +104,6 @@ class PlayerController extends GetxController {
 
     this.player.value = player;
     playlistEpisode.value = episode;
-
-    _autoSetCountdown();
 
     myAudioHandler.playByEpisode(episode);
 
@@ -159,7 +124,6 @@ class PlayerController extends GetxController {
       playByEpisode(playlistEpisode.value);
       return;
     }
-    _autoSetCountdown();
     return myAudioHandler.play();
   }
 
@@ -176,7 +140,7 @@ class PlayerController extends GetxController {
   }
 }
 
-class SettinigsController extends GetxController {
+class SettingsController extends GetxController {
   var isCounting = false.obs;
   var countdownDuration = Duration.zero.obs;
   var speed = 1.0.obs;
@@ -262,5 +226,37 @@ class SettinigsController extends GetxController {
 
   void setAutoSleepCountdownMinIndex(int index) {
     autoSleepCountdownMinIndex.value = index;
+  }
+
+  void autoSetCountdown() {
+    if (isCounting.value) {
+      return;
+    }
+    var startHour = autoSleepStartHourIndex.value;
+    var endHour = autoSleepEndHourIndex.value;
+    var countdownMin = autoSleepCountdownMinIndex.value;
+    if (countdownMin == 0) {
+      return;
+    }
+    var now = DateTime.now();
+    // if not in range, return
+    var small = startHour < endHour ? startHour : endHour;
+    var big = startHour > endHour ? startHour : endHour;
+    var exchanged = startHour > endHour;
+    if (exchanged) {
+      if (now.hour > small && now.hour < big) {
+        return;
+      }
+    } else {
+      if (now.hour < small || now.hour > big) {
+        return;
+      }
+    }
+
+    var duration = sleepMins[countdownMin];
+    if (duration == 0) {
+      return;
+    }
+    start(Duration(minutes: duration));
   }
 }
