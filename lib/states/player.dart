@@ -96,6 +96,39 @@ class PlayerController extends GetxController {
         });
   }
 
+  void _autoSetCountdown() {
+    var settingsController = Get.find<SettinigsController>();
+    if (settingsController.isCounting.value) {
+      return;
+    }
+    var startHour = settingsController.autoSleepStartHourIndex.value;
+    var endHour = settingsController.autoSleepEndHourIndex.value;
+    var countdownMin = settingsController.autoSleepCountdownMinIndex.value;
+    if (countdownMin == 0) {
+      return;
+    }
+    var now = DateTime.now();
+    // if not in range, return
+    var small = startHour < endHour ? startHour : endHour;
+    var big = startHour > endHour ? startHour : endHour;
+    var exchanged = startHour > endHour;
+    if (exchanged) {
+      if (now.hour > small && now.hour < big) {
+        return;
+      }
+    } else {
+      if (now.hour < small || now.hour > big) {
+        return;
+      }
+    }
+
+    var duration = settingsController.sleepMins[countdownMin];
+    if (duration == 0) {
+      return;
+    }
+    settingsController.start(Duration(minutes: duration));
+  }
+
   void playByEpisode(PlaylistEpisodeModel episode) async {
     var playlistId = episode.playlistId!;
     var player = PlayerModel.fromMap({
@@ -104,6 +137,8 @@ class PlayerController extends GetxController {
 
     this.player.value = player;
     playlistEpisode.value = episode;
+
+    _autoSetCountdown();
 
     myAudioHandler.playByEpisode(episode);
 
@@ -124,6 +159,7 @@ class PlayerController extends GetxController {
       playByEpisode(playlistEpisode.value);
       return;
     }
+    _autoSetCountdown();
     return myAudioHandler.play();
   }
 
@@ -145,6 +181,22 @@ class SettinigsController extends GetxController {
   var countdownDuration = Duration.zero.obs;
   var speed = 1.0.obs;
   var skipSilence = false.obs;
+  var autoSleepStartHourIndex = 0.obs;
+  var autoSleepEndHourIndex = 0.obs;
+  var autoSleepCountdownMinIndex = 0.obs;
+
+  var hours = List.generate(24, (index) => index);
+  var sleepMins = List.generate(7, (index) => index * 10);
+  var sleepMinsText = [
+    'OFF',
+    '10 min',
+    '20 min',
+    '30 min',
+    '40 min',
+    '50 min',
+    '1 hour',
+  ];
+
   Timer? timer;
 
   final MyAudioHandler myAudioHandler = MyAudioHandler();
@@ -184,6 +236,7 @@ class SettinigsController extends GetxController {
     isCounting.value = false;
   }
 
+  // only for display
   void onChangeCountdown(Duration duration) {
     countdownDuration.value = duration;
     isCounting.value = false;
@@ -197,5 +250,17 @@ class SettinigsController extends GetxController {
   void setSkipSilence(bool skipSilence) {
     this.skipSilence.value = skipSilence;
     myAudioHandler.setSkipSilence(skipSilence);
+  }
+
+  void setAutoSleepStartHourIndex(int index) {
+    autoSleepStartHourIndex.value = index;
+  }
+
+  void setAutoSleepEndHourIndex(int index) {
+    autoSleepEndHourIndex.value = index;
+  }
+
+  void setAutoSleepCountdownMinIndex(int index) {
+    autoSleepCountdownMinIndex.value = index;
   }
 }

@@ -4,6 +4,7 @@ import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:get/get.dart';
@@ -440,6 +441,7 @@ class Settings extends GetView<SettinigsController> {
     );
 
     return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(children: [
           const Row(
@@ -531,32 +533,249 @@ class Settings extends GetView<SettinigsController> {
             ),
           )
         ]),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // switch skip silence
-            Text(
-              'Skip Silence',
-              style: TextStyle(
-                fontSize: 16,
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Skip Silence',
+                    style: TextStyle(
+                      fontSize: 16,
+                    ),
+                  ),
+                  Material(
+                    color: Colors.transparent,
+                    child: SizedBox(
+                      width: 80,
+                      height: 64,
+                      child: FittedBox(
+                        fit: BoxFit.fill,
+                        child: Obx(
+                          () => Switch(
+                            activeColor: Colors.blue,
+                            inactiveThumbColor: Colors.blue,
+                            inactiveTrackColor: Colors.white.withOpacity(0.7),
+                            trackOutlineColor: MaterialStateColor.resolveWith(
+                                (states) => Colors.blue.withOpacity(0.3)),
+                            value: controller.skipSilence.value,
+                            onChanged: (value) {
+                              controller.setSkipSilence(value);
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            SizedBox(width: 8),
-            Obx(
-              () => Material(
-                color: Colors.transparent,
-                child: Switch(
-                  activeColor: Colors.blue,
-                  value: controller.skipSilence.value,
-                  onChanged: (value) {
-                    controller.setSkipSilence(value);
-                  },
+              Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+                const Row(
+                  children: [
+                    Text(
+                      'Auto sleep timer',
+                      style: TextStyle(
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Tooltip(
+                      showDuration: Duration(seconds: 10),
+                      message:
+                          'A countdown will be enabled when a podcast starts '
+                          'within the time range you set.\n'
+                          'If you changed this setting, you need to replay '
+                          'the podcast to take effect.',
+                      triggerMode: TooltipTriggerMode.tap,
+                      child: Icon(Icons.info_outline),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ],
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 40,
+                  width: 80,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.black,
+                    ),
+                    onPressed: () {
+                      Get.bottomSheet(
+                        const AutoSleepPicker(),
+                        backgroundColor: Colors.blueGrey,
+                      );
+                    },
+                    child: Obx(
+                      () {
+                        var off =
+                            controller.autoSleepCountdownMinIndex.value == 0 ||
+                                controller.autoSleepStartHourIndex.value ==
+                                    controller.autoSleepEndHourIndex.value;
+                        return Text(
+                          off
+                              ? 'OFF'
+                              : controller.sleepMinsText[
+                                  controller.autoSleepCountdownMinIndex.value],
+                          style: const TextStyle(
+                            color: Colors.white,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                )
+              ]),
+            ],
+          ),
         ),
       ],
+    );
+  }
+}
+
+class AutoSleepPicker extends GetView<SettinigsController> {
+  const AutoSleepPicker({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 300,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Obx(
+            () {
+              const style = TextStyle(
+                fontSize: 18,
+                color: Colors.amber,
+              );
+              var startHour =
+                  controller.hours[controller.autoSleepStartHourIndex.value];
+              var endHour =
+                  controller.hours[controller.autoSleepEndHourIndex.value];
+              if (controller.autoSleepCountdownMinIndex.value == 0 ||
+                  startHour == endHour) {
+                return const Text(
+                  'OFF',
+                  style: style,
+                );
+              }
+              var endHourStr = '$endHour:00';
+              if (startHour >= endHour) {
+                endHourStr = '$endHour:00 (next day)';
+              }
+
+              if (controller.autoSleepCountdownMinIndex.value == 0) {
+                return const SizedBox.shrink();
+              }
+              var countdownMin = controller
+                  .sleepMinsText[controller.autoSleepCountdownMinIndex.value];
+              return Column(children: [
+                Text(
+                  '$startHour:00 - $endHourStr',
+                  style: style,
+                ),
+                Text(
+                  '$countdownMin countdown',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: Colors.amber,
+                  ),
+                ),
+              ]);
+            },
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              SizedBox(
+                height: 40,
+                width: 64,
+                child: Obx(
+                  () => CupertinoPicker(
+                    scrollController: FixedExtentScrollController(
+                        initialItem: controller.autoSleepStartHourIndex.value),
+                    itemExtent: 24,
+                    onSelectedItemChanged: (index) {
+                      controller.setAutoSleepStartHourIndex(index);
+                    },
+                    children: controller.hours.map((e) {
+                      return Text(
+                        '$e:00',
+                        style: const TextStyle(
+                          color: Colors.white,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 40,
+                width: 64,
+                child: Obx(
+                  () => CupertinoPicker(
+                    scrollController: FixedExtentScrollController(
+                        initialItem: controller.autoSleepEndHourIndex.value),
+                    itemExtent: 24,
+                    onSelectedItemChanged: (index) {
+                      controller.setAutoSleepEndHourIndex(index);
+                    },
+                    children: controller.hours.map((e) {
+                      return Text(
+                        '$e:00',
+                        style: const TextStyle(
+                          color: Colors.white,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 40,
+                width: 70,
+                child: Obx(
+                  () => CupertinoPicker(
+                    scrollController: FixedExtentScrollController(
+                        initialItem:
+                            controller.autoSleepCountdownMinIndex.value),
+                    itemExtent: 24,
+                    onSelectedItemChanged: (index) {
+                      controller.setAutoSleepCountdownMinIndex(index);
+                    },
+                    children: controller.sleepMinsText.map((e) {
+                      return Text(
+                        e,
+                        style: const TextStyle(
+                          color: Colors.white,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 24, left: 24, right: 24),
+            child: Text(
+              'If you changed this setting, you need to play or replay '
+              'the podcast to take effect.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
