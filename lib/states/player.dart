@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/player.dart';
+import 'package:anycast/models/settings.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/utils/audio_handler.dart';
@@ -143,6 +144,8 @@ class PlayerController extends GetxController {
 class SettingsController extends GetxController {
   var isCounting = false.obs;
   var countdownDuration = Duration.zero.obs;
+
+  var darkMode = false.obs;
   var speed = 1.0.obs;
   var skipSilence = false.obs;
   var autoSleepStartHourIndex = 0.obs;
@@ -164,10 +167,29 @@ class SettingsController extends GetxController {
   Timer? timer;
 
   final MyAudioHandler myAudioHandler = MyAudioHandler();
+  final DatabaseHelper helper = DatabaseHelper();
+
+  void _load() {
+    helper.db.then((db) => {
+          SettingsModel.get(db!).then((settings) {
+            darkMode.value = settings.darkMode!;
+            speed.value = settings.speed!;
+            skipSilence.value = settings.skipSilence!;
+            var autoSleepTimer = settings.autoSleepTimer!;
+            var autoSleepTimers = autoSleepTimer.split(',');
+            autoSleepStartHourIndex.value = int.parse(autoSleepTimers[0]);
+            autoSleepEndHourIndex.value = int.parse(autoSleepTimers[1]);
+            autoSleepCountdownMinIndex.value = int.parse(autoSleepTimers[2]);
+          })
+        });
+  }
 
   @override
   void onInit() {
     super.onInit();
+
+    _load();
+
     timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!isCounting.value) {
         return;
@@ -209,23 +231,46 @@ class SettingsController extends GetxController {
   void setSpeed(double speed) {
     this.speed.value = speed;
     myAudioHandler.setSpeed(speed);
+
+    helper.db.then((db) {
+      SettingsModel.setSpeed(db!, speed);
+    });
   }
 
   void setSkipSilence(bool skipSilence) {
     this.skipSilence.value = skipSilence;
     myAudioHandler.setSkipSilence(skipSilence);
+
+    helper.db.then((db) {
+      SettingsModel.setSkipSilence(db!, skipSilence);
+    });
   }
 
   void setAutoSleepStartHourIndex(int index) {
     autoSleepStartHourIndex.value = index;
+
+    helper.db.then((db) {
+      SettingsModel.setAutoSleepTimer(db!, autoSleepStartHourIndex.value,
+          autoSleepEndHourIndex.value, autoSleepCountdownMinIndex.value);
+    });
   }
 
   void setAutoSleepEndHourIndex(int index) {
     autoSleepEndHourIndex.value = index;
+
+    helper.db.then((db) {
+      SettingsModel.setAutoSleepTimer(db!, autoSleepStartHourIndex.value,
+          autoSleepEndHourIndex.value, autoSleepCountdownMinIndex.value);
+    });
   }
 
   void setAutoSleepCountdownMinIndex(int index) {
     autoSleepCountdownMinIndex.value = index;
+
+    helper.db.then((db) {
+      SettingsModel.setAutoSleepTimer(db!, autoSleepStartHourIndex.value,
+          autoSleepEndHourIndex.value, autoSleepCountdownMinIndex.value);
+    });
   }
 
   void autoSetCountdown() {

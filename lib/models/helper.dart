@@ -1,3 +1,5 @@
+import 'package:anycast/models/settings.dart';
+
 import 'feed_episode.dart';
 import 'player.dart';
 import 'playlist.dart';
@@ -13,6 +15,7 @@ List<TableCreator> tableCreators = [
   subscriptionTableCreator,
   playlistTableCreator,
   playerTableCreator,
+  settingsTableCreator,
 ];
 
 class DatabaseHelper {
@@ -36,8 +39,8 @@ class DatabaseHelper {
     // await deleteDatabase(path);
 
     // create new
-    Database db = await openDatabase(path, version: 1,
-        onCreate: (Database db, int version) async {
+    Database db =
+        await openDatabase(path, version: 1, onOpen: (Database db) async {
       for (TableCreator tableCreator in tableCreators) {
         await tableCreator(db);
       }

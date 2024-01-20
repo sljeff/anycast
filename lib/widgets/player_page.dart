@@ -588,9 +588,7 @@ class Settings extends GetView<SettingsController> {
                       showDuration: Duration(seconds: 10),
                       message:
                           'A countdown will be enabled when a podcast starts '
-                          'within the time range you set.\n'
-                          'If you changed this setting, you need to replay '
-                          'the podcast to take effect.',
+                          'within the time range you set.',
                       triggerMode: TooltipTriggerMode.tap,
                       child: Icon(Icons.info_outline),
                     ),
