@@ -29,8 +29,11 @@ class ChannelController extends GetxController {
   }
 
   Future<void> load() async {
-    var allEpisode = await channel.value.listAllEpisodes();
-    episodes.value = allEpisode!;
+    var podcastData = await channel.value.listAllEpisodes();
+    episodes.value = podcastData.feedEpisodes!;
+    if (channel.value.title == null) {
+      channel.value = podcastData.subscription!;
+    }
   }
 
   void subscribe() {

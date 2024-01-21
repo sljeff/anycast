@@ -139,6 +139,13 @@ class PlayerController extends GetxController {
       duration: Duration(milliseconds: pe.duration ?? 0),
     );
   }
+
+  bool isPlayingEpisode(String enclosureUrl) {
+    if (playlistEpisode.value.guid == null || isPlaying.value == false) {
+      return false;
+    }
+    return playlistEpisode.value.enclosureUrl == enclosureUrl;
+  }
 }
 
 class SettingsController extends GetxController {

@@ -1,5 +1,6 @@
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
+import 'package:anycast/states/playlist.dart';
 import 'package:get/get.dart';
 
 class PlaylistEpisodeController extends GetxController {
@@ -14,10 +15,13 @@ class PlaylistEpisodeController extends GetxController {
     var db = await helper.db;
     var episodes = await PlaylistEpisodeModel.listByPlaylistId(db!, playlistId);
     this.episodes.value = episodes;
+    Get.find<PlaylistController>()
+        .addToSet(episodes.map((e) => e.enclosureUrl!).toList());
   }
 
   Future<void> add(int position, PlaylistEpisodeModel episode) async {
     episodes.insert(position, episode);
+    Get.find<PlaylistController>().addToSet([episode.enclosureUrl!]);
     helper.db.then((db) => {
           PlaylistEpisodeModel.insertOrUpdateByIndex(
               db!, playlistId, position, episode)
@@ -26,7 +30,12 @@ class PlaylistEpisodeController extends GetxController {
 
   void remove(String guid) {
     var oldIndex = episodes.indexWhere((e) => e.guid == guid);
+    if (oldIndex == -1) {
+      return;
+    }
+    var enclosureUrl = episodes[oldIndex].enclosureUrl;
     episodes.removeAt(oldIndex);
+    Get.find<PlaylistController>().removeFromSet(enclosureUrl!);
 
     helper.db.then((db) => {PlaylistEpisodeModel.deleteByGuid(db!, guid)});
   }

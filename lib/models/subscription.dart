@@ -1,4 +1,3 @@
-import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -102,10 +101,10 @@ class SubscriptionModel {
         whereArgs: [subscription.rssFeedUrl, subscription.title]);
   }
 
-  Future<List<FeedEpisodeModel>?> listAllEpisodes() async {
+  Future<PodcastImportData> listAllEpisodes() async {
     return fetchPodcastsByUrls([rssFeedUrl!], onlyFistEpisode: false)
         .then((value) {
-      return value[0].feedEpisodes;
+      return value[0];
     });
   }
 }

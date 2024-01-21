@@ -1,4 +1,3 @@
-import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/widgets/feeds_episodes_list.dart';
 import 'package:anycast/widgets/player.dart';
@@ -10,9 +9,9 @@ import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class Channel extends StatelessWidget {
-  final SubscriptionModel subscription;
+  final String rssFeedUrl;
 
-  const Channel({Key? key, required this.subscription}) : super(key: key);
+  const Channel({Key? key, required this.rssFeedUrl}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -22,11 +21,14 @@ class Channel extends StatelessWidget {
       direction: DismissiblePageDismissDirection.down,
       onDismissed: () {
         Get.back();
-        Get.delete<ChannelController>(tag: subscription.rssFeedUrl);
+        Get.delete<ChannelController>(tag: rssFeedUrl);
       },
       child: Obx(() {
-        var controller =
-            Get.find<ChannelController>(tag: subscription.rssFeedUrl);
+        var controller = Get.find<ChannelController>(tag: rssFeedUrl);
+        if (controller.channel.value.title == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        var subscription = controller.channel.value;
         return Scaffold(
           floatingActionButton: PlayerWidget(),
           appBar: AppBar(
@@ -35,7 +37,7 @@ class Channel extends StatelessWidget {
             title: IconButton(
               onPressed: () {
                 Get.back();
-                Get.delete<ChannelController>(tag: subscription.rssFeedUrl);
+                Get.delete<ChannelController>(tag: rssFeedUrl);
               },
               icon: const Icon(Icons.keyboard_arrow_down),
             ),
@@ -126,7 +128,7 @@ class Channel extends StatelessWidget {
               const SizedBox(height: 16),
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.center,
+                alignment: Alignment.centerLeft,
                 width: screenSize.width,
                 child: ExpandableText(
                   subscription.description!,

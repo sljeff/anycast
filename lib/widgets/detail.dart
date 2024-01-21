@@ -1,4 +1,5 @@
 import 'package:anycast/models/episode.dart';
+import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/formatters.dart';
@@ -68,13 +69,15 @@ class DetailWidget extends StatelessWidget {
                                     onTap: () {
                                       var s = subscriptionController
                                           .getByTitle(episode.channelTitle!);
-                                      if (s != null) {
-                                        Get.lazyPut(
-                                            () => ChannelController(channel: s),
-                                            tag: s.rssFeedUrl);
-                                        context.pushTransparentRoute(
-                                            Channel(subscription: s));
+                                      if (s == null) {
+                                        s = SubscriptionModel.empty();
+                                        s.rssFeedUrl = episode.rssFeedUrl;
                                       }
+                                      Get.lazyPut(
+                                          () => ChannelController(channel: s!),
+                                          tag: s.rssFeedUrl);
+                                      context.pushTransparentRoute(
+                                          Channel(rssFeedUrl: s.rssFeedUrl!));
                                     },
                                     child: Text(
                                       episode.channelTitle!,

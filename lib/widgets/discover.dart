@@ -104,7 +104,7 @@ class DiscoverBody extends StatelessWidget {
                                       channel: channels[index]),
                                   tag: channels[index].rssFeedUrl);
                               context.pushTransparentRoute(Channel(
-                                subscription: channels[index],
+                                rssFeedUrl: channels[index].rssFeedUrl!,
                               ));
                             },
                             leading: ClipRRect(
@@ -186,7 +186,7 @@ class SearchPage extends GetView<DiscoverController> {
                                 channel: subscriptions[index]),
                             tag: subscriptions[index].rssFeedUrl);
                         context.pushTransparentRoute(Channel(
-                          subscription: subscriptions[index],
+                          rssFeedUrl: subscriptions[index].rssFeedUrl!,
                         ));
                       },
                       leading: ClipRRect(

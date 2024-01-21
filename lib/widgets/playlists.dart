@@ -1,8 +1,13 @@
+import 'package:anycast/models/subscription.dart';
+import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/player.dart';
+import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/formatters.dart';
+import 'package:anycast/widgets/channel.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
@@ -92,12 +97,26 @@ class PlaylistEpisodesList extends StatelessWidget {
               title: Text(episode.title!, style: const TextStyle(fontSize: 14)),
               subtitle: Row(
                 children: [
-                  Text(
-                    episode.channelTitle!,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 9,
-                        color: Colors.brown),
+                  GestureDetector(
+                    onTap: () {
+                      var s = Get.find<SubscriptionController>()
+                          .getByTitle(episode.channelTitle!);
+                      if (s == null) {
+                        s = SubscriptionModel.empty();
+                        s.rssFeedUrl = episode.rssFeedUrl;
+                      }
+                      Get.lazyPut(() => ChannelController(channel: s!),
+                          tag: s.rssFeedUrl);
+                      context.pushTransparentRoute(
+                          Channel(rssFeedUrl: s.rssFeedUrl!));
+                    },
+                    child: Text(
+                      episode.channelTitle!,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 9,
+                          color: Colors.brown),
+                    ),
                   ),
                   const Text(
                     " • ",

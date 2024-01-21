@@ -29,32 +29,26 @@ class Subscriptions extends StatelessWidget {
                       channel: controller.subscriptions[index]),
                   tag: controller.subscriptions[index].rssFeedUrl);
               context.pushTransparentRoute(Channel(
-                subscription: controller.subscriptions[index],
+                rssFeedUrl: controller.subscriptions[index].rssFeedUrl!,
               ));
             },
-            leading: controller.subscriptions[index].imageUrl != null
-                ? Hero(
-                    tag: controller.subscriptions[index].imageUrl!,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: controller.subscriptions[index].imageUrl!,
-                        width: 50,
-                        height: 50,
-                        placeholder: (context, url) => const Icon(
-                          Icons.image,
-                        ),
-                        errorWidget: (context, url, error) => const Icon(
-                          Icons.image_not_supported,
-                        ),
-                      ),
-                    ),
-                  )
-                : const SizedBox(
-                    width: 50,
-                    height: 50,
-                    child: Icon(Icons.image),
+            leading: Hero(
+              tag: controller.subscriptions[index].imageUrl!,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: controller.subscriptions[index].imageUrl!,
+                  width: 50,
+                  height: 50,
+                  placeholder: (context, url) => const Icon(
+                    Icons.image,
                   ),
+                  errorWidget: (context, url, error) => const Icon(
+                    Icons.image_not_supported,
+                  ),
+                ),
+              ),
+            ),
             title: Text(controller.subscriptions[index].title!),
             subtitle: Text(
               controller.subscriptions[index].description!,

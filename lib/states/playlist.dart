@@ -8,6 +8,7 @@ class PlaylistController extends GetxController {
   final playlists = <PlaylistModel>[].obs;
   final episodesControllers = <PlaylistEpisodeController>[].obs;
   final isLoading = true.obs;
+  var episodeEnclosureSet = <String>{}.obs;
 
   final DatabaseHelper helper = DatabaseHelper();
 
@@ -50,5 +51,23 @@ class PlaylistController extends GetxController {
       }
     }
     throw Exception('Playlist not found');
+  }
+
+  bool isInPlaylists(String enclosureUrl) {
+    return episodeEnclosureSet.contains(enclosureUrl);
+  }
+
+  Future<void> removeByGuid(String guid) async {
+    for (var controller in episodesControllers) {
+      controller.remove(guid);
+    }
+  }
+
+  void addToSet(List<String> enclosureUrls) {
+    episodeEnclosureSet.addAll(enclosureUrls);
+  }
+
+  void removeFromSet(String enclosureUrl) {
+    episodeEnclosureSet.remove(enclosureUrl);
   }
 }

@@ -1,6 +1,10 @@
+import 'package:anycast/models/subscription.dart';
+import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/player.dart';
+import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/utils/formatters.dart';
+import 'package:anycast/widgets/channel.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
@@ -332,14 +336,30 @@ class Titles extends GetView<PlayerController> {
                   // no bottom line
                 ),
               ),
-              SizedBox(
-                height: 20,
-                child: Text(
-                  episode.channelTitle!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    decoration: TextDecoration.none,
-                    color: Colors.white.withOpacity(0.64),
+              GestureDetector(
+                onTap: () {
+                  var subscriptionController =
+                      Get.find<SubscriptionController>();
+                  var s =
+                      subscriptionController.getByTitle(episode.channelTitle!);
+                  if (s == null) {
+                    s = SubscriptionModel.empty();
+                    s.rssFeedUrl = episode.rssFeedUrl;
+                  }
+                  Get.lazyPut(() => ChannelController(channel: s!),
+                      tag: s.rssFeedUrl);
+                  context
+                      .pushTransparentRoute(Channel(rssFeedUrl: s.rssFeedUrl!));
+                },
+                child: SizedBox(
+                  height: 20,
+                  child: Text(
+                    episode.channelTitle!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      decoration: TextDecoration.none,
+                      color: Colors.white.withOpacity(0.64),
+                    ),
                   ),
                 ),
               ),
