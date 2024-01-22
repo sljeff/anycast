@@ -1,4 +1,5 @@
 import 'package:anycast/models/settings.dart';
+import 'package:anycast/models/subtitle.dart';
 
 import 'feed_episode.dart';
 import 'player.dart';
@@ -16,6 +17,7 @@ List<TableCreator> tableCreators = [
   playlistTableCreator,
   playerTableCreator,
   settingsTableCreator,
+  subtitleTableCreator,
 ];
 
 class DatabaseHelper {

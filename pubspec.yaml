@@ -55,6 +55,9 @@ dependencies:
   cached_network_image: ^3.3.1
   url_launcher: ^6.2.3
   path: ^1.8.3
+  flutter_lyric:
+    git:
+      url: git@github.com:sljeff/flutter_lyric
 
 dev_dependencies:
   flutter_test:

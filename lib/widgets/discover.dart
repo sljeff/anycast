@@ -1,6 +1,6 @@
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/discover.dart';
-import 'package:anycast/utils/api.dart';
+import 'package:anycast/api/podcasts.dart';
 import 'package:anycast/widgets/channel.dart';
 import 'package:anycast/widgets/player.dart';
 import 'package:cached_network_image/cached_network_image.dart';

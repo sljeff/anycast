@@ -1,7 +1,13 @@
+import 'dart:convert';
+
+import 'package:anycast/api/subtitles.dart';
+import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/subscription.dart';
+import 'package:anycast/models/subtitle.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/subscription.dart';
+import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/channel.dart';
@@ -13,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:get/get.dart';
 import 'package:marquee/marquee.dart';
+import 'package:flutter_lyric/lyrics_reader.dart';
 
 class PlayerPage extends StatelessWidget {
   const PlayerPage({super.key});
@@ -160,7 +167,7 @@ class SwipeImage extends GetView<PlayerController> {
                     })),
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Center(child: Icon(Icons.abc)),
+                  child: Subtitles(),
                 ),
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 10),
@@ -209,6 +216,171 @@ class SwipeImage extends GetView<PlayerController> {
         ],
       ),
     );
+  }
+}
+
+class Subtitles extends GetView<SubtitleController> {
+  Subtitles({
+    super.key,
+  });
+
+  final lyricUI = UINetease();
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      var playerController = Get.find<PlayerController>();
+      var url = playerController.playlistEpisode.value.enclosureUrl!;
+
+      var status = controller.subtitleUrls[url];
+      if (status == null) {
+        // a button to fetch subtitles
+        return Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () {
+                  getSubtitles(url).then((value) {
+                    var subtitle = '';
+                    if (value.status == 'succeeded') {
+                      subtitle = jsonEncode(value.subtitles);
+                    }
+                    controller.add(url, value.status!, subtitle);
+                  });
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.blue,
+                ),
+                child: const Text('Generate with AI'),
+              ),
+              const SizedBox(width: 8),
+              const Tooltip(
+                  showDuration: Duration(seconds: 10),
+                  message:
+                      'The AI will generate a summary and subtitles for this episode. '
+                      'It may take a few minutes.',
+                  triggerMode: TooltipTriggerMode.tap,
+                  child: Icon(Icons.info_outline)),
+            ],
+          ),
+        );
+      }
+
+      if (status == 'processing') {
+        // a progress indicator
+        var style = TextStyle(
+          color: Colors.white.withOpacity(0.64),
+        );
+        return Center(
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 8),
+              Text("Generating with AI...", style: style),
+              const SizedBox(height: 8),
+              Text("It may take a few minutes...", style: style),
+              const SizedBox(height: 8),
+              Text(
+                  "The AI is on the job! Feel free to explore or come back later.",
+                  style: style),
+            ],
+          ),
+        );
+      }
+
+      if (status == 'failed') {
+        // a button to retry
+        return Center(
+          child: TextButton(
+            onPressed: () {
+              getSubtitles(url).then((value) {
+                var subtitle = '';
+                if (value.status == 'succeeded') {
+                  subtitle = jsonEncode(value.subtitles);
+                }
+                controller.add(url, value.status!, subtitle);
+              });
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.blue,
+            ),
+            child: const Text('Retry'),
+          ),
+        );
+      }
+
+      var helper = DatabaseHelper();
+      return SizedBox(
+        width: 300,
+        child: SingleChildScrollView(
+          child: FutureBuilder(
+            future: helper.db.then((db) {
+              return SubtitleModel.get(db!, url);
+            }),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const SizedBox.shrink();
+              }
+              var subtitle = snapshot.data!;
+
+              var model = LyricsModelBuilder.create()
+                  .bindLyricToMain(
+                    subtitle.toLrc(),
+                  )
+                  .getModel();
+              return Obx(
+                () => LyricsReader(
+                  position: playerController
+                      .positionData.value.position.inMilliseconds,
+                  model: model,
+                  lyricUi: lyricUI,
+                  size: Size(
+                      double.infinity, MediaQuery.of(context).size.height / 2),
+                  playing: playerController.isPlaying.value,
+                  emptyBuilder: () => Center(
+                    child: Text(
+                      'No subtitles',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.64),
+                      ),
+                    ),
+                  ),
+                  selectLineBuilder: (progress, confirm) {
+                    return Row(
+                      children: [
+                        IconButton(
+                            onPressed: () {
+                              confirm.call();
+                              MyAudioHandler()
+                                  .seek(Duration(milliseconds: progress));
+                            },
+                            icon: Icon(Icons.play_arrow, color: Colors.black)),
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(color: Colors.black),
+                            height: 1,
+                            width: double.infinity,
+                          ),
+                        ),
+                        Text(
+                          formatTime(Duration(milliseconds: progress)),
+                          style: TextStyle(color: Colors.black),
+                        )
+                      ],
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    });
   }
 }
 

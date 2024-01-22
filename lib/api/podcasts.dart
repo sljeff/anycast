@@ -3,17 +3,13 @@ import 'dart:convert';
 import 'package:anycast/models/subscription.dart';
 import 'package:http/http.dart' as http;
 
-const headers = {
-  'x-rapidapi-key': '4188f37e0dmsh6f57cb3e9804782p1f968ejsnec06e0a349b6',
-  'x-rapidapi-host': 'podcast-api1.p.rapidapi.com',
-};
-
+const host = 'api.anycast.website';
 const country = 'cn';
 
 Future<List<SubscriptionModel>> searchChannels(String searchText) async {
   // url encode
   var url = Uri(
-    host: 'podcast-api1.p.rapidapi.com',
+    host: host,
     scheme: 'https',
     path: '/search_channel/v2',
     queryParameters: {
@@ -22,7 +18,7 @@ Future<List<SubscriptionModel>> searchChannels(String searchText) async {
     },
   );
 
-  var response = await http.get(url, headers: headers);
+  var response = await http.get(url);
   var body = utf8.decode(response.bodyBytes);
   Map<String, dynamic> data = jsonDecode(body);
 
@@ -53,12 +49,12 @@ class Category {
 
 Future<List<Category>> listCategories() async {
   var url = Uri(
-    host: 'podcast-api1.p.rapidapi.com',
+    host: host,
     scheme: 'https',
     path: '/categories',
   );
 
-  var response = await http.get(url, headers: headers);
+  var response = await http.get(url);
   var body = utf8.decode(response.bodyBytes);
   Map<String, dynamic> data = jsonDecode(body);
 
@@ -77,7 +73,7 @@ Future<List<Category>> listCategories() async {
 Future<List<SubscriptionModel>> listChannelsByCategoryId(
     String categoryId) async {
   var url = Uri(
-    host: 'api.anycast.website',
+    host: host,
     scheme: 'https',
     path: '/top_channels/v2',
     queryParameters: {
@@ -86,7 +82,7 @@ Future<List<SubscriptionModel>> listChannelsByCategoryId(
     },
   );
 
-  var response = await http.get(url, headers: headers);
+  var response = await http.get(url);
   var body = utf8.decode(response.bodyBytes);
   Map<String, dynamic> data = jsonDecode(body);
 

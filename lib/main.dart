@@ -1,4 +1,5 @@
 import 'package:anycast/states/player.dart';
+import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:audio_service/audio_service.dart';
@@ -34,6 +35,7 @@ class NavigationBarApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Get.put(SettingsController());
+    Get.put(SubtitleController());
     return GetMaterialApp(
       home: GetBuilder<HomeTabController>(
         builder: (controller) => Scaffold(
