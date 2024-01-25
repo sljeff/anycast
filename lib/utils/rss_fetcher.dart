@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
+import 'package:anycast/states/subscription.dart';
+import 'package:get/get.dart';
 import 'package:webfeed_plus/webfeed_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
@@ -11,6 +13,15 @@ class PodcastImportData {
   List<FeedEpisodeModel>? feedEpisodes;
 
   PodcastImportData(this.subscription, this.feedEpisodes);
+}
+
+Future<List<PodcastImportData>> importPodcastsByUrls(List<String> rssFeedUrls) {
+  // filter exsiting subscriptions
+  var existingSubscriptions = Get.find<SubscriptionController>().subscriptions;
+  var s = Set.from(existingSubscriptions.map((e) => e.rssFeedUrl));
+  rssFeedUrls = rssFeedUrls.where((element) => !s.contains(element)).toList();
+
+  return fetchPodcastsByUrls(rssFeedUrls);
 }
 
 Future<List<PodcastImportData>> fetchPodcastsByUrls(List<String> rssFeedUrls,

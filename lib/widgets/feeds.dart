@@ -64,7 +64,7 @@ class ImportBlock extends StatelessWidget {
                       if (value != null) {
                         controller.isLoading.value = true;
                         parseOMPL(value.files.single.path).then((value) {
-                          fetchPodcastsByUrls(value).then((value) {
+                          importPodcastsByUrls(value).then((value) {
                             Get.find<FeedEpisodeController>().addMany(
                                 value.map((e) => e.feedEpisodes![0]).toList());
                             Get.find<SubscriptionController>().addMany(
@@ -98,7 +98,7 @@ class ImportBlock extends StatelessWidget {
                       suffixIcon: IconButton(
                         onPressed: () {
                           controller.isLoading.value = true;
-                          fetchPodcastsByUrls([controller.textController.text])
+                          importPodcastsByUrls([controller.textController.text])
                               .then((value) {
                             Get.find<FeedEpisodeController>().addMany(
                                 value.map((e) => e.feedEpisodes![0]).toList());

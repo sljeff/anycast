@@ -88,12 +88,12 @@ class Channel extends StatelessWidget {
                     const SizedBox(width: 16),
                     TextButton(
                       onPressed: () {
-                        if (controller.isLoading.value) {
-                          return;
-                        }
                         if (controller.subscribed.value) {
                           controller.unsubscribe();
                         } else {
+                          if (controller.isLoading.value) {
+                            return;
+                          }
                           controller.subscribe();
                         }
                       },
@@ -106,7 +106,8 @@ class Channel extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: controller.isLoading.value
+                      child: controller.isLoading.value &&
+                              !controller.subscribed.value
                           ? const SizedBox(
                               width: 20,
                               height: 20,

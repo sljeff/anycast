@@ -83,7 +83,7 @@ class ImportExportBlock extends StatelessWidget {
                         Get.dialog(
                             const Center(child: CircularProgressIndicator()));
                         parseOMPL(value.files.single.path).then((value) {
-                          fetchPodcastsByUrls(value).then((value) {
+                          importPodcastsByUrls(value).then((value) {
                             Get.find<FeedEpisodeController>().addMany(
                                 value.map((e) => e.feedEpisodes![0]).toList());
                             Get.find<SubscriptionController>().addMany(
@@ -147,7 +147,7 @@ class ImportExportBlock extends StatelessWidget {
                   // show loading
                   Get.dialog(const Center(child: CircularProgressIndicator()));
                   // fetch rss feed
-                  fetchPodcastsByUrls([url]).then((value) {
+                  importPodcastsByUrls([url]).then((value) {
                     Get.find<FeedEpisodeController>()
                         .addMany(value.map((e) => e.feedEpisodes![0]).toList());
                     Get.find<SubscriptionController>()
