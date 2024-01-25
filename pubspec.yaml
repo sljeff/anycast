@@ -58,6 +58,9 @@ dependencies:
   flutter_lyric:
     git:
       url: git@github.com:sljeff/flutter_lyric
+  opml: ^0.4.0
+  share_plus: ^7.2.1
+  path_provider: ^2.1.2
 
 dev_dependencies:
   flutter_test:
