@@ -83,7 +83,7 @@ class MyProgressBar extends GetView<PlayerController> {
           buffered: bufferedPosition,
           total: duration,
           onSeek: (duration) {
-            myAudioHandler.seek(duration);
+            controller.seek(duration);
           },
           timeLabelLocation: TimeLabelLocation.above,
           timeLabelType: TimeLabelType.remainingTime,
@@ -284,9 +284,7 @@ class Subtitles extends GetView<SubtitleController> {
               const SizedBox(height: 8),
               Text("It may take a few minutes...", style: style),
               const SizedBox(height: 8),
-              Text(
-                  "The AI is on the job! Feel free to explore or come back later.",
-                  style: style),
+              Text("Feel free to explore or come back later.", style: style),
             ],
           ),
         );
@@ -356,7 +354,7 @@ class Subtitles extends GetView<SubtitleController> {
                         IconButton(
                             onPressed: () {
                               confirm.call();
-                              MyAudioHandler()
+                              playerController
                                   .seek(Duration(milliseconds: progress));
                             },
                             icon: Icon(Icons.play_arrow, color: Colors.black)),

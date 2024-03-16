@@ -93,6 +93,24 @@ class MyAudioHandler extends BaseAudioHandler {
     play();
   }
 
+  Future<void> seekAndPlayByEpisode(
+      PlaylistEpisodeModel episode, Duration position) async {
+    pause();
+    if (mediaItem.value?.id == episode.enclosureUrl) {
+      await _player.seek(position);
+      play();
+      return;
+    }
+
+    var source = _createAudioSource(episode.toMediaItem());
+
+    await _player.setAudioSource(source,
+        initialPosition: Duration(milliseconds: position.inMilliseconds));
+    mediaItem.add(source.tag as MediaItem);
+
+    play();
+  }
+
   @override
   Future<void> seek(Duration position) => _player.seek(position);
 

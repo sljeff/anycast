@@ -9,10 +9,10 @@ Future<void> subtitleTableCreator(DatabaseExecutor db) async {
     CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY,
       enclosureUrl TEXT UNIQUE,
-      language TEXT,
-      summary TEXT,
       status TEXT,
-      subtitle TEXT
+      subtitle TEXT,
+      language TEXT,
+      summary TEXT
     )
   """);
 }
@@ -22,6 +22,8 @@ class SubtitleModel {
   String? enclosureUrl;
   String? status;
   String? subtitle;
+  String? language;
+  String? summary;
 
   SubtitleModel.empty();
 
@@ -30,6 +32,8 @@ class SubtitleModel {
       'enclosureUrl': enclosureUrl,
       'status': status,
       'subtitle': subtitle,
+      'language': language,
+      'summary': summary,
     };
     if (id != null) {
       map['id'] = id;
@@ -43,6 +47,8 @@ class SubtitleModel {
     enclosureUrl = map['enclosureUrl'];
     status = map['status'];
     subtitle = map['subtitle'];
+    language = map['language'];
+    summary = map['summary'];
   }
 
   static Future<SubtitleModel> get(
@@ -85,6 +91,9 @@ class SubtitleModel {
 
   String toLrc() {
     List<Subtitle> subtitles = [];
+    if (subtitle == null) {
+      return '';
+    }
     for (var item in jsonDecode(subtitle!)) {
       subtitles.add(Subtitle.fromMap(item));
     }

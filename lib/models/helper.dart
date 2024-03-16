@@ -42,7 +42,7 @@ class DatabaseHelper {
 
     // create new
     Database db =
-        await openDatabase(path, version: 1, onOpen: (Database db) async {
+        await openDatabase(path, version: 3, onOpen: (Database db) async {
       for (TableCreator tableCreator in tableCreators) {
         await tableCreator(db);
       }

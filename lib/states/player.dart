@@ -128,6 +128,13 @@ class PlayerController extends GetxController {
     return myAudioHandler.play();
   }
 
+  Future<void> seek(Duration position) async {
+    if (playlistEpisode.value.guid == null) {
+      return;
+    }
+    return myAudioHandler.seekAndPlayByEpisode(playlistEpisode.value, position);
+  }
+
   void initProgress() {
     var pe = playlistEpisode.value;
     if (pe.guid == null) {
@@ -296,11 +303,11 @@ class SettingsController extends GetxController {
     var big = startHour > endHour ? startHour : endHour;
     var exchanged = startHour > endHour;
     if (exchanged) {
-      if (now.hour > small && now.hour < big) {
+      if (now.hour >= small && now.hour < big) {
         return;
       }
     } else {
-      if (now.hour < small || now.hour > big) {
+      if (now.hour < small || now.hour >= big) {
         return;
       }
     }

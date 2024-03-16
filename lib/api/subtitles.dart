@@ -25,7 +25,9 @@ class Subtitle {
 
 class SubtitleResult {
   String? status;
+  String? language;
   List<Subtitle>? subtitles;
+  String? summary;
 }
 
 Future<SubtitleResult> getSubtitles(String enclosureUrl) async {
@@ -42,7 +44,9 @@ Future<SubtitleResult> getSubtitles(String enclosureUrl) async {
   Map<String, dynamic> data = jsonDecode(body);
 
   var result = SubtitleResult();
+  result.language = data['detected_language'];
   result.status = data['status'];
+  result.summary = '';
 
   if (result.status != 'succeeded') {
     return result;
