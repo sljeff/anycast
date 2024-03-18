@@ -4,7 +4,7 @@ import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/import_block.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
-import 'package:anycast/widgets/feeds_episodes_list.dart';
+import 'package:anycast/pages/feeds_episodes_list.dart';
 import 'package:get/get.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';

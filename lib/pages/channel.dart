@@ -1,6 +1,6 @@
 import 'package:anycast/states/channel.dart';
-import 'package:anycast/widgets/feeds_episodes_list.dart';
-import 'package:anycast/widgets/player.dart';
+import 'package:anycast/pages/feeds_episodes_list.dart';
+import 'package:anycast/pages/player.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:expandable_text/expandable_text.dart';

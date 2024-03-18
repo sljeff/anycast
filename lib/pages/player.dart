@@ -1,6 +1,6 @@
 import 'package:anycast/states/playlist.dart';
-import 'package:anycast/widgets/play_icon.dart';
-import 'package:anycast/widgets/player_page.dart';
+import 'package:anycast/pages/play_icon.dart';
+import 'package:anycast/pages/player_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/player.dart';

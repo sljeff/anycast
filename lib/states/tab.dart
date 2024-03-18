@@ -1,10 +1,9 @@
 import 'package:get/get.dart';
 
 class HomeTabController extends GetxController {
-  int selectedIndex = 0;
+  var selectedIndex = 0.obs;
 
   void onItemTapped(int index) {
-    selectedIndex = index;
-    update();
+    selectedIndex.value = index;
   }
 }

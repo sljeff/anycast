@@ -2,13 +2,14 @@ import 'package:anycast/states/player.dart';
 import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/audio_handler.dart';
+import 'package:anycast/widgets/bottom_nav_bar.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'widgets/discover.dart';
-import 'widgets/player.dart';
-import 'widgets/playlists.dart';
-import 'widgets/podcasts.dart';
+import 'pages/discover.dart';
+import 'pages/player.dart';
+import 'pages/playlists.dart';
+import 'pages/podcasts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,33 +42,18 @@ class NavigationBarApp extends StatelessWidget {
         builder: (controller) => Scaffold(
           floatingActionButton: PlayerWidget(),
           body: Center(
-            child: IndexedStack(
-              index: controller.selectedIndex,
-              children: <Widget>[
-                const PodcastsPage(),
-                Playlists(),
-                Discover(),
-              ],
+            child: Obx(
+              () => IndexedStack(
+                index: controller.selectedIndex.value,
+                children: <Widget>[
+                  const PodcastsPage(),
+                  Playlists(),
+                  Discover(),
+                ],
+              ),
             ),
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: controller.selectedIndex,
-            onDestinationSelected: homeTabController.onItemTapped,
-            destinations: const <Widget>[
-              NavigationDestination(
-                label: 'Podcasts',
-                icon: Icon(Icons.podcasts),
-              ),
-              NavigationDestination(
-                label: 'Playlists',
-                icon: Icon(Icons.playlist_play),
-              ),
-              NavigationDestination(
-                label: 'Discover',
-                icon: Icon(Icons.explore),
-              ),
-            ],
-          ),
+          bottomNavigationBar: const BottomNavBar(),
         ),
       ),
     );
