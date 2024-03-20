@@ -22,7 +22,11 @@ class PodcastsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: Text('Podcasts', style: DarkColor.mainTitle),
+          title: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('Podcasts', style: DarkColor.mainTitle),
+          ),
+          titleSpacing: 0,
           centerTitle: false,
           actions: [
             IconButton(

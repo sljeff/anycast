@@ -3,8 +3,9 @@ import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/import_block.dart';
 import 'package:anycast/states/tab.dart';
+import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
-import 'package:anycast/pages/feeds_episodes_list.dart';
+import 'package:anycast/widgets/card.dart' as card;
 import 'package:get/get.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
@@ -16,19 +17,36 @@ import 'package:xml/xml.dart';
 class Feeds extends StatelessWidget {
   Feeds({Key? key}) : super(key: key);
 
-  final FeedEpisodeController controller = Get.put(FeedEpisodeController());
+  final controller = Get.put(FeedEpisodeController());
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      if (controller.episodes.isEmpty) {
-        return ImportBlock();
-      }
-      return RefreshIndicator(
-        onRefresh: fetchNewEpisodes,
-        child: FeedsEpisodesListView(controller.episodes, true),
-      );
-    });
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, right: 24, top: 24),
+      child: Obx(() {
+        var episodes = controller.episodes;
+        if (episodes.isEmpty) {
+          return ImportBlock();
+        }
+        return RefreshIndicator(
+          onRefresh: fetchNewEpisodes,
+          child: ListView.separated(
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemCount: episodes.length,
+            itemBuilder: (context, index) {
+              return card.Card(
+                title: episodes[index].title!,
+                imageUrl: episodes[index].imageUrl!,
+                channelName: episodes[index].channelTitle!,
+                description:
+                    '${formatDuration(episodes[index].duration!)} · ${formatDatetime(episodes[index].pubDate!)}',
+                onTap: () {},
+              );
+            },
+          ),
+        );
+      }),
+    );
   }
 }
 

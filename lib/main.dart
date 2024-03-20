@@ -1,4 +1,6 @@
 import 'package:anycast/states/player.dart';
+import 'package:anycast/states/playlist.dart';
+import 'package:anycast/states/subscription.dart';
 import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/styles.dart';
@@ -30,7 +32,7 @@ void main() async {
 }
 
 class NavigationBarApp extends StatelessWidget {
-  final HomeTabController homeTabController = Get.put(HomeTabController());
+  final homeTabController = Get.put(HomeTabController());
 
   NavigationBarApp({super.key});
 
@@ -38,6 +40,9 @@ class NavigationBarApp extends StatelessWidget {
   Widget build(BuildContext context) {
     Get.put(SettingsController());
     Get.put(SubtitleController());
+    Get.put(SubscriptionController());
+    Get.put(PlayerController());
+    Get.put(PlaylistController());
     return GetMaterialApp(
       theme: ThemeData(
           colorScheme: const ColorScheme(
@@ -59,14 +64,14 @@ class NavigationBarApp extends StatelessWidget {
           )),
       home: GetBuilder<HomeTabController>(
         builder: (controller) => Scaffold(
-          floatingActionButton: PlayerWidget(),
+          floatingActionButton: const PlayerWidget(),
           body: Center(
             child: Obx(
               () => IndexedStack(
                 index: controller.selectedIndex.value,
                 children: <Widget>[
                   const PodcastsPage(),
-                  Playlists(),
+                  const Playlists(),
                   Discover(),
                 ],
               ),

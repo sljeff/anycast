@@ -1,6 +1,6 @@
 import 'package:anycast/states/channel.dart';
-import 'package:anycast/pages/feeds_episodes_list.dart';
 import 'package:anycast/pages/player.dart';
+import 'package:anycast/widgets/card.dart' as card;
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:expandable_text/expandable_text.dart';
@@ -29,6 +29,7 @@ class Channel extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         var subscription = controller.channel.value;
+        var episodes = controller.episodes;
         return Scaffold(
           floatingActionButton: PlayerWidget(),
           appBar: AppBar(
@@ -182,7 +183,18 @@ class Channel extends StatelessWidget {
               Expanded(
                   child: controller.isLoading.value
                       ? const Center(child: CircularProgressIndicator())
-                      : FeedsEpisodesListView(controller.episodes, false))
+                      : ListView.builder(
+                          itemCount: episodes.length,
+                          itemBuilder: (context, index) {
+                            return card.Card(
+                              title: episodes[index].title!,
+                              imageUrl: episodes[index].imageUrl!,
+                              channelName: episodes[index].channelTitle!,
+                              description: episodes[index].description!,
+                              onTap: () {},
+                            );
+                          },
+                        ))
             ],
           ),
         );

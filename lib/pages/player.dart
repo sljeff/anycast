@@ -1,16 +1,14 @@
+import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/pages/player_page.dart';
 import 'package:anycast/styles.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:anycast/states/player.dart';
 import 'package:get/get.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 
-class PlayerWidget extends StatelessWidget {
-  final PlayerController controller = Get.put(PlayerController());
-
-  PlayerWidget({super.key});
+class PlayerWidget extends GetView<PlayerController> {
+  const PlayerWidget({super.key});
 
   @override
   Widget build(BuildContext context) {

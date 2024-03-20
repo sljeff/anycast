@@ -13,10 +13,8 @@ import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:get/get.dart';
 
-class Playlists extends StatelessWidget {
-  final PlaylistController controller = Get.put(PlaylistController());
-
-  Playlists({super.key});
+class Playlists extends GetView<PlaylistController> {
+  const Playlists({super.key});
 
   @override
   Widget build(BuildContext context) {
