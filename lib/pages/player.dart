@@ -1,6 +1,6 @@
 import 'package:anycast/states/playlist.dart';
-import 'package:anycast/pages/play_icon.dart';
 import 'package:anycast/pages/player_page.dart';
+import 'package:anycast/styles.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/player.dart';
@@ -30,111 +30,64 @@ class PlayerWidget extends StatelessWidget {
 
         var imageUrl = episode.imageUrl;
 
-        return Stack(
-          children: [
-            // backgroud with blur, click effect, shadow
-            Positioned(
-              width: 100,
-              height: 56,
-              right: 8,
-              bottom: 8,
-              child: Hero(
-                tag: 'play_background',
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.blueGrey.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blueGrey.withOpacity(0.5),
-                        spreadRadius: 1,
-                        blurRadius: 2,
-                        offset: const Offset(0, 1),
+        // get rotate angle by position
+        var pos = controller.refreshFrameTime.value; // 0-999
+        var rotateAngle = 0.0;
+        if (controller.isPlaying.value) {
+          rotateAngle = pos * 1.0 / 2000;
+        }
+
+        return GestureDetector(
+          onTap: () {
+            context.pushTransparentRoute(const PlayerPage());
+          },
+          child: Container(
+            width: 64,
+            height: 64,
+            padding: const EdgeInsets.all(0.53),
+            decoration: ShapeDecoration(
+              color: DarkColor.primaryBackground,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(64),
+              ),
+              shadows: const [
+                BoxShadow(
+                  color: DarkColor.primaryDark,
+                  blurRadius: 20,
+                  offset: Offset(0, 0),
+                  spreadRadius: 0,
+                )
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Hero(
+                  tag: 'play_image',
+                  child: Transform.rotate(
+                    angle: rotateAngle,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: ShapeDecoration(
+                        image: DecorationImage(
+                          image: CachedNetworkImageProvider(imageUrl!),
+                          fit: BoxFit.fill,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-            Positioned(
-                right: 58, bottom: 16, child: PlayerImage(imageUrl: imageUrl)),
-            const Positioned(
-              right: 16,
-              bottom: 16,
-              child: PlayerButton(),
-            ),
-          ],
+          ),
         );
       },
-    );
-  }
-}
-
-class PlayerButton extends GetView<PlayerController> {
-  const PlayerButton({
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        if (controller.isPlaying.value) {
-          Get.find<PlayerController>().pause();
-        } else {
-          Get.find<PlayerController>().play();
-        }
-      },
-      child: const SizedBox(
-        width: 40,
-        height: 40,
-        child: Hero(
-          tag: 'play_button',
-          child: PlayIcon(),
-        ),
-      ),
-    );
-  }
-}
-
-class PlayerImage extends StatelessWidget {
-  const PlayerImage({
-    super.key,
-    required this.imageUrl,
-  });
-
-  final String? imageUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget child;
-    if (imageUrl == null) {
-      child = const SizedBox(
-        width: 40,
-        height: 40,
-        child: Icon(Icons.image),
-      );
-    } else {
-      child = ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: CachedNetworkImage(
-            imageUrl: imageUrl!,
-            width: 40,
-            height: 40,
-            placeholder: (context, url) => const Icon(
-              Icons.image,
-            ),
-            errorWidget: (context, url, error) => const Icon(
-              Icons.image_not_supported,
-            ),
-          ));
-    }
-
-    return GestureDetector(
-      onTap: () {
-        context.pushTransparentRoute(const PlayerPage());
-      },
-      child: Hero(tag: 'play_image', child: child),
     );
   }
 }

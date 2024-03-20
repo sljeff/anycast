@@ -22,6 +22,7 @@ class PlayerController extends GetxController {
   ).obs;
   var pageIndex = 2.obs;
   var playlistEpisode = PlaylistEpisodeModel.empty().obs;
+  var refreshFrameTime = 0.obs;
 
   var pageController = PageController(
     viewportFraction: 1,
@@ -75,6 +76,14 @@ class PlayerController extends GetxController {
           playByEpisode(peController.episodes[0]);
         }
       }
+
+      Timer.periodic(const Duration(milliseconds: 20), (timer) {
+        var now = DateTime.now();
+        refreshFrameTime.value = now.hour * 3600000 +
+            now.minute * 60000 +
+            now.second * 1000 +
+            now.millisecond;
+      });
     });
 
     myAudioHandler.positionDataStream.listen((event) {

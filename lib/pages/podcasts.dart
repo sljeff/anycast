@@ -4,55 +4,36 @@ import 'dart:io';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
+import 'package:anycast/styles.dart';
 import 'package:anycast/utils/keepalive.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/pages/feeds.dart';
-import 'package:anycast/pages/Subscriptions.dart';
 import 'package:get/get.dart';
 import 'package:opml/opml.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
-class PodcastsPage extends StatefulWidget {
+class PodcastsPage extends StatelessWidget {
   const PodcastsPage({super.key});
 
   @override
-  State<PodcastsPage> createState() => _PodcastsPageState();
-}
-
-class _PodcastsPageState extends State<PodcastsPage> {
-  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-          appBar: AppBar(
-            title: const Text('Podcasts'),
-            bottom: const TabBar(
-              tabs: [
-                Tab(icon: Icon(Icons.view_timeline), text: 'Feeds'),
-                Tab(icon: Icon(Icons.subscriptions), text: 'Subscriptions'),
-              ],
+    return Scaffold(
+        appBar: AppBar(
+          title: Text('Podcasts', style: DarkColor.mainTitle),
+          centerTitle: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.import_export),
+              onPressed: () {
+                Get.dialog(const ImportExportBlock());
+              },
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.import_export),
-                onPressed: () {
-                  Get.dialog(const ImportExportBlock());
-                },
-              ),
-            ],
-          ),
-          body: TabBarView(
-            children: [
-              KeepAliveWrapper(key: const Key('feeds'), child: Feeds()),
-              KeepAliveWrapper(
-                  key: const Key('subscriptions'), child: Subscriptions()),
-            ],
-          )),
-    );
+          ],
+        ),
+        body: KeepAliveWrapper(key: const Key('feeds'), child: Feeds()));
   }
 }
 

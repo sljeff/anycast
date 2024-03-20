@@ -16,14 +16,22 @@ class BottomNavBar extends GetView<HomeTabController> {
         right: 24,
         bottom: 24,
       ),
-      decoration: const ShapeDecoration(
+      decoration: ShapeDecoration(
         color: DarkColor.primaryBackground,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
           ),
         ),
+        shadows: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 0),
+            spreadRadius: 0,
+          )
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

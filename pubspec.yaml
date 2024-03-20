@@ -61,6 +61,7 @@ dependencies:
   opml: ^0.4.0
   share_plus: ^7.2.1
   path_provider: ^2.1.2
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:

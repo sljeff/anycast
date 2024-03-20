@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class DarkColor {
   static const Color primary = Color(0xFF34D399);
@@ -10,53 +11,53 @@ class DarkColor {
   static const Color accentColor = Color(0xFFFFBC25);
   static const Color secondaryColor = Color(0xFF96A7AF);
 
-  static const TextStyle cardTitleBold = TextStyle(
+  static TextStyle cardTitleBold = TextStyle(
     color: primaryLightMax,
     fontSize: 16,
     fontWeight: FontWeight.w700,
-    fontFamily: 'Noto Sans',
+    fontFamily: GoogleFonts.notoSans().fontFamily,
     height: 0,
   );
-  static const TextStyle cardTextLight = TextStyle(
+  static TextStyle cardTextLight = TextStyle(
     color: primary,
     fontSize: 12,
-    fontFamily: 'Inter',
+    fontFamily: GoogleFonts.inter().fontFamily,
     fontWeight: FontWeight.w400,
     height: 0,
   );
-  static const TextStyle defaultText = TextStyle(
+  static TextStyle defaultText = TextStyle(
     color: secondaryColor,
     fontSize: 12,
-    fontFamily: 'Inter',
+    fontFamily: GoogleFonts.inter().fontFamily,
     fontWeight: FontWeight.w400,
     height: 0,
   );
-  static const TextStyle defaultTitle = TextStyle(
+  static TextStyle defaultTitle = TextStyle(
     color: primaryLightMax,
     fontSize: 16,
-    fontFamily: "Noto Sans",
+    fontFamily: GoogleFonts.notoSans().fontFamily,
     fontWeight: FontWeight.w700,
     height: 0,
   );
-  static const TextStyle defaultMainText = TextStyle(
+  static TextStyle defaultMainText = TextStyle(
     color: primaryLightMax,
     fontSize: 14,
     fontWeight: FontWeight.w400,
-    fontFamily: 'Comfortaa',
+    fontFamily: GoogleFonts.comfortaa().fontFamily,
     height: 0,
   );
-  static const TextStyle mainTitle = TextStyle(
+  static TextStyle mainTitle = TextStyle(
     color: primaryLightMax,
     fontSize: 44,
-    fontFamily: 'Comfortaa',
+    fontFamily: GoogleFonts.comfortaa().fontFamily,
     fontWeight: FontWeight.w700,
     height: 0,
     letterSpacing: 4.40,
   );
-  static const TextStyle secondaryTitle = TextStyle(
+  static TextStyle secondaryTitle = TextStyle(
     color: primaryLightMax,
     fontSize: 24,
-    fontFamily: 'Comfortaa',
+    fontFamily: GoogleFonts.comfortaa().fontFamily,
     fontWeight: FontWeight.w700,
     height: 0,
     letterSpacing: 2.40,
