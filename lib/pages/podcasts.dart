@@ -21,7 +21,11 @@ class PodcastsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
+          toolbarHeight: 100,
+          scrolledUnderElevation: 0,
+          backgroundColor: DarkColor.primaryBackgroundDark.withOpacity(0.8),
           title: Padding(
             padding: const EdgeInsets.all(24),
             child: Text('Podcasts', style: DarkColor.mainTitle),

@@ -1,5 +1,6 @@
 import 'package:anycast/styles.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class Card extends StatelessWidget {
@@ -47,15 +48,14 @@ class Card extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.only(left: 12),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 193,
+                SizedBox(
                   height: 65,
                   child: Text(
                     title,
