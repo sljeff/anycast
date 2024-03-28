@@ -3,7 +3,6 @@ import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/import_block.dart';
 import 'package:anycast/states/tab.dart';
-import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/card.dart' as card;
 import 'package:get/get.dart';
@@ -37,11 +36,7 @@ class Feeds extends StatelessWidget {
             itemCount: episodes.length,
             itemBuilder: (context, index) {
               return card.Card(
-                title: episodes[index].title!,
-                imageUrl: episodes[index].imageUrl!,
-                channelName: episodes[index].channelTitle!,
-                description:
-                    '${formatDuration(episodes[index].duration!)} · ${formatDatetime(episodes[index].pubDate!)}',
+                episode: episodes[index],
                 onTap: () {},
               );
             },

@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anycast/models/subscription.dart';
+import 'package:anycast/pages/login.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:anycast/styles.dart';
 import 'package:anycast/utils/keepalive.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/pages/feeds.dart';
 import 'package:get/get.dart';
@@ -23,21 +25,19 @@ class PodcastsPage extends StatelessWidget {
     return Scaffold(
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          toolbarHeight: 100,
-          scrolledUnderElevation: 0,
-          backgroundColor: DarkColor.primaryBackgroundDark.withOpacity(0.8),
           title: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.only(left: 24, top: 24, bottom: 24),
             child: Text('Podcasts', style: DarkColor.mainTitle),
           ),
-          titleSpacing: 0,
-          centerTitle: false,
           actions: [
-            IconButton(
-              icon: const Icon(Icons.import_export),
-              onPressed: () {
-                Get.dialog(const ImportExportBlock());
-              },
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: IconButton(
+                icon: const Icon(Icons.login),
+                onPressed: () {
+                  Get.to(() => LoginPage());
+                },
+              ),
             ),
           ],
         ),

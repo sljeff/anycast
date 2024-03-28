@@ -1,3 +1,4 @@
+import 'package:anycast/styles.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -57,26 +58,32 @@ Widget renderHtml(context, String html) {
       sanitized = htmlToText(html)!;
     }
     return Html(
-      data: sanitized,
-      onLinkTap: (url, attributes, element) async {
-        if (url == null) {
-          return;
-        }
-        var uri = Uri.parse(url);
-        var can = await canLaunchUrl(uri);
-        if (can) {
-          await launchUrl(
-            uri,
-            mode: LaunchMode.inAppBrowserView,
-          );
-        } else {
-          print("cannot launch $url");
-        }
-      },
-    );
+        data: sanitized,
+        onLinkTap: (url, attributes, element) async {
+          if (url == null) {
+            return;
+          }
+          var uri = Uri.parse(url);
+          var can = await canLaunchUrl(uri);
+          if (can) {
+            await launchUrl(
+              uri,
+              mode: LaunchMode.inAppBrowserView,
+            );
+          } else {
+            print("cannot launch $url");
+          }
+        },
+        style: {
+          'body': Style(
+            padding: HtmlPaddings.zero,
+            fontSize: FontSize(14),
+            color: DarkColor.defaultMainText.color,
+          ),
+        });
   }
 
-  return Text(html, style: const TextStyle(fontSize: 14));
+  return Text(html, style: DarkColor.defaultMainText);
 }
 
 String formatCountdown(Duration duration) {

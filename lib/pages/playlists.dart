@@ -2,6 +2,7 @@ import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/subscription.dart';
+import 'package:anycast/styles.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/pages/channel.dart';
 import 'package:anycast/pages/detail.dart';
@@ -27,7 +28,10 @@ class Playlists extends GetView<PlaylistController> {
           length: playlists.length,
           child: Scaffold(
               appBar: AppBar(
-                title: const Text('Playlists'),
+                title: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text('Playlist', style: DarkColor.mainTitle),
+                ),
                 bottom: TabBar(
                     tabs: playlists.map((playlist) {
                   return Tab(text: playlist.title);

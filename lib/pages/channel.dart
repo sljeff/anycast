@@ -187,10 +187,7 @@ class Channel extends StatelessWidget {
                           itemCount: episodes.length,
                           itemBuilder: (context, index) {
                             return card.Card(
-                              title: episodes[index].title!,
-                              imageUrl: episodes[index].imageUrl!,
-                              channelName: episodes[index].channelTitle!,
-                              description: episodes[index].description!,
+                              episode: episodes[index],
                               onTap: () {},
                             );
                           },

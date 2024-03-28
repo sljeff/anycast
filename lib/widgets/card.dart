@@ -1,21 +1,17 @@
+import 'package:anycast/models/episode.dart';
 import 'package:anycast/styles.dart';
+import 'package:anycast/utils/formatters.dart';
+import 'package:anycast/widgets/detail.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class Card extends StatelessWidget {
-  final String title;
-  final String imageUrl;
-  final String channelName;
-  final String description;
+  final Episode episode;
   final Function onTap;
 
   const Card({
     Key? key,
-    required this.title,
-    required this.imageUrl,
-    required this.channelName,
-    required this.description,
+    required this.episode,
     required this.onTap,
   }) : super(key: key);
 
@@ -35,16 +31,26 @@ class Card extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: ShapeDecoration(
-              image: DecorationImage(
-                image: CachedNetworkImageProvider(imageUrl),
-                fit: BoxFit.fill,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          GestureDetector(
+            onTap: () {
+              showModalBottomSheet(
+                useSafeArea: true,
+                isScrollControlled: true,
+                context: context,
+                builder: (context) => Detail(episode),
+              );
+            },
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: ShapeDecoration(
+                image: DecorationImage(
+                  image: CachedNetworkImageProvider(episode.imageUrl!),
+                  fit: BoxFit.fill,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
           ),
@@ -58,7 +64,7 @@ class Card extends StatelessWidget {
                 SizedBox(
                   height: 65,
                   child: Text(
-                    title,
+                    episode.title!,
                     style: DarkColor.defaultTitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -71,7 +77,7 @@ class Card extends StatelessWidget {
                       width: 80,
                       height: 15,
                       child: Text(
-                        channelName,
+                        episode.channelTitle!,
                         style: DarkColor.cardTextLight,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -80,7 +86,7 @@ class Card extends StatelessWidget {
                     SizedBox(
                       width: 120,
                       child: Text(
-                        description,
+                        '${formatDuration(episode.duration!)} • ${formatDatetime(episode.pubDate!)}',
                         textAlign: TextAlign.right,
                         style: DarkColor.defaultText,
                         maxLines: 1,
