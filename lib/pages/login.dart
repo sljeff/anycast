@@ -46,6 +46,11 @@ class LoginPage extends StatelessWidget {
               onPressed: signInWithGoogle,
               child: Text('Sign in with Google'),
             ),
+            ElevatedButton(
+                onPressed: () {
+                  FirebaseAuth.instance.signOut();
+                },
+                child: Text('Logout')),
           ],
         ),
       ),
