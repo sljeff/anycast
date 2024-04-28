@@ -2,20 +2,19 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anycast/models/subscription.dart';
-import 'package:anycast/pages/login.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
-import 'package:anycast/styles.dart';
 import 'package:anycast/utils/keepalive.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/pages/feeds.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:opml/opml.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:simple_gradient_text/simple_gradient_text.dart';
 
 class PodcastsPage extends StatelessWidget {
   const PodcastsPage({super.key});
@@ -26,20 +25,53 @@ class PodcastsPage extends StatelessWidget {
         extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: Padding(
-            padding: const EdgeInsets.only(left: 24, top: 24, bottom: 24),
-            child: Text('Podcasts', style: DarkColor.mainTitle),
-          ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: IconButton(
-                icon: const Icon(Icons.login),
-                onPressed: () {
-                  Get.to(() => LoginPage());
-                },
-              ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Column(
+              children: [
+                Container(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: () {
+                      Get.dialog(const ImportExportBlock());
+                    },
+                    child: Container(
+                      height: 36,
+                      width: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF232830),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.import_export_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  alignment: Alignment.centerLeft,
+                  height: 48,
+                  child: GradientText(
+                    'PODCAST',
+                    gradientDirection: GradientDirection.ttb,
+                    colors: const [
+                      Color(0xFF059669),
+                      Color(0x00059669),
+                    ],
+                    style: TextStyle(
+                      fontSize: 44,
+                      fontFamily: GoogleFonts.comfortaa().fontFamily,
+                      fontWeight: FontWeight.w700,
+                      height: 0,
+                      letterSpacing: 4.40,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
         body: KeepAliveWrapper(key: const Key('feeds'), child: Feeds()));
   }

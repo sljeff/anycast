@@ -55,7 +55,6 @@ class NavigationBarApp extends StatelessWidget {
         appBarTheme: AppBarTheme(
           toolbarHeight: 100,
           scrolledUnderElevation: 0,
-          backgroundColor: DarkColor.primaryBackgroundDark.withOpacity(0.8),
           titleSpacing: 0,
           centerTitle: false,
           iconTheme: const IconThemeData(
