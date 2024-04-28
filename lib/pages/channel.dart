@@ -1,5 +1,4 @@
 import 'package:anycast/states/channel.dart';
-import 'package:anycast/pages/player.dart';
 import 'package:anycast/widgets/card.dart' as card;
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +30,6 @@ class Channel extends StatelessWidget {
         var subscription = controller.channel.value;
         var episodes = controller.episodes;
         return Scaffold(
-          floatingActionButton: PlayerWidget(),
           appBar: AppBar(
             centerTitle: true,
             leading: const SizedBox.shrink(),
