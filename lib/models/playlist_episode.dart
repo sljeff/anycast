@@ -158,6 +158,13 @@ class PlaylistEpisodeModel extends Episode {
         where: 'guid = ?', whereArgs: [guid]);
   }
 
+  // format: 21:32 / 31:56
+  static String getPlayedAndTotalTime(int playedDuration, int duration) {
+    var played = Duration(milliseconds: playedDuration);
+    var total = Duration(milliseconds: duration);
+    return '${played.inMinutes}:${(played.inSeconds % 60).toString().padLeft(2, '0')} / ${total.inMinutes}:${(total.inSeconds % 60).toString().padLeft(2, '0')}';
+  }
+
   MediaItem toMediaItem() {
     return MediaItem(
       id: enclosureUrl!,

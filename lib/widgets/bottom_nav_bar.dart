@@ -1,63 +1,68 @@
+import 'package:anycast/models/playlist_episode.dart';
+import 'package:anycast/pages/player_page.dart';
+import 'package:anycast/states/player.dart';
 import 'package:anycast/states/tab.dart';
-import 'package:anycast/styles.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:remixicon/remixicon.dart';
+import 'package:dismissible_page/dismissible_page.dart';
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 
 class BottomNavBar extends GetView<HomeTabController> {
-  const BottomNavBar({Key? key}) : super(key: key);
+  final playerController = Get.find<PlayerController>();
+
+  BottomNavBar({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    if (playerController.playlistEpisode.value.guid == null) {
+      return Container();
+    }
+
     return Container(
-      height: 96,
-      padding: const EdgeInsets.only(
-        top: 16,
-        left: 24,
-        right: 24,
-        bottom: 24,
-      ),
-      decoration: ShapeDecoration(
-        color: DarkColor.primaryBackground,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment(0.00, -1.00),
+          end: Alignment(0, 1),
+          colors: [Color(0xF014171A), Color(0xFF16191D)],
         ),
-        shadows: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 0),
-            spreadRadius: 0,
-          )
-        ],
       ),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          BottomIcon(
-            icon: Icons.podcasts,
-            index: 0,
-            onTap: () {
-              controller.onItemTapped(0);
-            },
-          ),
-          BottomIcon(
-            icon: Icons.playlist_play,
-            index: 1,
-            onTap: () {
-              controller.onItemTapped(1);
-            },
-          ),
-          BottomIcon(
-            icon: Icons.search,
-            index: 2,
-            onTap: () {
-              controller.onItemTapped(2);
-            },
+          const PlayerBar(),
+          Container(
+            height: 96,
+            padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Expanded(
+                    child: BarIcon(
+                  icon: Icons.home_rounded,
+                  index: 0,
+                  text: 'Podcast',
+                )),
+                const Expanded(
+                    child: BarIcon(
+                  icon: Icons.video_library_rounded,
+                  index: 1,
+                  text: 'Playlist',
+                )),
+                Expanded(
+                    child: BarIcon(
+                  icon: MdiIcons.cloudSearch,
+                  index: 2,
+                  text: 'Discover',
+                )),
+              ],
+            ),
           ),
         ],
       ),
@@ -65,50 +70,266 @@ class BottomNavBar extends GetView<HomeTabController> {
   }
 }
 
-class BottomIcon extends GetView<HomeTabController> {
+class PlayerBar extends GetView<PlayerController> {
+  const PlayerBar({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      var episode = controller.playlistEpisode.value;
+
+      if (episode.guid == null) {
+        return const SizedBox.shrink();
+      }
+
+      var postion = controller.positionData;
+      var posPercent = postion.value.position.inMilliseconds /
+          postion.value.duration.inMilliseconds;
+      // width of played bar * posPercent
+      var barWidth = MediaQuery.of(context).size.width - 12 * 2;
+      var playedWidth = barWidth * posPercent;
+
+      return GestureDetector(
+        onTap: () {
+          context.pushTransparentRoute(const PlayerPage());
+        },
+        // 上拉，显示 PlayerPage
+        onVerticalDragUpdate: (details) {
+          context.pushTransparentRoute(const PlayerPage());
+        },
+        child: Container(
+          height: 56,
+          margin: const EdgeInsets.only(left: 12, right: 12),
+          decoration: ShapeDecoration(
+            color: Colors.white.withOpacity(0.1),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                Container(
+                  width: playedWidth,
+                  color: Colors.white.withOpacity(0.2),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: ShapeDecoration(
+                          image: DecorationImage(
+                            image:
+                                CachedNetworkImageProvider(episode.imageUrl!),
+                            fit: BoxFit.fill,
+                          ),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: Text(
+                                episode.title!,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontFamily: 'PingFang SC',
+                                  fontWeight: FontWeight.w500,
+                                  height: 0,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Opacity(
+                              opacity: 0.50,
+                              child: Text(
+                                PlaylistEpisodeModel.getPlayedAndTotalTime(
+                                    postion.value.position.inMilliseconds,
+                                    postion.value.duration.inMilliseconds),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontFamily: 'PingFang SC',
+                                  fontWeight: FontWeight.w400,
+                                  height: 0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              if (controller.isPlaying.value) {
+                                controller.pause();
+                              } else {
+                                controller.play();
+                              }
+                            },
+                            child: SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                clipBehavior: Clip.antiAlias,
+                                decoration: const BoxDecoration(),
+                                child: Stack(children: [
+                                  Icon(
+                                    controller.isPlaying.value
+                                        ? FluentIcons.pause_32_filled
+                                        : FluentIcons.play_32_filled,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                ]),
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              controller.seek(Duration(
+                                  milliseconds:
+                                      postion.value.position.inMilliseconds +
+                                          30000));
+                            },
+                            child: SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                clipBehavior: Clip.antiAlias,
+                                decoration: const BoxDecoration(),
+                                child: const Stack(children: [
+                                  Icon(
+                                    Remix.forward_30_fill,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                ]),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                )
+              ],
+            ),
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class BarIcon extends GetView<HomeTabController> {
   final IconData icon;
   final int index;
-  final VoidCallback onTap;
+  final String text;
 
-  const BottomIcon({
+  const BarIcon({
+    Key? key,
     required this.icon,
     required this.index,
-    required this.onTap,
-    Key? key,
+    required this.text,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      var iconColor = DarkColor.secondaryColor;
-      var decorationColor = Colors.transparent;
-      if (index == controller.selectedIndex.value) {
-        iconColor = Colors.white;
-        decorationColor = DarkColor.primary;
-      }
-
-      var iconBtn = Container(
-        width: 48,
-        height: 48,
-        decoration: ShapeDecoration(
-          color: decorationColor,
-          shape: const OvalBorder(),
-        ),
-        child: Icon(
-          icon,
-          color: iconColor,
-        ),
-      );
+      var isSelected = controller.selectedIndex.value == index;
+      var color =
+          isSelected ? const Color(0xFF6EE7B7) : const Color(0xFF6b7280);
 
       return GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 96,
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: iconBtn,
-        ),
-      );
+          onTap: () => controller.onItemTapped(index),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: ShapeDecoration(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(36),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  icon,
+                                  color: color,
+                                  size: 24,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                text,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontFamily: 'Comfortaa',
+                  fontWeight: FontWeight.w400,
+                  height: 0,
+                ),
+              ),
+            ],
+          ));
     });
   }
 }

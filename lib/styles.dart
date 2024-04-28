@@ -7,7 +7,7 @@ class DarkColor {
   static const Color primaryLightMax = Color(0xFFECFDF5);
   static const Color primaryDark = Color(0xFF079669);
   static const Color primaryBackground = Color(0xFF30444E);
-  static const Color primaryBackgroundDark = Color(0xFF22343C);
+  static const Color primaryBackgroundDark = Color(0xFF111316);
   static const Color accentColor = Color(0xFFFFBC25);
   static const Color secondaryColor = Color(0xFF96A7AF);
 

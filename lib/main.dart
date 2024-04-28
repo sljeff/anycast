@@ -11,7 +11,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'pages/discover.dart';
-import 'pages/player.dart';
 import 'pages/playlists.dart';
 import 'pages/podcasts.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -97,7 +96,6 @@ class NavigationBarApp extends StatelessWidget {
       ),
       home: GetBuilder<HomeTabController>(
         builder: (controller) => Scaffold(
-          floatingActionButton: const PlayerWidget(),
           body: Center(
             child: Obx(
               () => IndexedStack(
@@ -110,7 +108,7 @@ class NavigationBarApp extends StatelessWidget {
               ),
             ),
           ),
-          bottomNavigationBar: const BottomNavBar(),
+          bottomNavigationBar: BottomNavBar(),
         ),
       ),
     );

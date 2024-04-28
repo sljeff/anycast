@@ -2,6 +2,7 @@ import 'package:anycast/models/helper.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/models/playlist.dart';
+import 'package:anycast/utils/audio_handler.dart';
 import 'package:get/get.dart';
 
 class PlaylistController extends GetxController {
@@ -37,6 +38,12 @@ class PlaylistController extends GetxController {
                     playerController.playlistEpisodeController!.episodes;
                 if (episodes.isNotEmpty) {
                   playerController.playlistEpisode.value = episodes[0];
+                  playerController.positionData.value = PositionData(
+                    position:
+                        Duration(milliseconds: episodes[0].playedDuration!),
+                    duration: Duration(milliseconds: episodes[0].duration!),
+                    bufferedPosition: Duration.zero,
+                  );
                 }
               }
             });
