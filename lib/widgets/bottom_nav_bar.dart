@@ -118,8 +118,7 @@ class PlayerBar extends GetView<PlayerController> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Container(
@@ -147,12 +146,11 @@ class PlayerBar extends GetView<PlayerController> {
                               width: double.infinity,
                               child: Text(
                                 episode.title!,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
                                   fontFamily: 'PingFang SC',
                                   fontWeight: FontWeight.w500,
-                                  height: 0,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -164,12 +162,11 @@ class PlayerBar extends GetView<PlayerController> {
                                 PlaylistEpisodeModel.getPlayedAndTotalTime(
                                     postion.value.position.inMilliseconds,
                                     postion.value.duration.inMilliseconds),
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,
                                   fontFamily: 'PingFang SC',
                                   fontWeight: FontWeight.w400,
-                                  height: 0,
                                 ),
                               ),
                             ),
@@ -177,65 +174,42 @@ class PlayerBar extends GetView<PlayerController> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              if (controller.isPlaying.value) {
-                                controller.pause();
-                              } else {
-                                controller.play();
-                              }
-                            },
-                            child: SizedBox(
-                              width: 40,
-                              height: 40,
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                clipBehavior: Clip.antiAlias,
-                                decoration: const BoxDecoration(),
-                                child: Stack(children: [
-                                  Icon(
-                                    controller.isPlaying.value
-                                        ? FluentIcons.pause_32_filled
-                                        : FluentIcons.play_32_filled,
-                                    color: Colors.white,
-                                    size: 32,
-                                  ),
-                                ]),
-                              ),
-                            ),
+                      GestureDetector(
+                        onTap: () {
+                          if (controller.isPlaying.value) {
+                            controller.pause();
+                          } else {
+                            controller.play();
+                          }
+                        },
+                        child: SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Icon(
+                            controller.isPlaying.value
+                                ? FluentIcons.pause_32_filled
+                                : FluentIcons.play_32_filled,
+                            color: Colors.white,
+                            size: 32,
                           ),
-                          GestureDetector(
-                            onTap: () {
-                              controller.seek(Duration(
-                                  milliseconds:
-                                      postion.value.position.inMilliseconds +
-                                          30000));
-                            },
-                            child: SizedBox(
-                              width: 40,
-                              height: 40,
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                clipBehavior: Clip.antiAlias,
-                                decoration: const BoxDecoration(),
-                                child: const Stack(children: [
-                                  Icon(
-                                    Remix.forward_30_fill,
-                                    color: Colors.white,
-                                    size: 32,
-                                  ),
-                                ]),
-                              ),
-                            ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          controller.seek(Duration(
+                              milliseconds:
+                                  postion.value.position.inMilliseconds +
+                                      30000));
+                        },
+                        child: const SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Icon(
+                            Remix.forward_30_fill,
+                            color: Colors.white,
+                            size: 32,
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
