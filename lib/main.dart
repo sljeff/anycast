@@ -52,17 +52,11 @@ class NavigationBarApp extends StatelessWidget {
     Get.put(UserController());
     return GetMaterialApp(
       theme: ThemeData(
-        appBarTheme: AppBarTheme(
-          toolbarHeight: 100,
+        appBarTheme: const AppBarTheme(
+          toolbarHeight: 156,
           scrolledUnderElevation: 0,
           titleSpacing: 0,
           centerTitle: false,
-          iconTheme: const IconThemeData(
-            color: DarkColor.primaryLightMax,
-          ),
-          actionsIconTheme: const IconThemeData(
-            color: DarkColor.primaryLightMax,
-          ),
         ),
         colorScheme: const ColorScheme(
             brightness: Brightness.dark,
