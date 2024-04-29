@@ -132,6 +132,7 @@ class SearchBar extends GetView<DiscoverController> {
           onTap: () {
             controller.searchController.clear();
             controller.searchText.value = '';
+            FocusScope.of(context).requestFocus(FocusNode());
           },
           child: Text(
             'Cancel',
