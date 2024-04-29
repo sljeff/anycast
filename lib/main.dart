@@ -8,8 +8,10 @@ import 'package:anycast/styles.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/widgets/bottom_nav_bar.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'pages/discover.dart';
 import 'pages/playlists.dart';
 import 'pages/podcasts.dart';
@@ -84,6 +86,24 @@ class NavigationBarApp extends StatelessWidget {
               topLeft: Radius.circular(24),
               topRight: Radius.circular(24),
             ),
+          ),
+        ),
+        tabBarTheme: TabBarTheme(
+          labelColor: const Color(0xFF6EE7B7),
+          indicatorColor: const Color(0xFF6EE7B7),
+          indicatorSize: TabBarIndicatorSize.label,
+          dividerColor: const Color(0xFF9CA3AF),
+          dividerHeight: 1,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontFamily: GoogleFonts.comfortaa().fontFamily,
+            fontWeight: FontWeight.w400,
+          ),
+          unselectedLabelColor: const Color(0xFFD1D5DB),
+          unselectedLabelStyle: TextStyle(
+            fontSize: 12,
+            fontFamily: GoogleFonts.comfortaa().fontFamily,
+            fontWeight: FontWeight.w400,
           ),
         ),
       ),

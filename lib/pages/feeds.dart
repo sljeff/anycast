@@ -20,7 +20,6 @@ class Feeds extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var topPadding = MediaQuery.of(context).padding.top;
     return Padding(
       padding: const EdgeInsets.only(left: 24, right: 24),
       child: Obx(() {
@@ -31,7 +30,6 @@ class Feeds extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: fetchNewEpisodes,
           child: ListView.separated(
-            padding: EdgeInsets.only(bottom: 120, top: topPadding),
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemCount: episodes.length,
             itemBuilder: (context, index) {

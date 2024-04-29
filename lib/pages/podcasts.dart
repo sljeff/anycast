@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anycast/models/subscription.dart';
+import 'package:anycast/pages/subscriptions.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/keepalive.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/appbar.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/pages/feeds.dart';
 import 'package:get/get.dart';
@@ -29,7 +31,35 @@ class PodcastsPage extends StatelessWidget {
             Get.dialog(const ImportExportBlock());
           },
         ),
-        body: KeepAliveWrapper(key: const Key('feeds'), child: Feeds()));
+        // body: KeepAliveWrapper(key: const Key('feeds'), child: Feeds()));
+        body: DefaultTabController(
+          length: 2,
+          child: Column(
+            children: [
+              const TabBar(
+                tabs: [
+                  Tab(
+                      text: 'Inbox',
+                      icon: Icon(FluentIcons.mail_inbox_all_24_filled)),
+                  Tab(
+                    text: 'Subscriptions',
+                    icon: Icon(FluentIcons.library_24_filled),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    KeepAliveWrapper(key: const Key('feeds'), child: Feeds()),
+                    KeepAliveWrapper(
+                        key: const Key('subscriptions'),
+                        child: Subscriptions()),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ));
   }
 }
 

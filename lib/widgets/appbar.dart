@@ -18,7 +18,7 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       title: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        padding: const EdgeInsets.only(left: 24, right: 24, top: 8),
         child: Column(
           children: [
             Container(
@@ -60,7 +60,7 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
             ),
-            const SearchBar()
+            const SearchBar(),
           ],
         ),
       ),
@@ -68,73 +68,7 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(156);
-}
-
-class SearchBarExample extends StatelessWidget {
-  const SearchBarExample({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      clipBehavior: Clip.antiAlias,
-      decoration: ShapeDecoration(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Container(
-              height: 40,
-              padding: const EdgeInsets.all(8),
-              decoration: ShapeDecoration(
-                color: const Color(0xFF232830),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.search,
-                    color: Color(0xFF4B5563),
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      height: 18,
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Text(
-                        'Shows,Episodes,and more',
-                        style: TextStyle(
-                          color: const Color(0xFF4B5563),
-                          fontSize: 16,
-                          fontFamily: GoogleFonts.comfortaa().fontFamily,
-                          fontWeight: FontWeight.w400,
-                          height: 0,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Size get preferredSize => const Size.fromHeight(148);
 }
 
 class SearchBar extends GetView<DiscoverController> {
