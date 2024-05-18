@@ -3,20 +3,16 @@ import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/states/tab.dart';
-import 'package:anycast/states/user.dart';
 import 'package:anycast/styles.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/widgets/bottom_nav_bar.dart';
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'pages/discover.dart';
 import 'pages/playlists.dart';
 import 'pages/podcasts.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,9 +28,9 @@ void main() async {
     ),
   );
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // await Firebase.initializeApp(
+  //   options: DefaultFirebaseOptions.currentPlatform,
+  // );
 
   runApp(NavigationBarApp());
 }
@@ -51,7 +47,6 @@ class NavigationBarApp extends StatelessWidget {
     Get.put(SubscriptionController());
     Get.put(PlayerController());
     Get.put(PlaylistController());
-    Get.put(UserController());
     return GetMaterialApp(
       theme: ThemeData(
         appBarTheme: const AppBarTheme(
@@ -68,8 +63,6 @@ class NavigationBarApp extends StatelessWidget {
             onSecondary: DarkColor.secondaryColor,
             error: DarkColor.accentColor,
             onError: DarkColor.accentColor,
-            background: DarkColor.primaryBackgroundDark,
-            onBackground: DarkColor.primaryBackgroundDark,
             surface: DarkColor.primaryBackgroundDark,
             onSurface: DarkColor.primaryBackgroundDark),
         textTheme: TextTheme(
@@ -107,22 +100,18 @@ class NavigationBarApp extends StatelessWidget {
           ),
         ),
       ),
-      home: GetBuilder<HomeTabController>(
-        builder: (controller) => Scaffold(
-          body: Center(
-            child: Obx(
-              () => IndexedStack(
-                index: controller.selectedIndex.value,
-                children: <Widget>[
-                  const PodcastsPage(),
-                  const Playlists(),
-                  Discover(),
-                ],
-              ),
-            ),
+      home: Scaffold(
+        body: Obx(
+          () => IndexedStack(
+            index: homeTabController.selectedIndex.value,
+            children: <Widget>[
+              const PodcastsPage(),
+              const Playlists(),
+              Discover(),
+            ],
           ),
-          bottomNavigationBar: BottomNavBar(),
         ),
+        bottomNavigationBar: BottomNavBar(),
       ),
     );
   }

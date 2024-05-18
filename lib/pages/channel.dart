@@ -1,3 +1,4 @@
+import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/widgets/card.dart' as card;
 import 'package:dismissible_page/dismissible_page.dart';
@@ -15,12 +16,14 @@ class Channel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var screenSize = MediaQuery.of(context).size;
+    var clController = Get.put(CardListController(), tag: rssFeedUrl);
 
     return DismissiblePage(
       direction: DismissiblePageDismissDirection.down,
       onDismissed: () {
         Get.back();
         Get.delete<ChannelController>(tag: rssFeedUrl);
+        Get.delete<CardListController>(tag: rssFeedUrl);
       },
       child: Obx(() {
         var controller = Get.find<ChannelController>(tag: rssFeedUrl);
@@ -181,15 +184,8 @@ class Channel extends StatelessWidget {
               Expanded(
                   child: controller.isLoading.value
                       ? const Center(child: CircularProgressIndicator())
-                      : ListView.builder(
-                          itemCount: episodes.length,
-                          itemBuilder: (context, index) {
-                            return card.Card(
-                              episode: episodes[index],
-                              onTap: () {},
-                            );
-                          },
-                        ))
+                      : card.CardList(
+                          episodes: episodes, controller: clController))
             ],
           ),
         );

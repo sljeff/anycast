@@ -13,14 +13,10 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 class BottomNavBar extends GetView<HomeTabController> {
   final playerController = Get.find<PlayerController>();
 
-  BottomNavBar({Key? key}) : super(key: key);
+  BottomNavBar({super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (playerController.playlistEpisode.value.guid == null) {
-      return Container();
-    }
-
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -71,7 +67,7 @@ class BottomNavBar extends GetView<HomeTabController> {
 }
 
 class PlayerBar extends GetView<PlayerController> {
-  const PlayerBar({Key? key}) : super(key: key);
+  const PlayerBar({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -229,11 +225,11 @@ class BarIcon extends GetView<HomeTabController> {
   final String text;
 
   const BarIcon({
-    Key? key,
+    super.key,
     required this.icon,
     required this.index,
     required this.text,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

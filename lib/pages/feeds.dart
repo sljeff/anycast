@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
+import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/import_block.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
@@ -14,9 +15,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:xml/xml.dart';
 
 class Feeds extends StatelessWidget {
-  Feeds({Key? key}) : super(key: key);
+  Feeds({super.key});
 
   final controller = Get.put(FeedEpisodeController());
+  final clController = Get.put(CardListController(), tag: 'feeds');
 
   @override
   Widget build(BuildContext context) {
@@ -29,15 +31,9 @@ class Feeds extends StatelessWidget {
         }
         return RefreshIndicator(
           onRefresh: fetchNewEpisodes,
-          child: ListView.separated(
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemCount: episodes.length,
-            itemBuilder: (context, index) {
-              return card.Card(
-                episode: episodes[index],
-                onTap: () {},
-              );
-            },
+          child: card.CardList(
+            episodes: episodes,
+            controller: clController,
           ),
         );
       }),
