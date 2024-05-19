@@ -8,13 +8,13 @@
 */
 import 'package:anycast/models/episode.dart';
 import 'package:anycast/states/cardlist.dart';
-import 'package:anycast/styles.dart';
 import 'package:anycast/utils/formatters.dart';
+import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class Card extends StatelessWidget {
   final Episode episode;
@@ -43,8 +43,11 @@ class Card extends StatelessWidget {
               height: 96,
               padding: const EdgeInsets.all(8),
               decoration: ShapeDecoration(
-                color: DarkColor.primaryBackground,
                 shape: RoundedRectangleBorder(
+                  side: BorderSide(
+                    color: Colors.grey.shade800,
+                    width: 1,
+                  ),
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),
@@ -84,7 +87,12 @@ class Card extends StatelessWidget {
                       children: [
                         Text(
                           episode.title!,
-                          style: DarkColor.defaultTitle,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontFamily: 'PingFangSC-Regular,PingFang SC',
+                            fontWeight: FontWeight.w500,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -92,26 +100,48 @@ class Card extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             SizedBox(
-                              width: 80,
+                              width: 94,
                               child: Text(
                                 episode.channelTitle!,
-                                style: DarkColor.cardTextLight,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
+                                  fontWeight: FontWeight.w500,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
                             SizedBox(
-                              width: 120,
+                              width: 124,
                               child: Text(
                                 '${formatDuration(episode.duration!)} • ${formatDatetime(episode.pubDate!)}',
                                 textAlign: TextAlign.right,
-                                style: DarkColor.defaultText,
+                                style: const TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 12,
+                                  fontFamily: 'PingFang SC',
+                                  fontWeight: FontWeight.w400,
+                                  height: 0,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
+                        Text(
+                          htmlToText(episode.description),
+                          style: TextStyle(
+                            color: const Color(0xFF6B7280),
+                            fontSize: 12,
+                            fontFamily: GoogleFonts.inter().fontFamily,
+                            fontWeight: FontWeight.w400,
+                            height: 0,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        )
                       ],
                     ),
                   ),
@@ -120,11 +150,12 @@ class Card extends StatelessWidget {
             ),
           ),
           AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
             height: clController.expandedIndex.value == index ? 60 : 0,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children:
                   clController.expandedIndex.value == index ? actions : [],
             ),
@@ -135,47 +166,37 @@ class Card extends StatelessWidget {
   }
 }
 
-class CardList extends StatelessWidget {
-  final List<Episode> episodes;
-  final CardListController controller;
+class CardBtn extends StatelessWidget {
+  final Widget icon;
+  final Function() onPressed;
 
-  const CardList({
+  const CardBtn({
     super.key,
-    required this.episodes,
-    required this.controller,
+    required this.icon,
+    required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Obx(
-      () => ListView.separated(
-        padding: const EdgeInsets.only(top: 12),
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemCount: episodes.length,
-        itemBuilder: (context, index) {
-          return Card(
-            episode: episodes[index],
-            index: index,
-            clController: controller,
-            actions: [
-              IconButton(
-                color: Colors.red,
-                icon: const Icon(FluentIcons.play_32_filled),
-                onPressed: () {},
-              ),
-              IconButton(
-                color: Colors.red,
-                icon: const Icon(FluentIcons.add_32_filled),
-                onPressed: () {},
-              ),
-              IconButton(
-                color: Colors.red,
-                icon: const Icon(FluentIcons.delete_32_filled),
-                onPressed: () {},
-              ),
-            ],
-          );
-        },
+    return GestureDetector(
+      onTap: () {
+        onPressed();
+      },
+      child: Container(
+        margin: const EdgeInsets.only(top: 12),
+        width: 48,
+        height: 48,
+        decoration: ShapeDecoration(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(36),
+          ),
+        ),
+        child: FractionallySizedBox(
+          widthFactor: 0.5,
+          heightFactor: 0.5,
+          child: icon,
+        ),
       ),
     );
   }

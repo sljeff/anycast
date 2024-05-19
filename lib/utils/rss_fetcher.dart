@@ -41,7 +41,7 @@ Future<List<PodcastImportData>> fetchPodcastsByUrls(List<String> rssFeedUrls,
       var subscription = SubscriptionModel.fromMap(Map<String, dynamic>.from({
         'rssFeedUrl': rssFeedUrl,
         'title': channel.title?.trim(),
-        'description': htmlToText(channel.description)?.trim(),
+        'description': htmlToText(channel.description).trim(),
         'imageUrl': channel.image?.url ?? (channel.itunes?.image?.href ?? ''),
         'link': channel.link,
         'categories': channel.categories?.map((e) => e.value).join(','),
@@ -88,9 +88,9 @@ Future<List<PodcastImportData>> fetchPodcastsByUrls(List<String> rssFeedUrls,
   return podcasts;
 }
 
-String? htmlToText(String? html) {
+String htmlToText(String? html) {
   if (html == null) {
-    return null;
+    return '';
   }
   html = html.trim();
 
@@ -103,7 +103,7 @@ String? htmlToText(String? html) {
     if (document.body == null) {
       return html;
     }
-    return document.body?.text;
+    return document.body!.text;
   } catch (error) {
     print(error);
     return html;

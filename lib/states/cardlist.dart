@@ -10,4 +10,8 @@ class CardListController extends GetxController {
       expandedIndex.value = index;
     }
   }
+
+  void close() {
+    expandedIndex.value = -1;
+  }
 }

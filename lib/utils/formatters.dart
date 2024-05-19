@@ -55,7 +55,7 @@ Widget renderHtml(context, String html) {
   if (html.trim().startsWith('<')) {
     var sanitized = sanitizeHtml(html).trim();
     if (sanitized.isEmpty) {
-      sanitized = htmlToText(html)!;
+      sanitized = htmlToText(html);
     }
     return Html(
         data: sanitized,

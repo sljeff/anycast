@@ -3,13 +3,15 @@ import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/import_block.dart';
+import 'package:anycast/states/player.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/card.dart' as card;
 import 'package:get/get.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
-
+import 'package:iconify_flutter/icons/ic.dart';
+import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:xml/xml.dart';
@@ -31,9 +33,43 @@ class Feeds extends StatelessWidget {
         }
         return RefreshIndicator(
           onRefresh: fetchNewEpisodes,
-          child: card.CardList(
-            episodes: episodes,
-            controller: clController,
+          child: ListView.separated(
+            padding: const EdgeInsets.only(top: 12),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemCount: episodes.length,
+            itemBuilder: (context, index) {
+              var ep = episodes[index];
+              return card.Card(
+                episode: ep,
+                index: index,
+                clController: clController,
+                actions: [
+                  card.CardBtn(
+                    icon: const Iconify(Ic.round_play_arrow),
+                    onPressed: () {
+                      controller.addToTop(1, ep).then((pe) {
+                        Get.find<PlayerController>().playByEpisode(pe);
+                        clController.close();
+                      });
+                    },
+                  ),
+                  card.CardBtn(
+                    icon: const Iconify(Ic.round_playlist_add),
+                    onPressed: () {
+                      controller.addToPlaylist(1, ep);
+                      clController.close();
+                    },
+                  ),
+                  card.CardBtn(
+                    icon: const Iconify(Ic.round_clear),
+                    onPressed: () {
+                      controller.removeByGuids([ep.guid!]);
+                      clController.close();
+                    },
+                  ),
+                ],
+              );
+            },
           ),
         );
       }),
