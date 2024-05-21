@@ -5,6 +5,7 @@ import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class Subscriptions extends StatelessWidget {
   final SubscriptionController controller = Get.put(SubscriptionController());
@@ -15,8 +16,21 @@ class Subscriptions extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       if (controller.subscriptions.isEmpty) {
-        return const Center(
-          child: Text('No subscriptions'),
+        return Center(
+          child: SizedBox(
+            width: 300,
+            child: Text(
+              'Whoops! \n\nLooks like your podcast galaxy is still unexplored.\n \nStart subscribing and fill it with stars of shows!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontFamily: GoogleFonts.comfortaa().fontFamily,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 2.40,
+              ),
+            ),
+          ),
         );
       }
       return ListView.builder(

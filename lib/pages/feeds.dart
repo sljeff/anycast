@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
+import 'package:anycast/pages/podcasts.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/import_block.dart';
 import 'package:anycast/states/player.dart';
@@ -10,10 +11,10 @@ import 'package:anycast/widgets/card.dart' as card;
 import 'package:get/get.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:xml/xml.dart';
 
 class Feeds extends StatelessWidget {
@@ -91,73 +92,108 @@ class ImportBlock extends StatelessWidget {
         );
       }
       return Container(
-        padding: const EdgeInsets.all(16),
+        alignment: Alignment.center,
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('No feeds found. Maybe you can:'),
-            const SizedBox(height: 16),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: () {
-                    // select xml file
-                    FilePicker.platform.pickFiles(
-                      type: FileType.custom,
-                      allowedExtensions: ['xml'],
-                    ).then((value) {
-                      if (value != null) {
-                        controller.isLoading.value = true;
-                        parseOMPL(value.files.single.path).then((value) {
-                          importPodcastsByUrls(value).then((value) {
-                            Get.find<FeedEpisodeController>().addMany(
-                                value.map((e) => e.feedEpisodes![0]).toList());
-                            Get.find<SubscriptionController>().addMany(
-                                value.map((e) => e.subscription!).toList());
-                            controller.isLoading.value = false;
-                          });
-                        });
-                      }
-                    });
-                  },
-                  child: const Text('Import OMPL'),
+            Container(
+              alignment: Alignment.center,
+              height: 240,
+              child: Text(
+                'It’s empty here.\n\nLet\'s change that!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontFamily: GoogleFonts.comfortaa().fontFamily,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2.40,
                 ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    Get.find<HomeTabController>().onItemTapped(2);
-                  },
-                  child: const Text('Search Podcasts'),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: 200,
-                  height: 50,
-                  child: TextField(
-                    style: const TextStyle(fontSize: 10),
-                    controller: controller.textController,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.all(1),
-                      border: const OutlineInputBorder(),
-                      labelText: 'Enter a Podcast URL',
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          controller.isLoading.value = true;
-                          importPodcastsByUrls([controller.textController.text])
-                              .then((value) {
-                            Get.find<FeedEpisodeController>().addMany(
-                                value.map((e) => e.feedEpisodes![0]).toList());
-                            Get.find<SubscriptionController>().addMany(
-                                value.map((e) => e.subscription!).toList());
-                            controller.isLoading.value = false;
-                          });
-                        },
-                        icon: const Icon(Icons.add),
+              ),
+            ),
+            Expanded(
+              child: SizedBox(
+                width: 220,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton(
+                      style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: const Color(0xFF10B981),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 36,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          textStyle: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontFamily: GoogleFonts.comfortaa().fontFamily,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.40,
+                          )),
+                      onPressed: () {
+                        Get.find<HomeTabController>().onItemTapped(2);
+                      },
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Iconify(Ic.outline_explore,
+                              color: Colors.white, size: 24),
+                          SizedBox(width: 8),
+                          Text('Explore'),
+                        ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        SizedBox(
+                          height: 48,
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              side: const BorderSide(
+                                  color: Colors.white, width: 1),
+                              textStyle: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontFamily: GoogleFonts.comfortaa().fontFamily,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            onPressed: () {
+                              Get.dialog(const ImportExportBlock());
+                            },
+                            child: const Row(
+                              children: [
+                                Iconify(Ic.round_file_download,
+                                    color: Colors.white),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Import OMPL',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Iconify(Ic.round_help, color: Colors.white),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
         ),
