@@ -78,7 +78,7 @@ Widget renderHtml(context, String html) {
           'body': Style(
             padding: HtmlPaddings.zero,
             fontSize: FontSize(14),
-            color: DarkColor.defaultMainText.color,
+            color: Colors.white,
           ),
         });
   }

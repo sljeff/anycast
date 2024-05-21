@@ -16,35 +16,30 @@ class DarkColor {
     fontSize: 16,
     fontWeight: FontWeight.w700,
     fontFamily: GoogleFonts.notoSans().fontFamily,
-    height: 0,
   );
   static TextStyle cardTextLight = TextStyle(
     color: primary,
     fontSize: 12,
     fontFamily: GoogleFonts.inter().fontFamily,
     fontWeight: FontWeight.w400,
-    height: 0,
   );
   static TextStyle defaultText = TextStyle(
     color: secondaryColor,
     fontSize: 12,
     fontFamily: GoogleFonts.inter().fontFamily,
     fontWeight: FontWeight.w400,
-    height: 0,
   );
   static TextStyle defaultTitle = TextStyle(
     color: primaryLightMax,
     fontSize: 16,
     fontFamily: GoogleFonts.notoSans().fontFamily,
     fontWeight: FontWeight.w700,
-    height: 0,
   );
   static TextStyle defaultMainText = TextStyle(
     color: primaryLightMax,
     fontSize: 14,
     fontWeight: FontWeight.w400,
     fontFamily: GoogleFonts.comfortaa().fontFamily,
-    height: 0,
   );
   static TextStyle mainTitle = TextStyle(
     color: primaryLightMax,

@@ -2,12 +2,13 @@ import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/widgets/card.dart' as card;
 import 'package:dismissible_page/dismissible_page.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:expandable_text/expandable_text.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/ic.dart';
 
 class Channel extends StatelessWidget {
   final String rssFeedUrl;
@@ -200,16 +201,9 @@ class Channel extends StatelessWidget {
                                     index: index,
                                     clController: clController,
                                     actions: [
-                                      IconButton(
-                                        color: Colors.red,
-                                        icon: const Icon(
-                                            FluentIcons.play_32_filled),
-                                        onPressed: () {},
-                                      ),
-                                      IconButton(
-                                        color: Colors.red,
-                                        icon: const Icon(
-                                            FluentIcons.add_32_filled),
+                                      card.CardBtn(
+                                        icon:
+                                            const Iconify(Ic.round_play_arrow),
                                         onPressed: () {},
                                       ),
                                     ],

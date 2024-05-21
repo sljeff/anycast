@@ -117,18 +117,21 @@ class PlayerBar extends GetView<PlayerController> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: ShapeDecoration(
-                          image: DecorationImage(
-                            image:
-                                CachedNetworkImageProvider(episode.imageUrl!),
-                            fit: BoxFit.fill,
+                      Hero(
+                        tag: 'play_image',
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: ShapeDecoration(
+                            image: DecorationImage(
+                              image:
+                                  CachedNetworkImageProvider(episode.imageUrl!),
+                              fit: BoxFit.fill,
+                            ),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
                       const SizedBox(width: 8),

@@ -1,8 +1,8 @@
-import 'package:anycast/pages/subscriptions.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/discover.dart';
 import 'package:anycast/api/podcasts.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/widgets/card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';

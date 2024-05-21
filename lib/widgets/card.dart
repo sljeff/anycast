@@ -7,18 +7,22 @@
 播放列表的卡片有背景表示播放进度
 */
 import 'package:anycast/models/episode.dart';
+import 'package:anycast/models/subscription.dart';
+import 'package:anycast/pages/channel.dart';
 import 'package:anycast/states/cardlist.dart';
+import 'package:anycast/states/channel.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class Card extends StatelessWidget {
   final Episode episode;
-  final List<Widget> actions;
+  final List<CardBtn> actions;
   final int index;
   final CardListController clController;
 
@@ -40,7 +44,6 @@ class Card extends StatelessWidget {
               clController.expand(index);
             },
             child: Container(
-              height: 96,
               padding: const EdgeInsets.all(8),
               decoration: ShapeDecoration(
                 shape: RoundedRectangleBorder(
@@ -62,7 +65,8 @@ class Card extends StatelessWidget {
                         useSafeArea: true,
                         isScrollControlled: true,
                         context: context,
-                        builder: (context) => Detail(episode),
+                        builder: (context) =>
+                            Detail(episode: episode, actions: actions),
                       );
                     },
                     child: Container(
@@ -196,6 +200,136 @@ class CardBtn extends StatelessWidget {
           widthFactor: 0.5,
           heightFactor: 0.5,
           child: icon,
+        ),
+      ),
+    );
+  }
+}
+
+class PodcastCard extends StatelessWidget {
+  final SubscriptionModel subscription;
+
+  const PodcastCard({super.key, required this.subscription});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Get.lazyPut(() => ChannelController(channel: subscription),
+            tag: subscription.rssFeedUrl);
+        context.pushTransparentRoute(Channel(
+          rssFeedUrl: subscription.rssFeedUrl!,
+        ));
+      },
+      child: Container(
+        padding: const EdgeInsets.only(left: 12, right: 12),
+        decoration: ShapeDecoration(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                height: 80,
+                padding: const EdgeInsets.all(8),
+                decoration: ShapeDecoration(
+                  shape: RoundedRectangleBorder(
+                    side: BorderSide(
+                      width: 1,
+                      color: Colors.grey.shade800,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Hero(
+                      tag: subscription.imageUrl!,
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: ShapeDecoration(
+                          image: DecorationImage(
+                            image: CachedNetworkImageProvider(
+                              subscription.imageUrl!,
+                            ),
+                            fit: BoxFit.fill,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        decoration: ShapeDecoration(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 16,
+                              clipBehavior: Clip.antiAlias,
+                              decoration: const BoxDecoration(),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      child: Text(
+                                        subscription.title!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontFamily: GoogleFonts.comfortaa()
+                                              .fontFamily,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              subscription.description!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontFamily: 'PingFangSC-Regular,PingFang SC',
+                                fontWeight: FontWeight.w400,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

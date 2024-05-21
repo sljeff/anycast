@@ -71,9 +71,9 @@ class NavigationBarApp extends StatelessWidget {
           displaySmall: DarkColor.defaultMainText,
         ),
         bottomSheetTheme: const BottomSheetThemeData(
-          modalBackgroundColor: DarkColor.primaryBackground,
+          modalBackgroundColor: Color(0xFF111316),
           modalElevation: 0,
-          backgroundColor: DarkColor.primaryBackground,
+          backgroundColor: Color(0xFF111316),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(24),

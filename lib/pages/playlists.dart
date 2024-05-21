@@ -5,8 +5,8 @@ import 'package:anycast/states/subscription.dart';
 import 'package:anycast/styles.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/pages/channel.dart';
-import 'package:anycast/pages/detail.dart';
 import 'package:anycast/pages/play_icon.dart';
+import 'package:anycast/widgets/detail.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
@@ -75,8 +75,13 @@ class PlaylistEpisodesList extends StatelessWidget {
                       child: GestureDetector(
                         onTap: () {
                           showModalBottomSheet(
+                              useSafeArea: true,
+                              isScrollControlled: true,
                               context: context,
-                              builder: (context) => DetailWidget(episode));
+                              builder: (context) => Detail(
+                                    episode: episode,
+                                    actions: [],
+                                  ));
                         },
                         child: CachedNetworkImage(
                           imageUrl: episode.imageUrl!,

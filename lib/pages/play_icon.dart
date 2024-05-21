@@ -5,7 +5,7 @@ import 'package:get/get.dart';
 class PlayIcon extends GetView<PlayerController> {
   final double size;
 
-  const PlayIcon({Key? key, this.size = 24}) : super(key: key);
+  const PlayIcon({super.key, this.size = 24});
 
   @override
   Widget build(BuildContext context) {
