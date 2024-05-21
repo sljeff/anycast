@@ -1,5 +1,6 @@
-import 'package:anycast/states/channel.dart';
+import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/states/channel.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
@@ -33,45 +34,144 @@ class Subscriptions extends StatelessWidget {
           ),
         );
       }
-      return ListView.builder(
+      return ListView.separated(
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
         itemCount: controller.subscriptions.length,
         itemBuilder: (context, index) {
-          return ListTile(
-            onTap: () {
-              Get.lazyPut(
-                  () => ChannelController(
-                      channel: controller.subscriptions[index]),
-                  tag: controller.subscriptions[index].rssFeedUrl);
-              context.pushTransparentRoute(Channel(
-                rssFeedUrl: controller.subscriptions[index].rssFeedUrl!,
-              ));
-            },
-            leading: Hero(
-              tag: controller.subscriptions[index].imageUrl!,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl: controller.subscriptions[index].imageUrl!,
-                  width: 50,
-                  height: 50,
-                  placeholder: (context, url) => const Icon(
-                    Icons.image,
-                  ),
-                  errorWidget: (context, url, error) => const Icon(
-                    Icons.image_not_supported,
-                  ),
-                ),
-              ),
-            ),
-            title: Text(controller.subscriptions[index].title!),
-            subtitle: Text(
-              controller.subscriptions[index].description!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          );
+          return PodcastCard(subscription: controller.subscriptions[index]);
         },
       );
     });
+  }
+}
+
+class PodcastCard extends StatelessWidget {
+  final SubscriptionModel subscription;
+
+  const PodcastCard({super.key, required this.subscription});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Get.lazyPut(() => ChannelController(channel: subscription),
+            tag: subscription.rssFeedUrl);
+        context.pushTransparentRoute(Channel(
+          rssFeedUrl: subscription.rssFeedUrl!,
+        ));
+      },
+      child: Container(
+        padding: const EdgeInsets.only(left: 12, right: 12),
+        decoration: ShapeDecoration(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                height: 80,
+                padding: const EdgeInsets.all(8),
+                decoration: ShapeDecoration(
+                  shape: RoundedRectangleBorder(
+                    side: BorderSide(
+                      width: 1,
+                      color: Colors.grey.shade800,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Hero(
+                      tag: subscription.imageUrl!,
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: ShapeDecoration(
+                          image: DecorationImage(
+                            image: CachedNetworkImageProvider(
+                              subscription.imageUrl!,
+                            ),
+                            fit: BoxFit.fill,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        decoration: ShapeDecoration(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 16,
+                              clipBehavior: Clip.antiAlias,
+                              decoration: const BoxDecoration(),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      child: Text(
+                                        subscription.title!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontFamily: GoogleFonts.comfortaa()
+                                              .fontFamily,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              subscription.description!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontFamily: 'PingFangSC-Regular,PingFang SC',
+                                fontWeight: FontWeight.w400,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

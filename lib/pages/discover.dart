@@ -1,3 +1,4 @@
+import 'package:anycast/pages/subscriptions.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/discover.dart';
 import 'package:anycast/api/podcasts.dart';
@@ -93,39 +94,15 @@ class DiscoverBody extends StatelessWidget {
                       );
                     }
                     var channels = snapshot.data!;
-                    return ListView.builder(
+                    return ListView.separated(
+                        padding:
+                            const EdgeInsets.only(left: 12, right: 12, top: 12),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
                         itemCount: channels.length,
                         itemBuilder: (context, index) {
-                          return ListTile(
-                            onTap: () {
-                              Get.lazyPut(
-                                  () => ChannelController(
-                                      channel: channels[index]),
-                                  tag: channels[index].rssFeedUrl);
-                              context.pushTransparentRoute(Channel(
-                                rssFeedUrl: channels[index].rssFeedUrl!,
-                              ));
-                            },
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: CachedNetworkImage(
-                                imageUrl: channels[index].imageUrl!,
-                                width: 50,
-                                height: 50,
-                                placeholder: (context, url) => const Icon(
-                                  Icons.image,
-                                ),
-                                errorWidget: (context, url, error) =>
-                                    const Icon(
-                                  Icons.image_not_supported,
-                                ),
-                              ),
-                            ),
-                            title: Text(channels[index].title!),
-                            subtitle: Text(
-                              channels[index].description!,
-                              maxLines: 2,
-                            ),
+                          return PodcastCard(
+                            subscription: channels[index],
                           );
                         });
                   }),

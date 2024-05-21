@@ -145,7 +145,7 @@ class PlayerBar extends GetView<PlayerController> {
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
-                                  fontFamily: 'PingFang SC',
+                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
                                   fontWeight: FontWeight.w500,
                                 ),
                                 maxLines: 1,
@@ -161,7 +161,7 @@ class PlayerBar extends GetView<PlayerController> {
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,
-                                  fontFamily: 'PingFang SC',
+                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
                                   fontWeight: FontWeight.w400,
                                 ),
                               ),

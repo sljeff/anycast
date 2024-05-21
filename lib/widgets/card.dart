@@ -120,7 +120,7 @@ class Card extends StatelessWidget {
                                 style: const TextStyle(
                                   color: Color(0xFF6B7280),
                                   fontSize: 12,
-                                  fontFamily: 'PingFang SC',
+                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
                                   fontWeight: FontWeight.w400,
                                   height: 0,
                                 ),
