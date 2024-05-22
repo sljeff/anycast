@@ -66,12 +66,13 @@ class FeedEpisodeController extends GetxController {
     var playlistEpisode = feed2playlist(playlistId, episode);
 
     var position = 0;
-    if (Get.find<PlayerController>().player.value.currentPlaylistId ==
-        playlistId) {
+    var playerController = Get.find<PlayerController>();
+    if (playerController.player.value.currentPlaylistId == playlistId) {
+      if (playerController.playlistEpisode.value.guid == episode.guid) {
+        return playerController.playlistEpisode.value;
+      }
       position = 1;
     }
-
-    removeByGuids([episode.guid!]);
 
     var playlistEpisodeController = Get.find<PlaylistController>()
         .getEpisodeControllerByPlaylistId(playlistId);
@@ -85,8 +86,6 @@ class FeedEpisodeController extends GetxController {
     var playlistEpisode = feed2playlist(playlistId, episode);
     var playlistEpisodeController = Get.find<PlaylistController>()
         .getEpisodeControllerByPlaylistId(playlistId);
-    removeByGuids([episode.guid!]);
-    await playlistEpisodeController.add(0, playlistEpisode);
-    return playlistEpisode;
+    return await playlistEpisodeController.add(0, playlistEpisode);
   }
 }

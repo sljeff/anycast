@@ -19,13 +19,28 @@ class PlaylistEpisodeController extends GetxController {
         .addToSet(episodes.map((e) => e.enclosureUrl!).toList());
   }
 
-  Future<void> add(int position, PlaylistEpisodeModel episode) async {
+  Future<PlaylistEpisodeModel> add(
+      int position, PlaylistEpisodeModel episode) async {
+    // if exist, only move it
+    var oldIndex = episodes.indexWhere((e) => e.guid == episode.guid);
+    if (oldIndex != -1) {
+      var ep = episodes[oldIndex];
+      if (oldIndex == position) {
+        return ep;
+      }
+      episodes.removeAt(oldIndex);
+      episodes.insert(position, ep);
+      // 更新到数据库去
+      helper.db.then((db) => PlaylistEpisodeModel.insertOrUpdateByIndex(
+          db!, playlistId, position, ep));
+      return ep;
+    }
     episodes.insert(position, episode);
+    // episodes.insert(position, episode);
     Get.find<PlaylistController>().addToSet([episode.enclosureUrl!]);
-    helper.db.then((db) => {
-          PlaylistEpisodeModel.insertOrUpdateByIndex(
-              db!, playlistId, position, episode)
-        });
+    helper.db.then((db) => PlaylistEpisodeModel.insertOrUpdateByIndex(
+        db!, playlistId, position, episode));
+    return episode;
   }
 
   void remove(String guid) {

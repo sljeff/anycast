@@ -72,6 +72,7 @@ class PlayerController extends GetxController {
         peController.removeTop();
         if (peController.episodes.isEmpty) {
           pause();
+          clear();
         } else {
           playByEpisode(peController.episodes[0]);
         }

@@ -106,3 +106,9 @@ String formatTime(Duration duration) {
   var seconds = duration.inSeconds.remainder(60);
   return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
+
+// example: https://www.ximalaya.com/album/41563226.xml => ximalaya.com
+String urlToDomain(String url) {
+  var uri = Uri.parse(url);
+  return uri.host;
+}

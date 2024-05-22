@@ -91,7 +91,11 @@ class PlaylistEpisodeModel extends Episode {
   }
 
   static Future<void> insertOrUpdateByIndex(DatabaseExecutor db, int playlistId,
-      int index, PlaylistEpisodeModel episode) async {
+      int index, PlaylistEpisodeModel ep) async {
+    var episode = await getByEnclosureUrl(db, ep.enclosureUrl!);
+
+    episode ??= ep;
+
     var episodes = await listByPlaylistId(db, playlistId);
     var positionLeft = index > 0 ? episodes[index - 1].position : null;
     var positionRight =
@@ -141,10 +145,13 @@ class PlaylistEpisodeModel extends Episode {
     });
   }
 
-  static Future<PlaylistEpisodeModel> getByEnclosureUrl(
+  static Future<PlaylistEpisodeModel?> getByEnclosureUrl(
       DatabaseExecutor db, String enclosureUrl) async {
     return db.rawQuery('SELECT * FROM $tableName WHERE enclosureUrl = ?',
         [enclosureUrl]).then((List<Map<String, dynamic>> maps) {
+      if (maps.isEmpty) {
+        return null;
+      }
       return PlaylistEpisodeModel.fromMap(maps[0]);
     });
   }
