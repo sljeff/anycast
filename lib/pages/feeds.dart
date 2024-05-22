@@ -49,6 +49,7 @@ class Feeds extends StatelessWidget {
                     icon: const Iconify(Ic.round_play_arrow),
                     onPressed: () {
                       controller.addToTop(1, ep).then((pe) {
+                        controller.removeByGuids([ep.guid!]);
                         Get.find<PlayerController>().playByEpisode(pe);
                         clController.close();
                       });
