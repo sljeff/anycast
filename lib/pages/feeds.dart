@@ -58,7 +58,9 @@ class Feeds extends StatelessWidget {
                   card.CardBtn(
                     icon: const Iconify(Ic.round_playlist_add),
                     onPressed: () {
-                      controller.addToPlaylist(1, ep);
+                      controller.addToPlaylist(1, ep).then((pe) {
+                        controller.removeByGuids([ep.guid!]);
+                      });
                       clController.close();
                     },
                   ),
