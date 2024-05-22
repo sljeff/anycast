@@ -169,7 +169,7 @@ class PlaylistEpisodesList extends StatelessWidget {
                         });
                         Get.snackbar(
                           'Processing',
-                          'Subtitle downloading...',
+                          'Subtitle generating, please wait...',
                           snackPosition: SnackPosition.BOTTOM,
                         );
                       case 'failed':
@@ -183,6 +183,12 @@ class PlaylistEpisodesList extends StatelessWidget {
                         Get.snackbar(
                           'Success',
                           'You can view subtitles in the player page.',
+                          snackPosition: SnackPosition.BOTTOM,
+                        );
+                      case 'processing':
+                        Get.snackbar(
+                          'Processing',
+                          'It takes a while, please wait...',
                           snackPosition: SnackPosition.BOTTOM,
                         );
                     }

@@ -92,6 +92,7 @@ class Card extends StatelessWidget {
                         Text(
                           episode.title!,
                           style: const TextStyle(
+                            decoration: TextDecoration.none,
                             color: Colors.white,
                             fontSize: 16,
                             fontFamily: 'PingFangSC-Regular,PingFang SC',
@@ -108,6 +109,7 @@ class Card extends StatelessWidget {
                               child: Text(
                                 episode.channelTitle!,
                                 style: const TextStyle(
+                                  decoration: TextDecoration.none,
                                   color: Colors.white,
                                   fontSize: 12,
                                   fontFamily: 'PingFangSC-Regular,PingFang SC',
@@ -122,6 +124,7 @@ class Card extends StatelessWidget {
                                 '${formatDuration(episode.duration!)} • ${formatDatetime(episode.pubDate!)}',
                                 textAlign: TextAlign.right,
                                 style: const TextStyle(
+                                  decoration: TextDecoration.none,
                                   color: Color(0xFF6B7280),
                                   fontSize: 12,
                                   fontFamily: 'PingFangSC-Regular,PingFang SC',
@@ -137,6 +140,7 @@ class Card extends StatelessWidget {
                         Text(
                           htmlToText(episode.description),
                           style: TextStyle(
+                            decoration: TextDecoration.none,
                             color: const Color(0xFF6B7280),
                             fontSize: 12,
                             fontFamily: GoogleFonts.inter().fontFamily,
@@ -297,6 +301,7 @@ class PodcastCard extends StatelessWidget {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
+                                          decoration: TextDecoration.none,
                                           color: Colors.white,
                                           fontSize: 14,
                                           fontFamily: GoogleFonts.comfortaa()
@@ -313,6 +318,7 @@ class PodcastCard extends StatelessWidget {
                             Text(
                               subscription.description!,
                               style: const TextStyle(
+                                decoration: TextDecoration.none,
                                 color: Colors.white,
                                 fontSize: 12,
                                 fontFamily: 'PingFangSC-Regular,PingFang SC',

@@ -2,11 +2,14 @@ import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/discover.dart';
 import 'package:anycast/api/podcasts.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/widgets/appbar.dart';
+import 'package:anycast/widgets/card.dart' as card;
 import 'package:anycast/widgets/card.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:anycast/widgets/handler.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class Discover extends StatelessWidget {
   final DiscoverController controller = Get.put(DiscoverController());
@@ -15,48 +18,12 @@ class Discover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: MediaQuery.of(context).size.width - 100,
-              height: 50,
-              child: TextField(
-                onChanged: (value) {
-                  controller.searchText.value = value;
-                },
-                onSubmitted: (value) {
-                  controller.searchText.value = value;
-                  context.pushTransparentRoute(const SearchPage());
-                },
-                controller: controller.searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search title',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      controller.searchController.clear();
-                    },
-                    icon: const Icon(Icons.clear),
-                  ),
-                ),
-              ),
-            ),
-            IconButton(
-              onPressed: () {
-                context.pushTransparentRoute(const SearchPage());
-              },
-              icon: const Icon(Icons.search),
-            ),
-          ],
-        ),
+    return const Scaffold(
+      appBar: MyAppBar(
+        title: 'DISCOVER',
+        icon: Icons.settings_rounded,
       ),
-      body: const DiscoverBody(),
+      body: DiscoverBody(),
     );
   }
 }
@@ -122,72 +89,91 @@ class SearchPage extends GetView<DiscoverController> {
   @override
   Widget build(BuildContext context) {
     return DismissiblePage(
+      backgroundColor: const Color(0xFF111316),
+      isFullScreen: false,
       direction: DismissiblePageDismissDirection.down,
       onDismissed: () {
         Get.back();
       },
-      child: Scaffold(
-        appBar: AppBar(
-            centerTitle: true,
-            leading: const SizedBox.shrink(),
-            title: IconButton(
-              onPressed: () {
-                Get.back();
-              },
-              icon: const Icon(Icons.keyboard_arrow_down),
-            )),
-        body: Obx(
-          () => FutureBuilder(
-            future: searchChannels(controller.searchText.value),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
-              }
-              var subscriptions = snapshot.data!;
-              if (subscriptions.isEmpty) {
-                return const Center(
-                  child: Text('No results'),
-                );
-              }
-              return ListView.builder(
-                  itemCount: subscriptions.length,
-                  itemBuilder: (context, index) {
-                    return ListTile(
-                      onTap: () {
-                        Get.lazyPut(
-                            () => ChannelController(
-                                channel: subscriptions[index]),
-                            tag: subscriptions[index].rssFeedUrl);
-                        context.pushTransparentRoute(Channel(
-                          rssFeedUrl: subscriptions[index].rssFeedUrl!,
-                        ));
-                      },
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: subscriptions[index].imageUrl!,
-                          width: 50,
-                          height: 50,
-                          placeholder: (context, url) => const Icon(
-                            Icons.image,
-                          ),
-                          errorWidget: (context, url, error) => const Icon(
-                            Icons.image_not_supported,
-                          ),
-                        ),
-                      ),
-                      title: Text(subscriptions[index].title!),
-                      subtitle: Text(
-                        subscriptions[index].description!,
-                        maxLines: 2,
-                      ),
-                    );
-                  });
+      child: Column(
+        children: [
+          GestureDetector(
+            child: const Handler(),
+            onTap: () {
+              Navigator.pop(context);
             },
           ),
-        ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'You are searching for',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontFamily: GoogleFonts.comfortaa().fontFamily,
+                  fontWeight: FontWeight.w700,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                controller.searchText.value,
+                style: TextStyle(
+                    color: const Color(0xFF6EE7B7),
+                    fontSize: 16,
+                    fontFamily: GoogleFonts.comfortaa().fontFamily,
+                    fontWeight: FontWeight.w400,
+                    decoration: TextDecoration.none),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: Obx(
+              () => FutureBuilder(
+                future: searchChannels(controller.searchText.value),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+                  var subscriptions = snapshot.data!;
+                  if (subscriptions.isEmpty) {
+                    return const Center(
+                      child: Text('No results'),
+                    );
+                  }
+                  return ListView.separated(
+                      padding:
+                          const EdgeInsets.only(left: 12, right: 12, top: 12),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemCount: subscriptions.length,
+                      itemBuilder: (context, index) {
+                        return GestureDetector(
+                          onTap: () {
+                            Get.lazyPut(
+                                () => ChannelController(
+                                    channel: subscriptions[index]),
+                                tag: subscriptions[index].rssFeedUrl);
+                            context.pushTransparentRoute(Channel(
+                              rssFeedUrl: subscriptions[index].rssFeedUrl!,
+                            ));
+                          },
+                          child: card.PodcastCard(
+                            subscription: subscriptions[index],
+                          ),
+                        );
+                      });
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

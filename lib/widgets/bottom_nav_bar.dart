@@ -84,7 +84,7 @@ class PlayerBar extends GetView<PlayerController> {
       // width of played bar * posPercent
       var barWidth = MediaQuery.of(context).size.width - 12 * 2;
       var playedWidth = barWidth * posPercent;
-      if (playedWidth < 0 || playedWidth > barWidth) {
+      if (playedWidth < 0 || playedWidth > barWidth || playedWidth.isNaN) {
         playedWidth = 0;
       }
 
