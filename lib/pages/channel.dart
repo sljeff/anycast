@@ -256,7 +256,16 @@ class Channel extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(36),
                                       ),
                                     ),
-                                    onPressed: () {},
+                                    onPressed: () {
+                                      var feedsController =
+                                          Get.find<FeedEpisodeController>();
+                                      feedsController
+                                          .addToTop(1, controller.episodes[0])
+                                          .then((pe) {
+                                        Get.find<PlayerController>()
+                                            .playByEpisode(pe);
+                                      });
+                                    },
                                     child: Row(
                                       children: [
                                         const Iconify(Ic.round_play_arrow),
