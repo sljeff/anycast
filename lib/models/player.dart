@@ -49,4 +49,8 @@ class PlayerModel {
       return PlayerModel.fromMap(maps[0]);
     });
   }
+
+  static Future<void> delete(DatabaseExecutor db) async {
+    await db.delete(tableName, where: 'id = ?', whereArgs: [1]);
+  }
 }

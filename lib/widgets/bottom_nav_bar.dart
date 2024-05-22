@@ -2,13 +2,13 @@ import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/pages/player_page.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/tab.dart';
+import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:dismissible_page/dismissible_page.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 
 class BottomNavBar extends GetView<HomeTabController> {
   final playerController = Get.find<PlayerController>();
@@ -84,6 +84,9 @@ class PlayerBar extends GetView<PlayerController> {
       // width of played bar * posPercent
       var barWidth = MediaQuery.of(context).size.width - 12 * 2;
       var playedWidth = barWidth * posPercent;
+      if (playedWidth < 0 || playedWidth > barWidth) {
+        playedWidth = 0;
+      }
 
       return GestureDetector(
         onTap: () {
@@ -181,15 +184,12 @@ class PlayerBar extends GetView<PlayerController> {
                             controller.play();
                           }
                         },
-                        child: SizedBox(
+                        child: const SizedBox(
                           width: 40,
                           height: 40,
-                          child: Icon(
-                            controller.isPlaying.value
-                                ? FluentIcons.pause_32_filled
-                                : FluentIcons.play_32_filled,
-                            color: Colors.white,
+                          child: PlayIcon(
                             size: 32,
+                            color: Colors.white,
                           ),
                         ),
                       ),

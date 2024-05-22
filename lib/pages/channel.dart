@@ -13,7 +13,7 @@ import 'package:iconify_flutter/icons/ic.dart';
 class Channel extends StatelessWidget {
   final String rssFeedUrl;
 
-  const Channel({Key? key, required this.rssFeedUrl}) : super(key: key);
+  const Channel({super.key, required this.rssFeedUrl});
 
   @override
   Widget build(BuildContext context) {

@@ -30,9 +30,7 @@ class Detail extends StatelessWidget {
       detailActions.add(CardBtn(
         icon: action.icon,
         onPressed: () {
-          print(1);
           action.onPressed();
-          print(2);
           Navigator.pop(context);
         },
       ));

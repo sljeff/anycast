@@ -1,18 +1,20 @@
-import 'package:anycast/models/subscription.dart';
-import 'package:anycast/states/channel.dart';
+import 'dart:convert';
+
+import 'package:anycast/api/subtitles.dart';
+import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/player.dart';
-import 'package:anycast/states/subscription.dart';
-import 'package:anycast/styles.dart';
-import 'package:anycast/utils/formatters.dart';
-import 'package:anycast/pages/channel.dart';
-import 'package:anycast/pages/play_icon.dart';
-import 'package:anycast/widgets/detail.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dismissible_page/dismissible_page.dart';
+import 'package:anycast/states/subtitle.dart';
+import 'package:anycast/states/tab.dart';
+import 'package:anycast/widgets/appbar.dart';
+import 'package:anycast/widgets/card.dart' as card;
+import 'package:anycast/widgets/play_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/ic.dart';
 
 class Playlists extends GetView<PlaylistController> {
   const Playlists({super.key});
@@ -24,18 +26,19 @@ class Playlists extends GetView<PlaylistController> {
         var playlists = controller.playlists;
         var episodesControllers = controller.episodesControllers;
 
+        for (var c in episodesControllers) {
+          Get.lazyPut<CardListController>(
+            () => CardListController(),
+            tag: 'playlits${c.playlistId}',
+          );
+        }
+
         return DefaultTabController(
           length: playlists.length,
           child: Scaffold(
-              appBar: AppBar(
-                title: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text('Playlist', style: DarkColor.mainTitle),
-                ),
-                bottom: TabBar(
-                    tabs: playlists.map((playlist) {
-                  return Tab(text: playlist.title);
-                }).toList()),
+              appBar: const MyAppBar(
+                title: 'PLAYLIST',
+                icon: Icons.history_rounded,
               ),
               body: TabBarView(
                   children: episodesControllers
@@ -59,133 +62,141 @@ class PlaylistEpisodesList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(
       () {
+        if (controller.episodes.isEmpty) {
+          return Column(
+            children: [
+              Container(
+                alignment: Alignment.center,
+                height: 300,
+                child: Text(
+                  'All caught up?\n\nExplore new shows!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontFamily: GoogleFonts.comfortaa().fontFamily,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2.40,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 262,
+                child: TextButton(
+                  onPressed: () {
+                    Get.find<HomeTabController>().onItemTapped(2);
+                  },
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Iconify(
+                        Ic.baseline_explore,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Explore',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontFamily: GoogleFonts.comfortaa().fontFamily,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 2.40,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
         var playerController = Get.find<PlayerController>();
         var isPlaying = playerController.isPlaying.value &&
             playerController.player.value.currentPlaylistId ==
                 controller.playlistId;
-        return ListView.builder(
+        var clController = Get.find<CardListController>(
+            tag: 'playlits${controller.playlistId}');
+
+        return ListView.separated(
+          padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
           itemCount: controller.episodes.length,
           itemBuilder: (context, index) {
             var episode = controller.episodes[index];
-            return ExpansionTile(
-              controlAffinity: ListTileControlAffinity.leading,
-              leading: episode.imageUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: GestureDetector(
-                        onTap: () {
-                          showModalBottomSheet(
-                              useSafeArea: true,
-                              isScrollControlled: true,
-                              context: context,
-                              builder: (context) => Detail(
-                                    episode: episode,
-                                    actions: [],
-                                  ));
-                        },
-                        child: CachedNetworkImage(
-                          imageUrl: episode.imageUrl!,
-                          width: 48,
-                          height: 48,
-                          placeholder: (context, url) => const Icon(
-                            Icons.image,
-                          ),
-                          errorWidget: (context, url, error) => const Icon(
-                            Icons.image_not_supported,
-                          ),
-                        ),
-                      ),
-                    )
-                  : const SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: Icon(Icons.image),
-                    ),
-              title: Text(episode.title!, style: const TextStyle(fontSize: 14)),
-              subtitle: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      var s = Get.find<SubscriptionController>()
-                          .getByTitle(episode.channelTitle!);
-                      if (s == null) {
-                        s = SubscriptionModel.empty();
-                        s.rssFeedUrl = episode.rssFeedUrl;
-                      }
-                      Get.lazyPut(() => ChannelController(channel: s!),
-                          tag: s.rssFeedUrl);
-                      context.pushTransparentRoute(
-                          Channel(rssFeedUrl: s.rssFeedUrl!));
-                    },
-                    child: Text(
-                      episode.channelTitle!,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 9,
-                          color: Colors.brown),
-                    ),
+            return card.Card(
+              episode: episode,
+              index: index,
+              clController: clController,
+              actions: [
+                card.CardBtn(
+                  icon: PlayIcon(
+                    size: 24,
+                    enclosureUrl: episode.enclosureUrl!,
                   ),
-                  const Text(
-                    " • ",
-                    style: TextStyle(fontSize: 9),
-                  ),
-                  Text(
-                    formatRemainingTime(
-                      Duration(milliseconds: episode.duration!),
-                      Duration(milliseconds: episode.playedDuration ?? 0),
-                    ),
-                    style: const TextStyle(fontSize: 9),
-                  ),
-                  const Text(
-                    " • ",
-                    style: TextStyle(fontSize: 9),
-                  ),
-                  Text(
-                    formatDatetime(episode.pubDate!),
-                    style: const TextStyle(fontSize: 9),
-                  ),
-                ],
-              ),
-              children: [
-                ButtonBar(
-                  alignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    IconButton(
-                        onPressed: () {
-                          if (index != 0) {
-                            playerController.pause().then((value) => {
-                                  controller.moveToTop(episode).then((value) {
-                                    playerController.playByEpisode(episode);
-                                  })
-                                });
-                          } else {
-                            if (isPlaying) {
-                              playerController.pause();
-                              return;
-                            }
-                            playerController.playByEpisode(episode);
-                          }
-                        },
-                        icon: index != 0
-                            ? const Icon(Icons.play_arrow)
-                            : const PlayIcon()),
-                    IconButton(
-                        onPressed: () {
-                          if (index != 0) {
-                            controller.remove(episode.guid!);
-                            return;
-                          }
-                          playerController.pause();
-                          controller.removeTop();
-                          // if playing, play next
-                          if (isPlaying) {
-                            playerController
-                                .playByEpisode(controller.episodes[0]);
-                          }
-                        },
-                        icon: Icon(Icons.delete)),
-                  ],
+                  onPressed: () {
+                    if (isPlaying && index == 0) {
+                      playerController.pause();
+                    } else {
+                      controller.moveToTop(episode);
+                      playerController.playByEpisode(episode);
+                      clController.expand(0);
+                    }
+                  },
                 ),
+                card.CardBtn(
+                  icon: AIIcon(
+                    size: 24,
+                    enclosureUrl: episode.enclosureUrl!,
+                    color: Colors.black,
+                  ),
+                  onPressed: () {
+                    var stController = Get.find<SubtitleController>();
+                    switch (stController.subtitleUrls[episode.enclosureUrl!]) {
+                      case null:
+                        getSubtitles(episode.enclosureUrl!).then((value) {
+                          var subtitle = '';
+                          if (value.status == 'succeeded') {
+                            subtitle = jsonEncode(value.subtitles);
+                          }
+                          stController.add(
+                              episode.enclosureUrl!, value.status!, subtitle);
+                        });
+                        Get.snackbar(
+                          'Processing',
+                          'Subtitle downloading...',
+                          snackPosition: SnackPosition.BOTTOM,
+                        );
+                      case 'failed':
+                        stController.remove(episode.enclosureUrl!);
+                        Get.snackbar(
+                          'Error',
+                          'Subtitle download failed, please try again later.',
+                          snackPosition: SnackPosition.BOTTOM,
+                        );
+                      case 'succeeded':
+                        Get.snackbar(
+                          'Success',
+                          'You can view subtitles in the player page.',
+                          snackPosition: SnackPosition.BOTTOM,
+                        );
+                    }
+                  },
+                ),
+                card.CardBtn(
+                  icon: const Iconify(Ic.round_clear),
+                  onPressed: () {
+                    controller.remove(episode.guid!);
+                    if (index == 0) {
+                      playerController.clear();
+                    }
+                  },
+                )
               ],
             );
           },

@@ -162,6 +162,21 @@ class PlayerController extends GetxController {
     }
     return playlistEpisode.value.enclosureUrl == enclosureUrl;
   }
+
+  void clear() {
+    pause();
+    positionData.value = PositionData(
+      position: Duration.zero,
+      bufferedPosition: Duration.zero,
+      duration: Duration.zero,
+    );
+    playlistEpisode.value = PlaylistEpisodeModel.empty();
+    player.value = PlayerModel.empty();
+
+    helper.db.then((db) {
+      PlayerModel.delete(db!);
+    });
+  }
 }
 
 class SettingsController extends GetxController {
