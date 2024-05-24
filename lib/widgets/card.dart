@@ -239,7 +239,6 @@ class PodcastCard extends StatelessWidget {
           children: [
             Expanded(
               child: Container(
-                height: 80,
                 padding: const EdgeInsets.all(8),
                 decoration: ShapeDecoration(
                   shape: RoundedRectangleBorder(
@@ -286,7 +285,6 @@ class PodcastCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              height: 16,
                               clipBehavior: Clip.antiAlias,
                               decoration: const BoxDecoration(),
                               child: Row(
