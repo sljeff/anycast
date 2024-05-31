@@ -171,7 +171,7 @@ class SwipeImage extends GetView<PlayerController> {
                 ),
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Center(child: Icon(Icons.abc)),
+                  child: const Center(child: Icon(Icons.abc)),
                 ),
               ],
             ),
@@ -357,17 +357,17 @@ class Subtitles extends GetView<SubtitleController> {
                               playerController
                                   .seek(Duration(milliseconds: progress));
                             },
-                            icon: Icon(Icons.play_arrow, color: Colors.black)),
+                            icon: const Icon(Icons.play_arrow, color: Colors.black)),
                         Expanded(
                           child: Container(
-                            decoration: BoxDecoration(color: Colors.black),
+                            decoration: const BoxDecoration(color: Colors.black),
                             height: 1,
                             width: double.infinity,
                           ),
                         ),
                         Text(
                           formatTime(Duration(milliseconds: progress)),
-                          style: TextStyle(color: Colors.black),
+                          style: const TextStyle(color: Colors.black),
                         )
                       ],
                     );
@@ -616,16 +616,16 @@ class Settings extends GetView<SettingsController> {
       trackHeight: 0,
       trackShape: const RoundedRectSliderTrackShape(),
       thumbColor: Colors.white,
-      thumbShape: CustomSliderThumbCircle(thumbRadius: 20),
+      thumbShape: const CustomSliderThumbCircle(thumbRadius: 20),
       overlayColor: Colors.transparent,
-      overlayShape: RoundSliderOverlayShape(overlayRadius: 12.0),
+      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
       showValueIndicator: ShowValueIndicator.never,
-      tickMarkShape: RoundSliderTickMarkShape(tickMarkRadius: 4),
+      tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 4),
       activeTickMarkColor: Colors.white,
       inactiveTickMarkColor: Colors.orange.withOpacity(0.5),
-      valueIndicatorShape: PaddleSliderValueIndicatorShape(),
+      valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
       valueIndicatorColor: Colors.orange,
-      valueIndicatorTextStyle: TextStyle(
+      valueIndicatorTextStyle: const TextStyle(
         color: Colors.white,
       ),
     );
@@ -751,7 +751,7 @@ class Settings extends GetView<SettingsController> {
                             activeColor: Colors.blue,
                             inactiveThumbColor: Colors.blue,
                             inactiveTrackColor: Colors.white.withOpacity(0.7),
-                            trackOutlineColor: MaterialStateColor.resolveWith(
+                            trackOutlineColor: WidgetStateColor.resolveWith(
                                 (states) => Colors.blue.withOpacity(0.3)),
                             value: controller.skipSilence.value,
                             onChanged: (value) {
