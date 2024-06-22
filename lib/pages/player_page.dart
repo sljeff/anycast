@@ -11,6 +11,7 @@ import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/widgets/handler.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dismissible_page/dismissible_page.dart';
@@ -21,43 +22,134 @@ import 'package:get/get.dart';
 import 'package:marquee/marquee.dart';
 import 'package:flutter_lyric/lyrics_reader.dart';
 
-class PlayerPage extends StatelessWidget {
+class PlayerPage extends GetView<PlayerController> {
   const PlayerPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    controller.pageIndex.value = 1;
     return DismissiblePage(
-      backgroundColor: Colors.blueGrey,
+      backgroundColor: const Color(0xFF111316),
       direction: DismissiblePageDismissDirection.down,
       onDismissed: () {
         Get.back();
       },
-      child: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  onPressed: () {
-                    Get.back();
-                  },
-                  icon: const Icon(Icons.keyboard_arrow_down),
+      child: Stack(
+        children: [
+          FutureBuilder(
+            future: updatePaletteGenerator(
+                NetworkImage(controller.playlistEpisode.value.imageUrl!)),
+            builder: (context, snapshot) {
+              var mainColor = snapshot.data ?? const Color(0xFF111316);
+              if (snapshot.hasData) {
+                mainColor = snapshot.data!;
+              }
+              return Container(
+                height: MediaQuery.of(context).size.height / 2,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      mainColor,
+                      const Color(0xFF111316),
+                    ],
+                  ),
                 ),
+              );
+            },
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: MediaQuery.of(context).size.height / 2,
+              color: const Color(0xFF111316),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Handler(),
+                SizedBox(
+                  height: 200,
+                  child: PageView(
+                    controller: controller.pageController,
+                    children: const [
+                      PlayerMain(),
+                      PlayerSettings(),
+                      PlayerAI(),
+                    ],
+                    onPageChanged: (index) {
+                      controller.pageIndex.value = index;
+                    },
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white.withOpacity(0.2),
+                  ),
+                  child: const ButtonBar(
+                    buttonPadding: EdgeInsets.all(0),
+                    children: [
+                      PageTabButton(
+                        icon: Icons.settings,
+                        index: 0,
+                      ),
+                      PageTabButton(
+                        icon: Icons.image,
+                        index: 1,
+                      ),
+                      PageTabButton(
+                        icon: Icons.subtitles,
+                        index: 2,
+                      ),
+                    ],
+                  ),
+                )
+                // const SwipeImage(),
+                // const Titles(),
+                // Container(
+                //   padding: const EdgeInsets.symmetric(horizontal: 24),
+                //   child: MyProgressBar(),
+                // ),
+                // Controls(),
               ],
             ),
-            const SwipeImage(),
-            const Titles(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: MyProgressBar(),
-            ),
-            Controls(),
-          ],
-        ),
+          )
+        ],
       ),
     );
+  }
+}
+
+class PlayerSettings extends GetView<PlayerController> {
+  const PlayerSettings({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const FlutterLogo();
+  }
+}
+
+class PlayerMain extends GetView<PlayerController> {
+  const PlayerMain({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const FlutterLogo();
+  }
+}
+
+class PlayerAI extends GetView<PlayerController> {
+  const PlayerAI({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const FlutterLogo();
   }
 }
 
@@ -177,41 +269,36 @@ class SwipeImage extends GetView<PlayerController> {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.white.withOpacity(0.2),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withOpacity(0.2),
+            ),
+            child: const ButtonBar(
+              buttonPadding: EdgeInsets.all(0),
+              children: [
+                PageTabButton(
+                  icon: Icons.description,
+                  index: 0,
                 ),
-                child: const ButtonBar(
-                  buttonPadding: EdgeInsets.all(0),
-                  children: [
-                    PageTabButton(
-                      icon: Icons.description,
-                      index: 0,
-                    ),
-                    PageTabButton(
-                      icon: Icons.settings,
-                      index: 1,
-                    ),
-                    PageTabButton(
-                      icon: Icons.image,
-                      index: 2,
-                    ),
-                    PageTabButton(
-                      icon: Icons.subtitles,
-                      index: 3,
-                    ),
-                    PageTabButton(
-                      icon: Icons.auto_awesome,
-                      index: 4,
-                    ),
-                  ],
+                PageTabButton(
+                  icon: Icons.settings,
+                  index: 1,
                 ),
-              ),
-            ],
+                PageTabButton(
+                  icon: Icons.image,
+                  index: 2,
+                ),
+                PageTabButton(
+                  icon: Icons.subtitles,
+                  index: 3,
+                ),
+                PageTabButton(
+                  icon: Icons.auto_awesome,
+                  index: 4,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -357,10 +444,12 @@ class Subtitles extends GetView<SubtitleController> {
                               playerController
                                   .seek(Duration(milliseconds: progress));
                             },
-                            icon: const Icon(Icons.play_arrow, color: Colors.black)),
+                            icon: const Icon(Icons.play_arrow,
+                                color: Colors.black)),
                         Expanded(
                           child: Container(
-                            decoration: const BoxDecoration(color: Colors.black),
+                            decoration:
+                                const BoxDecoration(color: Colors.black),
                             height: 1,
                             width: double.infinity,
                           ),

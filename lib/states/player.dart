@@ -20,7 +20,7 @@ class PlayerController extends GetxController {
     bufferedPosition: Duration.zero,
     duration: Duration.zero,
   ).obs;
-  var pageIndex = 2.obs;
+  var pageIndex = 1.obs;
   var playlistEpisode = PlaylistEpisodeModel.empty().obs;
   var refreshFrameTime = 0.obs;
 

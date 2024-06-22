@@ -44,25 +44,24 @@ class Channel extends StatelessWidget {
         }
         var subscription = controller.channel.value;
 
-        return FutureBuilder(
-          future: updatePaletteGenerator(
-              NetworkImage(controller.channel.value.imageUrl!)),
-          builder: (context, snapshot) {
-            var mainColor = snapshot.data ?? const Color(0xFF111316);
-            if (snapshot.hasData) {
-              mainColor = snapshot.data!;
-            }
-
-            return DismissiblePage(
-                direction: DismissiblePageDismissDirection.down,
-                onDismissed: () {
-                  Get.back();
-                  Get.delete<ChannelController>(tag: rssFeedUrl);
-                  Get.delete<CardListController>(tag: rssFeedUrl);
-                },
-                child: Stack(
-                  children: [
-                    Container(
+        return DismissiblePage(
+            direction: DismissiblePageDismissDirection.down,
+            onDismissed: () {
+              Get.back();
+              Get.delete<ChannelController>(tag: rssFeedUrl);
+              Get.delete<CardListController>(tag: rssFeedUrl);
+            },
+            child: Stack(
+              children: [
+                FutureBuilder(
+                  future: updatePaletteGenerator(
+                      NetworkImage(controller.channel.value.imageUrl!)),
+                  builder: (context, snapshot) {
+                    var mainColor = snapshot.data ?? const Color(0xFF111316);
+                    if (snapshot.hasData) {
+                      mainColor = snapshot.data!;
+                    }
+                    return Container(
                       height: MediaQuery.of(context).size.height / 2,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -74,227 +73,222 @@ class Channel extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        height: MediaQuery.of(context).size.height / 2,
-                        color: const Color(0xFF111316),
+                    );
+                  },
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: MediaQuery.of(context).size.height / 2,
+                    color: const Color(0xFF111316),
+                  ),
+                ),
+                SafeArea(
+                  child: Column(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          Get.back();
+                          Get.delete<ChannelController>(tag: rssFeedUrl);
+                          Get.delete<CardListController>(tag: rssFeedUrl);
+                        },
+                        child: const Handler(),
                       ),
-                    ),
-                    SafeArea(
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              Get.back();
-                              Get.delete<ChannelController>(tag: rssFeedUrl);
-                              Get.delete<CardListController>(tag: rssFeedUrl);
-                            },
-                            child: const Handler(),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 16),
-                            child: Column(
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 16),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () {
-                                        Get.back();
-                                        Get.delete<ChannelController>(
-                                            tag: rssFeedUrl);
-                                        Get.delete<CardListController>(
-                                            tag: rssFeedUrl);
-                                      },
-                                      child: Container(
-                                        width: 40,
-                                        height: 40,
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: ShapeDecoration(
-                                          color: Colors.white.withOpacity(0.1),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(20),
-                                          ),
-                                        ),
-                                        child: const Iconify(
-                                          Ic.round_arrow_back,
-                                          size: 24,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                    Row(children: [
-                                      SubscriptionButton(rssFeedUrl),
-                                      const SizedBox(width: 12),
-                                      Container(
-                                          width: 40,
-                                          height: 40,
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: ShapeDecoration(
-                                            color:
-                                                Colors.white.withOpacity(0.1),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                            ),
-                                          ),
-                                          child: const Iconify(
-                                            Ic.round_ios_share,
-                                            size: 24,
-                                            color: Colors.white,
-                                          )),
-                                    ]),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Column(children: [
-                                  Container(
-                                    width: 120,
-                                    height: 120,
-                                    decoration: ShapeDecoration(
-                                      image: DecorationImage(
-                                        image: CachedNetworkImageProvider(
-                                          controller.channel.value.imageUrl!,
-                                        ),
-                                        fit: BoxFit.fill,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    controller.channel.value.title!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontFamily:
-                                          GoogleFonts.comfortaa().fontFamily,
-                                      fontWeight: FontWeight.w400,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    controller.channel.value.author!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontFamily:
-                                          'PingFangSC-Regular,PingFang SC',
-                                      fontWeight: FontWeight.w600,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                ]),
                                 GestureDetector(
                                   onTap: () {
-                                    Clipboard.setData(ClipboardData(
-                                        text: controller
-                                            .channel.value.rssFeedUrl!));
-                                    Get.snackbar(
-                                      'Copied',
-                                      'RSS Feed URL copied to clipboard',
-                                      snackPosition: SnackPosition.BOTTOM,
-                                      duration: const Duration(seconds: 1),
-                                    );
+                                    Get.back();
+                                    Get.delete<ChannelController>(
+                                        tag: rssFeedUrl);
+                                    Get.delete<CardListController>(
+                                        tag: rssFeedUrl);
                                   },
-                                  child: Text(
-                                    urlToDomain(
-                                        controller.channel.value.rssFeedUrl!),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFF6EE7B7),
-                                      fontSize: 16,
-                                      fontFamily:
-                                          'PingFangSC-Regular,PingFang SC',
-                                      fontWeight: FontWeight.w600,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                ExpandableText(
-                                  subscription.description!,
-                                  expandText: "show more",
-                                  collapseText: "show less",
-                                  maxLines: 2,
-                                  linkColor: Colors.blue,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontFamily: GoogleFonts.inter().fontFamily,
-                                    fontWeight: FontWeight.w400,
-                                    decoration: TextDecoration.none,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  width: 184,
-                                  height: 40,
-                                  // borderRadius 36
-                                  child: TextButton(
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.all(8),
-                                      backgroundColor: Colors.white,
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: ShapeDecoration(
+                                      color: Colors.white.withOpacity(0.1),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(36),
+                                        borderRadius: BorderRadius.circular(20),
                                       ),
                                     ),
-                                    onPressed: () {
-                                      var feedsController =
-                                          Get.find<FeedEpisodeController>();
-                                      feedsController
-                                          .addToTop(1, controller.episodes[0])
-                                          .then((pe) {
-                                        Get.find<PlayerController>()
-                                            .playByEpisode(pe);
-                                      });
-                                    },
-                                    child: Row(
-                                      children: [
-                                        const Iconify(Ic.round_play_arrow),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Lastest Episode',
-                                          style: TextStyle(
-                                            color: const Color(0xFF111316),
-                                            fontSize: 16,
-                                            fontFamily: GoogleFonts.comfortaa()
-                                                .fontFamily,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
+                                    child: const Iconify(
+                                      Ic.round_arrow_back,
+                                      size: 24,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ),
+                                Row(children: [
+                                  SubscriptionButton(rssFeedUrl),
+                                  const SizedBox(width: 12),
+                                  Container(
+                                      width: 40,
+                                      height: 40,
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: ShapeDecoration(
+                                        color: Colors.white.withOpacity(0.1),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                      ),
+                                      child: const Iconify(
+                                        Ic.round_ios_share,
+                                        size: 24,
+                                        color: Colors.white,
+                                      )),
+                                ]),
                               ],
                             ),
-                          ),
-                          CardList(clController, rssFeedUrl),
-                        ],
+                            const SizedBox(height: 12),
+                            Column(children: [
+                              Container(
+                                width: 120,
+                                height: 120,
+                                decoration: ShapeDecoration(
+                                  image: DecorationImage(
+                                    image: CachedNetworkImageProvider(
+                                      controller.channel.value.imageUrl!,
+                                    ),
+                                    fit: BoxFit.fill,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                controller.channel.value.title!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontFamily:
+                                      GoogleFonts.comfortaa().fontFamily,
+                                  fontWeight: FontWeight.w400,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                controller.channel.value.author!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ]),
+                            GestureDetector(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(
+                                    text:
+                                        controller.channel.value.rssFeedUrl!));
+                                Get.snackbar(
+                                  'Copied',
+                                  'RSS Feed URL copied to clipboard',
+                                  snackPosition: SnackPosition.BOTTOM,
+                                  duration: const Duration(seconds: 1),
+                                );
+                              },
+                              child: Text(
+                                urlToDomain(
+                                    controller.channel.value.rssFeedUrl!),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF6EE7B7),
+                                  fontSize: 16,
+                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ExpandableText(
+                              subscription.description!,
+                              expandText: "show more",
+                              collapseText: "show less",
+                              maxLines: 2,
+                              linkColor: Colors.blue,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontFamily: GoogleFonts.inter().fontFamily,
+                                fontWeight: FontWeight.w400,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: 184,
+                              height: 40,
+                              // borderRadius 36
+                              child: TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.all(8),
+                                  backgroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(36),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  var feedsController =
+                                      Get.find<FeedEpisodeController>();
+                                  feedsController
+                                      .addToTop(1, controller.episodes[0])
+                                      .then((pe) {
+                                    Get.find<PlayerController>()
+                                        .playByEpisode(pe);
+                                  });
+                                },
+                                child: Row(
+                                  children: [
+                                    const Iconify(Ic.round_play_arrow),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Lastest Episode',
+                                      style: TextStyle(
+                                        color: const Color(0xFF111316),
+                                        fontSize: 16,
+                                        fontFamily:
+                                            GoogleFonts.comfortaa().fontFamily,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    )
-                  ],
-                ));
-          },
-        );
+                      CardList(clController, rssFeedUrl),
+                    ],
+                  ),
+                )
+              ],
+            ));
       },
     );
   }
