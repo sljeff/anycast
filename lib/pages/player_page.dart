@@ -78,8 +78,8 @@ class PlayerPage extends GetView<PlayerController> {
                   child: PageView(
                     controller: controller.pageController,
                     children: const [
-                      PlayerMain(),
                       PlayerSettings(),
+                      PlayerMain(),
                       PlayerAI(),
                     ],
                     onPageChanged: (index) {
@@ -207,7 +207,7 @@ class SwipeImage extends GetView<PlayerController> {
   Widget build(BuildContext context) {
     var size = MediaQuery.of(context).size;
     var height = size.height * 0.4;
-    controller.pageIndex.value = 2;
+    controller.pageIndex.value = 1;
 
     var episode = controller.playlistEpisode.value;
     if (episode.guid == null) {

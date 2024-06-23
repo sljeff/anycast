@@ -26,7 +26,7 @@ class PlayerController extends GetxController {
 
   var pageController = PageController(
     viewportFraction: 1,
-    initialPage: 2,
+    initialPage: 1,
   );
   final DatabaseHelper helper = DatabaseHelper();
   final MyAudioHandler myAudioHandler = MyAudioHandler();
