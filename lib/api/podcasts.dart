@@ -87,6 +87,10 @@ Future<List<SubscriptionModel>> listChannelsByCategoryId(
   Map<String, dynamic> data = jsonDecode(body);
 
   List<SubscriptionModel> subscriptions = [];
+  if (data['data'] == null) {
+    return subscriptions;
+  }
+
   for (var item in data['data']['list']) {
     subscriptions.add(SubscriptionModel.fromMap({
       'rssFeedUrl': item['rss_url'],

@@ -53,28 +53,18 @@ class Channel extends StatelessWidget {
             },
             child: Stack(
               children: [
-                FutureBuilder(
-                  future: updatePaletteGenerator(
-                      NetworkImage(controller.channel.value.imageUrl!)),
-                  builder: (context, snapshot) {
-                    var mainColor = snapshot.data ?? const Color(0xFF111316);
-                    if (snapshot.hasData) {
-                      mainColor = snapshot.data!;
-                    }
-                    return Container(
-                      height: MediaQuery.of(context).size.height / 2,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            mainColor,
-                            const Color(0xFF111316),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                Container(
+                  height: MediaQuery.of(context).size.height / 2,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        controller.backgroundColor.value,
+                        const Color(0xFF111316),
+                      ],
+                    ),
+                  ),
                 ),
                 Positioned(
                   bottom: 0,

@@ -36,28 +36,18 @@ class PlayerPage extends GetView<PlayerController> {
       },
       child: Stack(
         children: [
-          FutureBuilder(
-            future: updatePaletteGenerator(
-                NetworkImage(controller.playlistEpisode.value.imageUrl!)),
-            builder: (context, snapshot) {
-              var mainColor = snapshot.data ?? const Color(0xFF111316);
-              if (snapshot.hasData) {
-                mainColor = snapshot.data!;
-              }
-              return Container(
-                height: MediaQuery.of(context).size.height / 2,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      mainColor,
-                      const Color(0xFF111316),
-                    ],
-                  ),
-                ),
-              );
-            },
+          Container(
+            height: MediaQuery.of(context).size.height / 2,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  controller.backgroudColor.value,
+                  const Color(0xFF111316),
+                ],
+              ),
+            ),
           ),
           Positioned(
             bottom: 0,
@@ -74,7 +64,7 @@ class PlayerPage extends GetView<PlayerController> {
               children: [
                 const Handler(),
                 SizedBox(
-                  height: 200,
+                  height: MediaQuery.of(context).size.height * 0.8,
                   child: PageView(
                     controller: controller.pageController,
                     children: const [
@@ -87,29 +77,7 @@ class PlayerPage extends GetView<PlayerController> {
                     },
                   ),
                 ),
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.white.withOpacity(0.2),
-                  ),
-                  child: const ButtonBar(
-                    buttonPadding: EdgeInsets.all(0),
-                    children: [
-                      PageTabButton(
-                        icon: Icons.settings,
-                        index: 0,
-                      ),
-                      PageTabButton(
-                        icon: Icons.image,
-                        index: 1,
-                      ),
-                      PageTabButton(
-                        icon: Icons.subtitles,
-                        index: 2,
-                      ),
-                    ],
-                  ),
-                )
+                const PageTab(),
                 // const SwipeImage(),
                 // const Titles(),
                 // Container(
@@ -126,12 +94,62 @@ class PlayerPage extends GetView<PlayerController> {
   }
 }
 
+class PageTab extends GetView<PlayerController> {
+  const PageTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.all(4),
+      decoration: ShapeDecoration(
+        color: const Color(0x19232830),
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(width: 1, color: Color(0xFF4B5563)),
+          borderRadius: BorderRadius.circular(36),
+        ),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PageTabButton(icon: Icons.settings, index: 0),
+          PageTabButton(icon: Icons.photo, index: 1),
+          PageTabButton(icon: Icons.air, index: 2),
+        ],
+      ),
+    );
+  }
+}
+
 class PlayerSettings extends GetView<PlayerController> {
   const PlayerSettings({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const FlutterLogo();
+    return DefaultTextStyle(
+      style: const TextStyle(color: Colors.white),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.only(top: 16, bottom: 16),
+              height: 200,
+              child: Scrollbar(
+                child: Obx(
+                  () => SingleChildScrollView(
+                      child: renderHtml(context,
+                          controller.playlistEpisode.value.description!)),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 280, child: Settings()),
+        ]),
+      ),
+    );
   }
 }
 
@@ -140,7 +158,36 @@ class PlayerMain extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    return const FlutterLogo();
+    return DefaultTextStyle(
+      style: const TextStyle(color: Colors.white),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          children: [
+            Obx(() {
+              return Hero(
+                tag: 'play_image',
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: controller.playlistEpisode.value.imageUrl ?? '',
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => const Icon(
+                      Icons.image,
+                    ),
+                    errorWidget: (context, url, error) => const Icon(
+                      Icons.image_not_supported,
+                    ),
+                    height: 328,
+                    width: 328,
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -228,35 +275,6 @@ class SwipeImage extends GetView<PlayerController> {
               controller: controller.pageController,
               // descrption / settings / image / subtitle / ai summary
               children: [
-                Scrollbar(
-                  child: Obx(
-                    () => SingleChildScrollView(
-                        child: renderHtml(context,
-                            controller.playlistEpisode.value.description!)),
-                  ),
-                ),
-                const Settings(),
-                Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Obx(() {
-                      return Hero(
-                        tag: 'play_image',
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: CachedNetworkImage(
-                            imageUrl:
-                                controller.playlistEpisode.value.imageUrl ?? '',
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => const Icon(
-                              Icons.image,
-                            ),
-                            errorWidget: (context, url, error) => const Icon(
-                              Icons.image_not_supported,
-                            ),
-                          ),
-                        ),
-                      );
-                    })),
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 10),
                   child: Subtitles(),
@@ -482,23 +500,41 @@ class PageTabButton extends GetView<PlayerController> {
     return Obx(
       () {
         var isSelect = controller.pageIndex.value == index;
+        var dec = isSelect
+            ? ShapeDecoration(
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(36),
+                ),
+              )
+            : ShapeDecoration(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(36),
+                ),
+              );
+
         return Container(
-          decoration: isSelect
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.white.withOpacity(0.2),
-                )
-              : null,
-          child: IconButton(
-            onPressed: () {
+          width: 48,
+          height: 48,
+          decoration: dec,
+          child: GestureDetector(
+            child: Container(
+              width: 24,
+              height: 24,
+              clipBehavior: Clip.antiAlias,
+              decoration: const BoxDecoration(),
+              child: Icon(
+                icon,
+                color: isSelect ? Colors.black : Colors.white,
+              ),
+            ),
+            onTap: () {
               controller.pageController.animateToPage(
                 index,
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
               );
             },
-            icon: Icon(icon),
-            isSelected: isSelect,
           ),
         );
       },

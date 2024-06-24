@@ -4,6 +4,7 @@ import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/player.dart';
 import 'package:anycast/models/settings.dart';
+import 'package:anycast/pages/channel.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/utils/audio_handler.dart';
@@ -23,6 +24,8 @@ class PlayerController extends GetxController {
   var pageIndex = 1.obs;
   var playlistEpisode = PlaylistEpisodeModel.empty().obs;
   var refreshFrameTime = 0.obs;
+  var backgroudColor =
+      const Color(0xFF111316).obs; // The color caculated by palette generator
 
   var pageController = PageController(
     viewportFraction: 1,
@@ -35,8 +38,17 @@ class PlayerController extends GetxController {
     if (player.value.currentPlaylistId == null) {
       return null;
     }
-    return Get.find<PlaylistController>()
+    var peController = Get.find<PlaylistController>()
         .getEpisodeControllerByPlaylistId(player.value.currentPlaylistId!);
+
+    if (peController.episodes.isNotEmpty &&
+        playlistEpisode.value.guid == null) {
+      playlistEpisode.value = peController.episodes[0];
+      updatePaletteGenerator(NetworkImage(playlistEpisode.value.imageUrl!))
+          .then((value) => backgroudColor.value = value);
+    }
+
+    return peController;
   }
 
   @override
@@ -107,6 +119,7 @@ class PlayerController extends GetxController {
         });
   }
 
+  // The final method interact with the AudioHandler
   void playByEpisode(PlaylistEpisodeModel episode) async {
     var playlistId = episode.playlistId!;
     var player = PlayerModel.fromMap({
@@ -115,6 +128,8 @@ class PlayerController extends GetxController {
 
     this.player.value = player;
     playlistEpisode.value = episode;
+    updatePaletteGenerator(NetworkImage(episode.imageUrl!))
+        .then((value) => backgroudColor.value = value);
 
     myAudioHandler.playByEpisode(episode);
 

@@ -61,6 +61,14 @@ class DiscoverBody extends StatelessWidget {
                       );
                     }
                     var channels = snapshot.data!;
+                    if (channels.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'Network Error',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }
                     return ListView.separated(
                         padding:
                             const EdgeInsets.only(left: 12, right: 12, top: 12),

@@ -1,8 +1,12 @@
+import 'dart:ui';
+
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/subscription.dart';
+import 'package:anycast/pages/channel.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:get/get.dart';
 
 class ChannelController extends GetxController {
@@ -11,6 +15,7 @@ class ChannelController extends GetxController {
   var isLoading = true.obs;
   var subscribed = false.obs;
   var isReversed = false.obs;
+  var backgroundColor = const Color(0xFF111316).obs;
 
   var helper = DatabaseHelper();
   var subscriptionController = Get.find<SubscriptionController>();
@@ -25,6 +30,10 @@ class ChannelController extends GetxController {
     super.onInit();
     load().then((_) {
       isLoading.value = false;
+    });
+    updatePaletteGenerator(CachedNetworkImageProvider(channel.value.imageUrl!))
+        .then((color) {
+      backgroundColor.value = color;
     });
   }
 
