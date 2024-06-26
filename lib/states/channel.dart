@@ -31,6 +31,12 @@ class ChannelController extends GetxController {
     load().then((_) {
       isLoading.value = false;
     });
+    if (channel.value.title != null) {
+      _updateColor();
+    }
+  }
+
+  void _updateColor() {
     updatePaletteGenerator(CachedNetworkImageProvider(channel.value.imageUrl!))
         .then((color) {
       backgroundColor.value = color;
@@ -42,6 +48,7 @@ class ChannelController extends GetxController {
     episodes.value = podcastData.feedEpisodes!;
     if (channel.value.title == null) {
       channel.value = podcastData.subscription!;
+      _updateColor();
     }
   }
 

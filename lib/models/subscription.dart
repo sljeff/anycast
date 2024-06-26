@@ -107,4 +107,17 @@ class SubscriptionModel {
       return value[0];
     });
   }
+
+  static Future<SubscriptionModel?> getOrFetch(
+      DatabaseExecutor db, String rssFeedUrl) async {
+    return db.rawQuery('SELECT * FROM subscription WHERE rssFeedUrl = ?',
+        [rssFeedUrl]).then((List<Map<String, dynamic>> maps) async {
+      if (maps.isEmpty) {
+        var data = await fetchPodcastsByUrls([rssFeedUrl]);
+        return data[0].subscription;
+      } else {
+        return SubscriptionModel.fromMap(maps.first);
+      }
+    });
+  }
 }

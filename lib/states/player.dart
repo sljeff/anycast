@@ -24,7 +24,7 @@ class PlayerController extends GetxController {
   var pageIndex = 1.obs;
   var playlistEpisode = PlaylistEpisodeModel.empty().obs;
   var refreshFrameTime = 0.obs;
-  var backgroudColor =
+  var backgroundColor =
       const Color(0xFF111316).obs; // The color caculated by palette generator
 
   var pageController = PageController(
@@ -45,7 +45,7 @@ class PlayerController extends GetxController {
         playlistEpisode.value.guid == null) {
       playlistEpisode.value = peController.episodes[0];
       updatePaletteGenerator(NetworkImage(playlistEpisode.value.imageUrl!))
-          .then((value) => backgroudColor.value = value);
+          .then((value) => backgroundColor.value = value);
     }
 
     return peController;
@@ -129,7 +129,7 @@ class PlayerController extends GetxController {
     this.player.value = player;
     playlistEpisode.value = episode;
     updatePaletteGenerator(NetworkImage(episode.imageUrl!))
-        .then((value) => backgroudColor.value = value);
+        .then((value) => backgroundColor.value = value);
 
     myAudioHandler.playByEpisode(episode);
 

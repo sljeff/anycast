@@ -43,7 +43,7 @@ class PlayerPage extends GetView<PlayerController> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  controller.backgroudColor.value,
+                  controller.backgroundColor.value,
                   const Color(0xFF111316),
                 ],
               ),
@@ -78,13 +78,6 @@ class PlayerPage extends GetView<PlayerController> {
                   ),
                 ),
                 const PageTab(),
-                // const SwipeImage(),
-                // const Titles(),
-                // Container(
-                //   padding: const EdgeInsets.symmetric(horizontal: 24),
-                //   child: MyProgressBar(),
-                // ),
-                // Controls(),
               ],
             ),
           )
@@ -164,6 +157,7 @@ class PlayerMain extends GetView<PlayerController> {
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           children: [
+            const SizedBox(height: 16),
             Obx(() {
               return Hero(
                 tag: 'play_image',
@@ -174,16 +168,22 @@ class PlayerMain extends GetView<PlayerController> {
                     fit: BoxFit.cover,
                     placeholder: (context, url) => const Icon(
                       Icons.image,
+                      size: 328,
                     ),
                     errorWidget: (context, url, error) => const Icon(
                       Icons.image_not_supported,
+                      size: 328,
                     ),
-                    height: 328,
-                    width: 328,
                   ),
                 ),
               );
             }),
+            const SizedBox(height: 16),
+            const TitleBar(),
+            const SizedBox(height: 16),
+            const MyProgressBar(),
+            const SizedBox(height: 16),
+            const Controls(),
           ],
         ),
       ),
@@ -196,27 +196,123 @@ class PlayerAI extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    return const FlutterLogo();
+    return const DefaultTextStyle(
+      style: TextStyle(color: Colors.white),
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Subtitles(),
+      ),
+    );
+  }
+}
+
+class TitleBar extends GetView<PlayerController> {
+  const TitleBar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    var rightWidth = MediaQuery.of(context).size.width - 24 * 2 - 64 - 6;
+    return Obx(() {
+      var rssFeedUrl = '';
+      if (controller.playlistEpisode.value.guid != null) {
+        rssFeedUrl = controller.playlistEpisode.value.rssFeedUrl!;
+      }
+      var f = DatabaseHelper().db.then((db) async {
+        if (rssFeedUrl == '') {
+          return null;
+        }
+        return await SubscriptionModel.getOrFetch(db!, rssFeedUrl);
+      });
+      return FutureBuilder(
+        future: f,
+        builder: (context, snapshot) {
+          var imgUrl = '';
+          var title = 'Waiting...';
+          var channelTitle = 'Waiting...';
+          var backgroundColor = controller.backgroundColor.value;
+          if (snapshot.hasData && snapshot.data != null) {
+            var subscription = snapshot.data as SubscriptionModel;
+            imgUrl = subscription.imageUrl!;
+            title = controller.playlistEpisode.value.title!;
+            channelTitle = subscription.title!;
+          }
+
+          Widget img = const Icon(
+            Icons.image,
+            size: 64,
+          );
+          if (imgUrl != '') {
+            img = CachedNetworkImage(
+              imageUrl: imgUrl,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => const Icon(
+                Icons.image,
+              ),
+              errorWidget: (context, url, error) => const Icon(
+                Icons.image_not_supported,
+              ),
+              height: 64,
+              width: 64,
+            );
+          }
+
+          return Row(children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: img,
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: rightWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 32,
+                    child: Marquee(
+                      text: title,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      blankSpace: 8,
+                    ),
+                  ),
+                  Text(
+                    channelTitle,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: backgroundColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]);
+        },
+      );
+    });
   }
 }
 
 class MyProgressBar extends GetView<PlayerController> {
-  MyProgressBar({super.key});
+  const MyProgressBar({super.key});
 
   // myAudioHandler
-  final MyAudioHandler myAudioHandler = MyAudioHandler();
+  static final MyAudioHandler myAudioHandler = MyAudioHandler();
 
   @override
   Widget build(BuildContext context) {
-    if (controller.playlistEpisode.value.guid != null &&
-        controller.positionData.value.duration == Duration.zero) {
-      controller.initProgress();
-    }
     return Obx(
       () {
         var duration = controller.positionData.value.duration;
         var position = controller.positionData.value.position;
         var bufferedPosition = controller.positionData.value.bufferedPosition;
+        if (controller.playlistEpisode.value.guid != null &&
+            controller.positionData.value.duration == Duration.zero) {
+          controller.initProgress();
+        }
         return ProgressBar(
           progress: position,
           buffered: bufferedPosition,
@@ -247,89 +343,12 @@ class MyProgressBar extends GetView<PlayerController> {
   }
 }
 
-class SwipeImage extends GetView<PlayerController> {
-  const SwipeImage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    var size = MediaQuery.of(context).size;
-    var height = size.height * 0.4;
-    controller.pageIndex.value = 1;
-
-    var episode = controller.playlistEpisode.value;
-    if (episode.guid == null) {
-      return const SizedBox.shrink();
-    }
-
-    return DefaultTextStyle(
-      style: const TextStyle(fontSize: 16, color: Colors.white),
-      child: Column(
-        children: [
-          SizedBox(
-            height: height,
-            width: height + 16,
-            child: PageView(
-              onPageChanged: (value) {
-                controller.pageIndex.value = value;
-              },
-              controller: controller.pageController,
-              // descrption / settings / image / subtitle / ai summary
-              children: [
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Subtitles(),
-                ),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 10),
-                  child: const Center(child: Icon(Icons.abc)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: Colors.white.withOpacity(0.2),
-            ),
-            child: const ButtonBar(
-              buttonPadding: EdgeInsets.all(0),
-              children: [
-                PageTabButton(
-                  icon: Icons.description,
-                  index: 0,
-                ),
-                PageTabButton(
-                  icon: Icons.settings,
-                  index: 1,
-                ),
-                PageTabButton(
-                  icon: Icons.image,
-                  index: 2,
-                ),
-                PageTabButton(
-                  icon: Icons.subtitles,
-                  index: 3,
-                ),
-                PageTabButton(
-                  icon: Icons.auto_awesome,
-                  index: 4,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class Subtitles extends GetView<SubtitleController> {
-  Subtitles({
+  const Subtitles({
     super.key,
   });
 
-  final lyricUI = UINetease();
+  static final lyricUI = UINetease();
 
   @override
   Widget build(BuildContext context) {
@@ -418,71 +437,67 @@ class Subtitles extends GetView<SubtitleController> {
       }
 
       var helper = DatabaseHelper();
-      return SizedBox(
-        width: 300,
-        child: SingleChildScrollView(
-          child: FutureBuilder(
-            future: helper.db.then((db) {
-              return SubtitleModel.get(db!, url);
-            }),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const SizedBox.shrink();
-              }
-              var subtitle = snapshot.data!;
+      return SingleChildScrollView(
+        child: FutureBuilder(
+          future: helper.db.then((db) {
+            return SubtitleModel.get(db!, url);
+          }),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const SizedBox.shrink();
+            }
+            var subtitle = snapshot.data!;
 
-              var model = LyricsModelBuilder.create()
-                  .bindLyricToMain(
-                    subtitle.toLrc(),
-                  )
-                  .getModel();
-              return Obx(
-                () => LyricsReader(
-                  position: playerController
-                      .positionData.value.position.inMilliseconds,
-                  model: model,
-                  lyricUi: lyricUI,
-                  size: Size(
-                      double.infinity, MediaQuery.of(context).size.height / 2),
-                  playing: playerController.isPlaying.value,
-                  emptyBuilder: () => Center(
-                    child: Text(
-                      'No subtitles',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.64),
-                      ),
+            var model = LyricsModelBuilder.create()
+                .bindLyricToMain(
+                  subtitle.toLrc(),
+                )
+                .getModel();
+            return Obx(
+              () => LyricsReader(
+                position:
+                    playerController.positionData.value.position.inMilliseconds,
+                model: model,
+                lyricUi: lyricUI,
+                size: Size(
+                    double.infinity, MediaQuery.of(context).size.height / 2),
+                playing: playerController.isPlaying.value,
+                emptyBuilder: () => Center(
+                  child: Text(
+                    'No subtitles',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.64),
                     ),
                   ),
-                  selectLineBuilder: (progress, confirm) {
-                    return Row(
-                      children: [
-                        IconButton(
-                            onPressed: () {
-                              confirm.call();
-                              playerController
-                                  .seek(Duration(milliseconds: progress));
-                            },
-                            icon: const Icon(Icons.play_arrow,
-                                color: Colors.black)),
-                        Expanded(
-                          child: Container(
-                            decoration:
-                                const BoxDecoration(color: Colors.black),
-                            height: 1,
-                            width: double.infinity,
-                          ),
-                        ),
-                        Text(
-                          formatTime(Duration(milliseconds: progress)),
-                          style: const TextStyle(color: Colors.black),
-                        )
-                      ],
-                    );
-                  },
                 ),
-              );
-            },
-          ),
+                selectLineBuilder: (progress, confirm) {
+                  return Row(
+                    children: [
+                      IconButton(
+                          onPressed: () {
+                            confirm.call();
+                            playerController
+                                .seek(Duration(milliseconds: progress));
+                          },
+                          icon: const Icon(Icons.play_arrow,
+                              color: Colors.black)),
+                      Expanded(
+                        child: Container(
+                          decoration: const BoxDecoration(color: Colors.black),
+                          height: 1,
+                          width: double.infinity,
+                        ),
+                      ),
+                      Text(
+                        formatTime(Duration(milliseconds: progress)),
+                        style: const TextStyle(color: Colors.black),
+                      )
+                    ],
+                  );
+                },
+              ),
+            );
+          },
         ),
       );
     });
@@ -543,9 +558,9 @@ class PageTabButton extends GetView<PlayerController> {
 }
 
 class Controls extends GetView<PlayerController> {
-  Controls({super.key});
+  const Controls({super.key});
 
-  final MyAudioHandler myAudioHandler = MyAudioHandler();
+  static final MyAudioHandler myAudioHandler = MyAudioHandler();
 
   @override
   Widget build(BuildContext context) {
