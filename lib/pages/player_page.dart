@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:anycast/api/subtitles.dart';
 import 'package:anycast/models/helper.dart';
+import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/models/subtitle.dart';
 import 'package:anycast/states/channel.dart';
@@ -19,6 +20,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:marquee/marquee.dart';
 import 'package:flutter_lyric/lyrics_reader.dart';
 
@@ -151,11 +153,13 @@ class PlayerMain extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
+    var size = MediaQuery.of(context).size.width - 48;
     return DefaultTextStyle(
       style: const TextStyle(color: Colors.white),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const SizedBox(height: 16),
             Obx(() {
@@ -164,15 +168,17 @@ class PlayerMain extends GetView<PlayerController> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
+                    width: size,
+                    height: size,
                     imageUrl: controller.playlistEpisode.value.imageUrl ?? '',
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => const Icon(
+                    placeholder: (context, url) => Icon(
                       Icons.image,
-                      size: 328,
+                      size: size,
                     ),
-                    errorWidget: (context, url, error) => const Icon(
+                    errorWidget: (context, url, error) => Icon(
                       Icons.image_not_supported,
-                      size: 328,
+                      size: size,
                     ),
                   ),
                 ),
@@ -184,6 +190,7 @@ class PlayerMain extends GetView<PlayerController> {
             const MyProgressBar(),
             const SizedBox(height: 16),
             const Controls(),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -214,7 +221,8 @@ class TitleBar extends GetView<PlayerController> {
     var rightWidth = MediaQuery.of(context).size.width - 24 * 2 - 64 - 6;
     return Obx(() {
       var rssFeedUrl = '';
-      if (controller.playlistEpisode.value.guid != null) {
+      var episode = controller.playlistEpisode.value;
+      if (episode.guid != null) {
         rssFeedUrl = controller.playlistEpisode.value.rssFeedUrl!;
       }
       var f = DatabaseHelper().db.then((db) async {
@@ -242,17 +250,43 @@ class TitleBar extends GetView<PlayerController> {
             size: 64,
           );
           if (imgUrl != '') {
-            img = CachedNetworkImage(
-              imageUrl: imgUrl,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => const Icon(
-                Icons.image,
+            img = GestureDetector(
+              onTap: () {
+                jumpToChannel(episode, context);
+              },
+              child: CachedNetworkImage(
+                imageUrl: imgUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => const Icon(
+                  Icons.image,
+                ),
+                errorWidget: (context, url, error) => const Icon(
+                  Icons.image_not_supported,
+                ),
+                height: 64,
+                width: 64,
               ),
-              errorWidget: (context, url, error) => const Icon(
-                Icons.image_not_supported,
-              ),
-              height: 64,
-              width: 64,
+            );
+          }
+
+          // marquee or text
+          var titleStyle = const TextStyle(
+            fontSize: 24,
+            color: Colors.white,
+            fontFamily: 'PingFang SC',
+            fontWeight: FontWeight.w600,
+          );
+          Widget titleWidget = Text(
+            title,
+            style: titleStyle,
+          );
+          // if text width > rightWidth, use marquee
+          if (title.length * 24 > rightWidth) {
+            titleWidget = Marquee(
+              text: title,
+              pauseAfterRound: const Duration(seconds: 1),
+              style: titleStyle,
+              blankSpace: 8,
             );
           }
 
@@ -266,24 +300,28 @@ class TitleBar extends GetView<PlayerController> {
               width: rightWidth,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   SizedBox(
-                    height: 32,
-                    child: Marquee(
-                      text: title,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      blankSpace: 8,
-                    ),
+                    height: 34,
+                    child: titleWidget,
                   ),
-                  Text(
-                    channelTitle,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: backgroundColor,
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () {
+                      jumpToChannel(episode, context);
+                    },
+                    child: SizedBox(
+                      height: 24,
+                      child: Text(
+                        channelTitle,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: backgroundColor,
+                          fontFamily: 'PingFang SC',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -294,6 +332,17 @@ class TitleBar extends GetView<PlayerController> {
       );
     });
   }
+}
+
+void jumpToChannel(PlaylistEpisodeModel episode, BuildContext context) {
+  var subscriptionController = Get.find<SubscriptionController>();
+  var s = subscriptionController.getByTitle(episode.channelTitle!);
+  if (s == null) {
+    s = SubscriptionModel.empty();
+    s.rssFeedUrl = episode.rssFeedUrl;
+  }
+  Get.lazyPut(() => ChannelController(channel: s!), tag: s.rssFeedUrl);
+  context.pushTransparentRoute(Channel(rssFeedUrl: s.rssFeedUrl!));
 }
 
 class MyProgressBar extends GetView<PlayerController> {
@@ -322,20 +371,22 @@ class MyProgressBar extends GetView<PlayerController> {
           },
           timeLabelLocation: TimeLabelLocation.above,
           timeLabelType: TimeLabelType.remainingTime,
-          timeLabelPadding: 6,
+          timeLabelPadding: 4,
           timeLabelTextStyle: TextStyle(
-            color: Colors.white.withOpacity(0.64),
+            color: Colors.white,
             fontSize: 12,
+            fontFamily: GoogleFonts.comfortaa().fontFamily,
+            fontWeight: FontWeight.w700,
           ),
           thumbColor: Colors.white,
           thumbGlowColor: Colors.black.withOpacity(0.2),
           thumbCanPaintOutsideBar: false,
           thumbRadius: 16,
           thumbGlowRadius: 20,
-          barHeight: 48,
+          barHeight: 40,
           barCapShape: BarCapShape.round,
-          baseBarColor: Colors.white.withOpacity(0.24),
-          bufferedBarColor: Colors.white.withOpacity(0.2),
+          baseBarColor: const Color(0xFF232830),
+          bufferedBarColor: Colors.white.withOpacity(0.05),
           progressBarColor: Colors.white,
         );
       },
@@ -564,119 +615,51 @@ class Controls extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 96,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          IconButton(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        IconButton(
+          onPressed: () {
+            myAudioHandler.seekByRelative(const Duration(seconds: -10));
+          },
+          icon: const Icon(
+            Icons.replay_10,
+            size: 48,
+            color: Colors.white,
+          ),
+        ),
+        Container(
+          height: 72,
+          width: 72,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color(0xFF10B981),
+          ),
+          child: IconButton(
             onPressed: () {
-              myAudioHandler.seekByRelative(const Duration(seconds: -10));
+              if (controller.isPlaying.value) {
+                controller.pause();
+              } else {
+                controller.play();
+              }
             },
-            icon: const Icon(
-              Icons.replay_10,
+            icon: const PlayIcon(
               size: 48,
               color: Colors.white,
             ),
           ),
-          Container(
-            height: 64,
-            width: 64,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-            ),
-            child: IconButton(
-              onPressed: () {
-                if (controller.isPlaying.value) {
-                  controller.pause();
-                } else {
-                  controller.play();
-                }
-              },
-              icon: const PlayIcon(size: 48),
-            ),
+        ),
+        IconButton(
+          onPressed: () {
+            myAudioHandler.seekByRelative(const Duration(seconds: 30));
+          },
+          icon: const Icon(
+            Icons.forward_30,
+            color: Colors.white,
+            size: 48,
           ),
-          IconButton(
-            onPressed: () {
-              myAudioHandler.seekByRelative(const Duration(seconds: 30));
-            },
-            icon: const Icon(
-              Icons.forward_30,
-              color: Colors.white,
-              size: 48,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class Titles extends GetView<PlayerController> {
-  const Titles({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(
-      () {
-        var episode = controller.playlistEpisode.value;
-        if (episode.guid == null) {
-          // placeholder
-          return const SizedBox(
-            height: 70,
-          );
-        }
-
-        return Container(
-          height: 70,
-          padding: const EdgeInsets.only(left: 16, right: 16),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 50,
-                child: Marquee(
-                  text: episode.title!,
-                  blankSpace: 8,
-                  style: const TextStyle(
-                    fontSize: 32,
-                    decoration: TextDecoration.none,
-                    color: Colors.white,
-                  ),
-                  // no bottom line
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  var subscriptionController =
-                      Get.find<SubscriptionController>();
-                  var s =
-                      subscriptionController.getByTitle(episode.channelTitle!);
-                  if (s == null) {
-                    s = SubscriptionModel.empty();
-                    s.rssFeedUrl = episode.rssFeedUrl;
-                  }
-                  Get.lazyPut(() => ChannelController(channel: s!),
-                      tag: s.rssFeedUrl);
-                  context
-                      .pushTransparentRoute(Channel(rssFeedUrl: s.rssFeedUrl!));
-                },
-                child: SizedBox(
-                  height: 20,
-                  child: Text(
-                    episode.channelTitle!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      decoration: TextDecoration.none,
-                      color: Colors.white.withOpacity(0.64),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
