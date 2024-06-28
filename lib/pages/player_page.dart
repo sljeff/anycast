@@ -286,7 +286,7 @@ class TitleBar extends GetView<PlayerController> {
               text: title,
               pauseAfterRound: const Duration(seconds: 1),
               style: titleStyle,
-              blankSpace: 8,
+              blankSpace: 40,
             );
           }
 
@@ -734,8 +734,8 @@ class Settings extends GetView<SettingsController> {
   @override
   Widget build(BuildContext context) {
     SliderThemeData sliderThemeData = SliderTheme.of(context).copyWith(
-      activeTrackColor: Colors.blue,
-      inactiveTrackColor: Colors.blue.withOpacity(0.3),
+      activeTrackColor: const Color(0xFF6B7280),
+      inactiveTrackColor: const Color(0xFF6B7280).withOpacity(0.3),
       trackHeight: 0,
       trackShape: const RoundedRectSliderTrackShape(),
       thumbColor: Colors.white,
@@ -745,11 +745,14 @@ class Settings extends GetView<SettingsController> {
       showValueIndicator: ShowValueIndicator.never,
       tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 4),
       activeTickMarkColor: Colors.white,
-      inactiveTickMarkColor: Colors.orange.withOpacity(0.5),
+      inactiveTickMarkColor: const Color(0xFF232830),
       valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
-      valueIndicatorColor: Colors.orange,
-      valueIndicatorTextStyle: const TextStyle(
-        color: Colors.white,
+      valueIndicatorColor: const Color(0xFF111316),
+      valueIndicatorTextStyle: TextStyle(
+        color: const Color(0xFF111316),
+        fontSize: 14,
+        fontFamily: GoogleFonts.comfortaa().fontFamily,
+        fontWeight: FontWeight.w400,
       ),
     );
 
@@ -757,13 +760,16 @@ class Settings extends GetView<SettingsController> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Text(
-                'Speed',
+                'SPEED',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 12,
+                  fontFamily: GoogleFonts.comfortaa().fontFamily,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -773,12 +779,12 @@ class Settings extends GetView<SettingsController> {
             child: Obx(
               () => Material(
                 shape: const StadiumBorder(),
-                color: Colors.blue,
+                color: const Color(0xFF232830),
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: SliderTheme(
                     data: sliderThemeData.copyWith(
-                      activeTrackColor: Colors.blue,
+                      activeTrackColor: Colors.grey,
                       inactiveTrackColor: Colors.blue,
                       inactiveTickMarkColor: Colors.white,
                     ),
@@ -799,13 +805,16 @@ class Settings extends GetView<SettingsController> {
           ),
         ]),
         Column(children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Text(
-                'Countdown',
+                'COUNTDOWN',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 12,
+                  fontFamily: GoogleFonts.comfortaa().fontFamily,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -814,7 +823,7 @@ class Settings extends GetView<SettingsController> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Obx(
               () => Material(
-                color: Colors.blue,
+                color: const Color(0xFF232830),
                 shape: const StadiumBorder(),
                 child: Padding(
                   padding: const EdgeInsets.all(4),
@@ -846,103 +855,106 @@ class Settings extends GetView<SettingsController> {
             ),
           )
         ]),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Skip Silence',
-                    style: TextStyle(
-                      fontSize: 16,
-                    ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SKIP SILENCE',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontFamily: GoogleFonts.comfortaa().fontFamily,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
                   ),
-                  Material(
-                    color: Colors.transparent,
-                    child: SizedBox(
-                      width: 80,
-                      height: 64,
-                      child: FittedBox(
-                        fit: BoxFit.fill,
-                        child: Obx(
-                          () => Switch(
-                            activeColor: Colors.blue,
-                            inactiveThumbColor: Colors.blue,
-                            inactiveTrackColor: Colors.white.withOpacity(0.7),
-                            trackOutlineColor: WidgetStateColor.resolveWith(
-                                (states) => Colors.blue.withOpacity(0.3)),
-                            value: controller.skipSilence.value,
-                            onChanged: (value) {
-                              controller.setSkipSilence(value);
-                            },
-                          ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: SizedBox(
+                    width: 80,
+                    height: 64,
+                    child: FittedBox(
+                      fit: BoxFit.fill,
+                      child: Obx(
+                        () => Switch(
+                          activeColor: Colors.white,
+                          inactiveThumbColor: Colors.grey,
+                          inactiveTrackColor:
+                              const Color(0xFF232830).withOpacity(0.7),
+                          trackOutlineColor: WidgetStateColor.resolveWith(
+                              (states) =>
+                                  const Color(0xFF232830).withOpacity(0.3)),
+                          value: controller.skipSilence.value,
+                          onChanged: (value) {
+                            controller.setSkipSilence(value);
+                          },
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
-              Column(mainAxisAlignment: MainAxisAlignment.start, children: [
-                const Row(
-                  children: [
-                    Text(
-                      'Auto sleep timer',
-                      style: TextStyle(
-                        fontSize: 16,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Tooltip(
-                      showDuration: Duration(seconds: 10),
-                      message:
-                          'A countdown will be enabled when a podcast starts '
-                          'within the time range you set.',
-                      triggerMode: TooltipTriggerMode.tap,
-                      child: Icon(Icons.info_outline),
-                    ),
-                  ],
                 ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 40,
-                  width: 80,
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      backgroundColor: Colors.black,
-                    ),
-                    onPressed: () {
-                      Get.bottomSheet(
-                        const AutoSleepPicker(),
-                        backgroundColor: Colors.blueGrey,
-                      );
-                    },
-                    child: Obx(
-                      () {
-                        var off =
-                            controller.autoSleepCountdownMinIndex.value == 0 ||
-                                controller.autoSleepStartHourIndex.value ==
-                                    controller.autoSleepEndHourIndex.value;
-                        return Text(
-                          off
-                              ? 'OFF'
-                              : controller.sleepMinsText[
-                                  controller.autoSleepCountdownMinIndex.value],
-                          style: const TextStyle(
-                            color: Colors.white,
-                          ),
-                        );
-                      },
+              ],
+            ),
+            Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SLEEP TIMER',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontFamily: GoogleFonts.comfortaa().fontFamily,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                )
-              ]),
-            ],
-          ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 48,
+                    width: 80,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.black,
+                      ),
+                      onPressed: () {
+                        Get.bottomSheet(
+                          const AutoSleepPicker(),
+                          backgroundColor: Colors.blueGrey,
+                        );
+                      },
+                      child: Obx(
+                        () {
+                          var off =
+                              controller.autoSleepCountdownMinIndex.value ==
+                                      0 ||
+                                  controller.autoSleepStartHourIndex.value ==
+                                      controller.autoSleepEndHourIndex.value;
+                          return Text(
+                            off
+                                ? 'OFF'
+                                : controller.sleepMinsText[controller
+                                    .autoSleepCountdownMinIndex.value],
+                            style: const TextStyle(
+                              color: Colors.white,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  )
+                ]),
+            const Tooltip(
+              showDuration: Duration(seconds: 10),
+              message: 'A countdown will be enabled when a podcast starts '
+                  'within the time range you set.',
+              triggerMode: TooltipTriggerMode.tap,
+              child: Icon(Icons.info_outline, size: 16),
+            ),
+          ],
         ),
       ],
     );
