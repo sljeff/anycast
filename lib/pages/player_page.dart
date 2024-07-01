@@ -317,7 +317,7 @@ class TitleBar extends GetView<PlayerController> {
                         channelTitle,
                         style: TextStyle(
                           fontSize: 16,
-                          color: backgroundColor,
+                          color: getSafeColor(backgroundColor),
                           fontFamily: 'PingFang SC',
                           fontWeight: FontWeight.w600,
                         ),

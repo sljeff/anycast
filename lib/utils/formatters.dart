@@ -112,3 +112,20 @@ String urlToDomain(String url) {
   var uri = Uri.parse(url);
   return uri.host;
 }
+
+Color getSafeColor(Color dynamicColor) {
+  // 定义亮度阈值，低于这个值就认为颜色太暗
+  const double brightnessThreshold = 0.2;
+
+  // 计算颜色的亮度
+  double brightness = dynamicColor.computeLuminance();
+
+  if (brightness < brightnessThreshold) {
+    // 如果颜色太暗，返回一个替代颜色
+    // 这里使用浅灰色作为示例，您可以根据需要选择其他颜色
+    return const Color(0xFF10B981);
+  } else {
+    // 如果颜色亮度足够，返回原始的动态颜色
+    return dynamicColor;
+  }
+}

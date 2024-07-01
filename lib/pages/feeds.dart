@@ -51,7 +51,6 @@ class Feeds extends StatelessWidget {
                       controller.addToTop(1, ep).then((pe) {
                         controller.removeByGuids([ep.guid!]);
                         Get.find<PlayerController>().playByEpisode(pe);
-                        clController.close();
                       });
                     },
                   ),
@@ -61,14 +60,12 @@ class Feeds extends StatelessWidget {
                       controller.addToPlaylist(1, ep).then((pe) {
                         controller.removeByGuids([ep.guid!]);
                       });
-                      clController.close();
                     },
                   ),
                   card.CardBtn(
                     icon: const Iconify(Ic.round_clear),
                     onPressed: () {
                       controller.removeByGuids([ep.guid!]);
-                      clController.close();
                     },
                   ),
                 ],
