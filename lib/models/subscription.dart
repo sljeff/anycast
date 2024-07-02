@@ -104,6 +104,9 @@ class SubscriptionModel {
   Future<PodcastImportData> listAllEpisodes() async {
     return fetchPodcastsByUrls([rssFeedUrl!], onlyFistEpisode: false)
         .then((value) {
+      if (value.isEmpty) {
+        return PodcastImportData(this, []);
+      }
       return value[0];
     });
   }

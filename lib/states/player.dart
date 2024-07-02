@@ -198,6 +198,17 @@ class PlayerController extends GetxController {
       PlayerModel.delete(db!);
     });
   }
+
+  void togglePlay() {
+    if (playlistEpisode.value.guid == null) {
+      return;
+    }
+    if (isPlaying.value) {
+      pause();
+    } else {
+      play();
+    }
+  }
 }
 
 class SettingsController extends GetxController {

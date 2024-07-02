@@ -41,7 +41,9 @@ dependencies:
   file_picker: ^8.0.3
   html: ^0.15.4
   timeago: ^3.3.0
-  webfeed_plus: ^1.0.1+1
+  webfeed_plus:
+    git:
+      url: git@github.com:sljeff/webfeed_plus
   xml: ^6.5.0
   flutter_html: ^3.0.0-beta.2
   sanitize_html: ^2.1.0

@@ -593,6 +593,9 @@ class Subtitles extends GetView<SubtitleController> {
                   .getModel();
               return Obx(
                 () => LyricsReader(
+                  onTap: () {
+                    Get.find<PlayerController>().togglePlay();
+                  },
                   position: playerController
                       .positionData.value.position.inMilliseconds,
                   model: model,
