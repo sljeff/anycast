@@ -18,10 +18,10 @@ import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 
 class Feeds extends StatelessWidget {
-  Feeds({super.key});
+  const Feeds({super.key});
 
-  final controller = Get.put(FeedEpisodeController());
-  final clController = Get.put(CardListController(), tag: 'feeds');
+  static final controller = Get.put(FeedEpisodeController());
+  static final clController = Get.put(CardListController(), tag: 'feeds');
 
   @override
   Widget build(BuildContext context) {

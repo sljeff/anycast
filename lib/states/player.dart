@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:anycast/models/helper.dart';
+import 'package:anycast/models/history_episode.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/player.dart';
 import 'package:anycast/models/settings.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/states/history.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/utils/audio_handler.dart';
@@ -132,6 +134,9 @@ class PlayerController extends GetxController {
         .then((value) => backgroundColor.value = value);
 
     myAudioHandler.playByEpisode(episode);
+
+    Get.find<HistoryController>()
+        .insert(HistoryEpisodeModel.fromMap(episode.toMap()));
 
     helper.db.then((db) {
       PlayerModel.update(db!, player);

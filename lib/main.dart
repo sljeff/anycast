@@ -32,13 +32,13 @@ void main() async {
   //   options: DefaultFirebaseOptions.currentPlatform,
   // );
 
-  runApp(NavigationBarApp());
+  runApp(const NavigationBarApp());
 }
 
 class NavigationBarApp extends StatelessWidget {
-  final homeTabController = Get.put(HomeTabController());
+  static final homeTabController = Get.put(HomeTabController());
 
-  NavigationBarApp({super.key});
+  const NavigationBarApp({super.key});
 
   @override
   Widget build(BuildContext context) {

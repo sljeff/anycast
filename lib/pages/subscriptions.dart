@@ -5,9 +5,10 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class Subscriptions extends StatelessWidget {
-  final SubscriptionController controller = Get.put(SubscriptionController());
+  static final SubscriptionController controller =
+      Get.put(SubscriptionController());
 
-  Subscriptions({super.key});
+  const Subscriptions({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -33,11 +33,11 @@ class PodcastsPage extends StatelessWidget {
           },
         ),
         // body: KeepAliveWrapper(key: const Key('feeds'), child: Feeds()));
-        body: DefaultTabController(
+        body: const DefaultTabController(
           length: 2,
           child: Column(
             children: [
-              const TabBar(
+              TabBar(
                 tabs: [
                   Tab(
                       text: 'Inbox',
@@ -51,10 +51,9 @@ class PodcastsPage extends StatelessWidget {
               Expanded(
                 child: TabBarView(
                   children: [
-                    KeepAliveWrapper(key: const Key('feeds'), child: Feeds()),
+                    KeepAliveWrapper(key: Key('feeds'), child: Feeds()),
                     KeepAliveWrapper(
-                        key: const Key('subscriptions'),
-                        child: Subscriptions()),
+                        key: Key('subscriptions'), child: Subscriptions()),
                   ],
                 ),
               ),

@@ -2,12 +2,16 @@ import 'dart:convert';
 
 import 'package:anycast/api/subtitles.dart';
 import 'package:anycast/states/cardlist.dart';
+import 'package:anycast/states/feed_episode.dart';
+import 'package:anycast/states/history.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/widgets/appbar.dart';
 import 'package:anycast/widgets/card.dart' as card;
+import 'package:anycast/widgets/detail.dart';
 import 'package:anycast/widgets/play_icon.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
@@ -15,12 +19,15 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
+import 'package:marquee/marquee.dart';
 
 class Playlists extends GetView<PlaylistController> {
   const Playlists({super.key});
 
   @override
   Widget build(BuildContext context) {
+    Get.put(HistoryController());
+
     return Obx(
       () {
         var playlists = controller.playlists;
@@ -36,9 +43,12 @@ class Playlists extends GetView<PlaylistController> {
         return DefaultTabController(
           length: playlists.length,
           child: Scaffold(
-              appBar: const MyAppBar(
+              appBar: MyAppBar(
                 title: 'PLAYLIST',
                 icon: Icons.history_rounded,
+                iconOnTap: () {
+                  Get.dialog(const HistoryBlock());
+                },
               ),
               body: TabBarView(
                   children: episodesControllers
@@ -209,5 +219,144 @@ class PlaylistEpisodesList extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class HistoryBlock extends StatelessWidget {
+  static final clController = Get.put(CardListController(), tag: 'history');
+  static final controller = Get.find<HistoryController>();
+
+  const HistoryBlock({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      if (controller.episodes.isEmpty) {
+        return const AlertDialog(
+            title: Center(
+          child: Text(
+            'No history',
+            style: TextStyle(
+              color: Colors.white,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ));
+      }
+
+      return Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12),
+        child: SizedBox(
+          height: 400,
+          width: 300,
+          child: ListView.separated(
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
+            itemCount: controller.episodes.length,
+            itemBuilder: (context, index) {
+              var episode = controller.episodes[index];
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.grey,
+                    width: 1,
+                  ),
+                ),
+                child: GestureDetector(
+                  onTap: () {
+                    Get.bottomSheet(Detail(episode: episode, actions: [
+                      card.CardBtn(
+                          icon: const Iconify(Ic.round_play_arrow),
+                          onPressed: () {
+                            var ep = controller.toFeedEpisode(episode);
+                            Get.find<FeedEpisodeController>()
+                                .addToTop(1, ep)
+                                .then((value) {
+                              Get.find<PlayerController>().playByEpisode(value);
+                            });
+                          }),
+                      card.CardBtn(
+                          icon: const Iconify(Ic.round_clear),
+                          onPressed: () {
+                            controller.delete(episode.enclosureUrl!);
+                          }),
+                    ]));
+                  },
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
+                          imageUrl: episode.imageUrl!,
+                          width: 48,
+                          height: 48,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              height: 20,
+                              child: Marquee(
+                                text: episode.title!,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontFamily:
+                                      GoogleFonts.comfortaa().fontFamily,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 2.40,
+                                ),
+                                blankSpace: 72,
+                                startAfter: const Duration(seconds: 1),
+                                startPadding: 12,
+                              ),
+                            ),
+                            Text(
+                              episode.channelTitle!,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: TextStyle(
+                                color: const Color(0xFF10B981),
+                                fontSize: 12,
+                                fontFamily: GoogleFonts.comfortaa().fontFamily,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 2.40,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        alignment: Alignment.centerRight,
+                        child: IconButton(
+                          onPressed: () {
+                            controller.delete(episode.enclosureUrl!);
+                          },
+                          padding: const EdgeInsets.all(6),
+                          style: IconButton.styleFrom(
+                            shape: const CircleBorder(),
+                            backgroundColor: Colors.white,
+                          ),
+                          icon: const Iconify(Ic.clear, color: Colors.black),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    });
   }
 }

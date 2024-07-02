@@ -1,3 +1,4 @@
+import 'package:anycast/models/history_episode.dart';
 import 'package:anycast/models/settings.dart';
 import 'package:anycast/models/subtitle.dart';
 
@@ -18,6 +19,7 @@ List<TableCreator> tableCreators = [
   playerTableCreator,
   settingsTableCreator,
   subtitleTableCreator,
+  historyEpisodeTableCreator,
 ];
 
 class DatabaseHelper {
