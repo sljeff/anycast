@@ -7,6 +7,7 @@
 播放列表的卡片有背景表示播放进度
 */
 import 'package:anycast/models/episode.dart';
+import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
 import 'package:anycast/states/cardlist.dart';
@@ -36,6 +37,18 @@ class Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var rightText =
+        '${formatDuration(episode.duration!)} • ${formatDatetime(episode.pubDate!)}';
+    if (episode is PlaylistEpisodeModel) {
+      var pe = episode as PlaylistEpisodeModel;
+      if (pe.playedDuration != null && pe.playedDuration! > 0) {
+        rightText = formatRemainingTime(
+          Duration(milliseconds: pe.duration!),
+          Duration(milliseconds: pe.playedDuration!),
+        );
+      }
+    }
+
     return Obx(
       () => Column(
         children: [
@@ -121,7 +134,7 @@ class Card extends StatelessWidget {
                             SizedBox(
                               width: 124,
                               child: Text(
-                                '${formatDuration(episode.duration!)} • ${formatDatetime(episode.pubDate!)}',
+                                rightText,
                                 textAlign: TextAlign.right,
                                 style: const TextStyle(
                                   decoration: TextDecoration.none,
