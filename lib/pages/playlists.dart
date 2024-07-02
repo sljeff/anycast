@@ -192,13 +192,13 @@ class PlaylistEpisodesList extends StatelessWidget {
                       case 'succeeded':
                         Get.snackbar(
                           'Success',
-                          'You can view subtitles in the player page.',
+                          'You can check the subtitles when playing.',
                           snackPosition: SnackPosition.BOTTOM,
                         );
                       case 'processing':
                         Get.snackbar(
-                          'Processing',
-                          'It takes a while, please wait...',
+                          'Generating',
+                          'Generating transcript may take a few minutes...',
                           snackPosition: SnackPosition.BOTTOM,
                         );
                     }

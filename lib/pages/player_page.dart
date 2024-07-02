@@ -12,6 +12,7 @@ import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/widgets/card.dart';
 import 'package:anycast/widgets/handler.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -21,6 +22,7 @@ import 'package:flutter/material.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:marquee/marquee.dart';
 import 'package:flutter_lyric/lyrics_reader.dart';
 
@@ -204,7 +206,10 @@ class PlayerAI extends GetView<PlayerController> {
   @override
   Widget build(BuildContext context) {
     return const DefaultTextStyle(
-      style: TextStyle(color: Colors.white),
+      style: TextStyle(
+        color: Colors.white,
+        decoration: TextDecoration.none,
+      ),
       child: Padding(
         padding: EdgeInsets.all(24),
         child: Subtitles(),
@@ -403,155 +408,263 @@ class Subtitles extends GetView<SubtitleController> {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      var playerController = Get.find<PlayerController>();
-      var url = playerController.playlistEpisode.value.enclosureUrl!;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      alignment: Alignment.center,
+      decoration: ShapeDecoration(
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(width: 1, color: Color(0xFF232830)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+      child: Obx(() {
+        var playerController = Get.find<PlayerController>();
+        var url = playerController.playlistEpisode.value.enclosureUrl!;
 
-      var status = controller.subtitleUrls[url];
-      if (status == null) {
-        // a button to fetch subtitles
-        return Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              TextButton(
-                onPressed: () {
-                  getSubtitles(url).then((value) {
-                    var subtitle = '';
-                    if (value.status == 'succeeded') {
-                      subtitle = jsonEncode(value.subtitles);
-                    }
-                    controller.add(url, value.status!, subtitle);
-                  });
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Colors.blue,
-                ),
-                child: const Text('Generate with AI'),
-              ),
-              const SizedBox(width: 8),
-              const Tooltip(
-                  showDuration: Duration(seconds: 10),
-                  message:
-                      'The AI will generate a summary and subtitles for this episode. '
-                      'It may take a few minutes.',
-                  triggerMode: TooltipTriggerMode.tap,
-                  child: Icon(Icons.info_outline)),
-            ],
-          ),
-        );
-      }
-
-      if (status == 'processing') {
-        // a progress indicator
-        var style = TextStyle(
-          color: Colors.white.withOpacity(0.64),
-        );
-        return Center(
-          child: Column(
-            children: [
-              const SizedBox(height: 16),
-              const CircularProgressIndicator(),
-              const SizedBox(height: 8),
-              Text("Generating with AI...", style: style),
-              const SizedBox(height: 8),
-              Text("It may take a few minutes...", style: style),
-              const SizedBox(height: 8),
-              Text("Feel free to explore or come back later.", style: style),
-            ],
-          ),
-        );
-      }
-
-      if (status == 'failed') {
-        // a button to retry
-        return Center(
-          child: TextButton(
-            onPressed: () {
-              getSubtitles(url).then((value) {
-                var subtitle = '';
-                if (value.status == 'succeeded') {
-                  subtitle = jsonEncode(value.subtitles);
-                }
-                controller.add(url, value.status!, subtitle);
-              });
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.blue,
-            ),
-            child: const Text('Retry'),
-          ),
-        );
-      }
-
-      var helper = DatabaseHelper();
-      return SingleChildScrollView(
-        child: FutureBuilder(
-          future: helper.db.then((db) {
-            return SubtitleModel.get(db!, url);
-          }),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const SizedBox.shrink();
-            }
-            var subtitle = snapshot.data!;
-
-            var model = LyricsModelBuilder.create()
-                .bindLyricToMain(
-                  subtitle.toLrc(),
-                )
-                .getModel();
-            return Obx(
-              () => LyricsReader(
-                position:
-                    playerController.positionData.value.position.inMilliseconds,
-                model: model,
-                lyricUi: lyricUI,
-                size: Size(
-                    double.infinity, MediaQuery.of(context).size.height / 2),
-                playing: playerController.isPlaying.value,
-                emptyBuilder: () => Center(
-                  child: Text(
-                    'No subtitles',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.64),
+        var status = controller.subtitleUrls[url];
+        if (status == null) {
+          // a button to fetch subtitles
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Generate transcript with AI',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontFamily: GoogleFonts.comfortaa().fontFamily,
+                        fontWeight: FontWeight.w400,
+                        height: 0,
+                      ),
                     ),
-                  ),
-                ),
-                selectLineBuilder: (progress, confirm) {
-                  return Row(
-                    children: [
-                      IconButton(
-                          onPressed: () {
-                            confirm.call();
-                            playerController
-                                .seek(Duration(milliseconds: progress));
-                          },
-                          icon: const Icon(Icons.play_arrow,
-                              color: Colors.black)),
-                      Expanded(
-                        child: Container(
-                          decoration: const BoxDecoration(color: Colors.black),
-                          height: 1,
-                          width: double.infinity,
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: const ShapeDecoration(
+                        color: Color(0xFF059669),
+                        shape: OvalBorder(),
+                      ),
+                      child: const Tooltip(
+                        showDuration: Duration(seconds: 10),
+                        message:
+                            'The AI will generate a summary and subtitles for this episode. '
+                            'It may take a few minutes.',
+                        triggerMode: TooltipTriggerMode.tap,
+                        child: Icon(
+                          Icons.question_mark_rounded,
+                          size: 12,
+                          color: Color(
+                            0xFF10B981,
+                          ),
                         ),
                       ),
-                      Text(
-                        formatTime(Duration(milliseconds: progress)),
-                        style: const TextStyle(color: Colors.black),
-                      )
-                    ],
-                  );
-                },
+                    ),
+                  ],
+                ),
+                GestureDetector(
+                  onTap: () {
+                    getSubtitles(url).then((value) {
+                      var subtitle = '';
+                      if (value.status == 'succeeded') {
+                        subtitle = jsonEncode(value.subtitles);
+                      }
+                      controller.add(url, value.status!, subtitle);
+                    });
+                  },
+                  child: Container(
+                    width: 247,
+                    height: 75,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 36, vertical: 24),
+                    decoration: ShapeDecoration(
+                      color: const Color(0xFF10B981),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Iconify(tablerTopology),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Generate',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontFamily: GoogleFonts.comfortaa().fontFamily,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 2.40,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              ],
+            ),
+          );
+        }
+
+        if (status == 'processing') {
+          // a progress indicator
+          var style = TextStyle(
+            color: Colors.white,
+            fontFamily: GoogleFonts.comfortaa().fontFamily,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          );
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 24),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 24),
+                Text("Generating with AI...", style: style),
+                const SizedBox(height: 8),
+                Text("It may take a few minutes...", style: style),
+                const SizedBox(height: 8),
+                Text("Feel free to explore or come back later.", style: style),
+              ],
+            ),
+          );
+        }
+
+        if (status == 'failed') {
+          // a button to retry
+          return Center(
+            child: TextButton(
+              onPressed: () {
+                getSubtitles(url).then((value) {
+                  var subtitle = '';
+                  if (value.status == 'succeeded') {
+                    subtitle = jsonEncode(value.subtitles);
+                  }
+                  controller.add(url, value.status!, subtitle);
+                });
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.blue,
               ),
-            );
-          },
-        ),
-      );
-    });
+              child: const Text('Retry'),
+            ),
+          );
+        }
+
+        var helper = DatabaseHelper();
+        return SingleChildScrollView(
+          child: FutureBuilder(
+            future: helper.db.then((db) {
+              return SubtitleModel.get(db!, url);
+            }),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const SizedBox.shrink();
+              }
+              var subtitle = snapshot.data!;
+
+              var model = LyricsModelBuilder.create()
+                  .bindLyricToMain(
+                    subtitle.toLrc(),
+                  )
+                  .getModel();
+              return Obx(
+                () => LyricsReader(
+                  position: playerController
+                      .positionData.value.position.inMilliseconds,
+                  model: model,
+                  lyricUi: lyricUI,
+                  size: Size(double.infinity,
+                      MediaQuery.of(context).size.height / 1.5),
+                  playing: playerController.isPlaying.value,
+                  emptyBuilder: () => Center(
+                    child: Text(
+                      'No subtitles',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.64),
+                      ),
+                    ),
+                  ),
+                  selectLineBuilder: (progress, confirm) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          formatTime(Duration(milliseconds: progress)),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: GoogleFonts.comfortaa().fontFamily,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 24,
+                            shadows: const [
+                              Shadow(
+                                color: Colors.black,
+                                offset: Offset(1, 1),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            decoration:
+                                const BoxDecoration(color: Colors.white),
+                            height: 2,
+                            width: double.infinity,
+                          ),
+                        ),
+                        IconButton(
+                            onPressed: () {
+                              confirm.call();
+                              playerController
+                                  .seek(Duration(milliseconds: progress));
+                            },
+                            tooltip: 'Seek',
+                            iconSize: 24,
+                            style: ButtonStyle(
+                              shape: const WidgetStatePropertyAll(
+                                CircleBorder(),
+                              ),
+                              backgroundColor: WidgetStatePropertyAll(
+                                Colors.white.withOpacity(0.8),
+                              ),
+                            ),
+                            icon: const Icon(Icons.play_arrow_rounded,
+                                color: Color(0xFF10B981)))
+                      ],
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        );
+      }),
+    );
   }
 }
 
