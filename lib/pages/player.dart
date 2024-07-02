@@ -23,6 +23,7 @@ import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/ic.dart';
 import 'package:marquee/marquee.dart';
 import 'package:flutter_lyric/lyrics_reader.dart';
 
@@ -111,9 +112,9 @@ class PageTab extends GetView<PlayerController> {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PageTabButton(icon: Icons.settings, index: 0),
-          PageTabButton(icon: Icons.photo, index: 1),
-          PageTabButton(icon: Icons.air, index: 2),
+          PageTabButton(icon: Ic.round_settings, index: 0),
+          PageTabButton(icon: Ic.round_podcasts, index: 1),
+          PageTabButton(icon: tablerTopology, index: 2),
         ],
       ),
     );
@@ -669,7 +670,7 @@ class Subtitles extends GetView<SubtitleController> {
 }
 
 class PageTabButton extends GetView<PlayerController> {
-  final IconData icon;
+  final String icon;
   final int index;
 
   const PageTabButton({super.key, required this.icon, required this.index});
@@ -696,16 +697,11 @@ class PageTabButton extends GetView<PlayerController> {
           width: 48,
           height: 48,
           decoration: dec,
+          padding: const EdgeInsets.all(12),
           child: GestureDetector(
-            child: Container(
-              width: 24,
-              height: 24,
-              clipBehavior: Clip.antiAlias,
-              decoration: const BoxDecoration(),
-              child: Icon(
-                icon,
-                color: isSelect ? Colors.black : Colors.white,
-              ),
+            child: Iconify(
+              icon,
+              color: isSelect ? Colors.black : Colors.white,
             ),
             onTap: () {
               controller.pageController.animateToPage(

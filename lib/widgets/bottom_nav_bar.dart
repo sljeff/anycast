@@ -1,5 +1,5 @@
 import 'package:anycast/models/playlist_episode.dart';
-import 'package:anycast/pages/player_page.dart';
+import 'package:anycast/pages/player.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/widgets/play_icon.dart';
