@@ -25,7 +25,6 @@ class PlayerController extends GetxController {
   ).obs;
   var pageIndex = 1.obs;
   var playlistEpisode = PlaylistEpisodeModel.empty().obs;
-  var refreshFrameTime = 0.obs;
   var backgroundColor =
       const Color(0xFF111316).obs; // The color caculated by palette generator
 
@@ -91,14 +90,6 @@ class PlayerController extends GetxController {
           playByEpisode(peController.episodes[0]);
         }
       }
-
-      Timer.periodic(const Duration(milliseconds: 20), (timer) {
-        var now = DateTime.now();
-        refreshFrameTime.value = now.hour * 3600000 +
-            now.minute * 60000 +
-            now.second * 1000 +
-            now.millisecond;
-      });
     });
 
     myAudioHandler.positionDataStream.listen((event) {
@@ -130,6 +121,7 @@ class PlayerController extends GetxController {
 
     this.player.value = player;
     playlistEpisode.value = episode;
+    initProgress();
     updatePaletteGenerator(NetworkImage(episode.imageUrl!))
         .then((value) => backgroundColor.value = value);
 
@@ -137,6 +129,25 @@ class PlayerController extends GetxController {
 
     Get.find<HistoryController>()
         .insert(HistoryEpisodeModel.fromMap(episode.toMap()));
+
+    helper.db.then((db) {
+      PlayerModel.update(db!, player);
+    });
+  }
+
+  void setByEpisode(PlaylistEpisodeModel episode) async {
+    var playlistId = episode.playlistId!;
+    var player = PlayerModel.fromMap({
+      'currentPlaylistId': playlistId,
+    });
+
+    this.player.value = player;
+    playlistEpisode.value = episode;
+    initProgress();
+    updatePaletteGenerator(NetworkImage(episode.imageUrl!))
+        .then((value) => backgroundColor.value = value);
+
+    myAudioHandler.setByEpisode(episode);
 
     helper.db.then((db) {
       PlayerModel.update(db!, player);

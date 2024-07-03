@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
+import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:get/get.dart';
 
@@ -76,5 +79,36 @@ class PlaylistEpisodeController extends GetxController {
     return helper.db.then((db) {
       episode.updatePlayedDuration(db!);
     });
+  }
+
+  Future<void> move(int from, int to) async {
+    if (from == to) {
+      return;
+    }
+    if (from == 0) {
+      var playerController = Get.find<PlayerController>();
+
+      playerController.pause().then((_) {
+        // wait for episodes reorder
+        sleep(const Duration(milliseconds: 100));
+        playerController.setByEpisode(episodes[0]);
+      });
+    }
+    if (to == 0) {
+      var playerController = Get.find<PlayerController>();
+      playerController.pause().then((_) {
+        sleep(const Duration(milliseconds: 100));
+        playerController.setByEpisode(episodes[0]);
+      });
+    }
+
+    var episode = episodes.removeAt(from);
+    if (to > from) {
+      to -= 1;
+    }
+    episodes.insert(to, episode);
+
+    helper.db.then((db) => PlaylistEpisodeModel.insertOrUpdateByIndex(
+        db!, playlistId, to, episode));
   }
 }

@@ -58,7 +58,7 @@ class Card extends StatelessWidget {
       () {
         Widget back = Container(
           width: playedWidth,
-          height: 96,
+          height: 100,
           color: Colors.white.withOpacity(0.1),
         );
 
@@ -79,17 +79,17 @@ class Card extends StatelessWidget {
           });
         }
 
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                top: 0,
-                child: back,
-              ),
-              Column(
+        return Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
                 children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: back,
+                  ),
                   GestureDetector(
                     onTap: () {
                       clController.expand(index);
@@ -212,23 +212,22 @@ class Card extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    height: clController.expandedIndex.value == index ? 60 : 0,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: clController.expandedIndex.value == index
-                          ? actions
-                          : [],
-                    ),
-                  ),
+                  )
                 ],
-              )
-            ],
-          ),
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              height: clController.expandedIndex.value == index ? 60 : 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children:
+                    clController.expandedIndex.value == index ? actions : [],
+              ),
+            ),
+          ],
         );
       },
     );

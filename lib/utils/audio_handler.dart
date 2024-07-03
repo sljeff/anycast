@@ -79,8 +79,13 @@ class MyAudioHandler extends BaseAudioHandler {
   Stream<bool> get skipSilenceEnabledStream => _player.skipSilenceEnabledStream;
 
   Future<void> playByEpisode(PlaylistEpisodeModel episode) async {
+    setByEpisode(episode);
+
+    play();
+  }
+
+  Future<void> setByEpisode(PlaylistEpisodeModel episode) async {
     if (mediaItem.value?.id == episode.enclosureUrl) {
-      play();
       return;
     }
 
@@ -89,8 +94,6 @@ class MyAudioHandler extends BaseAudioHandler {
     await _player.setAudioSource(source,
         initialPosition: Duration(milliseconds: episode.playedDuration ?? 0));
     mediaItem.add(source.tag as MediaItem);
-
-    play();
   }
 
   Future<void> seekAndPlayByEpisode(

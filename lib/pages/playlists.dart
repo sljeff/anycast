@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:anycast/api/subtitles.dart';
 import 'package:anycast/states/cardlist.dart';
@@ -12,6 +13,7 @@ import 'package:anycast/widgets/card.dart' as card;
 import 'package:anycast/widgets/detail.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
@@ -135,88 +137,116 @@ class PlaylistEpisodesList extends StatelessWidget {
 
         return Container(
           padding: const EdgeInsets.only(left: 24, right: 24),
-          child: ListView.separated(
+          child: ReorderableListView.builder(
+            onReorder: controller.move,
+            onReorderStart: (index) {
+              clController.close();
+            },
+            footer: const SizedBox(height: 12),
+            proxyDecorator:
+                (Widget child, int index, Animation<double> animation) {
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (BuildContext context, Widget? child) {
+                  final double animValue =
+                      Curves.easeInOut.transform(animation.value);
+                  return Transform.scale(
+                    scale: lerpDouble(1, 1.1, animValue),
+                    child: child,
+                  );
+                },
+                child: child,
+              );
+            },
+            buildDefaultDragHandles: false,
             padding: const EdgeInsets.only(top: 12),
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemCount: controller.episodes.length,
             itemBuilder: (context, index) {
               var episode = controller.episodes[index];
-              return card.Card(
-                episode: episode,
-                index: index,
-                clController: clController,
-                actions: [
-                  card.CardBtn(
-                    icon: PlayIcon(
-                      size: 24,
-                      enclosureUrl: episode.enclosureUrl!,
-                    ),
-                    onPressed: () {
-                      if (isPlaying && index == 0) {
-                        playerController.pause();
-                      } else {
-                        controller.moveToTop(episode);
-                        playerController.playByEpisode(episode);
-                        clController.expand(0);
-                      }
-                    },
+              return Padding(
+                key: Key(episode.enclosureUrl!),
+                padding: const EdgeInsets.only(bottom: 12),
+                child: MyReorderableDelayedDragStartListener(
+                  delay: const Duration(milliseconds: 150),
+                  index: index,
+                  child: card.Card(
+                    episode: episode,
+                    index: index,
+                    clController: clController,
+                    actions: [
+                      card.CardBtn(
+                        icon: PlayIcon(
+                          size: 24,
+                          enclosureUrl: episode.enclosureUrl!,
+                        ),
+                        onPressed: () {
+                          if (isPlaying && index == 0) {
+                            playerController.pause();
+                          } else {
+                            controller.moveToTop(episode);
+                            playerController.playByEpisode(episode);
+                            clController.expand(0);
+                          }
+                        },
+                      ),
+                      card.CardBtn(
+                        icon: AIIcon(
+                          size: 24,
+                          enclosureUrl: episode.enclosureUrl!,
+                          color: Colors.black,
+                        ),
+                        onPressed: () {
+                          var stController = Get.find<SubtitleController>();
+                          switch (stController
+                              .subtitleUrls[episode.enclosureUrl!]) {
+                            case null:
+                              getSubtitles(episode.enclosureUrl!).then((value) {
+                                var subtitle = '';
+                                if (value.status == 'succeeded') {
+                                  subtitle = jsonEncode(value.subtitles);
+                                }
+                                stController.add(episode.enclosureUrl!,
+                                    value.status!, subtitle);
+                              });
+                              Get.snackbar(
+                                'Processing',
+                                'Subtitle generating, please wait...',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            case 'failed':
+                              stController.remove(episode.enclosureUrl!);
+                              Get.snackbar(
+                                'Error',
+                                'Subtitle download failed, please try again later.',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            case 'succeeded':
+                              Get.snackbar(
+                                'Success',
+                                'You can check the subtitles when playing.',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            case 'processing':
+                              Get.snackbar(
+                                'Generating',
+                                'Generating transcript may take a few minutes...',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                          }
+                        },
+                      ),
+                      card.CardBtn(
+                        icon: const Iconify(Ic.round_clear),
+                        onPressed: () {
+                          controller.remove(episode.guid!);
+                          if (index == 0) {
+                            playerController.clear();
+                          }
+                        },
+                      )
+                    ],
                   ),
-                  card.CardBtn(
-                    icon: AIIcon(
-                      size: 24,
-                      enclosureUrl: episode.enclosureUrl!,
-                      color: Colors.black,
-                    ),
-                    onPressed: () {
-                      var stController = Get.find<SubtitleController>();
-                      switch (
-                          stController.subtitleUrls[episode.enclosureUrl!]) {
-                        case null:
-                          getSubtitles(episode.enclosureUrl!).then((value) {
-                            var subtitle = '';
-                            if (value.status == 'succeeded') {
-                              subtitle = jsonEncode(value.subtitles);
-                            }
-                            stController.add(
-                                episode.enclosureUrl!, value.status!, subtitle);
-                          });
-                          Get.snackbar(
-                            'Processing',
-                            'Subtitle generating, please wait...',
-                            snackPosition: SnackPosition.BOTTOM,
-                          );
-                        case 'failed':
-                          stController.remove(episode.enclosureUrl!);
-                          Get.snackbar(
-                            'Error',
-                            'Subtitle download failed, please try again later.',
-                            snackPosition: SnackPosition.BOTTOM,
-                          );
-                        case 'succeeded':
-                          Get.snackbar(
-                            'Success',
-                            'You can check the subtitles when playing.',
-                            snackPosition: SnackPosition.BOTTOM,
-                          );
-                        case 'processing':
-                          Get.snackbar(
-                            'Generating',
-                            'Generating transcript may take a few minutes...',
-                            snackPosition: SnackPosition.BOTTOM,
-                          );
-                      }
-                    },
-                  ),
-                  card.CardBtn(
-                    icon: const Iconify(Ic.round_clear),
-                    onPressed: () {
-                      controller.remove(episode.guid!);
-                      if (index == 0) {
-                        playerController.clear();
-                      }
-                    },
-                  )
-                ],
+                ),
               );
             },
           ),
@@ -362,5 +392,23 @@ class HistoryBlock extends StatelessWidget {
         ),
       );
     });
+  }
+}
+
+class MyReorderableDelayedDragStartListener
+    extends ReorderableDragStartListener {
+  final Duration delay;
+
+  const MyReorderableDelayedDragStartListener({
+    this.delay = kLongPressTimeout,
+    super.key,
+    required super.child,
+    required super.index,
+    super.enabled,
+  });
+
+  @override
+  MultiDragGestureRecognizer createRecognizer() {
+    return DelayedMultiDragGestureRecognizer(delay: delay, debugOwner: this);
   }
 }
