@@ -12,6 +12,7 @@ import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/channel.dart';
+import 'package:anycast/states/player.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/detail.dart';
@@ -37,8 +38,11 @@ class Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var barWidth = MediaQuery.of(context).size.width - 48;
+
     var rightText =
         '${formatDuration(episode.duration!)} • ${formatDatetime(episode.pubDate!)}';
+    var playedWidth = 0.0;
     if (episode is PlaylistEpisodeModel) {
       var pe = episode as PlaylistEpisodeModel;
       if (pe.playedDuration != null && pe.playedDuration! > 0) {
@@ -46,143 +50,187 @@ class Card extends StatelessWidget {
           Duration(milliseconds: pe.duration!),
           Duration(milliseconds: pe.playedDuration!),
         );
+        playedWidth = (pe.playedDuration! / pe.duration!) * barWidth;
       }
     }
 
     return Obx(
-      () => Column(
-        children: [
-          GestureDetector(
-            onTap: () {
-              clController.expand(index);
-            },
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: ShapeDecoration(
-                shape: RoundedRectangleBorder(
-                  side: BorderSide(
-                    color: Colors.grey.shade800,
-                    width: 1,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+      () {
+        Widget back = Container(
+          width: playedWidth,
+          height: 96,
+          color: Colors.white.withOpacity(0.1),
+        );
+
+        var playerController = Get.find<PlayerController>();
+        if (episode is PlaylistEpisodeModel &&
+            playerController.playlistEpisode.value.enclosureUrl ==
+                episode.enclosureUrl) {
+          back = Obx(() {
+            var positionData = playerController.positionData.value;
+            playedWidth = positionData.position.inMilliseconds /
+                positionData.duration.inMilliseconds *
+                barWidth;
+            return Container(
+              width: playedWidth,
+              height: 98,
+              color: Colors.white.withOpacity(0.1),
+            );
+          });
+        }
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                child: back,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Column(
                 children: [
                   GestureDetector(
                     onTap: () {
-                      showModalBottomSheet(
-                        useSafeArea: true,
-                        isScrollControlled: true,
-                        context: context,
-                        builder: (context) =>
-                            Detail(episode: episode, actions: actions),
-                      );
+                      clController.expand(index);
                     },
                     child: Container(
-                      width: 80,
-                      height: 80,
+                      padding: const EdgeInsets.all(8),
                       decoration: ShapeDecoration(
-                        image: DecorationImage(
-                          image: CachedNetworkImageProvider(episode.imageUrl!),
-                          fit: BoxFit.fill,
-                        ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: Colors.grey.shade800,
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
                         ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              showModalBottomSheet(
+                                useSafeArea: true,
+                                isScrollControlled: true,
+                                context: context,
+                                builder: (context) =>
+                                    Detail(episode: episode, actions: actions),
+                              );
+                            },
+                            child: Container(
+                              width: 80,
+                              height: 80,
+                              decoration: ShapeDecoration(
+                                image: DecorationImage(
+                                  image: CachedNetworkImageProvider(
+                                      episode.imageUrl!),
+                                  fit: BoxFit.fill,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  episode.title!,
+                                  style: const TextStyle(
+                                    decoration: TextDecoration.none,
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontFamily:
+                                        'PingFangSC-Regular,PingFang SC',
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    SizedBox(
+                                      width: 94,
+                                      child: Text(
+                                        episode.channelTitle!,
+                                        style: const TextStyle(
+                                          decoration: TextDecoration.none,
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontFamily:
+                                              'PingFangSC-Regular,PingFang SC',
+                                          fontWeight: FontWeight.w500,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 124,
+                                      child: Text(
+                                        rightText,
+                                        textAlign: TextAlign.right,
+                                        style: const TextStyle(
+                                          decoration: TextDecoration.none,
+                                          color: Color(0xFF6B7280),
+                                          fontSize: 12,
+                                          fontFamily:
+                                              'PingFangSC-Regular,PingFang SC',
+                                          fontWeight: FontWeight.w400,
+                                          height: 0,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  htmlToText(episode.description),
+                                  style: TextStyle(
+                                    decoration: TextDecoration.none,
+                                    color: const Color(0xFF6B7280),
+                                    fontSize: 12,
+                                    fontFamily: GoogleFonts.inter().fontFamily,
+                                    fontWeight: FontWeight.w400,
+                                    height: 0,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          episode.title!,
-                          style: const TextStyle(
-                            decoration: TextDecoration.none,
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontFamily: 'PingFangSC-Regular,PingFang SC',
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            SizedBox(
-                              width: 94,
-                              child: Text(
-                                episode.channelTitle!,
-                                style: const TextStyle(
-                                  decoration: TextDecoration.none,
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
-                                  fontWeight: FontWeight.w500,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              width: 124,
-                              child: Text(
-                                rightText,
-                                textAlign: TextAlign.right,
-                                style: const TextStyle(
-                                  decoration: TextDecoration.none,
-                                  color: Color(0xFF6B7280),
-                                  fontSize: 12,
-                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
-                                  fontWeight: FontWeight.w400,
-                                  height: 0,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          htmlToText(episode.description),
-                          style: TextStyle(
-                            decoration: TextDecoration.none,
-                            color: const Color(0xFF6B7280),
-                            fontSize: 12,
-                            fontFamily: GoogleFonts.inter().fontFamily,
-                            fontWeight: FontWeight.w400,
-                            height: 0,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      ],
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    height: clController.expandedIndex.value == index ? 60 : 0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: clController.expandedIndex.value == index
+                          ? actions
+                          : [],
                     ),
                   ),
                 ],
-              ),
-            ),
+              )
+            ],
           ),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-            height: clController.expandedIndex.value == index ? 60 : 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children:
-                  clController.expandedIndex.value == index ? actions : [],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
