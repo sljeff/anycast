@@ -128,30 +128,34 @@ class SearchBar extends GetView<DiscoverController> {
     return Obx(() {
       Widget cancel = const SizedBox.shrink();
       if (controller.searchText.value.isNotEmpty) {
-        cancel = GestureDetector(
-          onTap: () {
-            controller.searchController.clear();
-            controller.searchText.value = '';
-            FocusScope.of(context).requestFocus(FocusNode());
-          },
-          child: Text(
-            'Cancel',
-            style: TextStyle(
-              color: const Color(0xFF34D399),
-              fontSize: 16,
-              fontFamily: GoogleFonts.comfortaa().fontFamily,
-              fontWeight: FontWeight.w400,
-              height: 0,
+        cancel = Row(
+          children: [
+            const SizedBox(
+              width: 16,
             ),
-          ),
+            GestureDetector(
+              onTap: () {
+                controller.searchController.clear();
+                controller.searchText.value = '';
+                FocusScope.of(context).requestFocus(FocusNode());
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: const Color(0xFF34D399),
+                  fontSize: 16,
+                  fontFamily: GoogleFonts.comfortaa().fontFamily,
+                  fontWeight: FontWeight.w400,
+                  height: 0,
+                ),
+              ),
+            ),
+          ],
         );
       }
       return Row(
         children: [
           Expanded(child: searchBar),
-          const SizedBox(
-            width: 16,
-          ),
           cancel,
         ],
       );
