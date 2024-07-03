@@ -108,9 +108,14 @@ class PlayerBar extends GetView<PlayerController> {
             borderRadius: BorderRadius.circular(16),
             child: Stack(
               children: [
-                Container(
-                  width: playedWidth,
-                  color: Colors.white.withOpacity(0.2),
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  child: Container(
+                    width: playedWidth,
+                    height: 56,
+                    color: Colors.white.withOpacity(0.2),
+                  ),
                 ),
                 Padding(
                   padding:
