@@ -166,6 +166,8 @@ class PlayerController extends GetxController {
       playByEpisode(playlistEpisode.value);
       return;
     }
+    Get.find<HistoryController>()
+        .insert(HistoryEpisodeModel.fromMap(playlistEpisode.value.toMap()));
     return myAudioHandler.play();
   }
 
