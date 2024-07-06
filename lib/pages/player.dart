@@ -26,6 +26,7 @@ import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:marquee/marquee.dart';
 import 'package:flutter_lyric/lyrics_reader.dart';
+import 'package:share_plus/share_plus.dart';
 
 class PlayerPage extends GetView<PlayerController> {
   const PlayerPage({super.key});
@@ -165,28 +166,73 @@ class PlayerMain extends GetView<PlayerController> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const SizedBox(height: 16),
-            Obx(() {
-              return Hero(
-                tag: 'play_image',
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    width: size,
-                    height: size,
-                    imageUrl: controller.playlistEpisode.value.imageUrl ?? '',
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Icon(
-                      Icons.image,
-                      size: size,
+            Stack(
+              children: [
+                Obx(() {
+                  return Hero(
+                    tag: 'play_image',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        width: size,
+                        height: size,
+                        imageUrl:
+                            controller.playlistEpisode.value.imageUrl ?? '',
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Icon(
+                          Icons.image,
+                          size: size,
+                        ),
+                        errorWidget: (context, url, error) => Icon(
+                          Icons.image_not_supported,
+                          size: size,
+                        ),
+                      ),
                     ),
-                    errorWidget: (context, url, error) => Icon(
-                      Icons.image_not_supported,
-                      size: size,
+                  );
+                }),
+                Positioned(
+                  bottom: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () {
+                      var shareUrl = Uri(
+                        scheme: 'https',
+                        host: 'share.anycast.website',
+                        path: 'player',
+                        queryParameters: {
+                          'rssfeedurl': controller.channel.value.rssFeedUrl,
+                          'enclosureurl':
+                              controller.playlistEpisode.value.enclosureUrl,
+                        },
+                      );
+
+                      Share.share(
+                        '${controller.playlistEpisode.value.title}\n\n$shareUrl',
+                      );
+                    },
+                    child: Container(
+                      alignment: Alignment.center,
+                      width: 36,
+                      height: 36,
+                      padding: const EdgeInsets.all(8),
+                      clipBehavior: Clip.antiAlias,
+                      decoration: ShapeDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: Iconify(
+                        Ic.round_ios_share,
+                        size: 18,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
                     ),
                   ),
                 ),
-              );
-            }),
+              ],
+            ),
             const SizedBox(height: 16),
             const TitleBar(),
             const SizedBox(height: 16),
@@ -226,129 +272,113 @@ class TitleBar extends GetView<PlayerController> {
   Widget build(BuildContext context) {
     var rightWidth = MediaQuery.of(context).size.width - 24 * 2 - 64 - 6;
     return Obx(() {
-      var rssFeedUrl = '';
       var episode = controller.playlistEpisode.value;
-      if (episode.guid != null) {
-        rssFeedUrl = controller.playlistEpisode.value.rssFeedUrl!;
-      }
-      var f = DatabaseHelper().db.then((db) async {
-        if (rssFeedUrl == '') {
-          return null;
-        }
-        return await SubscriptionModel.getOrFetch(db!, rssFeedUrl);
-      });
-      return FutureBuilder(
-        future: f,
-        builder: (context, snapshot) {
-          var imgUrl = '';
-          var title = 'Waiting...';
-          var channelTitle = 'Waiting...';
-          var backgroundColor = controller.backgroundColor.value;
-          if (snapshot.hasData && snapshot.data != null) {
-            var subscription = snapshot.data as SubscriptionModel;
-            imgUrl = subscription.imageUrl!;
-            title = controller.playlistEpisode.value.title!;
-            channelTitle = subscription.title!;
-          }
+      var backgroundColor = controller.backgroundColor.value;
+      var subscription = controller.channel.value;
+      var imgUrl = subscription.imageUrl!;
+      var title = controller.playlistEpisode.value.title!;
+      var channelTitle = subscription.title!;
 
-          Widget img = const Icon(
-            Icons.image,
-            size: 64,
-          );
-          if (imgUrl != '') {
-            img = GestureDetector(
-              onTap: () {
-                jumpToChannel(episode, context);
-              },
-              child: CachedNetworkImage(
-                imageUrl: imgUrl,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => const Icon(
-                  Icons.image,
-                ),
-                errorWidget: (context, url, error) => const Icon(
-                  Icons.image_not_supported,
-                ),
-                height: 64,
-                width: 64,
-              ),
-            );
-          }
-
-          // marquee or text
-          var titleStyle = const TextStyle(
-            fontSize: 24,
-            color: Colors.white,
-            fontFamily: 'PingFang SC',
-            fontWeight: FontWeight.w600,
-          );
-          Widget titleWidget = Text(
-            title,
-            style: titleStyle,
-          );
-          // if text width > rightWidth, use marquee
-          if (title.length * 24 > rightWidth) {
-            titleWidget = Marquee(
-              text: title,
-              pauseAfterRound: const Duration(seconds: 1),
-              style: titleStyle,
-              blankSpace: 40,
-            );
-          }
-
-          return Row(children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: img,
+      Widget img = const Icon(
+        Icons.image,
+        size: 64,
+      );
+      if (imgUrl != '') {
+        img = GestureDetector(
+          onTap: () {
+            jumpToChannel(episode, context, channel: subscription);
+          },
+          child: CachedNetworkImage(
+            imageUrl: imgUrl,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => const Icon(
+              Icons.image,
             ),
-            const SizedBox(width: 6),
-            SizedBox(
-              width: rightWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  SizedBox(
-                    height: 34,
-                    child: titleWidget,
-                  ),
-                  const SizedBox(height: 6),
-                  GestureDetector(
-                    onTap: () {
-                      jumpToChannel(episode, context);
-                    },
-                    child: SizedBox(
-                      height: 24,
-                      child: Text(
-                        channelTitle,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: getSafeColor(backgroundColor),
-                          fontFamily: 'PingFang SC',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+            errorWidget: (context, url, error) => const Icon(
+              Icons.image_not_supported,
+            ),
+            height: 64,
+            width: 64,
+          ),
+        );
+      }
+
+      // marquee or text
+      var titleStyle = const TextStyle(
+        fontSize: 24,
+        color: Colors.white,
+        fontFamily: 'PingFang SC',
+        fontWeight: FontWeight.w600,
+      );
+      Widget titleWidget = Text(
+        title,
+        style: titleStyle,
+      );
+      // if text width > rightWidth, use marquee
+      if (title.length * 24 > rightWidth) {
+        titleWidget = Marquee(
+          text: title,
+          pauseAfterRound: const Duration(seconds: 1),
+          style: titleStyle,
+          blankSpace: 40,
+        );
+      }
+
+      return Row(children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: img,
+        ),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: rightWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SizedBox(
+                height: 34,
+                child: titleWidget,
+              ),
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: () {
+                  jumpToChannel(episode, context, channel: subscription);
+                },
+                child: SizedBox(
+                  height: 24,
+                  child: Text(
+                    channelTitle,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: getSafeColor(backgroundColor),
+                      fontFamily: 'PingFang SC',
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ]);
-        },
-      );
+            ],
+          ),
+        ),
+      ]);
     });
   }
 }
 
-void jumpToChannel(PlaylistEpisodeModel episode, BuildContext context) {
-  var subscriptionController = Get.find<SubscriptionController>();
-  var s = subscriptionController.getByTitle(episode.channelTitle!);
-  if (s == null) {
-    s = SubscriptionModel.empty();
-    s.rssFeedUrl = episode.rssFeedUrl;
+void jumpToChannel(PlaylistEpisodeModel episode, BuildContext context,
+    {SubscriptionModel? channel}) {
+  if (channel == null) {
+    var subscriptionController = Get.find<SubscriptionController>();
+    channel = subscriptionController.getByTitle(episode.channelTitle!);
+    if (channel == null) {
+      channel = SubscriptionModel.empty();
+      channel.rssFeedUrl = episode.rssFeedUrl;
+    }
   }
-  Get.lazyPut(() => ChannelController(channel: s!), tag: s.rssFeedUrl);
-  context.pushTransparentRoute(Channel(rssFeedUrl: s.rssFeedUrl!));
+  Get.lazyPut(() => ChannelController(channel: channel!),
+      tag: channel.rssFeedUrl);
+  context.pushTransparentRoute(Channel(rssFeedUrl: channel.rssFeedUrl!));
 }
 
 class MyProgressBar extends GetView<PlayerController> {

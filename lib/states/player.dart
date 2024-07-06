@@ -5,11 +5,13 @@ import 'package:anycast/models/history_episode.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/player.dart';
 import 'package:anycast/models/settings.dart';
+import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
 import 'package:anycast/states/history.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/utils/audio_handler.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
@@ -27,6 +29,7 @@ class PlayerController extends GetxController {
   var playlistEpisode = PlaylistEpisodeModel.empty().obs;
   var backgroundColor =
       const Color(0xFF111316).obs; // The color caculated by palette generator
+  var channel = SubscriptionModel.empty().obs;
 
   var pageController = PageController(
     viewportFraction: 1,
@@ -44,9 +47,7 @@ class PlayerController extends GetxController {
 
     if (peController.episodes.isNotEmpty &&
         playlistEpisode.value.guid == null) {
-      playlistEpisode.value = peController.episodes[0];
-      updatePaletteGenerator(NetworkImage(playlistEpisode.value.imageUrl!))
-          .then((value) => backgroundColor.value = value);
+      _updateEpisode(peController.episodes[0]);
     }
 
     return peController;
@@ -120,10 +121,7 @@ class PlayerController extends GetxController {
     });
 
     this.player.value = player;
-    playlistEpisode.value = episode;
-    initProgress();
-    updatePaletteGenerator(NetworkImage(episode.imageUrl!))
-        .then((value) => backgroundColor.value = value);
+    _updateEpisode(episode);
 
     myAudioHandler.playByEpisode(episode);
 
@@ -142,10 +140,7 @@ class PlayerController extends GetxController {
     });
 
     this.player.value = player;
-    playlistEpisode.value = episode;
-    initProgress();
-    updatePaletteGenerator(NetworkImage(episode.imageUrl!))
-        .then((value) => backgroundColor.value = value);
+    _updateEpisode(episode);
 
     myAudioHandler.setByEpisode(episode);
 
@@ -181,6 +176,12 @@ class PlayerController extends GetxController {
   void initProgress() {
     var pe = playlistEpisode.value;
     if (pe.guid == null) {
+      positionData.value = PositionData(
+        position: Duration.zero,
+        bufferedPosition: Duration.zero,
+        duration: Duration.zero,
+      );
+
       return;
     }
     positionData.value = PositionData(
@@ -199,12 +200,7 @@ class PlayerController extends GetxController {
 
   void clear() {
     pause();
-    positionData.value = PositionData(
-      position: Duration.zero,
-      bufferedPosition: Duration.zero,
-      duration: Duration.zero,
-    );
-    playlistEpisode.value = PlaylistEpisodeModel.empty();
+    _updateEpisode(PlaylistEpisodeModel.empty());
     player.value = PlayerModel.empty();
 
     helper.db.then((db) {
@@ -220,6 +216,26 @@ class PlayerController extends GetxController {
       pause();
     } else {
       play();
+    }
+  }
+
+  void _updateEpisode(PlaylistEpisodeModel episode) {
+    playlistEpisode.value = episode;
+    initProgress();
+
+    if (episode.imageUrl != null) {
+      updatePaletteGenerator(
+              CachedNetworkImageProvider(playlistEpisode.value.imageUrl!))
+          .then((value) => backgroundColor.value = value);
+    }
+    if (episode.rssFeedUrl != null) {
+      DatabaseHelper().db.then((db) {
+        SubscriptionModel.getOrFetch(db!, episode.rssFeedUrl!).then((s) {
+          if (s != null) {
+            channel.value = s;
+          }
+        });
+      });
     }
   }
 }

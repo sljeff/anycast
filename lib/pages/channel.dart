@@ -1,4 +1,5 @@
 import 'package:anycast/states/cardlist.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/player.dart';
@@ -123,22 +124,35 @@ class Channel extends StatelessWidget {
                                 Row(children: [
                                   SubscriptionButton(rssFeedUrl),
                                   const SizedBox(width: 12),
-                                  Container(
-                                      width: 40,
-                                      height: 40,
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: ShapeDecoration(
-                                        color: Colors.white.withOpacity(0.1),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(20),
+                                  GestureDetector(
+                                    onTap: () async {
+                                      var shareUrl = Uri(
+                                          scheme: 'https',
+                                          host: 'share.anycast.website',
+                                          path: 'channel',
+                                          queryParameters: {
+                                            'rssfeedurl': rssFeedUrl,
+                                          });
+                                      await Share.share(
+                                          '${subscription.title}\n$shareUrl');
+                                    },
+                                    child: Container(
+                                        width: 40,
+                                        height: 40,
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: ShapeDecoration(
+                                          color: Colors.white.withOpacity(0.1),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
                                         ),
-                                      ),
-                                      child: const Iconify(
-                                        Ic.round_ios_share,
-                                        size: 24,
-                                        color: Colors.white,
-                                      )),
+                                        child: const Iconify(
+                                          Ic.round_ios_share,
+                                          size: 24,
+                                          color: Colors.white,
+                                        )),
+                                  ),
                                 ]),
                               ],
                             ),
