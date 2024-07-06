@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:anycast/models/playlist_episode.dart';
+import 'package:anycast/states/cache.dart';
 import 'package:anycast/states/player.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 class PositionData {
   final Duration position;
@@ -85,15 +87,11 @@ class MyAudioHandler extends BaseAudioHandler {
   }
 
   Future<void> setByEpisode(PlaylistEpisodeModel episode) async {
-    if (mediaItem.value?.id == episode.enclosureUrl) {
-      return;
-    }
+    await autoSet(
+        url: episode.enclosureUrl!,
+        initialPosition: Duration(milliseconds: episode.playedDuration!));
 
-    var source = _createAudioSource(episode.toMediaItem());
-
-    await _player.setAudioSource(source,
-        initialPosition: Duration(milliseconds: episode.playedDuration ?? 0));
-    mediaItem.add(source.tag as MediaItem);
+    mediaItem.add(episode.toMediaItem());
   }
 
   Future<void> seekAndPlayByEpisode(
@@ -105,13 +103,8 @@ class MyAudioHandler extends BaseAudioHandler {
       return;
     }
 
-    var source = _createAudioSource(episode.toMediaItem());
-
-    await _player.setAudioSource(source,
-        initialPosition: Duration(milliseconds: position.inMilliseconds));
-    mediaItem.add(source.tag as MediaItem);
-
-    play();
+    episode.playedDuration = position.inMilliseconds;
+    playByEpisode(episode);
   }
 
   @override
@@ -198,11 +191,32 @@ class MyAudioHandler extends BaseAudioHandler {
     await super.skipToPrevious();
   }
 
-  UriAudioSource _createAudioSource(MediaItem item) {
-    return ProgressiveAudioSource(Uri.parse(item.id), tag: item);
-  }
-
   void setSkipSilence(bool skipSilence) {
     _player.setSkipSilenceEnabled(skipSilence);
+  }
+
+  Future<void> autoSet({
+    required String url,
+    String? path,
+    bool preload = true,
+    Duration initialPosition = Duration.zero,
+  }) async {
+    var controller = Get.find<CacheController>();
+
+    var info = await DefaultCacheManager().getFileFromCache(url);
+    if (info != null) {
+      _player.setFilePath(info.file.path,
+          preload: preload, initialPosition: initialPosition);
+
+      controller.set(url, info);
+      return;
+    }
+
+    _player.setUrl(url, preload: preload, initialPosition: initialPosition);
+    DefaultCacheManager()
+        .getFileStream(url, withProgress: true)
+        .listen((event) {
+      controller.set(url, event);
+    });
   }
 }

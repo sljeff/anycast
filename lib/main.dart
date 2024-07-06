@@ -1,3 +1,4 @@
+import 'package:anycast/states/cache.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/subscription.dart';
@@ -47,6 +48,7 @@ class NavigationBarApp extends StatelessWidget {
     Get.put(SubscriptionController());
     Get.put(PlayerController());
     Get.put(PlaylistController());
+    Get.put(CacheController());
     return GetMaterialApp(
       theme: ThemeData(
         appBarTheme: const AppBarTheme(

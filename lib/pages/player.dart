@@ -196,20 +196,18 @@ class PlayerMain extends GetView<PlayerController> {
                   right: 4,
                   child: GestureDetector(
                     onTap: () {
+                      var episode = controller.playlistEpisode.value;
                       var shareUrl = Uri(
                         scheme: 'https',
                         host: 'share.anycast.website',
                         path: 'player',
                         queryParameters: {
-                          'rssfeedurl': controller.channel.value.rssFeedUrl,
-                          'enclosureurl':
-                              controller.playlistEpisode.value.enclosureUrl,
+                          'rssfeedurl': episode.rssFeedUrl,
+                          'enclosureurl': episode.enclosureUrl,
                         },
                       );
 
-                      Share.share(
-                        '${controller.playlistEpisode.value.title}\n\n$shareUrl',
-                      );
+                      Share.share('${episode.title}\n\n$shareUrl');
                     },
                     child: Container(
                       alignment: Alignment.center,

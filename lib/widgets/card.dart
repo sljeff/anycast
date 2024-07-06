@@ -10,6 +10,7 @@ import 'package:anycast/models/episode.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/states/cache.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/player.dart';
@@ -21,6 +22,9 @@ import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/icon_park_solid.dart';
+import 'package:percent_indicator/percent_indicator.dart';
 
 class Card extends StatelessWidget {
   final Episode episode;
@@ -212,7 +216,33 @@ class Card extends StatelessWidget {
                         ],
                       ),
                     ),
-                  )
+                  ),
+                  Positioned(
+                      right: 12,
+                      bottom: 16,
+                      child: episode is! PlaylistEpisodeModel
+                          ? const SizedBox.shrink()
+                          : Obx(() {
+                              var controller = Get.find<CacheController>();
+                              var progress =
+                                  controller.get(episode.enclosureUrl!);
+                              if (progress == null) {
+                                return const SizedBox.shrink();
+                              }
+                              if (progress >= 1) {
+                                return Iconify(
+                                  IconParkSolid.check_one,
+                                  color: Colors.green.withOpacity(0.7),
+                                  size: 16,
+                                );
+                              }
+                              return CircularPercentIndicator(
+                                radius: 8,
+                                lineWidth: 3,
+                                percent: progress,
+                                progressColor: Colors.blue,
+                              );
+                            })),
                 ],
               ),
             ),

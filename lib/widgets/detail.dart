@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
+import 'package:share_plus/share_plus.dart';
 
 class Detail extends StatelessWidget {
   final Episode episode;
@@ -134,6 +135,19 @@ class Detail extends StatelessWidget {
                             ),
                             const SizedBox(width: 12),
                             GestureDetector(
+                              onTap: () {
+                                var shareUrl = Uri(
+                                  scheme: 'https',
+                                  host: 'share.anycast.website',
+                                  path: 'player',
+                                  queryParameters: {
+                                    'rssfeedurl': episode.rssFeedUrl!,
+                                    'enclosureurl': episode.enclosureUrl!,
+                                  },
+                                );
+
+                                Share.share('${episode.title}\n\n$shareUrl');
+                              },
                               child: Container(
                                 width: 40,
                                 height: 40,
