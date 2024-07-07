@@ -25,7 +25,7 @@ class FeedEpisodeController extends GetxController {
     load(episodes);
     autoFetch();
 
-    Timer.periodic(const Duration(seconds: 180), (timer) async {
+    Timer.periodic(const Duration(seconds: 300), (timer) async {
       autoFetch();
     });
   }
@@ -105,6 +105,11 @@ class FeedEpisodeController extends GetxController {
     var now = DateTime.now();
     var db = await DatabaseHelper().db;
     var subcriptions = await SubscriptionModel.listAll(db!);
+
+    if (subcriptions.isEmpty) {
+      return;
+    }
+
     var latestUpdateTSs =
         subcriptions.map((subscription) => subscription.lastUpdated);
     var latestUpdateTS = latestUpdateTSs.reduce((a, b) {

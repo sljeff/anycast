@@ -7,6 +7,8 @@ import 'package:anycast/states/import_block.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
+import 'package:anycast/widgets/animation.dart';
+import 'package:anycast/widgets/bottom_nav_bar.dart';
 import 'package:anycast/widgets/card.dart' as card;
 import 'package:get/get.dart';
 import 'package:anycast/states/feed_episode.dart';
@@ -43,6 +45,7 @@ class Feeds extends StatelessWidget {
             itemCount: episodes.length,
             itemBuilder: (context, index) {
               var ep = episodes[index];
+              var key = GlobalKey();
               return card.Card(
                 episode: ep,
                 index: index,
@@ -58,8 +61,29 @@ class Feeds extends StatelessWidget {
                     },
                   ),
                   card.CardBtn(
+                    key: key,
                     icon: const Iconify(Ic.round_playlist_add),
                     onPressed: () {
+                      if (key.currentContext != null) {
+                        // icon in screen, show animation
+                        var currentContext = key.currentContext!;
+                        var r = currentContext.findRenderObject() as RenderBox;
+                        var startOffset =
+                            r.localToGlobal(r.size.center(Offset.zero));
+                        var endOffset = BottomNavBar.getPlaylistPosition();
+                        OverlayEntry? entry;
+                        entry = OverlayEntry(
+                          builder: (context) => AnimatedPlaylistIndicator(
+                            startPosition: startOffset,
+                            endPosition: endOffset,
+                            onAnimationComplete: () {
+                              entry?.remove();
+                            },
+                          ),
+                        );
+                        Overlay.of(context).insert(entry);
+                      }
+
                       controller.addToPlaylist(1, ep).then((pe) {
                         controller.removeByGuids([ep.guid!]);
                       });

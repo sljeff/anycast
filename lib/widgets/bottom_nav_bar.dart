@@ -12,9 +12,15 @@ import 'package:remixicon/remixicon.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 
 class BottomNavBar extends GetView<HomeTabController> {
-  final playerController = Get.find<PlayerController>();
+  static final playerController = Get.find<PlayerController>();
+  static final playlistKey = GlobalKey();
 
-  BottomNavBar({super.key});
+  const BottomNavBar({super.key});
+
+  static Offset getPlaylistPosition() {
+    var r = playlistKey.currentContext?.findRenderObject() as RenderBox;
+    return r.localToGlobal(r.size.center(Offset.zero));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,30 +40,29 @@ class BottomNavBar extends GetView<HomeTabController> {
           const PlayerBar(),
           Container(
             height: 96,
+            width: double.infinity,
             padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Expanded(
-                    child: BarIcon(
+                const BarIcon(
                   icon: Icons.home_rounded,
                   index: 0,
                   text: 'Podcast',
-                )),
-                const Expanded(
-                    child: BarIcon(
+                ),
+                BarIcon(
+                  key: playlistKey,
                   icon: Icons.video_library_rounded,
                   index: 1,
                   text: 'Playlist',
-                )),
-                Expanded(
-                    child: BarIcon(
+                ),
+                BarIcon(
                   icon: MdiIcons.cloudSearch,
                   index: 2,
                   text: 'Discover',
-                )),
+                ),
               ],
             ),
           ),
@@ -98,6 +103,7 @@ class PlayerBar extends GetView<PlayerController> {
           context.pushTransparentRoute(const PlayerPage());
         },
         child: Container(
+          height: 56,
           margin: const EdgeInsets.only(left: 12, right: 12),
           decoration: ShapeDecoration(
             color: Colors.white.withOpacity(0.1),
@@ -268,6 +274,7 @@ class BarIcon extends GetView<HomeTabController> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
+                alignment: Alignment.center,
                 width: 48,
                 height: 48,
                 decoration: ShapeDecoration(
@@ -275,39 +282,10 @@ class BarIcon extends GetView<HomeTabController> {
                     borderRadius: BorderRadius.circular(36),
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  icon,
-                                  color: color,
-                                  size: 24,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 24,
                 ),
               ),
               Text(
