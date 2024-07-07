@@ -39,4 +39,12 @@ class CacheController extends GetxController {
   void set(String key, FileResponse value) {
     key2FileResponse[key] = value;
   }
+
+  void download(String url) {
+    DefaultCacheManager()
+        .getFileStream(url, withProgress: true)
+        .listen((event) {
+      set(url, event);
+    });
+  }
 }

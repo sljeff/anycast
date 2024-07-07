@@ -54,7 +54,6 @@ class ChannelController extends GetxController {
 
   void subscribe() {
     subscribed.value = true;
-    subscriptionController.addMany([channel.value]);
     // add newest episode to feed
     if (episodes.isNotEmpty) {
       var newestEpisode = episodes.first;
@@ -62,7 +61,9 @@ class ChannelController extends GetxController {
         newestEpisode = episodes.last;
       }
       Get.find<FeedEpisodeController>().addMany([newestEpisode]);
+      channel.value.lastUpdated = newestEpisode.pubDate;
     }
+    subscriptionController.addMany([channel.value]);
   }
 
   void unsubscribe() {

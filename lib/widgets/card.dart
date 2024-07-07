@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/icons/icon_park_solid.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 
@@ -227,7 +228,25 @@ class Card extends StatelessWidget {
                               var progress =
                                   controller.get(episode.enclosureUrl!);
                               if (progress == null) {
-                                return const SizedBox.shrink();
+                                return GestureDetector(
+                                  onTap: () {
+                                    controller.download(episode.enclosureUrl!);
+                                  },
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.blue.withOpacity(0.7),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: const Iconify(
+                                      Ic.round_download,
+                                      color: Colors.white,
+                                      size: 12,
+                                    ),
+                                  ),
+                                );
                               }
                               if (progress >= 1) {
                                 return Iconify(
