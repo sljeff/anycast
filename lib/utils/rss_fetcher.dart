@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
@@ -24,12 +25,29 @@ Future<List<PodcastImportData>> importPodcastsByUrls(List<String> rssFeedUrls) {
   return fetchPodcastsByUrls(rssFeedUrls);
 }
 
-Future<List<PodcastImportData>> fetchPodcastsByUrls(List<String> rssFeedUrls,
-    {bool onlyFistEpisode = true}) async {
+Future<List<PodcastImportData>> fetchPodcastsByUrls(
+  List<String> rssFeedUrls, {
+  bool onlyFistEpisode = true,
+}) async {
+  // use isolate
+  final ReceivePort receivePort = ReceivePort();
+  await Isolate.spawn(_fetchPodcastsByUrls, [
+    rssFeedUrls,
+    onlyFistEpisode,
+    receivePort.sendPort,
+  ]);
+
+  return (await receivePort.first) as List<PodcastImportData>;
+}
+
+void _fetchPodcastsByUrls(List<dynamic> args) async {
+  var rssFeedUrls = args[0] as List<String>;
+  var onlyFistEpisode = args[1] as bool;
+  var sendPort = args[2] as SendPort;
+
   List<PodcastImportData> podcasts = [];
 
   var responses = await fetchConcurrentWithRetry(rssFeedUrls);
-
   var result = responses.entries.map((entry) {
     var rssFeedUrl = entry.key;
     var response = entry.value;
@@ -85,7 +103,7 @@ Future<List<PodcastImportData>> fetchPodcastsByUrls(List<String> rssFeedUrls,
     podcasts.add(podcast);
   }
 
-  return podcasts;
+  Isolate.exit(sendPort, podcasts);
 }
 
 String htmlToText(String? html) {
