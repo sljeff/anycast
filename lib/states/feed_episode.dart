@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
+import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/utils/audio_handler.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class FeedEpisodeController extends GetxController {
@@ -11,11 +15,19 @@ class FeedEpisodeController extends GetxController {
 
   final DatabaseHelper helper = DatabaseHelper();
   final MyAudioHandler audioHandler = MyAudioHandler();
+  final scrollController = ScrollController();
+  final GlobalKey<RefreshIndicatorState> refreshIndicatorKey =
+      GlobalKey<RefreshIndicatorState>();
 
   @override
   void onInit() {
     super.onInit();
     load(episodes);
+    autoFetch();
+
+    Timer.periodic(const Duration(seconds: 180), (timer) async {
+      autoFetch();
+    });
   }
 
   void addMany(List<FeedEpisodeModel> episodes) {
@@ -87,5 +99,25 @@ class FeedEpisodeController extends GetxController {
     var playlistEpisodeController = Get.find<PlaylistController>()
         .getEpisodeControllerByPlaylistId(playlistId);
     return await playlistEpisodeController.add(0, playlistEpisode);
+  }
+
+  void autoFetch() async {
+    var now = DateTime.now();
+    var db = await DatabaseHelper().db;
+    var subcriptions = await SubscriptionModel.listAll(db!);
+    var latestUpdateTSs =
+        subcriptions.map((subscription) => subscription.lastUpdated);
+    var latestUpdateTS = latestUpdateTSs.reduce((a, b) {
+      if (a == null) return b;
+      if (b == null) return a;
+      return a.compareTo(b) > 0 ? a : b;
+    });
+    var latestUpdateTime = latestUpdateTS != null
+        ? DateTime.fromMillisecondsSinceEpoch(latestUpdateTS)
+        : now;
+
+    if (latestUpdateTime.isBefore(now.subtract(const Duration(hours: 2)))) {
+      refreshIndicatorKey.currentState?.show();
+    }
   }
 }

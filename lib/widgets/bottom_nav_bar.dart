@@ -1,5 +1,6 @@
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/pages/player.dart';
+import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/widgets/play_icon.dart';
@@ -246,7 +247,21 @@ class BarIcon extends GetView<HomeTabController> {
           isSelected ? const Color(0xFF6EE7B7) : const Color(0xFF6b7280);
 
       return GestureDetector(
-          onTap: () => controller.onItemTapped(index),
+          onTap: () {
+            if (index == 0 && controller.selectedIndex.value == 0) {
+              var feedController = Get.find<FeedEpisodeController>();
+              if (!feedController.scrollController.hasClients ||
+                  feedController.scrollController.offset == 0) {
+                feedController.refreshIndicatorKey.currentState?.show();
+              } else {
+                feedController.scrollController.animateTo(0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut);
+              }
+            }
+
+            controller.onItemTapped(index);
+          },
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.start,

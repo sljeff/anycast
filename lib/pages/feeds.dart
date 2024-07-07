@@ -27,14 +27,17 @@ class Feeds extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 24, right: 24),
-      child: Obx(() {
-        var episodes = controller.episodes;
-        if (episodes.isEmpty) {
-          return ImportBlock();
-        }
-        return RefreshIndicator(
-          onRefresh: fetchNewEpisodes,
-          child: ListView.separated(
+      child: RefreshIndicator(
+        onRefresh: fetchNewEpisodes,
+        key: controller.refreshIndicatorKey,
+        child: Obx(() {
+          var episodes = controller.episodes;
+          if (episodes.isEmpty) {
+            return ImportBlock();
+          }
+          return ListView.separated(
+            controller: controller.scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(top: 12),
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemCount: episodes.length,
@@ -71,9 +74,9 @@ class Feeds extends StatelessWidget {
                 ],
               );
             },
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 }
@@ -228,6 +231,9 @@ Future<List<String>> parseOMPL(String? path) async {
 
 Future<void> fetchNewEpisodes() async {
   var subscriptions = Get.find<SubscriptionController>().subscriptions;
+  if (subscriptions.isEmpty) {
+    return;
+  }
   var urls = subscriptions.map((e) => e.rssFeedUrl!).toList();
 
   var episodes = await fetchPodcastsByUrls(urls, onlyFistEpisode: false);
