@@ -1,3 +1,4 @@
+import 'package:anycast/api/share.dart';
 import 'package:anycast/models/episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
@@ -146,7 +147,13 @@ class Detail extends StatelessWidget {
                                   },
                                 );
 
-                                Share.share('${episode.title}\n\n$shareUrl');
+                                getShortUrl(shareUrl).then((value) {
+                                  var finalUrl = shareUrl.toString();
+                                  if (value != null) {
+                                    finalUrl = value;
+                                  }
+                                  Share.share('${episode.title}\n\n$finalUrl');
+                                });
                               },
                               child: Container(
                                 width: 40,

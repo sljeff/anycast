@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:anycast/api/share.dart';
 import 'package:anycast/api/subtitles.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
@@ -207,7 +208,13 @@ class PlayerMain extends GetView<PlayerController> {
                         },
                       );
 
-                      Share.share('${episode.title}\n\n$shareUrl');
+                      getShortUrl(shareUrl).then((value) {
+                        var finalUrl = shareUrl.toString();
+                        if (value != null) {
+                          finalUrl = value;
+                        }
+                        Share.share('${episode.title}\n\n$finalUrl');
+                      });
                     },
                     child: Container(
                       alignment: Alignment.center,

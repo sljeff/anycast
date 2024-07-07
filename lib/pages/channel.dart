@@ -1,3 +1,4 @@
+import 'package:anycast/api/share.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:anycast/states/channel.dart';
@@ -133,8 +134,14 @@ class Channel extends StatelessWidget {
                                           queryParameters: {
                                             'rssfeedurl': rssFeedUrl,
                                           });
-                                      await Share.share(
-                                          '${subscription.title}\n$shareUrl');
+                                      getShortUrl(shareUrl).then((value) {
+                                        var finalUrl = shareUrl.toString();
+                                        if (value != null) {
+                                          finalUrl = value;
+                                        }
+                                        Share.share(
+                                            '${subscription.title}\n$finalUrl');
+                                      });
                                     },
                                     child: Container(
                                         width: 40,
@@ -209,9 +216,9 @@ class Channel extends StatelessWidget {
                                         controller.channel.value.rssFeedUrl!));
                                 Get.snackbar(
                                   'Copied',
-                                  'RSS Feed URL copied to clipboard',
+                                  'OK',
                                   snackPosition: SnackPosition.BOTTOM,
-                                  duration: const Duration(seconds: 1),
+                                  duration: const Duration(milliseconds: 500),
                                 );
                               },
                               child: Text(
@@ -367,22 +374,8 @@ class SubscriptionButton extends StatelessWidget {
           }
           if (subscribed) {
             controller.unsubscribe();
-            Get.snackbar(
-              'Success',
-              'Unsubscribed from ${controller.channel.value.title}',
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 1),
-            );
           } else {
             controller.subscribe();
-            Get.snackbar(
-              'Success',
-              'Subscribed to ${controller.channel.value.title}',
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 1),
-            );
           }
         },
         child: btn,

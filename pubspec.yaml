@@ -73,6 +73,8 @@ dependencies:
   palette_generator: ^0.3.3+3
   flutter_cache_manager: ^3.3.2
   percent_indicator: ^4.2.3
+  retry: ^3.1.2
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
