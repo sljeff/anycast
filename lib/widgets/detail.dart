@@ -3,7 +3,6 @@ import 'package:anycast/models/episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
 import 'package:anycast/states/channel.dart';
-import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/card.dart';
 import 'package:anycast/widgets/handler.dart';
@@ -104,16 +103,12 @@ class Detail extends StatelessWidget {
                                   const SizedBox(height: 4),
                                   GestureDetector(
                                     onTap: () {
-                                      var subscriptionController =
-                                          Get.find<SubscriptionController>();
-                                      var s = subscriptionController
-                                          .getByTitle(episode.channelTitle!);
-                                      if (s == null) {
-                                        s = SubscriptionModel.empty();
-                                        s.rssFeedUrl = episode.rssFeedUrl;
-                                      }
+                                      var s = SubscriptionModel.empty();
+                                      s.rssFeedUrl = episode.rssFeedUrl;
+                                      s.title = episode.channelTitle;
+                                      s.rssFeedUrl = episode.rssFeedUrl;
                                       Get.lazyPut(
-                                          () => ChannelController(channel: s!),
+                                          () => ChannelController(channel: s),
                                           tag: s.rssFeedUrl);
                                       context.pushTransparentRoute(
                                           Channel(rssFeedUrl: s.rssFeedUrl!));

@@ -8,7 +8,6 @@ import 'package:anycast/models/subscription.dart';
 import 'package:anycast/models/subtitle.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/player.dart';
-import 'package:anycast/states/subscription.dart';
 import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/utils/formatters.dart';
@@ -291,7 +290,7 @@ class TitleBar extends GetView<PlayerController> {
       if (imgUrl != '') {
         img = GestureDetector(
           onTap: () {
-            jumpToChannel(episode, context, channel: subscription);
+            jumpToChannel(episode, context, subscription);
           },
           child: CachedNetworkImage(
             imageUrl: imgUrl,
@@ -348,7 +347,7 @@ class TitleBar extends GetView<PlayerController> {
               const SizedBox(height: 6),
               GestureDetector(
                 onTap: () {
-                  jumpToChannel(episode, context, channel: subscription);
+                  jumpToChannel(episode, context, subscription);
                 },
                 child: SizedBox(
                   height: 24,
@@ -372,16 +371,8 @@ class TitleBar extends GetView<PlayerController> {
 }
 
 void jumpToChannel(PlaylistEpisodeModel episode, BuildContext context,
-    {SubscriptionModel? channel}) {
-  if (channel == null) {
-    var subscriptionController = Get.find<SubscriptionController>();
-    channel = subscriptionController.getByTitle(episode.channelTitle!);
-    if (channel == null) {
-      channel = SubscriptionModel.empty();
-      channel.rssFeedUrl = episode.rssFeedUrl;
-    }
-  }
-  Get.lazyPut(() => ChannelController(channel: channel!),
+    SubscriptionModel channel) {
+  Get.lazyPut(() => ChannelController(channel: channel),
       tag: channel.rssFeedUrl);
   context.pushTransparentRoute(Channel(rssFeedUrl: channel.rssFeedUrl!));
 }

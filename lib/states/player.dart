@@ -11,7 +11,6 @@ import 'package:anycast/states/history.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:anycast/utils/audio_handler.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
@@ -224,8 +223,7 @@ class PlayerController extends GetxController {
     initProgress();
 
     if (episode.imageUrl != null) {
-      updatePaletteGenerator(
-              CachedNetworkImageProvider(playlistEpisode.value.imageUrl!))
+      updatePaletteGenerator(playlistEpisode.value.imageUrl!)
           .then((value) => backgroundColor.value = value);
     }
     if (episode.rssFeedUrl != null) {

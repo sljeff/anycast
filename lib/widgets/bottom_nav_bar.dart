@@ -162,26 +162,22 @@ class PlayerBar extends GetView<PlayerController> {
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
-                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
                                   fontWeight: FontWeight.w500,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            Opacity(
-                              opacity: 0.50,
-                              child: Text(
-                                PlaylistEpisodeModel.getPlayedAndTotalTime(
-                                    postion.value.position.inMilliseconds,
-                                    postion.value.duration.inMilliseconds),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontFamily: 'PingFangSC-Regular,PingFang SC',
-                                  fontWeight: FontWeight.w400,
-                                ),
+                            Text(
+                              PlaylistEpisodeModel.getPlayedAndTotalTime(
+                                  postion.value.position.inMilliseconds,
+                                  postion.value.duration.inMilliseconds),
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
                               ),
+                              maxLines: 1,
                             ),
                           ],
                         ),

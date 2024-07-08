@@ -20,9 +20,11 @@ import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:palette_generator/palette_generator.dart';
 
-Future<Color> updatePaletteGenerator(ImageProvider imageProvider) async {
+Future<Color> updatePaletteGenerator(String imageUrl) async {
   final PaletteGenerator generator =
-      await PaletteGenerator.fromImageProvider(imageProvider);
+      await PaletteGenerator.fromImageProvider(CachedNetworkImageProvider(
+    imageUrl,
+  ));
   final Color dominantColor =
       generator.dominantColor?.color ?? const Color(0xFF111316);
 
@@ -45,6 +47,7 @@ class Channel extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         var subscription = controller.channel.value;
+        var height = MediaQuery.of(context).size.height;
 
         return DismissiblePage(
             direction: DismissiblePageDismissDirection.down,
@@ -56,7 +59,7 @@ class Channel extends StatelessWidget {
             child: Stack(
               children: [
                 Container(
-                  height: MediaQuery.of(context).size.height / 2,
+                  height: height / 2,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -73,7 +76,7 @@ class Channel extends StatelessWidget {
                   left: 0,
                   right: 0,
                   child: Container(
-                    height: MediaQuery.of(context).size.height / 2,
+                    height: height / 2,
                     color: const Color(0xFF111316),
                   ),
                 ),
@@ -165,21 +168,28 @@ class Channel extends StatelessWidget {
                             ),
                             const SizedBox(height: 12),
                             Column(children: [
-                              Container(
-                                width: 120,
-                                height: 120,
-                                decoration: ShapeDecoration(
-                                  image: DecorationImage(
-                                    image: CachedNetworkImageProvider(
-                                      controller.channel.value.imageUrl!,
+                              controller.channel.value.imageUrl == null
+                                  ? const Icon(
+                                      Icons.image,
+                                      color: Colors.white,
+                                      size: 120,
+                                    )
+                                  : Container(
+                                      width: 120,
+                                      height: 120,
+                                      decoration: ShapeDecoration(
+                                        image: DecorationImage(
+                                          image: CachedNetworkImageProvider(
+                                            controller.channel.value.imageUrl!,
+                                          ),
+                                          fit: BoxFit.fill,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                        ),
+                                      ),
                                     ),
-                                    fit: BoxFit.fill,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                              ),
                               const SizedBox(height: 12),
                               Text(
                                 controller.channel.value.title!,
@@ -196,7 +206,7 @@ class Channel extends StatelessWidget {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                controller.channel.value.author!,
+                                controller.channel.value.author ?? 'Unknown',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -237,7 +247,7 @@ class Channel extends StatelessWidget {
                             ),
                             const SizedBox(height: 12),
                             ExpandableText(
-                              subscription.description!,
+                              subscription.description ?? 'No description',
                               expandText: "show more",
                               collapseText: "show less",
                               maxLines: 2,
