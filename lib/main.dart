@@ -9,6 +9,7 @@ import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/widgets/bottom_nav_bar.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'pages/discover.dart';
@@ -17,6 +18,10 @@ import 'pages/podcasts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
   await AudioService.init(
     builder: () => MyAudioHandler(),
