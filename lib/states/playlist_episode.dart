@@ -25,7 +25,8 @@ class PlaylistEpisodeController extends GetxController {
   Future<PlaylistEpisodeModel> add(
       int position, PlaylistEpisodeModel episode) async {
     // if exist, only move it
-    var oldIndex = episodes.indexWhere((e) => e.guid == episode.guid);
+    var oldIndex =
+        episodes.indexWhere((e) => e.enclosureUrl == episode.enclosureUrl);
     if (oldIndex != -1) {
       var ep = episodes[oldIndex];
       if (oldIndex == position) {
@@ -46,21 +47,21 @@ class PlaylistEpisodeController extends GetxController {
     return episode;
   }
 
-  void remove(String guid) {
-    var oldIndex = episodes.indexWhere((e) => e.guid == guid);
+  void remove(String enclosureUrl) {
+    var oldIndex = episodes.indexWhere((e) => e.enclosureUrl == enclosureUrl);
     if (oldIndex == -1) {
       return;
     }
-    var enclosureUrl = episodes[oldIndex].enclosureUrl;
     episodes.removeAt(oldIndex);
-    Get.find<PlaylistController>().removeFromSet(enclosureUrl!);
+    Get.find<PlaylistController>().removeFromSet(enclosureUrl);
 
-    helper.db.then((db) => {PlaylistEpisodeModel.deleteByGuid(db!, guid)});
+    helper.db.then(
+        (db) => {PlaylistEpisodeModel.deleteByEnclosureUrl(db!, enclosureUrl)});
   }
 
   void removeTop() {
-    var guid = episodes[0].guid;
-    remove(guid!);
+    var url = episodes[0].enclosureUrl;
+    remove(url!);
   }
 
   Future<void> moveToTop(PlaylistEpisodeModel episode) async {

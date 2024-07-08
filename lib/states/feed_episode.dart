@@ -38,9 +38,9 @@ class FeedEpisodeController extends GetxController {
         });
   }
 
-  Future<void> removeByGuids(List<String> guids) async {
-    episodes.removeWhere((episode) => guids.contains(episode.guid));
-    helper.db.then((db) => {FeedEpisodeModel.removeByGuids(db!, guids)});
+  Future<void> removeByEnclosureUrls(List<String> urls) async {
+    episodes.removeWhere((episode) => urls.contains(episode.enclosureUrl));
+    helper.db.then((db) => {FeedEpisodeModel.removeByEnclosureUrls(db!, urls)});
   }
 
   void load(List<FeedEpisodeModel> episodes) {
@@ -57,7 +57,6 @@ class FeedEpisodeController extends GetxController {
         PlaylistEpisodeModel.fromMap(Map<String, dynamic>.from({
       'title': episode.title,
       'description': episode.description,
-      'guid': episode.guid,
       'duration': episode.duration,
       'enclosureUrl': episode.enclosureUrl,
       'pubDate': episode.pubDate,
@@ -80,7 +79,8 @@ class FeedEpisodeController extends GetxController {
     var position = 0;
     var playerController = Get.find<PlayerController>();
     if (playerController.player.value.currentPlaylistId == playlistId) {
-      if (playerController.playlistEpisode.value.guid == episode.guid) {
+      if (playerController.playlistEpisode.value.enclosureUrl ==
+          episode.enclosureUrl) {
         return playerController.playlistEpisode.value;
       }
       position = 1;

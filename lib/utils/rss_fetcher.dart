@@ -82,7 +82,6 @@ void _fetchPodcastsByUrls(List<dynamic> args) async {
       var feedEpisode = FeedEpisodeModel.fromMap(Map<String, dynamic>.from({
         'title': item.title?.trim(),
         'description': item.itunes?.summary?.trim() ?? item.description?.trim(),
-        'guid': item.guid,
         'duration': item.itunes?.duration?.inMilliseconds,
         'enclosureUrl': item.enclosure?.url,
         'pubDate': item.pubDate?.millisecondsSinceEpoch,

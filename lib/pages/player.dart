@@ -390,7 +390,7 @@ class MyProgressBar extends GetView<PlayerController> {
         var duration = controller.positionData.value.duration;
         var position = controller.positionData.value.position;
         var bufferedPosition = controller.positionData.value.bufferedPosition;
-        if (controller.playlistEpisode.value.guid != null &&
+        if (controller.playlistEpisode.value.enclosureUrl != null &&
             controller.positionData.value.duration == Duration.zero) {
           controller.initProgress();
         }

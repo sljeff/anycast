@@ -9,7 +9,6 @@ Future<void> feedEpisodeTableCreator(DatabaseExecutor db) {
       id INTEGER PRIMARY KEY,
       title TEXT,
       description TEXT,
-      guid TEXT UNIQUE,
       duration INTEGER,
       enclosureUrl TEXT UNIQUE,
       pubDate INTEGER,
@@ -27,7 +26,6 @@ class FeedEpisodeModel extends Episode {
       'rssFeedUrl': rssFeedUrl,
       'title': title,
       'description': description,
-      'guid': guid,
       'duration': duration,
       'enclosureUrl': enclosureUrl,
       'pubDate': pubDate,
@@ -46,7 +44,6 @@ class FeedEpisodeModel extends Episode {
     rssFeedUrl = map['rssFeedUrl'];
     title = map['title'];
     description = map['description'];
-    guid = map['guid'];
     duration = map['duration'];
     enclosureUrl = map['enclosureUrl'];
     pubDate = map['pubDate'];
@@ -71,11 +68,11 @@ class FeedEpisodeModel extends Episode {
     }
   }
 
-  static Future<void> removeByGuids(
-      DatabaseExecutor db, List<String> guids) async {
+  static Future<void> removeByEnclosureUrls(
+      DatabaseExecutor db, List<String> enclosureUrls) async {
     await db.rawDelete(
-        'DELETE FROM $tableName WHERE guid IN (${guids.map((e) => '?').join(',')})',
-        guids);
+      'DELETE FROM $tableName WHERE enclosureUrl IN (${enclosureUrls.map((e) => '?').join(',')})',
+    );
   }
 
   static Future<void> insertMany(

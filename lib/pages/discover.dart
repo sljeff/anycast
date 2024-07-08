@@ -1,15 +1,22 @@
+import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/discover.dart';
 import 'package:anycast/api/podcasts.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/states/feed_episode.dart';
+import 'package:anycast/states/player.dart';
+import 'package:anycast/states/playlist.dart';
 import 'package:anycast/widgets/appbar.dart';
 import 'package:anycast/widgets/card.dart' as card;
 import 'package:anycast/widgets/card.dart';
 import 'package:anycast/widgets/handler.dart';
+import 'package:anycast/widgets/play_icon.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/ic.dart';
 
 class Discover extends StatelessWidget {
   final DiscoverController controller = Get.put(DiscoverController());
@@ -91,16 +98,21 @@ class DiscoverBody extends StatelessWidget {
   }
 }
 
-class SearchPage extends GetView<DiscoverController> {
-  const SearchPage({super.key});
+class SearchPage extends StatelessWidget {
+  final String searchText;
+
+  const SearchPage({super.key, required this.searchText});
 
   @override
   Widget build(BuildContext context) {
+    var clController = Get.put(CardListController());
+
     return DismissiblePage(
       backgroundColor: const Color(0xFF111316),
       isFullScreen: false,
       direction: DismissiblePageDismissDirection.down,
       onDismissed: () {
+        clController.close();
         Get.back();
       },
       child: Column(
@@ -128,7 +140,7 @@ class SearchPage extends GetView<DiscoverController> {
               ),
               const SizedBox(width: 8),
               Text(
-                controller.searchText.value,
+                searchText,
                 style: TextStyle(
                     color: const Color(0xFF6EE7B7),
                     fontSize: 16,
@@ -140,47 +152,159 @@ class SearchPage extends GetView<DiscoverController> {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: Obx(
-              () => FutureBuilder(
-                future: searchChannels(controller.searchText.value),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                  var subscriptions = snapshot.data!;
-                  if (subscriptions.isEmpty) {
-                    return const Center(
-                      child: Text('No results'),
-                    );
-                  }
-                  return ListView.separated(
-                      padding:
-                          const EdgeInsets.only(left: 12, right: 12, top: 12),
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 12),
-                      itemCount: subscriptions.length,
-                      itemBuilder: (context, index) {
-                        return GestureDetector(
-                          onTap: () {
-                            Get.lazyPut(
-                                () => ChannelController(
-                                    channel: subscriptions[index]),
-                                tag: subscriptions[index].rssFeedUrl);
-                            context.pushTransparentRoute(Channel(
-                              rssFeedUrl: subscriptions[index].rssFeedUrl!,
-                            ));
+            child: DefaultTabController(
+              length: 2,
+              child: Column(
+                children: [
+                  Material(
+                    child: TabBar(
+                      tabs: const [
+                        Tab(text: 'Channels'),
+                        Tab(text: 'Episodes'),
+                      ],
+                      indicatorColor: const Color(0xFF6EE7B7),
+                      labelColor: const Color(0xFF6EE7B7),
+                      unselectedLabelColor: Colors.white,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontFamily: GoogleFonts.comfortaa().fontFamily,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      unselectedLabelStyle: TextStyle(
+                        fontSize: 12,
+                        fontFamily: GoogleFonts.comfortaa().fontFamily,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        FutureBuilder(
+                          future: searchChannels(searchText),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            var subscriptions = snapshot.data!;
+                            if (subscriptions.isEmpty) {
+                              return const Center(
+                                child: Text('No results'),
+                              );
+                            }
+                            return ListView.separated(
+                                padding: const EdgeInsets.only(
+                                    left: 12, right: 12, top: 12),
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 12),
+                                itemCount: subscriptions.length,
+                                itemBuilder: (context, index) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Get.lazyPut(
+                                          () => ChannelController(
+                                              channel: subscriptions[index]),
+                                          tag: subscriptions[index].rssFeedUrl);
+                                      context.pushTransparentRoute(Channel(
+                                        rssFeedUrl:
+                                            subscriptions[index].rssFeedUrl!,
+                                      ));
+                                    },
+                                    child: card.PodcastCard(
+                                      subscription: subscriptions[index],
+                                    ),
+                                  );
+                                });
                           },
-                          child: card.PodcastCard(
-                            subscription: subscriptions[index],
-                          ),
-                        );
-                      });
-                },
+                        ),
+                        FutureBuilder(
+                          future: searchEpisodes(searchText),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            var episodes = snapshot.data!;
+                            if (episodes.isEmpty) {
+                              return const Center(
+                                child: Text('No results'),
+                              );
+                            }
+                            return ListView.separated(
+                                padding: const EdgeInsets.only(
+                                    left: 12, right: 12, top: 12),
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 12),
+                                itemCount: episodes.length,
+                                itemBuilder: (context, index) {
+                                  var ep = episodes[index].episode!;
+                                  return Obx(
+                                    () {
+                                      var playlistController =
+                                          Get.find<PlaylistController>();
+                                      var playerController =
+                                          Get.find<PlayerController>();
+                                      var feedsController =
+                                          Get.find<FeedEpisodeController>();
+                                      var inPlaylist = playlistController
+                                          .isInPlaylists(ep.enclosureUrl!);
+                                      var playing =
+                                          playerController.isPlaying.value &&
+                                              ep.enclosureUrl ==
+                                                  playerController
+                                                      .playlistEpisode
+                                                      .value
+                                                      .enclosureUrl;
+
+                                      return card.Card(
+                                        episode: ep,
+                                        index: index,
+                                        clController: clController,
+                                        actions: [
+                                          card.CardBtn(
+                                            icon: PlayIcon(
+                                                enclosureUrl: ep.enclosureUrl!),
+                                            onPressed: () {
+                                              if (playing) {
+                                                playerController.pause();
+                                              } else {
+                                                feedsController
+                                                    .addToTop(1, ep)
+                                                    .then((pe) {
+                                                  Get.find<PlayerController>()
+                                                      .playByEpisode(pe);
+                                                });
+                                              }
+                                            },
+                                          ),
+                                          card.CardBtn(
+                                            icon: inPlaylist
+                                                ? const Iconify(
+                                                    Ic.round_playlist_add_check)
+                                                : const Iconify(
+                                                    Ic.round_playlist_add),
+                                            onPressed: () {
+                                              feedsController.addToPlaylist(
+                                                  1, ep);
+                                            },
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+          )
         ],
       ),
     );

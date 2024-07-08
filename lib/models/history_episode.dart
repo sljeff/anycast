@@ -9,7 +9,6 @@ Future<void> historyEpisodeTableCreator(DatabaseExecutor db) {
       id INTEGER PRIMARY KEY,
       title TEXT,
       description TEXT,
-      guid TEXT UNIQUE,
       duration INTEGER,
       enclosureUrl TEXT UNIQUE,
       pubDate INTEGER,
@@ -27,7 +26,6 @@ class HistoryEpisodeModel extends Episode {
       'rssFeedUrl': rssFeedUrl,
       'title': title,
       'description': description,
-      'guid': guid,
       'duration': duration,
       'enclosureUrl': enclosureUrl,
       'pubDate': pubDate,
@@ -46,7 +44,6 @@ class HistoryEpisodeModel extends Episode {
     rssFeedUrl = map['rssFeedUrl'];
     title = map['title'];
     description = map['description'];
-    guid = map['guid'];
     duration = map['duration'];
     enclosureUrl = map['enclosureUrl'];
     pubDate = map['pubDate'];

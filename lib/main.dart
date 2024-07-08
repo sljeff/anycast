@@ -118,7 +118,7 @@ class NavigationBarApp extends StatelessWidget {
             ],
           ),
         ),
-        bottomNavigationBar: BottomNavBar(),
+        bottomNavigationBar: const BottomNavBar(),
       ),
     );
   }

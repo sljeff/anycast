@@ -85,7 +85,7 @@ class SearchBar extends GetView<DiscoverController> {
         },
         onSubmitted: (value) {
           controller.searchText.value = value;
-          context.pushTransparentRoute(const SearchPage());
+          context.pushTransparentRoute(SearchPage(searchText: value));
         },
         controller: controller.searchController,
         style: const TextStyle(

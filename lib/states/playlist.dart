@@ -64,12 +64,6 @@ class PlaylistController extends GetxController {
     return episodeEnclosureSet.contains(enclosureUrl);
   }
 
-  Future<void> removeByGuid(String guid) async {
-    for (var controller in episodesControllers) {
-      controller.remove(guid);
-    }
-  }
-
   void addToSet(List<String> enclosureUrls) {
     episodeEnclosureSet.addAll(enclosureUrls);
   }

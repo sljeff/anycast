@@ -7,11 +7,12 @@ import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 
-class BottomNavBar extends GetView<HomeTabController> {
+class BottomNavBar extends StatelessWidget {
   static final playerController = Get.find<PlayerController>();
   static final playlistKey = GlobalKey();
 
@@ -80,7 +81,7 @@ class PlayerBar extends GetView<PlayerController> {
     return Obx(() {
       var episode = controller.playlistEpisode.value;
 
-      if (episode.guid == null) {
+      if (episode.enclosureUrl == null) {
         return const SizedBox.shrink();
       }
 
@@ -289,7 +290,7 @@ class BarIcon extends GetView<HomeTabController> {
                 style: TextStyle(
                   color: color,
                   fontSize: 12,
-                  fontFamily: 'Comfortaa',
+                  fontFamily: GoogleFonts.comfortaa().fontFamily,
                   fontWeight: FontWeight.w400,
                   height: 0,
                 ),

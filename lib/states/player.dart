@@ -45,7 +45,7 @@ class PlayerController extends GetxController {
         .getEpisodeControllerByPlaylistId(player.value.currentPlaylistId!);
 
     if (peController.episodes.isNotEmpty &&
-        playlistEpisode.value.guid == null) {
+        playlistEpisode.value.enclosureUrl == null) {
       _updateEpisode(peController.episodes[0]);
     }
 
@@ -64,7 +64,7 @@ class PlayerController extends GetxController {
       if (peController == null) {
         return;
       }
-      if (playlistEpisode.value.guid == null) {
+      if (playlistEpisode.value.enclosureUrl == null) {
         return;
       }
       peController.updatePlayedDuration(myAudioHandler.playedDuration);
@@ -154,7 +154,7 @@ class PlayerController extends GetxController {
 
   Future<void> play() async {
     if (myAudioHandler.audioSource == null) {
-      if (playlistEpisode.value.guid == null) {
+      if (playlistEpisode.value.enclosureUrl == null) {
         return;
       }
       playByEpisode(playlistEpisode.value);
@@ -166,7 +166,7 @@ class PlayerController extends GetxController {
   }
 
   Future<void> seek(Duration position) async {
-    if (playlistEpisode.value.guid == null) {
+    if (playlistEpisode.value.enclosureUrl == null) {
       return;
     }
     return myAudioHandler.seekAndPlayByEpisode(playlistEpisode.value, position);
@@ -174,7 +174,7 @@ class PlayerController extends GetxController {
 
   void initProgress() {
     var pe = playlistEpisode.value;
-    if (pe.guid == null) {
+    if (pe.enclosureUrl == null) {
       positionData.value = PositionData(
         position: Duration.zero,
         bufferedPosition: Duration.zero,
@@ -191,7 +191,8 @@ class PlayerController extends GetxController {
   }
 
   bool isPlayingEpisode(String enclosureUrl) {
-    if (playlistEpisode.value.guid == null || isPlaying.value == false) {
+    if (playlistEpisode.value.enclosureUrl == null ||
+        isPlaying.value == false) {
       return false;
     }
     return playlistEpisode.value.enclosureUrl == enclosureUrl;
@@ -208,7 +209,7 @@ class PlayerController extends GetxController {
   }
 
   void togglePlay() {
-    if (playlistEpisode.value.guid == null) {
+    if (playlistEpisode.value.enclosureUrl == null) {
       return;
     }
     if (isPlaying.value) {

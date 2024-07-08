@@ -238,7 +238,7 @@ class PlaylistEpisodesList extends StatelessWidget {
                       card.CardBtn(
                         icon: const Iconify(Ic.round_clear),
                         onPressed: () {
-                          controller.remove(episode.guid!);
+                          controller.remove(episode.enclosureUrl!);
                           if (index == 0) {
                             playerController.clear();
                           }

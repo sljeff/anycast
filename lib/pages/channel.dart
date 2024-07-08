@@ -431,8 +431,9 @@ class CardList extends StatelessWidget {
                           var inPlaylist = playlistController
                               .isInPlaylists(ep.enclosureUrl!);
                           var playing = playerController.isPlaying.value &&
-                              ep.guid ==
-                                  playerController.playlistEpisode.value.guid;
+                              ep.enclosureUrl ==
+                                  playerController
+                                      .playlistEpisode.value.enclosureUrl;
 
                           return card.Card(
                             episode: ep,

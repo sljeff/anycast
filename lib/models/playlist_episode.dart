@@ -10,7 +10,6 @@ Future<void> playlistEpisodeTableCreator(DatabaseExecutor db) {
       id INTEGER PRIMARY KEY,
       title TEXT,
       description TEXT,
-      guid TEXT UNIQUE,
       duration INTEGER,
       enclosureUrl TEXT UNIQUE,
       pubDate INTEGER,
@@ -38,7 +37,6 @@ class PlaylistEpisodeModel extends Episode {
       'playedDuration': playedDuration,
       'title': title,
       'description': description,
-      'guid': guid,
       'duration': duration,
       'enclosureUrl': enclosureUrl,
       'pubDate': pubDate,
@@ -62,7 +60,6 @@ class PlaylistEpisodeModel extends Episode {
     playedDuration = map['playedDuration'];
     title = map['title'];
     description = map['description'];
-    guid = map['guid'];
     duration = map['duration'];
     enclosureUrl = map['enclosureUrl'];
     pubDate = map['pubDate'];
@@ -137,14 +134,6 @@ class PlaylistEpisodeModel extends Episode {
     }
   }
 
-  static Future<PlaylistEpisodeModel> getByGuid(
-      DatabaseExecutor db, String guid) async {
-    return db.rawQuery('SELECT * FROM $tableName WHERE guid = ?', [guid]).then(
-        (List<Map<String, dynamic>> maps) {
-      return PlaylistEpisodeModel.fromMap(maps[0]);
-    });
-  }
-
   static Future<PlaylistEpisodeModel?> getByEnclosureUrl(
       DatabaseExecutor db, String enclosureUrl) async {
     return db.rawQuery('SELECT * FROM $tableName WHERE enclosureUrl = ?',
@@ -156,13 +145,15 @@ class PlaylistEpisodeModel extends Episode {
     });
   }
 
-  static Future<void> deleteByGuid(DatabaseExecutor db, String guid) async {
-    await db.delete(tableName, where: 'guid = ?', whereArgs: [guid]);
+  static Future<void> deleteByEnclosureUrl(
+      DatabaseExecutor db, String enclosureUrl) async {
+    await db.delete(tableName,
+        where: 'enclosureUrl = ?', whereArgs: [enclosureUrl]);
   }
 
   void updatePlayedDuration(DatabaseExecutor db) async {
     await db.update(tableName, {'playedDuration': playedDuration},
-        where: 'guid = ?', whereArgs: [guid]);
+        where: 'enclosureUrl = ?', whereArgs: [enclosureUrl]);
   }
 
   // format: 21:32 / 31:56

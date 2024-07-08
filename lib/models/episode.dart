@@ -3,7 +3,6 @@ class Episode {
   int? id;
   String? title;
   String? description;
-  String? guid;
   int? duration; // in milliseconds
   String? enclosureUrl;
   int? pubDate; // unix timestamp
