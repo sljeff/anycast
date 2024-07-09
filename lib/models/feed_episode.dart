@@ -72,6 +72,7 @@ class FeedEpisodeModel extends Episode {
       DatabaseExecutor db, List<String> enclosureUrls) async {
     await db.rawDelete(
       'DELETE FROM $tableName WHERE enclosureUrl IN (${enclosureUrls.map((e) => '?').join(',')})',
+      enclosureUrls,
     );
   }
 
