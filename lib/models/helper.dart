@@ -29,10 +29,10 @@ class DatabaseHelper {
 
   DatabaseHelper.internal();
 
-  Future<Database?> get db async {
-    if (_db != null) return _db;
+  Future<Database> get db async {
+    if (_db != null) return _db!;
     _db = await initDb();
-    return _db;
+    return _db!;
   }
 
   Future<Database> initDb() async {
@@ -54,6 +54,6 @@ class DatabaseHelper {
 
   Future close() async {
     var dbClient = await db;
-    return dbClient?.close();
+    return dbClient.close();
   }
 }

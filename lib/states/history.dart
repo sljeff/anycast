@@ -17,7 +17,7 @@ class HistoryController extends GetxController {
 
   Future<void> load() async {
     db.then((db) async {
-      episodes.value = await HistoryEpisodeModel.listAll(db!);
+      episodes.value = await HistoryEpisodeModel.listAll(db);
       isLoading.value = false;
     });
   }
@@ -26,7 +26,7 @@ class HistoryController extends GetxController {
     episodes.value = [];
 
     db.then((db) async {
-      await HistoryEpisodeModel.deleteAll(db!);
+      await HistoryEpisodeModel.deleteAll(db);
     });
   }
 
@@ -34,7 +34,7 @@ class HistoryController extends GetxController {
     episodes.removeWhere((e) => e.enclosureUrl == enclosureUrl);
 
     db.then((db) async {
-      await HistoryEpisodeModel.delete(db!, enclosureUrl);
+      await HistoryEpisodeModel.delete(db, enclosureUrl);
     });
   }
 
@@ -43,7 +43,7 @@ class HistoryController extends GetxController {
     episodes.insert(0, episode);
 
     db.then((db) async {
-      await HistoryEpisodeModel.insert(db!, episode);
+      await HistoryEpisodeModel.insert(db, episode);
     });
   }
 

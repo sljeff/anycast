@@ -11,7 +11,7 @@ class CacheController extends GetxController {
     super.onInit();
 
     DatabaseHelper().db.then((db) {
-      PlaylistEpisodeModel.listByPlaylistId(db!, 1).then((list) {
+      PlaylistEpisodeModel.listByPlaylistId(db, 1).then((list) {
         for (var e in list) {
           DefaultCacheManager().getFileFromCache(e.enclosureUrl!).then((info) {
             if (info != null) {

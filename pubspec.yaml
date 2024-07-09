@@ -75,6 +75,7 @@ dependencies:
   percent_indicator: ^4.2.3
   retry: ^3.1.2
   crypto: ^3.0.3
+  country_code_picker: ^3.0.0
 
 dev_dependencies:
   flutter_test:

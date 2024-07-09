@@ -16,7 +16,7 @@ class SubtitleController extends GetxController {
   void onInit() {
     super.onInit();
     helper.db.then((db) {
-      SubtitleModel.list(db!).then((urls) {
+      SubtitleModel.list(db).then((urls) {
         subtitleUrls.addAll(urls);
       });
     });
@@ -31,7 +31,7 @@ class SubtitleController extends GetxController {
               subtitleUrls[url] = 'succeeded';
               helper.db.then((db) {
                 SubtitleModel.insert(
-                    db!,
+                    db,
                     SubtitleModel.fromMap({
                       'enclosureUrl': url,
                       'status': 'succeeded',
@@ -41,7 +41,7 @@ class SubtitleController extends GetxController {
             } else if (result.status == 'failed') {
               subtitleUrls.remove(url);
               helper.db.then((db) {
-                SubtitleModel.delete(db!, url);
+                SubtitleModel.delete(db, url);
               });
             }
           }
@@ -54,7 +54,7 @@ class SubtitleController extends GetxController {
     subtitleUrls[url] = status;
     helper.db.then((db) {
       SubtitleModel.insert(
-          db!,
+          db,
           SubtitleModel.fromMap({
             'enclosureUrl': url,
             'status': status,
@@ -66,7 +66,7 @@ class SubtitleController extends GetxController {
   void remove(String url) {
     subtitleUrls.remove(url);
     helper.db.then((db) {
-      SubtitleModel.delete(db!, url);
+      SubtitleModel.delete(db, url);
     });
   }
 }

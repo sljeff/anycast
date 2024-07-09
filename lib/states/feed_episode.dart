@@ -32,7 +32,7 @@ class FeedEpisodeController extends GetxController {
 
   void addMany(List<FeedEpisodeModel> episodes) {
     helper.db.then((db) => {
-          FeedEpisodeModel.insertMany(db!, episodes).then((db) {
+          FeedEpisodeModel.insertMany(db, episodes).then((db) {
             load(episodes);
           })
         });
@@ -40,12 +40,12 @@ class FeedEpisodeController extends GetxController {
 
   Future<void> removeByEnclosureUrls(List<String> urls) async {
     episodes.removeWhere((episode) => urls.contains(episode.enclosureUrl));
-    helper.db.then((db) => {FeedEpisodeModel.removeByEnclosureUrls(db!, urls)});
+    helper.db.then((db) => {FeedEpisodeModel.removeByEnclosureUrls(db, urls)});
   }
 
   void load(List<FeedEpisodeModel> episodes) {
     helper.db.then((db) => {
-          FeedEpisodeModel.listAll(db!).then((episodes) {
+          FeedEpisodeModel.listAll(db).then((episodes) {
             this.episodes.value = episodes;
           })
         });
@@ -104,7 +104,7 @@ class FeedEpisodeController extends GetxController {
   void autoFetch() async {
     var now = DateTime.now();
     var db = await DatabaseHelper().db;
-    var subcriptions = await SubscriptionModel.listAll(db!);
+    var subcriptions = await SubscriptionModel.listAll(db);
 
     if (subcriptions.isEmpty) {
       return;

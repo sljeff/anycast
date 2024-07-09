@@ -604,7 +604,7 @@ class Subtitles extends GetView<SubtitleController> {
         return SingleChildScrollView(
           child: FutureBuilder(
             future: helper.db.then((db) {
-              return SubtitleModel.get(db!, url);
+              return SubtitleModel.get(db, url);
             }),
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {

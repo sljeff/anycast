@@ -106,7 +106,7 @@ class PlayerController extends GetxController {
 
   void load() {
     helper.db.then((db) => {
-          PlayerModel.get(db!).then((player) {
+          PlayerModel.get(db).then((player) {
             this.player.value = player;
           })
         });
@@ -128,7 +128,7 @@ class PlayerController extends GetxController {
         .insert(HistoryEpisodeModel.fromMap(episode.toMap()));
 
     helper.db.then((db) {
-      PlayerModel.update(db!, player);
+      PlayerModel.update(db, player);
     });
   }
 
@@ -144,7 +144,7 @@ class PlayerController extends GetxController {
     myAudioHandler.setByEpisode(episode);
 
     helper.db.then((db) {
-      PlayerModel.update(db!, player);
+      PlayerModel.update(db, player);
     });
   }
 
@@ -204,7 +204,7 @@ class PlayerController extends GetxController {
     player.value = PlayerModel.empty();
 
     helper.db.then((db) {
-      PlayerModel.delete(db!);
+      PlayerModel.delete(db);
     });
   }
 
@@ -229,7 +229,7 @@ class PlayerController extends GetxController {
     }
     if (episode.rssFeedUrl != null) {
       DatabaseHelper().db.then((db) {
-        SubscriptionModel.getOrFetch(db!, episode.rssFeedUrl!).then((s) {
+        SubscriptionModel.getOrFetch(db, episode.rssFeedUrl!).then((s) {
           if (s != null) {
             channel.value = s;
           }
@@ -249,6 +249,12 @@ class SettingsController extends GetxController {
   var autoSleepStartHourIndex = 0.obs;
   var autoSleepEndHourIndex = 0.obs;
   var autoSleepCountdownMinIndex = 0.obs;
+  var maxCacheCount = 10.obs;
+  var countryCode = 'US'.obs;
+  var targetLanguage = 'en'.obs;
+  var autoRefreshInterval = 180.obs;
+  var maxFeedEpisodes = 100.obs;
+  var maxHistoryEpisodes = 100.obs;
 
   var hours = List.generate(24, (index) => index);
   var sleepMins = List.generate(7, (index) => index * 10);
@@ -269,7 +275,7 @@ class SettingsController extends GetxController {
 
   void _load() {
     helper.db.then((db) => {
-          SettingsModel.get(db!).then((settings) {
+          SettingsModel.get(db).then((settings) {
             darkMode.value = settings.darkMode!;
             speed.value = settings.speed!;
             skipSilence.value = settings.skipSilence!;
@@ -278,6 +284,13 @@ class SettingsController extends GetxController {
             autoSleepStartHourIndex.value = int.parse(autoSleepTimers[0]);
             autoSleepEndHourIndex.value = int.parse(autoSleepTimers[1]);
             autoSleepCountdownMinIndex.value = int.parse(autoSleepTimers[2]);
+
+            maxCacheCount.value = settings.maxCacheCount!;
+            countryCode.value = settings.countryCode!;
+            targetLanguage.value = settings.targetLanguage!;
+            autoRefreshInterval.value = settings.autoRefreshInterval!;
+            maxFeedEpisodes.value = settings.maxFeedEpisodes!;
+            maxHistoryEpisodes.value = settings.maxHistoryEpisodes!;
           })
         });
   }
@@ -331,7 +344,7 @@ class SettingsController extends GetxController {
     myAudioHandler.setSpeed(speed);
 
     helper.db.then((db) {
-      SettingsModel.setSpeed(db!, speed);
+      SettingsModel.setSpeed(db, speed);
     });
   }
 
@@ -340,7 +353,7 @@ class SettingsController extends GetxController {
     myAudioHandler.setSkipSilence(skipSilence);
 
     helper.db.then((db) {
-      SettingsModel.setSkipSilence(db!, skipSilence);
+      SettingsModel.setSkipSilence(db, skipSilence);
     });
   }
 
@@ -348,7 +361,7 @@ class SettingsController extends GetxController {
     autoSleepStartHourIndex.value = index;
 
     helper.db.then((db) {
-      SettingsModel.setAutoSleepTimer(db!, autoSleepStartHourIndex.value,
+      SettingsModel.setAutoSleepTimer(db, autoSleepStartHourIndex.value,
           autoSleepEndHourIndex.value, autoSleepCountdownMinIndex.value);
     });
   }
@@ -357,7 +370,7 @@ class SettingsController extends GetxController {
     autoSleepEndHourIndex.value = index;
 
     helper.db.then((db) {
-      SettingsModel.setAutoSleepTimer(db!, autoSleepStartHourIndex.value,
+      SettingsModel.setAutoSleepTimer(db, autoSleepStartHourIndex.value,
           autoSleepEndHourIndex.value, autoSleepCountdownMinIndex.value);
     });
   }
@@ -366,7 +379,7 @@ class SettingsController extends GetxController {
     autoSleepCountdownMinIndex.value = index;
 
     helper.db.then((db) {
-      SettingsModel.setAutoSleepTimer(db!, autoSleepStartHourIndex.value,
+      SettingsModel.setAutoSleepTimer(db, autoSleepStartHourIndex.value,
           autoSleepEndHourIndex.value, autoSleepCountdownMinIndex.value);
     });
   }
@@ -401,5 +414,47 @@ class SettingsController extends GetxController {
       return;
     }
     start(Duration(minutes: duration));
+  }
+
+  Future<void> setMaxCacheCount(int value) async {
+    maxCacheCount.value = value;
+    helper.db.then((db) {
+      SettingsModel.set(db, 'maxCacheCount', value);
+    });
+  }
+
+  Future<void> setCountryCode(String value) async {
+    countryCode.value = value;
+    helper.db.then((db) {
+      SettingsModel.set(db, 'countryCode', value);
+    });
+  }
+
+  Future<void> setTargetLanguage(String value) async {
+    targetLanguage.value = value;
+    helper.db.then((db) {
+      SettingsModel.set(db, 'targetLanguage', value);
+    });
+  }
+
+  Future<void> setAutoRefreshInterval(int value) async {
+    autoRefreshInterval.value = value;
+    helper.db.then((db) {
+      SettingsModel.set(db, 'autoRefreshInterval', value);
+    });
+  }
+
+  Future<void> setMaxFeedEpisodes(int value) async {
+    maxFeedEpisodes.value = value;
+    helper.db.then((db) {
+      SettingsModel.set(db, 'maxFeedEpisodes', value);
+    });
+  }
+
+  Future<void> setMaxHistoryEpisodes(int value) async {
+    maxHistoryEpisodes.value = value;
+    helper.db.then((db) {
+      SettingsModel.set(db, 'maxHistoryEpisodes', value);
+    });
   }
 }

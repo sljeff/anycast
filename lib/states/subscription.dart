@@ -15,7 +15,7 @@ class SubscriptionController extends GetxController {
 
   void load() {
     helper.db.then((db) => {
-          SubscriptionModel.listAll(db!).then((subscriptions) {
+          SubscriptionModel.listAll(db).then((subscriptions) {
             this.subscriptions.value = subscriptions;
           })
         });
@@ -23,7 +23,7 @@ class SubscriptionController extends GetxController {
 
   void addMany(subscriptions) {
     helper.db.then((db) => {
-          SubscriptionModel.addMany(db!, subscriptions).then((_) {
+          SubscriptionModel.addMany(db, subscriptions).then((_) {
             load();
           })
         });
@@ -34,7 +34,7 @@ class SubscriptionController extends GetxController {
         .indexWhere((element) => element.title == subscription.title);
     subscriptions.removeAt(index);
     helper.db.then((db) {
-      SubscriptionModel.remove(db!, subscription);
+      SubscriptionModel.remove(db, subscription);
     });
   }
 

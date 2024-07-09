@@ -16,7 +16,7 @@ class PlaylistEpisodeController extends GetxController {
 
   Future<void> loadManually() async {
     var db = await helper.db;
-    var episodes = await PlaylistEpisodeModel.listByPlaylistId(db!, playlistId);
+    var episodes = await PlaylistEpisodeModel.listByPlaylistId(db, playlistId);
     this.episodes.value = episodes;
     Get.find<PlaylistController>()
         .addToSet(episodes.map((e) => e.enclosureUrl!).toList());
@@ -36,14 +36,14 @@ class PlaylistEpisodeController extends GetxController {
       episodes.insert(position, ep);
       // 更新到数据库去
       helper.db.then((db) => PlaylistEpisodeModel.insertOrUpdateByIndex(
-          db!, playlistId, position, ep));
+          db, playlistId, position, ep));
       return ep;
     }
     episodes.insert(position, episode);
     // episodes.insert(position, episode);
     Get.find<PlaylistController>().addToSet([episode.enclosureUrl!]);
     helper.db.then((db) => PlaylistEpisodeModel.insertOrUpdateByIndex(
-        db!, playlistId, position, episode));
+        db, playlistId, position, episode));
     return episode;
   }
 
@@ -56,7 +56,7 @@ class PlaylistEpisodeController extends GetxController {
     Get.find<PlaylistController>().removeFromSet(enclosureUrl);
 
     helper.db.then(
-        (db) => {PlaylistEpisodeModel.deleteByEnclosureUrl(db!, enclosureUrl)});
+        (db) => {PlaylistEpisodeModel.deleteByEnclosureUrl(db, enclosureUrl)});
   }
 
   void removeTop() {
@@ -69,8 +69,8 @@ class PlaylistEpisodeController extends GetxController {
     episodes.removeAt(oldIndex);
     episodes.insert(0, episode);
 
-    return helper.db.then((db) => PlaylistEpisodeModel.insertOrUpdateByIndex(
-        db!, playlistId, 0, episode));
+    return helper.db.then((db) =>
+        PlaylistEpisodeModel.insertOrUpdateByIndex(db, playlistId, 0, episode));
   }
 
   Future<void> updatePlayedDuration(Duration duration) async {
@@ -78,7 +78,7 @@ class PlaylistEpisodeController extends GetxController {
     episode.playedDuration = duration.inMilliseconds;
     episodes[0] = PlaylistEpisodeModel.fromMap(episode.toMap());
     return helper.db.then((db) {
-      episode.updatePlayedDuration(db!);
+      episode.updatePlayedDuration(db);
     });
   }
 
@@ -110,6 +110,6 @@ class PlaylistEpisodeController extends GetxController {
     episodes.insert(to, episode);
 
     helper.db.then((db) => PlaylistEpisodeModel.insertOrUpdateByIndex(
-        db!, playlistId, to, episode));
+        db, playlistId, to, episode));
   }
 }

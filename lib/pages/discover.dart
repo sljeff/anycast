@@ -1,3 +1,4 @@
+import 'package:anycast/pages/settings.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/discover.dart';
@@ -25,12 +26,15 @@ class Discover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       appBar: MyAppBar(
         title: 'DISCOVER',
         icon: Icons.settings_rounded,
+        iconOnTap: () {
+          context.pushTransparentRoute(const SettingsPage());
+        },
       ),
-      body: DiscoverBody(),
+      body: const DiscoverBody(),
     );
   }
 }

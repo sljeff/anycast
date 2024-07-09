@@ -22,7 +22,7 @@ class PlaylistController extends GetxController {
   void load() {
     isLoading.value = true;
     helper.db.then((db) => {
-          PlaylistModel.listAll(db!).then((playlists) {
+          PlaylistModel.listAll(db).then((playlists) {
             this.playlists.value = playlists;
             List<Future> futures = [];
             for (var playlist in playlists) {

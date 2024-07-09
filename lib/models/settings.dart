@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:sqflite/sqflite.dart';
 
 var tableName = 'settings';
@@ -8,12 +10,28 @@ Future<void> settingsTableCreator(DatabaseExecutor db) {
       darkMode INTEGER,
       speed REAL,
       skipSilence INTEGER,
-      autoSleepTimer TEXT
+      autoSleepTimer TEXT,
+      maxCacheCount INTEGER,
+      countryCode TEXT,
+      targetLanguage TEXT,
+      autoRefreshInterval INTEGER,
+      maxFeedEpisodes INTEGER,
+      maxHistoryEpisodes INTEGER
     )
   """).then((v) {
+    var code = Platform.localeName;
+    // en_US / zh_Hans_CN / zh_CN
+    var languageAndCountry = code.split('_');
+    var language = 'en';
+    var country = 'US';
+    if (languageAndCountry.length > 1) {
+      language = code.split('_')[0];
+      country = code.split('_')[languageAndCountry.length - 1];
+    }
+
     db.rawInsert("""
-      INSERT OR IGNORE INTO $tableName (id, darkMode, speed, skipSilence, autoSleepTimer)
-      VALUES (1, 0, 1.0, 0, '0,0,0')
+      INSERT OR IGNORE INTO $tableName (id, darkMode, speed, skipSilence, autoSleepTimer, maxCacheCount, countryCode, targetLanguage, autoRefreshInterval, maxFeedEpisodes, maxHistoryEpisodes)
+      VALUES (1, 0, 1.0, 0, '0,0,0', 10, '$country', '$language', 180, 100, 100)
     """);
   });
 }
@@ -24,6 +42,12 @@ class SettingsModel {
   double? speed;
   bool? skipSilence;
   String? autoSleepTimer; // startHour,endHour,countdownMinIndex
+  int? maxCacheCount;
+  String? countryCode;
+  String? targetLanguage;
+  int? autoRefreshInterval; // seconds
+  int? maxFeedEpisodes;
+  int? maxHistoryEpisodes;
 
   Map<String, dynamic> toMap() {
     var map = <String, dynamic>{
@@ -31,6 +55,12 @@ class SettingsModel {
       'speed': speed,
       'skipSilence': skipSilence,
       'autoSleepTimer': autoSleepTimer,
+      'maxCacheCount': maxCacheCount,
+      'countryCode': countryCode,
+      'targetLanguage': targetLanguage,
+      'autoRefreshInterval': autoRefreshInterval,
+      'maxFeedEpisodes': maxFeedEpisodes,
+      'maxHistoryEpisodes': maxHistoryEpisodes,
     };
     if (id != null) {
       map['id'] = id;
@@ -45,6 +75,12 @@ class SettingsModel {
     speed = map['speed'];
     skipSilence = map['skipSilence'] == 1;
     autoSleepTimer = map['autoSleepTimer'];
+    maxCacheCount = map['maxCacheCount'];
+    countryCode = map['countryCode'];
+    targetLanguage = map['targetLanguage'];
+    autoRefreshInterval = map['autoRefreshInterval'];
+    maxFeedEpisodes = map['maxFeedEpisodes'];
+    maxHistoryEpisodes = map['maxHistoryEpisodes'];
   }
 
   static Future<SettingsModel> get(DatabaseExecutor db) async {
@@ -88,5 +124,14 @@ class SettingsModel {
       SET autoSleepTimer = ?
       WHERE id = 1
     """, [autoSleepTimer]);
+  }
+
+  static Future<void> set(
+      DatabaseExecutor db, String field, dynamic value) async {
+    await db.rawUpdate("""
+      UPDATE $tableName
+      SET $field = ?
+      WHERE id = 1
+    """, [value]);
   }
 }
