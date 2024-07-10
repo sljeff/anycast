@@ -1,7 +1,4 @@
-import 'dart:convert';
-
 import 'package:anycast/api/share.dart';
-import 'package:anycast/api/subtitles.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subscription.dart';
@@ -497,13 +494,7 @@ class Subtitles extends GetView<SubtitleController> {
                 ),
                 GestureDetector(
                   onTap: () {
-                    getSubtitles(url).then((value) {
-                      var subtitle = '';
-                      if (value.status == 'succeeded') {
-                        subtitle = jsonEncode(value.subtitles);
-                      }
-                      controller.add(url, value.status!, subtitle);
-                    });
+                    controller.add(url);
                   },
                   child: Container(
                     width: 247,
@@ -583,13 +574,7 @@ class Subtitles extends GetView<SubtitleController> {
           return Center(
             child: TextButton(
               onPressed: () {
-                getSubtitles(url).then((value) {
-                  var subtitle = '';
-                  if (value.status == 'succeeded') {
-                    subtitle = jsonEncode(value.subtitles);
-                  }
-                  controller.add(url, value.status!, subtitle);
-                });
+                controller.add(url);
               },
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
@@ -631,7 +616,7 @@ class Subtitles extends GetView<SubtitleController> {
                   playing: playerController.isPlaying.value,
                   emptyBuilder: () => Center(
                     child: Text(
-                      'No subtitles',
+                      'No Transcript',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.64),
                       ),

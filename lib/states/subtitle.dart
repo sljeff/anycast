@@ -50,16 +50,33 @@ class SubtitleController extends GetxController {
     );
   }
 
-  void add(String url, String status, String subtitle) {
-    subtitleUrls[url] = status;
-    helper.db.then((db) {
+  void add(String url) async {
+    subtitleUrls[url] = 'processing';
+    await helper.db.then((db) {
       SubtitleModel.insert(
           db,
           SubtitleModel.fromMap({
             'enclosureUrl': url,
-            'status': status,
-            'subtitle': subtitle,
+            'status': 'processing',
+            'subtitle': '',
           }));
+    });
+
+    getSubtitles(url).then((value) {
+      if (value.status == 'succeeded') {
+        subtitleUrls[url] = 'succeeded';
+        helper.db.then((db) {
+          SubtitleModel.insert(
+              db,
+              SubtitleModel.fromMap({
+                'enclosureUrl': url,
+                'status': value.status,
+                'subtitle': jsonEncode(value.subtitles),
+              }));
+        });
+      } else if (value.status == 'failed') {
+        subtitleUrls.remove(url);
+      }
     });
   }
 

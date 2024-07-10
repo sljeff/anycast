@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:ui';
 
-import 'package:anycast/api/subtitles.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/history.dart';
@@ -200,30 +198,23 @@ class PlaylistEpisodesList extends StatelessWidget {
                           switch (stController
                               .subtitleUrls[episode.enclosureUrl!]) {
                             case null:
-                              getSubtitles(episode.enclosureUrl!).then((value) {
-                                var subtitle = '';
-                                if (value.status == 'succeeded') {
-                                  subtitle = jsonEncode(value.subtitles);
-                                }
-                                stController.add(episode.enclosureUrl!,
-                                    value.status!, subtitle);
-                              });
+                              stController.add(episode.enclosureUrl!);
                               Get.snackbar(
                                 'Processing',
-                                'Subtitle generating, please wait...',
+                                'Transcript generating, please wait...',
                                 snackPosition: SnackPosition.BOTTOM,
                               );
                             case 'failed':
                               stController.remove(episode.enclosureUrl!);
                               Get.snackbar(
                                 'Error',
-                                'Subtitle download failed, please try again later.',
+                                'Transcript generation failed, please try again later.',
                                 snackPosition: SnackPosition.BOTTOM,
                               );
                             case 'succeeded':
                               Get.snackbar(
                                 'Success',
-                                'You can check the subtitles when playing.',
+                                'You can check the transcript when playing.',
                                 snackPosition: SnackPosition.BOTTOM,
                               );
                             case 'processing':
