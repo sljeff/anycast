@@ -6,7 +6,6 @@ import 'package:anycast/utils/http_client.dart';
 import 'package:http/http.dart' as http;
 
 const host = 'api.anycast.website';
-const country = 'cn';
 
 Future<List<SubscriptionModel>> searchChannels(String searchText) async {
   var url = Uri(
@@ -124,7 +123,7 @@ Future<List<Category>> listCategories() async {
 }
 
 Future<List<SubscriptionModel>> listChannelsByCategoryId(
-    String categoryId) async {
+    String categoryId, String country) async {
   var url = Uri(
     host: host,
     scheme: 'https',

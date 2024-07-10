@@ -50,4 +50,19 @@ class HistoryController extends GetxController {
   FeedEpisodeModel toFeedEpisode(HistoryEpisodeModel episode) {
     return FeedEpisodeModel.fromMap(episode.toMap());
   }
+
+  Future<void> removeOld(int maxCount) async {
+    if (episodes.length <= maxCount) {
+      return;
+    }
+
+    var oldEpisodes = episodes.sublist(maxCount);
+    var urls = oldEpisodes.map((e) => e.enclosureUrl!).toList();
+
+    episodes.removeRange(maxCount, episodes.length);
+
+    db.then((db) async {
+      await HistoryEpisodeModel.deleteMany(db, urls);
+    });
+  }
 }

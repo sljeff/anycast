@@ -1,10 +1,18 @@
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
+import 'package:anycast/states/player.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:get/get.dart';
 
 class CacheController extends GetxController {
   var key2FileResponse = <String, FileResponse>{}.obs;
+
+  var cacheManager = CacheManager(
+    Config(
+      'anycast_episode',
+      maxNrOfCacheObjects: Get.find<SettingsController>().maxCacheCount.value,
+    ),
+  );
 
   @override
   void onInit() {
@@ -13,7 +21,7 @@ class CacheController extends GetxController {
     DatabaseHelper().db.then((db) {
       PlaylistEpisodeModel.listByPlaylistId(db, 1).then((list) {
         for (var e in list) {
-          DefaultCacheManager().getFileFromCache(e.enclosureUrl!).then((info) {
+          cacheManager.getFileFromCache(e.enclosureUrl!).then((info) {
             if (info != null) {
               set(e.enclosureUrl!, info);
             }
@@ -41,10 +49,17 @@ class CacheController extends GetxController {
   }
 
   void download(String url) {
-    DefaultCacheManager()
-        .getFileStream(url, withProgress: true)
-        .listen((event) {
+    print(cacheManager.store.lastCleanupRun);
+    print(cacheManager.store.cleanupRunMinInterval);
+    cacheManager.getFileStream(url, withProgress: true).listen((event) {
       set(url, event);
     });
+  }
+
+  void updateCacheConfig() {
+    cacheManager = CacheManager(Config(
+      'anycast_episode',
+      maxNrOfCacheObjects: Get.find<SettingsController>().maxCacheCount.value,
+    ));
   }
 }

@@ -6,7 +6,6 @@ import 'package:anycast/states/player.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 class PositionData {
   final Duration position;
@@ -203,7 +202,7 @@ class MyAudioHandler extends BaseAudioHandler {
   }) async {
     var controller = Get.find<CacheController>();
 
-    var info = await DefaultCacheManager().getFileFromCache(url);
+    var info = await controller.cacheManager.getFileFromCache(url);
     if (info != null) {
       _player.setFilePath(info.file.path,
           preload: preload, initialPosition: initialPosition);
@@ -213,7 +212,7 @@ class MyAudioHandler extends BaseAudioHandler {
     }
 
     _player.setUrl(url, preload: preload, initialPosition: initialPosition);
-    DefaultCacheManager()
+    controller.cacheManager
         .getFileStream(url, withProgress: true)
         .listen((event) {
       controller.set(url, event);

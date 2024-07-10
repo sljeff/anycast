@@ -7,6 +7,8 @@ import 'package:anycast/models/player.dart';
 import 'package:anycast/models/settings.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/states/cache.dart';
+import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/history.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
@@ -268,7 +270,7 @@ class SettingsController extends GetxController {
     '1 hour',
   ];
 
-  Timer? timer;
+  Timer? countdownTimer;
 
   final MyAudioHandler myAudioHandler = MyAudioHandler();
   final DatabaseHelper helper = DatabaseHelper();
@@ -300,8 +302,9 @@ class SettingsController extends GetxController {
     super.onInit();
 
     _load();
+    _scheduleCleanup();
 
-    timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!isCounting.value) {
         return;
       }
@@ -320,6 +323,13 @@ class SettingsController extends GetxController {
 
     myAudioHandler.skipSilenceEnabledStream.listen((event) {
       skipSilence.value = event;
+    });
+  }
+
+  void _scheduleCleanup() {
+    Timer.periodic(const Duration(minutes: 1), (timer) {
+      Get.find<FeedEpisodeController>().removeOld(maxFeedEpisodes.value);
+      Get.find<HistoryController>().removeOld(maxHistoryEpisodes.value);
     });
   }
 
@@ -421,6 +431,8 @@ class SettingsController extends GetxController {
     helper.db.then((db) {
       SettingsModel.set(db, 'maxCacheCount', value);
     });
+
+    Get.find<CacheController>().updateCacheConfig();
   }
 
   Future<void> setCountryCode(String value) async {
@@ -442,6 +454,7 @@ class SettingsController extends GetxController {
     helper.db.then((db) {
       SettingsModel.set(db, 'autoRefreshInterval', value);
     });
+    Get.find<FeedEpisodeController>().initAutoRefresher();
   }
 
   Future<void> setMaxFeedEpisodes(int value) async {

@@ -61,9 +61,9 @@ class SettingsPage extends GetView<SettingsController> {
                       SizedBox(width: 8),
                       Tooltip(
                         triggerMode: TooltipTriggerMode.tap,
-                        showDuration: Duration(milliseconds: 2000),
+                        showDuration: Duration(milliseconds: 3000),
                         message:
-                            "Limits the number of episodes stored for offline playback.",
+                            "Limits the number of episodes stored for offline playback.\nOnly audio that has not been used for more than one day will be deleted.",
                         child: Icon(Icons.info_outline),
                       ),
                     ],
@@ -196,7 +196,19 @@ class SettingsPage extends GetView<SettingsController> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Auto Refresh Interval'),
+                    const Row(
+                      children: [
+                        Text('Auto Refresh Interval'),
+                        SizedBox(width: 8),
+                        Tooltip(
+                          triggerMode: TooltipTriggerMode.tap,
+                          showDuration: Duration(milliseconds: 2000),
+                          message:
+                              "Automatically fetch new episodes every X minutes.",
+                          child: Icon(Icons.info_outline),
+                        ),
+                      ],
+                    ),
                     TextButton(
                         style: TextButton.styleFrom(
                             backgroundColor: const Color(0xFF111316)),

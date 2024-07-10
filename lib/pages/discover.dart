@@ -1,12 +1,12 @@
 import 'package:anycast/pages/settings.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/channel.dart';
-import 'package:anycast/states/discover.dart';
 import 'package:anycast/api/podcasts.dart';
 import 'package:anycast/pages/channel.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
+import 'package:anycast/utils/keepalive.dart';
 import 'package:anycast/widgets/appbar.dart';
 import 'package:anycast/widgets/card.dart' as card;
 import 'package:anycast/widgets/card.dart';
@@ -20,9 +20,7 @@ import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 
 class Discover extends StatelessWidget {
-  final DiscoverController controller = Get.put(DiscoverController());
-
-  Discover({super.key});
+  const Discover({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -63,35 +61,43 @@ class DiscoverBody extends StatelessWidget {
             Expanded(
               child: TabBarView(
                   children: categories.map((c) {
-                return FutureBuilder(
-                  future: listChannelsByCategoryId(c.id),
-                  builder: ((context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    }
-                    var channels = snapshot.data!;
-                    if (channels.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'Network Error',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }
-                    return ListView.separated(
-                        padding:
-                            const EdgeInsets.only(left: 12, right: 12, top: 12),
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12),
-                        itemCount: channels.length,
-                        itemBuilder: (context, index) {
-                          return PodcastCard(
-                            subscription: channels[index],
+                return KeepAliveWrapper(
+                  key: Key('discover_${c.id}'),
+                  child: Obx(
+                    () => FutureBuilder(
+                      future: listChannelsByCategoryId(
+                        c.id,
+                        Get.find<SettingsController>().countryCode.value,
+                      ),
+                      builder: ((context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
                           );
-                        });
-                  }),
+                        }
+                        var channels = snapshot.data!;
+                        if (channels.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              'Network Error',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          );
+                        }
+                        return ListView.separated(
+                            padding: const EdgeInsets.only(
+                                left: 12, right: 12, top: 12),
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
+                            itemCount: channels.length,
+                            itemBuilder: (context, index) {
+                              return PodcastCard(
+                                subscription: channels[index],
+                              );
+                            });
+                      }),
+                    ),
+                  ),
                 );
               }).toList()),
             ),
@@ -195,7 +201,13 @@ class SearchPage extends StatelessWidget {
                             var subscriptions = snapshot.data!;
                             if (subscriptions.isEmpty) {
                               return const Center(
-                                child: Text('No results'),
+                                child: Text(
+                                  'No results',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
                               );
                             }
                             return ListView.separated(
@@ -234,7 +246,13 @@ class SearchPage extends StatelessWidget {
                             var episodes = snapshot.data!;
                             if (episodes.isEmpty) {
                               return const Center(
-                                child: Text('No results'),
+                                child: Text(
+                                  'No results',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
                               );
                             }
                             return ListView.separated(

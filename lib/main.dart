@@ -1,4 +1,6 @@
 import 'package:anycast/states/cache.dart';
+import 'package:anycast/states/discover.dart';
+import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/subscription.dart';
@@ -54,6 +56,8 @@ class NavigationBarApp extends StatelessWidget {
     Get.put(PlayerController());
     Get.put(PlaylistController());
     Get.put(CacheController());
+    Get.lazyPut(() => DiscoverController());
+    Get.lazyPut(() => FeedEpisodeController());
     return GetMaterialApp(
       theme: ThemeData(
         appBarTheme: const AppBarTheme(
@@ -111,9 +115,9 @@ class NavigationBarApp extends StatelessWidget {
         body: Obx(
           () => IndexedStack(
             index: homeTabController.selectedIndex.value,
-            children: <Widget>[
-              const PodcastsPage(),
-              const Playlists(),
+            children: const [
+              PodcastsPage(),
+              Playlists(),
               Discover(),
             ],
           ),

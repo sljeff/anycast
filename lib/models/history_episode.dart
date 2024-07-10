@@ -86,4 +86,13 @@ class HistoryEpisodeModel extends Episode {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
+
+  static Future<void> deleteMany(
+      DatabaseExecutor db, List<String> enclosureUrls) async {
+    await db.delete(
+      tableName,
+      where: 'enclosureUrl IN (${enclosureUrls.map((e) => '?').join(',')})',
+      whereArgs: enclosureUrls,
+    );
+  }
 }

@@ -18,6 +18,7 @@ class FeedEpisodeController extends GetxController {
   final scrollController = ScrollController();
   final GlobalKey<RefreshIndicatorState> refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
+  Timer? refresher;
 
   @override
   void onInit() {
@@ -25,9 +26,7 @@ class FeedEpisodeController extends GetxController {
     load(episodes);
     autoFetch();
 
-    Timer.periodic(const Duration(seconds: 300), (timer) async {
-      autoFetch();
-    });
+    initAutoRefresher();
   }
 
   void addMany(List<FeedEpisodeModel> episodes) {
@@ -121,8 +120,36 @@ class FeedEpisodeController extends GetxController {
         ? DateTime.fromMillisecondsSinceEpoch(latestUpdateTS)
         : now;
 
-    if (latestUpdateTime.isBefore(now.subtract(const Duration(hours: 2)))) {
+    if (latestUpdateTime.isBefore(now.subtract(const Duration(hours: 1)))) {
       refreshIndicatorKey.currentState?.show();
     }
+  }
+
+  void initAutoRefresher() async {
+    if (refresher != null) {
+      refresher!.cancel();
+    }
+    var interval = Get.find<SettingsController>().autoRefreshInterval.value;
+    refresher = Timer.periodic(
+        Duration(
+          seconds: interval,
+        ), (timer) async {
+      autoFetch();
+    });
+  }
+
+  Future<void> removeOld(int maxCount) async {
+    if (episodes.length <= maxCount) {
+      return;
+    }
+
+    var episodesNeedRemove = episodes.sublist(maxCount);
+    var enclosureUrls =
+        episodesNeedRemove.map((episode) => episode.enclosureUrl!).toList();
+
+    episodes.removeRange(maxCount, episodes.length);
+
+    helper.db.then(
+        (db) => {FeedEpisodeModel.removeByEnclosureUrls(db, enclosureUrls)});
   }
 }

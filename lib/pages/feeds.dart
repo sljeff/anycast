@@ -19,10 +19,9 @@ import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 
-class Feeds extends StatelessWidget {
+class Feeds extends GetView<FeedEpisodeController> {
   const Feeds({super.key});
 
-  static final controller = Get.put(FeedEpisodeController());
   static final clController = Get.put(CardListController(), tag: 'feeds');
 
   @override
