@@ -103,7 +103,19 @@ class SettingsPage extends GetView<SettingsController> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Country'),
+                    const Row(
+                      children: [
+                        Text('Country'),
+                        SizedBox(width: 8),
+                        Tooltip(
+                          triggerMode: TooltipTriggerMode.tap,
+                          showDuration: Duration(milliseconds: 2000),
+                          message:
+                              "Discover page will show episodes from this country.",
+                          child: Icon(Icons.info_outline),
+                        ),
+                      ],
+                    ),
                     Container(
                       alignment: Alignment.center,
                       width: 160,
@@ -177,6 +189,47 @@ class SettingsPage extends GetView<SettingsController> {
                       ),
                     ]),
                     LanguagePicker(),
+                  ],
+                ),
+              ),
+              SettingContainer(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Auto Refresh Interval'),
+                    TextButton(
+                        style: TextButton.styleFrom(
+                            backgroundColor: const Color(0xFF111316)),
+                        child: Obx(() => Text(
+                              '${controller.autoRefreshInterval.value ~/ 60} min',
+                            )),
+                        onPressed: () {
+                          var minutes = [1, 3, 5, 10, 30];
+                          var interval = controller.autoRefreshInterval.value;
+                          var initialIndex = minutes.indexOf(interval ~/ 60);
+
+                          Get.bottomSheet(
+                            SettingsBottomContainer(
+                                picker: CupertinoPicker(
+                              scrollController: FixedExtentScrollController(
+                                initialItem: initialIndex,
+                              ),
+                              itemExtent: 36,
+                              onSelectedItemChanged: (index) {
+                                controller.setAutoRefreshInterval(
+                                    minutes[index] * 60);
+                              },
+                              children: const [
+                                Center(child: Text('1 min')),
+                                Center(child: Text('3 min')),
+                                Center(child: Text('5 min')),
+                                Center(child: Text('10 min')),
+                                Center(child: Text('30 min')),
+                              ],
+                            )),
+                            backgroundColor: Colors.black,
+                          );
+                        })
                   ],
                 ),
               ),

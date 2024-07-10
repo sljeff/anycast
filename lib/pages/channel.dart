@@ -228,7 +228,8 @@ class Channel extends StatelessWidget {
                                   'Copied',
                                   'OK',
                                   snackPosition: SnackPosition.BOTTOM,
-                                  duration: const Duration(milliseconds: 500),
+                                  duration: const Duration(milliseconds: 650),
+                                  backgroundColor: Colors.black,
                                 );
                               },
                               child: Text(
