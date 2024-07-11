@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:anycast/states/player.dart';
 import 'package:anycast/widgets/handler.dart';
 import 'package:dismissible_page/dismissible_page.dart';
@@ -6,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:country_code_picker/country_code_picker.dart';
+import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/ph.dart';
 
 class SettingsPage extends GetView<SettingsController> {
   const SettingsPage({super.key});
@@ -158,10 +162,9 @@ class SettingsPage extends GetView<SettingsController> {
                               'CN',
                               'FR',
                               'DE',
-                              'IN',
-                              'BR',
-                              'RU',
-                              'GB'
+                              'GB',
+                              "JP",
+                              "RU"
                             ],
                             showCountryOnly: true,
                             showOnlyCountryWhenClosed: true,
@@ -173,24 +176,66 @@ class SettingsPage extends GetView<SettingsController> {
                   ],
                 ),
               ),
-              const SettingContainer(
+              SettingContainer(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(children: [
-                      Text('Translated Transcript'),
-                      SizedBox(width: 8),
-                      Tooltip(
-                        triggerMode: TooltipTriggerMode.tap,
-                        showDuration: Duration(milliseconds: 2000),
-                        message:
-                            "Translates the podcast transcript into the target language.",
-                        child: Icon(Icons.info_outline),
-                      ),
-                    ]),
-                    LanguagePicker(),
+                    const Text('Enable Transcript Translation'),
+                    Obx(() {
+                      var controller = Get.find<SettingsController>();
+                      return Material(
+                        color: Colors.transparent,
+                        child: Switch(
+                          value: controller.targetLanguage.value != '',
+                          onChanged: (value) {
+                            if (!value) {
+                              controller.setTargetLanguage('');
+                              return;
+                            }
+                            var code = Platform.localeName;
+                            var languageAndCountry = code.split('_');
+                            var language = 'en';
+                            if (languageAndCountry.length > 1) {
+                              language = code.split('_')[0];
+                            }
+
+                            controller.setTargetLanguage(language);
+                          },
+                          thumbColor: WidgetStateProperty.all(Colors.grey),
+                        ),
+                      );
+                    }),
                   ],
                 ),
+              ),
+              Obx(
+                () {
+                  var controller = Get.find<SettingsController>();
+                  if (controller.targetLanguage.value == '') {
+                    return const SizedBox.shrink();
+                  }
+
+                  return const SettingContainer(
+                    indent: 1,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(children: [
+                          Text('Target Language'),
+                          SizedBox(width: 8),
+                          Tooltip(
+                            triggerMode: TooltipTriggerMode.tap,
+                            showDuration: Duration(milliseconds: 2000),
+                            message:
+                                "Translates the podcast transcript into the target language.",
+                            child: Icon(Icons.info_outline),
+                          ),
+                        ]),
+                        LanguagePicker(),
+                      ],
+                    ),
+                  );
+                },
               ),
               SettingContainer(
                 child: Row(
@@ -368,14 +413,14 @@ class PlanPage extends GetView<SettingsController> {
 }
 
 class SettingContainer extends StatelessWidget {
+  final int indent;
   final Widget child;
 
-  const SettingContainer({super.key, required this.child});
+  const SettingContainer({super.key, required this.child, this.indent = 0});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    var c = Container(
       height: 64,
       alignment: Alignment.centerLeft,
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -387,6 +432,17 @@ class SettingContainer extends StatelessWidget {
       ),
       child: child,
     );
+
+    if (indent == 0) {
+      return c;
+    } else {
+      return Row(
+        children: [
+          const Iconify(Ph.arrow_elbow_down_right_bold, color: Colors.white),
+          Expanded(child: c),
+        ],
+      );
+    }
   }
 }
 

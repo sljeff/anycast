@@ -1,7 +1,7 @@
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/states/player.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter_cache_manager_plus/flutter_cache_manager_plus.dart';
 import 'package:get/get.dart';
 
 class CacheController extends GetxController {
@@ -21,7 +21,7 @@ class CacheController extends GetxController {
     DatabaseHelper().db.then((db) {
       PlaylistEpisodeModel.listByPlaylistId(db, 1).then((list) {
         for (var e in list) {
-          cacheManager.getFileFromCache(e.enclosureUrl!).then((info) {
+          cacheManager.checkFileInCache(e.enclosureUrl!).then((info) {
             if (info != null) {
               set(e.enclosureUrl!, info);
             }
