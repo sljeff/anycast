@@ -6,6 +6,7 @@ import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/states/tab.dart';
+import 'package:anycast/states/translation.dart';
 import 'package:anycast/styles.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/widgets/bottom_nav_bar.dart';
@@ -58,6 +59,7 @@ class NavigationBarApp extends StatelessWidget {
     Get.put(CacheController());
     Get.lazyPut(() => DiscoverController());
     Get.lazyPut(() => FeedEpisodeController());
+    Get.put(TranslationController());
     return GetMaterialApp(
       theme: ThemeData(
         appBarTheme: const AppBarTheme(

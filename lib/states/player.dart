@@ -12,6 +12,7 @@ import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/history.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
+import 'package:anycast/states/translation.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -444,6 +445,7 @@ class SettingsController extends GetxController {
 
   Future<void> setTargetLanguage(String value) async {
     targetLanguage.value = value;
+    Get.find<TranslationController>().translationUrls.clear();
     helper.db.then((db) {
       SettingsModel.set(db, 'targetLanguage', value);
     });

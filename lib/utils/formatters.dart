@@ -130,3 +130,11 @@ Color getSafeColor(Color dynamicColor) {
     return dynamicColor;
   }
 }
+
+// seconds to mm:ss.xx
+String formatLrcTime(double time) {
+  var minutes = (time / 60).floor();
+  var seconds = (time % 60).floor();
+  var milliseconds = ((time * 1000) % 1000).floor();
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}.${milliseconds.toString().padLeft(3, '0')}';
+}

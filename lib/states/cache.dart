@@ -49,8 +49,6 @@ class CacheController extends GetxController {
   }
 
   void download(String url) {
-    print(cacheManager.store.lastCleanupRun);
-    print(cacheManager.store.cleanupRunMinInterval);
     cacheManager.getFileStream(url, withProgress: true).listen((event) {
       set(url, event);
     });

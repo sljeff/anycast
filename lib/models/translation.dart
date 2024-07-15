@@ -1,8 +1,12 @@
+import 'dart:convert';
+
+import 'package:anycast/api/subtitles.dart';
+import 'package:anycast/utils/formatters.dart';
 import 'package:sqflite/sqflite.dart';
 
 var tableName = 'translation';
 
-Future<void> createTable(DatabaseExecutor db) async {
+Future<void> translationCreateTable(DatabaseExecutor db) async {
   await db.execute("""
     CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,16 +49,42 @@ class TranslationModel {
     language = map['language'];
   }
 
-  static Future<TranslationModel> get(
-      DatabaseExecutor db, String enclosureUrl) async {
+  static Future<TranslationModel?> get(
+      DatabaseExecutor db, String enclosureUrl, String language) async {
     var result = await db.query(
       tableName,
-      where: 'enclosureUrl = ?',
-      whereArgs: [enclosureUrl],
+      where: 'enclosureUrl = ? AND language = ?',
+      whereArgs: [enclosureUrl, language],
     );
     if (result.isEmpty) {
-      return TranslationModel.empty();
+      return null;
     }
     return TranslationModel.fromMap(result.first);
+  }
+
+  static Future<void> insert(
+      DatabaseExecutor db, TranslationModel model) async {
+    await db.insert(
+      tableName,
+      model.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  String toLrc() {
+    List<Subtitle> translations = [];
+    if (translation == null) {
+      return '';
+    }
+    for (var item in jsonDecode(translation!)) {
+      translations.add(Subtitle.fromMap(item));
+    }
+    var lrc = '';
+    for (var i = 0; i < translations.length; i++) {
+      var t = translations[i];
+      lrc += '[${formatLrcTime(t.start!)}]${t.text}\n';
+      lrc += '[${formatLrcTime(t.end!)}]\n';
+    }
+    return lrc;
   }
 }

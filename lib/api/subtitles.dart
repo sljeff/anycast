@@ -31,6 +31,7 @@ class SubtitleResult {
 }
 
 Future<SubtitleResult> getSubtitles(String enclosureUrl) async {
+  print('getSubtitles $enclosureUrl');
   var url = Uri(
     host: host,
     scheme: 'https',
@@ -44,13 +45,14 @@ Future<SubtitleResult> getSubtitles(String enclosureUrl) async {
   Map<String, dynamic> data = jsonDecode(body);
 
   var result = SubtitleResult();
-  result.language = data['detected_language'];
-  result.status = data['status'];
-  result.summary = '';
-
-  if (result.status != 'succeeded') {
+  if (data['status'] != 'succeeded') {
+    result.status = data['status'];
     return result;
   }
+
+  result.language = data['subtitle']['detected_language'];
+  result.status = data['status'];
+  result.summary = '';
 
   result.subtitles = [];
   for (var item in data['subtitle']['segments']) {
@@ -59,6 +61,35 @@ Future<SubtitleResult> getSubtitles(String enclosureUrl) async {
     subtitle.end = item['end'];
     subtitle.text = item['text'];
     result.subtitles!.add(subtitle);
+  }
+  return result;
+}
+
+Future<List<Subtitle>?> getTranslation(
+    String enclosureUrl, String language) async {
+  print('getTranslation $enclosureUrl $language');
+  var url = Uri(
+    host: host,
+    scheme: 'https',
+    path: '/subtitles/translate',
+  );
+  var req = jsonEncode({'enclosure_url': enclosureUrl, 'language': language});
+  var headers = {'Content-Type': 'application/json'};
+
+  var response = await http.post(url, body: req, headers: headers);
+  var body = utf8.decode(response.bodyBytes);
+  Map<String, dynamic> data = jsonDecode(body);
+  if (data['translation'] == null) {
+    return null;
+  }
+
+  var result = <Subtitle>[];
+  for (var item in data['translation']) {
+    result.add(Subtitle.fromMap({
+      'start': item['start'],
+      'end': item['end'],
+      'text': item['text'],
+    }));
   }
   return result;
 }

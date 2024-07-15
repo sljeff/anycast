@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:anycast/api/subtitles.dart';
+import 'package:anycast/utils/formatters.dart';
 import 'package:sqflite/sqflite.dart';
 
 var tableName = 'subtitle';
@@ -65,6 +66,14 @@ class SubtitleModel {
   }
 
   static Future<void> insert(DatabaseExecutor db, SubtitleModel model) async {
+    // validation
+    if (model.subtitle == null ||
+        model.subtitle!.isEmpty ||
+        model.language == null ||
+        model.subtitle == 'null') {
+      return;
+    }
+
     await db.insert(
       tableName,
       model.toMap(),
@@ -91,7 +100,7 @@ class SubtitleModel {
 
   String toLrc() {
     List<Subtitle> subtitles = [];
-    if (subtitle == null) {
+    if (subtitle == null || subtitle!.isEmpty || subtitle == 'null') {
       return '';
     }
     for (var item in jsonDecode(subtitle!)) {
@@ -105,12 +114,4 @@ class SubtitleModel {
     }
     return lrc;
   }
-}
-
-// seconds to mm:ss.xx
-String formatLrcTime(double time) {
-  var minutes = (time / 60).floor();
-  var seconds = (time % 60).floor();
-  var milliseconds = ((time * 1000) % 1000).floor();
-  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}.${milliseconds.toString().padLeft(3, '0')}';
 }

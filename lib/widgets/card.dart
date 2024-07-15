@@ -363,21 +363,18 @@ class PodcastCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Hero(
-                      tag: subscription.imageUrl!,
-                      child: Container(
-                        width: 64,
-                        height: 64,
-                        decoration: ShapeDecoration(
-                          image: DecorationImage(
-                            image: CachedNetworkImageProvider(
-                              subscription.imageUrl!,
-                            ),
-                            fit: BoxFit.fill,
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: ShapeDecoration(
+                        image: DecorationImage(
+                          image: CachedNetworkImageProvider(
+                            subscription.imageUrl!,
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          fit: BoxFit.fill,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),

@@ -35,6 +35,7 @@ class SubtitleController extends GetxController {
                     SubtitleModel.fromMap({
                       'enclosureUrl': url,
                       'status': 'succeeded',
+                      'language': result.language,
                       'subtitle': jsonEncode(result.subtitles),
                     }));
               });
@@ -71,6 +72,7 @@ class SubtitleController extends GetxController {
               SubtitleModel.fromMap({
                 'enclosureUrl': url,
                 'status': value.status,
+                'language': value.language,
                 'subtitle': jsonEncode(value.subtitles),
               }));
         });

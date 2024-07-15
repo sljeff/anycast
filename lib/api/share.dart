@@ -42,7 +42,6 @@ Future<String?> getShortUrl(Uri origin) async {
   }
   var body = utf8.decode(resp.bodyBytes);
   Map<String, dynamic> data = jsonDecode(body);
-  print(data);
   if (data['status'] != 200) {
     return null;
   }
