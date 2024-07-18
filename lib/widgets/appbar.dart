@@ -84,6 +84,9 @@ class SearchBar extends GetView<DiscoverController> {
           controller.searchText.value = value;
         },
         onSubmitted: (value) {
+          if (value.isEmpty) {
+            return;
+          }
           controller.searchText.value = value;
           context.pushTransparentRoute(SearchPage(searchText: value));
         },

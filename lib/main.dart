@@ -7,6 +7,7 @@ import 'package:anycast/states/subscription.dart';
 import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/states/translation.dart';
+import 'package:anycast/states/user.dart';
 import 'package:anycast/styles.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/widgets/bottom_nav_bar.dart';
@@ -18,6 +19,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'pages/discover.dart';
 import 'pages/playlists.dart';
 import 'pages/podcasts.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,9 +40,9 @@ void main() async {
     ),
   );
 
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // );
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   runApp(const NavigationBarApp());
 }
@@ -60,6 +63,7 @@ class NavigationBarApp extends StatelessWidget {
     Get.lazyPut(() => DiscoverController());
     Get.lazyPut(() => FeedEpisodeController());
     Get.put(TranslationController());
+    Get.put(AuthController());
     return GetMaterialApp(
       theme: ThemeData(
         appBarTheme: const AppBarTheme(

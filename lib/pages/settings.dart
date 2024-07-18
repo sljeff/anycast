@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:anycast/pages/login.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/widgets/handler.dart';
 import 'package:dismissible_page/dismissible_page.dart';
@@ -48,7 +49,7 @@ class SettingsPage extends GetView<SettingsController> {
               const SizedBox(height: 24),
               GestureDetector(
                 onTap: () {
-                  Get.snackbar('没做', '没做完');
+                  context.pushTransparentRoute(const LoginPage());
                 },
                 child: const SettingContainer(
                   child: Text('Profile'),
@@ -389,26 +390,6 @@ class SettingsPage extends GetView<SettingsController> {
         ),
       ),
     );
-  }
-}
-
-class ProfilePage extends GetView<SettingsController> {
-  const ProfilePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO: implement build
-    throw UnimplementedError();
-  }
-}
-
-class PlanPage extends GetView<SettingsController> {
-  const PlanPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO: implement build
-    throw UnimplementedError();
   }
 }
 

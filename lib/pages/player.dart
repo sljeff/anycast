@@ -279,9 +279,9 @@ class TitleBar extends GetView<PlayerController> {
       var episode = controller.playlistEpisode.value;
       var backgroundColor = controller.backgroundColor.value;
       var subscription = controller.channel.value;
-      var imgUrl = subscription.imageUrl!;
+      var imgUrl = subscription.imageUrl ?? '';
       var title = controller.playlistEpisode.value.title!;
-      var channelTitle = subscription.title!;
+      var channelTitle = subscription.title ?? '';
 
       Widget img = const Icon(
         Icons.image,
