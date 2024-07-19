@@ -1,7 +1,6 @@
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -35,19 +34,10 @@ class AuthController extends GetxController {
 
   Future<void> signInWithApple() async {
     try {
-      final credential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-      );
-
-      final oauthCredential = OAuthProvider("apple.com").credential(
-        idToken: credential.identityToken,
-        accessToken: credential.authorizationCode,
-      );
-
-      await _auth.signInWithCredential(oauthCredential);
+      AppleAuthProvider appleProvider = AppleAuthProvider();
+      appleProvider = appleProvider.addScope('email');
+      appleProvider = appleProvider.addScope('name');
+      await FirebaseAuth.instance.signInWithProvider(appleProvider);
     } catch (e) {
       print('Error signing in with Apple: $e');
     }

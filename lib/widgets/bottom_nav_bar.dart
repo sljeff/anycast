@@ -104,7 +104,7 @@ class PlayerBar extends GetView<PlayerController> {
           context.pushTransparentRoute(const PlayerPage());
         },
         child: Container(
-          height: 56,
+          height: 58,
           margin: const EdgeInsets.only(left: 12, right: 12),
           decoration: ShapeDecoration(
             color: Colors.white.withOpacity(0.1),
@@ -121,7 +121,7 @@ class PlayerBar extends GetView<PlayerController> {
                   top: 0,
                   child: Container(
                     width: playedWidth,
-                    height: 56,
+                    height: 58,
                     color: Colors.white.withOpacity(0.2),
                   ),
                 ),
