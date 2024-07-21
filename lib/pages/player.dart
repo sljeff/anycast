@@ -68,9 +68,9 @@ class PlayerPage extends GetView<PlayerController> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                const SizedBox(height: 16),
                 const Handler(),
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.8,
+                Expanded(
                   child: PageView(
                     controller: controller.pageController,
                     children: const [
@@ -163,9 +163,8 @@ class PlayerMain extends GetView<PlayerController> {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            const SizedBox(height: 16),
             Stack(
               children: [
                 Obx(() {
@@ -237,13 +236,9 @@ class PlayerMain extends GetView<PlayerController> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
             const TitleBar(),
-            const SizedBox(height: 16),
             const MyProgressBar(),
-            const SizedBox(height: 16),
             const Controls(),
-            const SizedBox(height: 16),
           ],
         ),
       ),

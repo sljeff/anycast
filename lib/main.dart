@@ -64,6 +64,7 @@ class NavigationBarApp extends StatelessWidget {
     Get.lazyPut(() => FeedEpisodeController());
     Get.put(TranslationController());
     Get.put(AuthController());
+    Get.put(RevenueCatController());
     return GetMaterialApp(
       theme: ThemeData(
         appBarTheme: const AppBarTheme(

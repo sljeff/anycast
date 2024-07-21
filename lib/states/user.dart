@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 class AuthController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -11,7 +14,21 @@ class AuthController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    user.bindStream(_auth.authStateChanges());
+    // user.bindStream(_auth.authStateChanges());
+    _auth.authStateChanges().listen((User? user) {
+      this.user.value = user;
+      if (user != null) {
+        loginToRevenueCat();
+      }
+    });
+  }
+
+  Future<void> loginToRevenueCat() async {
+    try {
+      await Purchases.logIn(user.value!.uid);
+    } catch (e) {
+      print('Error logging in to RevenueCat: $e');
+    }
   }
 
   Future<void> signInWithGoogle() async {
@@ -46,5 +63,74 @@ class AuthController extends GetxController {
   Future<void> signOut() async {
     await _auth.signOut();
     await _googleSignIn.signOut();
+  }
+}
+
+class RevenueCatController extends GetxController {
+  final RxBool _isSubscribed = false.obs;
+  late final Rx<CustomerInfo> _customerInfo;
+
+  var choosenPlan = 'anycast_monthly'.obs;
+
+  bool get isSubscribed => _isSubscribed.value;
+  CustomerInfo get customerInfo => _customerInfo.value;
+
+  @override
+  void onInit() {
+    super.onInit();
+    initPlatformState();
+  }
+
+  Future<void> initPlatformState() async {
+    var configuration =
+        PurchasesConfiguration('IOS_KEY');
+    if (Platform.isAndroid) {
+      configuration =
+          PurchasesConfiguration('ANDROID_KEY');
+    }
+    var user = Get.find<AuthController>().user.value;
+    if (user?.uid != null) {
+      configuration.appUserID = user?.uid;
+    }
+    await Purchases.configure(configuration);
+    await Purchases.setLogLevel(LogLevel.debug);
+
+    CustomerInfo customerInfo = await Purchases.getCustomerInfo();
+    _customerInfo = customerInfo.obs;
+    _updateCustomerInfo(customerInfo);
+
+    Purchases.addCustomerInfoUpdateListener((customerInfo) {
+      _updateCustomerInfo(customerInfo);
+    });
+  }
+
+  Future<void> purchasePackage(Package package) async {
+    try {
+      CustomerInfo customerInfo = await Purchases.purchasePackage(package);
+      _updateCustomerInfo(customerInfo);
+    } catch (e) {
+      print('Error purchasing package: $e');
+    }
+  }
+
+  Future<void> restorePurchases() async {
+    try {
+      CustomerInfo customerInfo = await Purchases.restorePurchases();
+      _updateCustomerInfo(customerInfo);
+    } catch (e) {
+      print('Error restoring purchases: $e');
+    }
+  }
+
+  void _updateCustomerInfo(CustomerInfo customerInfo) {
+    _customerInfo.value = customerInfo;
+    _isSubscribed.value = customerInfo.entitlements.active.isNotEmpty;
+  }
+
+  @override
+  void onClose() {
+    // 移除监听器
+    Purchases.removeCustomerInfoUpdateListener(_updateCustomerInfo);
+    super.onClose();
   }
 }

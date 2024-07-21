@@ -163,8 +163,10 @@ class Card extends StatelessWidget {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    SizedBox(
-                                      width: 94,
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 140,
+                                      ),
                                       child: Text(
                                         episode.channelTitle!,
                                         style: const TextStyle(
@@ -179,7 +181,6 @@ class Card extends StatelessWidget {
                                       ),
                                     ),
                                     SizedBox(
-                                      width: 124,
                                       child: Text(
                                         rightText,
                                         textAlign: TextAlign.right,
