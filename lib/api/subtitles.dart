@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:anycast/api/error_handler.dart';
+import 'package:anycast/utils/http_client.dart';
 import 'package:http/http.dart' as http;
 
 const host = 'api.anycast.website';
@@ -31,16 +33,19 @@ class SubtitleResult {
 }
 
 Future<SubtitleResult> getSubtitles(String enclosureUrl) async {
-  print('getSubtitles $enclosureUrl');
   var url = Uri(
     host: host,
     scheme: 'https',
     path: '/subtitles',
   );
-  var req = jsonEncode({'enclosure_url': enclosureUrl});
-  var headers = {'Content-Type': 'application/json'};
+  var req = {'enclosure_url': enclosureUrl};
 
-  var response = await http.post(url, body: req, headers: headers);
+  var response = await reqWithAuth(url.toString(), method: "POST", data: req);
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    ErrorHandler.handle(response.statusCode, response.body);
+    return SubtitleResult()..status = 'failed';
+  }
+
   var body = utf8.decode(response.bodyBytes);
   Map<String, dynamic> data = jsonDecode(body);
 
@@ -67,7 +72,6 @@ Future<SubtitleResult> getSubtitles(String enclosureUrl) async {
 
 Future<List<Subtitle>?> getTranslation(
     String enclosureUrl, String language) async {
-  print('getTranslation $enclosureUrl $language');
   var url = Uri(
     host: host,
     scheme: 'https',

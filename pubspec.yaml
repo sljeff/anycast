@@ -83,6 +83,7 @@ dependencies:
   firebase_auth: ^5.1.2
   google_sign_in: ^6.2.1
   purchases_flutter: ^6.30.2
+  jiffy: ^6.3.1
 
 dev_dependencies:
   flutter_test:

@@ -1,15 +1,16 @@
+import 'package:anycast/api/user.dart';
 import 'package:anycast/states/user.dart';
 import 'package:anycast/widgets/handler.dart';
 import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/icons/ri.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:jiffy/jiffy.dart';
 
 class LoginPage extends GetView<AuthController> {
   const LoginPage({super.key});
@@ -256,17 +257,34 @@ class LoginPage extends GetView<AuthController> {
   Widget _buildSubscriptionInfo() {
     return Obx(() {
       var rcController = Get.find<RevenueCatController>();
-      var plan = 'Basic';
-      var remainingDays = '0';
 
-      if (rcController.isSubscribed) {
-        plan = 'Anycast+ Plus';
-        var ent = rcController.customerInfo.entitlements.active['plus'];
-
-        if (ent != null) {
-          remainingDays = ent.expirationDate!;
-        }
+      if (!rcController.isSubscribed) {
+        return Card(
+          color: const Color(0xFF1E1E1E),
+          child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: Text(
+              'Basic Plan',
+              style: GoogleFonts.comfortaa(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
       }
+
+      var expirationStrUTC = '';
+      var ent = rcController.customerInfo.entitlements.active['plus'];
+
+      if (ent != null) {
+        expirationStrUTC = ent.expirationDate!;
+      }
+
+      var expiration =
+          Jiffy.parse(expirationStrUTC, isUtc: true).toLocal().format(
+                pattern: 'yyyy-MM-dd HH:mm',
+              );
 
       return Card(
         color: const Color(0xFF1E1E1E),
@@ -281,17 +299,34 @@ class LoginPage extends GetView<AuthController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('Anycast+ Plus',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Plan expires on $expiration'),
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Text('Your plan: '),
-                    Text(plan,
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    FutureBuilder(
+                      future: getUser(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const Text('...');
+                        }
+
+                        var user = snapshot.data!;
+
+                        return Text('${user.remaining}/50',
+                            style: TextStyle(
+                              color: Colors.green.shade200,
+                              fontWeight: FontWeight.bold,
+                            ));
+                      },
+                    ),
+                    const Text(
+                      ' Transcriptions left (this month)',
+                    ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text('Remaining Days: $remainingDays'),
-                const SizedBox(height: 8),
-                Text('Remaining Transcriptions: 0'),
               ],
             ),
           ),

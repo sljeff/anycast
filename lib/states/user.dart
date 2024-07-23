@@ -23,6 +23,15 @@ class AuthController extends GetxController {
     });
   }
 
+  Future<String?> getToken() async {
+    if (user.value == null) {
+      return null;
+    }
+
+    var token = await user.value!.getIdToken();
+    return token;
+  }
+
   Future<void> loginToRevenueCat() async {
     try {
       await Purchases.logIn(user.value!.uid);

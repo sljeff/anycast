@@ -40,10 +40,7 @@ class SubtitleController extends GetxController {
                     }));
               });
             } else if (result.status == 'failed') {
-              subtitleUrls.remove(url);
-              helper.db.then((db) {
-                SubtitleModel.delete(db, url);
-              });
+              remove(url);
             }
           }
         }
@@ -77,7 +74,7 @@ class SubtitleController extends GetxController {
               }));
         });
       } else if (value.status == 'failed') {
-        subtitleUrls.remove(url);
+        remove(url);
       }
     });
   }

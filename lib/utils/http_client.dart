@@ -1,15 +1,79 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:anycast/states/user.dart';
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:retry/retry.dart';
 
+Future<T> myRetry<T>(
+  Future<T> Function() fn, {
+  int retryTimes = 3,
+}) async {
+  return retry(
+    () => fn(),
+    retryIf: (e) => e is SocketException || e is TimeoutException,
+    maxAttempts: retryTimes,
+  );
+}
+
+Future<http.Response> reqWithAuth(
+  String url, {
+  String method = 'GET',
+  Map<String, String>? headers,
+  Object? data,
+  int timeout = 10,
+}) async {
+  var token = await Get.find<AuthController>().getToken();
+  if (token == null) {
+    return http.Response('Unauthorized', 401);
+  }
+  headers = headers ?? {};
+  headers['Authorization'] = 'Bearer $token';
+  if (data != null) {
+    headers['Content-Type'] = 'application/json';
+    data = jsonEncode(data);
+  }
+
+  switch (method) {
+    case 'GET':
+      return myRetry(
+        () => http
+            .get(Uri.parse(url), headers: headers)
+            .timeout(Duration(seconds: timeout)),
+      );
+    case 'POST':
+      return myRetry(
+        () => http
+            .post(Uri.parse(url), headers: headers, body: data)
+            .timeout(Duration(seconds: timeout)),
+      );
+    case 'PUT':
+      return myRetry(
+        () => http
+            .put(Uri.parse(url), headers: headers, body: data)
+            .timeout(Duration(seconds: timeout)),
+      );
+    case 'DELETE':
+      return myRetry(
+        () => http
+            .delete(Uri.parse(url), headers: headers)
+            .timeout(Duration(seconds: timeout)),
+      );
+    default:
+      return myRetry(
+        () => http
+            .get(Uri.parse(url), headers: headers)
+            .timeout(Duration(seconds: timeout)),
+      );
+  }
+}
+
 Future<http.Response?> fetchWithRetry(String url) async {
   try {
-    return retry(
+    return myRetry(
       () => http.get(Uri.parse(url)).timeout(const Duration(seconds: 10)),
-      retryIf: (e) => e is SocketException || e is TimeoutException,
-      maxAttempts: 3,
     );
   } catch (e) {
     return null;

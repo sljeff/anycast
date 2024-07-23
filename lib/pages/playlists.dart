@@ -199,11 +199,6 @@ class PlaylistEpisodesList extends StatelessWidget {
                               .subtitleUrls[episode.enclosureUrl!]) {
                             case null:
                               stController.add(episode.enclosureUrl!);
-                              Get.snackbar(
-                                'Processing',
-                                'Transcript generating, please wait...',
-                                snackPosition: SnackPosition.BOTTOM,
-                              );
                             case 'failed':
                               stController.remove(episode.enclosureUrl!);
                               Get.snackbar(
