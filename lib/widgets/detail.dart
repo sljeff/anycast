@@ -7,11 +7,11 @@ import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/card.dart';
 import 'package:anycast/widgets/handler.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:share_plus/share_plus.dart';
 
 class Detail extends StatelessWidget {
@@ -110,8 +110,14 @@ class Detail extends StatelessWidget {
                                       Get.lazyPut(
                                           () => ChannelController(channel: s),
                                           tag: s.rssFeedUrl);
-                                      context.pushTransparentRoute(
-                                          Channel(rssFeedUrl: s.rssFeedUrl!));
+                                      showMaterialModalBottomSheet(
+                                        context: context,
+                                        builder: (context) => Channel(
+                                          rssFeedUrl: s.rssFeedUrl!,
+                                        ),
+                                        expand: true,
+                                        closeProgressThreshold: 0.9,
+                                      );
                                     },
                                     child: Text(
                                       episode.channelTitle!,

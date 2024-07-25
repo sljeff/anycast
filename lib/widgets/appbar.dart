@@ -1,9 +1,9 @@
 import 'package:anycast/pages/discover.dart';
 import 'package:anycast/states/discover.dart';
-import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:simple_gradient_text/simple_gradient_text.dart';
 
 class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -88,7 +88,12 @@ class SearchBar extends GetView<DiscoverController> {
             return;
           }
           controller.searchText.value = value;
-          context.pushTransparentRoute(SearchPage(searchText: value));
+          showMaterialModalBottomSheet(
+            expand: true,
+            context: context,
+            builder: (context) => SearchPage(searchText: value),
+            closeProgressThreshold: 0.8,
+          );
         },
         controller: controller.searchController,
         style: const TextStyle(

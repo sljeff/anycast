@@ -18,13 +18,13 @@ import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/detail.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/icons/icon_park_solid.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 
 class Card extends StatelessWidget {
@@ -331,9 +331,14 @@ class PodcastCard extends StatelessWidget {
       onTap: () {
         Get.lazyPut(() => ChannelController(channel: subscription),
             tag: subscription.rssFeedUrl);
-        context.pushTransparentRoute(Channel(
-          rssFeedUrl: subscription.rssFeedUrl!,
-        ));
+        showMaterialModalBottomSheet(
+          expand: true,
+          context: context,
+          builder: (context) {
+            return Channel(rssFeedUrl: subscription.rssFeedUrl!);
+          },
+          closeProgressThreshold: 0.9,
+        );
       },
       child: Container(
         padding: const EdgeInsets.only(left: 12, right: 12),

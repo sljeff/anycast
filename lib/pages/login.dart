@@ -1,7 +1,6 @@
 import 'package:anycast/api/user.dart';
 import 'package:anycast/states/user.dart';
 import 'package:anycast/widgets/handler.dart';
-import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -17,94 +16,122 @@ class LoginPage extends GetView<AuthController> {
 
   @override
   Widget build(BuildContext context) {
-    return DismissiblePage(
-      backgroundColor: const Color(0xFF111316),
-      isFullScreen: false,
-      direction: DismissiblePageDismissDirection.down,
-      onDismissed: () {
-        Get.back();
-      },
-      child: Column(
-        children: [
-          const Handler(),
-          Obx(() {
-            if (controller.user.value == null) {
-              return Container(
-                width: 300,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+    return Container(
+      color: const Color(0xFF111316),
+      child: SafeArea(
+        child: Column(
+          children: [
+            const Handler(),
+            Obx(() {
+              if (controller.user.value == null) {
+                return Expanded(
+                  child: Container(
+                    width: 300,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Logo
+                        Image.asset(
+                          'assets/icon/icon.png',
+                          width: 100,
+                          height: 100,
+                        ),
+                        const SizedBox(height: 50),
+                        Text(
+                          "Sign up now \n\n&\n\nGet 3 free audio transcriptions!",
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.comfortaa(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                        const SizedBox(height: 50),
+                        // Google Sign In Button
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Iconify(Ic.round_apple),
+                              SizedBox(width: 10),
+                              Text('Sign in with Apple'),
+                            ],
+                          ),
+                          onPressed: () async {
+                            Get.dialog(
+                              const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                            await controller.signInWithApple();
+                            Get.back();
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        // Apple Sign In Button
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Iconify(Ri.google_fill),
+                              SizedBox(width: 10),
+                              Text('Sign in with Google'),
+                            ],
+                          ),
+                          onPressed: () async {
+                            Get.dialog(
+                              const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                            await controller.signInWithGoogle();
+                            Get.back();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
                   children: [
-                    // Logo
-                    Image.asset(
-                      'assets/icon/icon.png',
-                      width: 100,
-                      height: 100,
-                    ),
-                    const SizedBox(height: 50),
-                    // Google Sign In Button
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Iconify(Ic.round_apple),
-                          SizedBox(width: 10),
-                          Text('Sign in with Apple'),
-                        ],
-                      ),
-                      onPressed: () => controller.signInWithApple(),
-                    ),
+                    _buildUserInfo(),
                     const SizedBox(height: 20),
-                    // Apple Sign In Button
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Iconify(Ri.google_fill),
-                          SizedBox(width: 10),
-                          Text('Sign in with Google'),
-                        ],
-                      ),
-                      onPressed: () => controller.signInWithGoogle(),
-                    ),
+                    _buildSubscriptionInfo(),
+                    const SizedBox(height: 20),
+                    _buildPaywall(context),
+                    const SizedBox(height: 30),
+                    const RemoveAccount(),
                   ],
                 ),
               );
-            }
-
-            return SizedBox(
-              height: Get.height - 100,
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _buildUserInfo(),
-                  const SizedBox(height: 20),
-                  _buildSubscriptionInfo(),
-                  const SizedBox(height: 20),
-                  _buildPaywall(context),
-                ],
-              ),
-            );
-          }),
-        ],
+            }),
+          ],
+        ),
       ),
     );
   }
@@ -258,17 +285,57 @@ class LoginPage extends GetView<AuthController> {
     return Obx(() {
       var rcController = Get.find<RevenueCatController>();
 
+      var remainingText = FutureBuilder(
+        future: getUser(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Text('...');
+          }
+          var user = snapshot.data!;
+          var total = 3;
+          var right = ' Transcriptions left';
+          if (user.plus == 1) {
+            total = 50;
+            right = ' Transcriptions left (this month)';
+          }
+
+          return Row(
+            children: [
+              Text('${user.remaining}/$total',
+                  style: TextStyle(
+                    color: Colors.green.shade200,
+                    fontWeight: FontWeight.bold,
+                  )),
+              Text(
+                right,
+                style: GoogleFonts.comfortaa(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          );
+        },
+      );
+
       if (!rcController.isSubscribed) {
         return Card(
           color: const Color(0xFF1E1E1E),
           child: Padding(
             padding: const EdgeInsets.all(15),
-            child: Text(
-              'Basic Plan',
-              style: GoogleFonts.comfortaa(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Basic Plan',
+                  style: GoogleFonts.comfortaa(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                remainingText,
+              ],
             ),
           ),
         );
@@ -304,29 +371,7 @@ class LoginPage extends GetView<AuthController> {
                 const SizedBox(height: 8),
                 Text('Plan expires on $expiration'),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    FutureBuilder(
-                      future: getUser(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const Text('...');
-                        }
-
-                        var user = snapshot.data!;
-
-                        return Text('${user.remaining}/50',
-                            style: TextStyle(
-                              color: Colors.green.shade200,
-                              fontWeight: FontWeight.bold,
-                            ));
-                      },
-                    ),
-                    const Text(
-                      ' Transcriptions left (this month)',
-                    ),
-                  ],
-                ),
+                remainingText,
               ],
             ),
           ),
@@ -387,7 +432,7 @@ class LoginPage extends GetView<AuthController> {
                           backgroundColor: Colors.lightGreenAccent,
                           minimumSize: const Size(double.infinity, 50),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           var rcController = Get.find<RevenueCatController>();
                           Package? plan;
 
@@ -416,7 +461,13 @@ class LoginPage extends GetView<AuthController> {
                             );
                             return;
                           }
-                          rcController.purchasePackage(plan);
+
+                          Get.dialog(const Center(
+                            child: CircularProgressIndicator(
+                                strokeCap: StrokeCap.round),
+                          ));
+                          await rcController.purchasePackage(plan);
+                          Get.back();
                         },
                         child: Text('Confirm purchase',
                             style: GoogleFonts.comfortaa(
@@ -428,10 +479,56 @@ class LoginPage extends GetView<AuthController> {
                 },
               ),
               const SizedBox(height: 10),
-              const Center(
-                child: Text(
-                  'restore purchases',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+              GestureDetector(
+                onTap: () async {
+                  Get.dialog(const Center(
+                    child: SizedBox(
+                      height: 50,
+                      width: 50,
+                      child:
+                          CircularProgressIndicator(strokeCap: StrokeCap.round),
+                    ),
+                  ));
+                  var rcController = Get.find<RevenueCatController>();
+                  var success = await rcController.restorePurchases();
+                  Get.back();
+
+                  if (!success) {
+                    Get.dialog(
+                      AlertDialog(
+                        title: Text('Error',
+                            style: GoogleFonts.comfortaa(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
+                        content: Text(
+                          'No active entitlements',
+                          style: GoogleFonts.comfortaa(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  Get.dialog(
+                    AlertDialog(
+                      title: Text('Success',
+                          style: GoogleFonts.comfortaa(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
+                      content: Text(
+                        'Restored purchases',
+                        style: GoogleFonts.comfortaa(
+                            color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  );
+                },
+                child: const Center(
+                  child: Text(
+                    'restore purchases',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
                 ),
               ),
             ],
@@ -494,6 +591,86 @@ class LoginPage extends GetView<AuthController> {
           ),
         );
       },
+    );
+  }
+}
+
+class RemoveAccount extends StatelessWidget {
+  const RemoveAccount({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: GestureDetector(
+        onTap: () {
+          Get.dialog(
+            AlertDialog(
+              title: Text("Permanently Delete Your Account?",
+                  style: GoogleFonts.comfortaa(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14)),
+              content: Text(
+                "Warning: This action will permanently delete your account and all associated data. Once deleted, your account cannot be recovered. Are you sure you want to proceed?",
+                style: GoogleFonts.comfortaa(color: Colors.white, fontSize: 14),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Get.back();
+                  },
+                  child: Text("Cancel",
+                      style: GoogleFonts.comfortaa(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    Get.dialog(
+                      const Center(
+                        child: SizedBox(
+                          height: 50,
+                          width: 50,
+                          child: CircularProgressIndicator(
+                              strokeCap: StrokeCap.round),
+                        ),
+                      ),
+                    );
+                    await deleteUser();
+                    Get.back();
+                    Get.back();
+                    Get.find<AuthController>().signOut();
+                  },
+                  child: Text("Confirm",
+                      style: GoogleFonts.comfortaa(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14)),
+                ),
+              ],
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            color: Colors.white30,
+          ),
+          child: Text(
+            "Permanently Delete Account",
+            style: GoogleFonts.comfortaa(
+              color: Colors.red,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

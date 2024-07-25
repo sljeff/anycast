@@ -9,8 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:remixicon/remixicon.dart';
-import 'package:dismissible_page/dismissible_page.dart';
 
 class BottomNavBar extends StatelessWidget {
   static final playerController = Get.find<PlayerController>();
@@ -97,11 +97,21 @@ class PlayerBar extends GetView<PlayerController> {
 
       return GestureDetector(
         onTap: () {
-          context.pushTransparentRoute(const PlayerPage());
+          showMaterialModalBottomSheet(
+            context: context,
+            builder: (context) => const PlayerPage(),
+            expand: true,
+            closeProgressThreshold: 0.9,
+          );
         },
         // 上拉，显示 PlayerPage
         onVerticalDragUpdate: (details) {
-          context.pushTransparentRoute(const PlayerPage());
+          showMaterialModalBottomSheet(
+            context: context,
+            builder: (context) => const PlayerPage(),
+            expand: true,
+            closeProgressThreshold: 0.9,
+          );
         },
         child: Container(
           height: 58,
@@ -132,21 +142,13 @@ class PlayerBar extends GetView<PlayerController> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Hero(
-                        tag: 'play_image',
-                        child: Container(
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
                           width: 36,
                           height: 36,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: ShapeDecoration(
-                            image: DecorationImage(
-                              image:
-                                  CachedNetworkImageProvider(episode.imageUrl!),
-                              fit: BoxFit.fill,
-                            ),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                          ),
+                          imageUrl:
+                              controller.playlistEpisode.value.imageUrl ?? '',
                         ),
                       ),
                       const SizedBox(width: 8),

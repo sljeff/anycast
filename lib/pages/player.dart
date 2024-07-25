@@ -15,7 +15,6 @@ import 'package:anycast/widgets/card.dart';
 import 'package:anycast/widgets/handler.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
@@ -26,6 +25,7 @@ import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:marquee/marquee.dart';
 import 'package:flutter_lyric/lyrics_reader.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:share_plus/share_plus.dart';
 
 class PlayerPage extends GetView<PlayerController> {
@@ -34,61 +34,54 @@ class PlayerPage extends GetView<PlayerController> {
   @override
   Widget build(BuildContext context) {
     controller.pageIndex.value = 1;
-    return DismissiblePage(
-      backgroundColor: const Color(0xFF111316),
-      direction: DismissiblePageDismissDirection.down,
-      onDismissed: () {
-        Get.back();
-      },
-      child: Stack(
-        children: [
-          Container(
-            height: MediaQuery.of(context).size.height / 2,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  controller.backgroundColor.value,
-                  const Color(0xFF111316),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: MediaQuery.of(context).size.height / 2,
-              color: const Color(0xFF111316),
-            ),
-          ),
-          SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const SizedBox(height: 16),
-                const Handler(),
-                Expanded(
-                  child: PageView(
-                    controller: controller.pageController,
-                    children: const [
-                      PlayerSettings(),
-                      PlayerMain(),
-                      PlayerAI(),
-                    ],
-                    onPageChanged: (index) {
-                      controller.pageIndex.value = index;
-                    },
-                  ),
-                ),
-                const PageTab(),
+    return Stack(
+      children: [
+        Container(
+          height: MediaQuery.of(context).size.height / 2,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                controller.backgroundColor.value,
+                const Color(0xFF111316),
               ],
             ),
-          )
-        ],
-      ),
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            height: MediaQuery.of(context).size.height / 2,
+            color: const Color(0xFF111316),
+          ),
+        ),
+        SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const SizedBox(height: 16),
+              const Handler(),
+              Expanded(
+                child: PageView(
+                  controller: controller.pageController,
+                  children: const [
+                    PlayerSettings(),
+                    PlayerMain(),
+                    PlayerAI(),
+                  ],
+                  onPageChanged: (index) {
+                    controller.pageIndex.value = index;
+                  },
+                ),
+              ),
+              const PageTab(),
+            ],
+          ),
+        )
+      ],
     );
   }
 }
@@ -157,7 +150,7 @@ class PlayerMain extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    var size = MediaQuery.of(context).size.width - 48;
+    var size = Get.width - 48;
     return DefaultTextStyle(
       style: const TextStyle(color: Colors.white),
       child: Padding(
@@ -168,25 +161,12 @@ class PlayerMain extends GetView<PlayerController> {
             Stack(
               children: [
                 Obx(() {
-                  return Hero(
-                    tag: 'play_image',
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        width: size,
-                        height: size,
-                        imageUrl:
-                            controller.playlistEpisode.value.imageUrl ?? '',
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Icon(
-                          Icons.image,
-                          size: size,
-                        ),
-                        errorWidget: (context, url, error) => Icon(
-                          Icons.image_not_supported,
-                          size: size,
-                        ),
-                      ),
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      width: size,
+                      height: size,
+                      imageUrl: controller.playlistEpisode.value.imageUrl ?? '',
                     ),
                   );
                 }),
@@ -369,7 +349,12 @@ void jumpToChannel(PlaylistEpisodeModel episode, BuildContext context,
     SubscriptionModel channel) {
   Get.lazyPut(() => ChannelController(channel: channel),
       tag: channel.rssFeedUrl);
-  context.pushTransparentRoute(Channel(rssFeedUrl: channel.rssFeedUrl!));
+  showMaterialModalBottomSheet(
+    context: context,
+    builder: (context) => Channel(rssFeedUrl: channel.rssFeedUrl!),
+    expand: true,
+    closeProgressThreshold: 0.9,
+  );
 }
 
 class MyProgressBar extends GetView<PlayerController> {

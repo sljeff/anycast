@@ -42,7 +42,7 @@ Future<SubtitleResult> getSubtitles(String enclosureUrl) async {
 
   var response = await reqWithAuth(url.toString(), method: "POST", data: req);
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    ErrorHandler.handle(response.statusCode, response.body);
+    ErrorHandler.handle(response.statusCode, response);
     return SubtitleResult()..status = 'failed';
   }
 

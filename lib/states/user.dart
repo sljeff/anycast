@@ -70,6 +70,7 @@ class AuthController extends GetxController {
   }
 
   Future<void> signOut() async {
+    Get.find<RevenueCatController>().signOut();
     await _auth.signOut();
     await _googleSignIn.signOut();
   }
@@ -122,18 +123,29 @@ class RevenueCatController extends GetxController {
     }
   }
 
-  Future<void> restorePurchases() async {
+  Future<bool> restorePurchases() async {
     try {
-      CustomerInfo customerInfo = await Purchases.restorePurchases();
-      _updateCustomerInfo(customerInfo);
+      var info = await Purchases.restorePurchases();
+      if (info.entitlements.active.isEmpty) {
+        return false;
+      }
+      _updateCustomerInfo(info);
     } catch (e) {
       print('Error restoring purchases: $e');
+      return false;
     }
+
+    return true;
   }
 
   void _updateCustomerInfo(CustomerInfo customerInfo) {
     _customerInfo.value = customerInfo;
     _isSubscribed.value = customerInfo.entitlements.active.isNotEmpty;
+  }
+
+  void signOut() {
+    Purchases.logOut();
+    _isSubscribed.value = false;
   }
 
   @override

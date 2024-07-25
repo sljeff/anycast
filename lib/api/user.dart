@@ -47,3 +47,14 @@ Future<User?> getUser() async {
     return null;
   }
 }
+
+Future<bool?> deleteUser() async {
+  var resp = await reqWithAuth('$host/user', method: 'DELETE');
+
+  if (resp.statusCode != 200) {
+    ErrorHandler.handle(resp.statusCode, resp);
+    return null;
+  }
+
+  return true;
+}

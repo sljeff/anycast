@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:anycast/pages/login.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/widgets/handler.dart';
-import 'package:dismissible_page/dismissible_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -11,33 +10,27 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ph.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
 class SettingsPage extends GetView<SettingsController> {
   const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DismissiblePage(
-      backgroundColor: const Color(0xFF111316),
-      isFullScreen: false,
-      direction: DismissiblePageDismissDirection.down,
-      onDismissed: () {
-        Get.back();
-      },
-      child: DefaultTextStyle(
-        style: TextStyle(
-          color: Colors.white,
-          decoration: TextDecoration.none,
-          fontFamily: GoogleFonts.comfortaa().fontFamily,
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
-          height: 1.5,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.start,
+    return Container(
+      color: const Color(0xFF111316),
+      child: SafeArea(
+        child: DefaultTextStyle(
+          style: TextStyle(
+            color: Colors.white,
+            decoration: TextDecoration.none,
+            fontFamily: GoogleFonts.comfortaa().fontFamily,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            height: 1.5,
+          ),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             children: [
               const SizedBox(height: 12),
               const Row(
@@ -49,7 +42,14 @@ class SettingsPage extends GetView<SettingsController> {
               const SizedBox(height: 24),
               GestureDetector(
                 onTap: () {
-                  context.pushTransparentRoute(const LoginPage());
+                  showMaterialModalBottomSheet(
+                    expand: true,
+                    context: context,
+                    builder: (context) {
+                      return const LoginPage();
+                    },
+                    closeProgressThreshold: 0.9,
+                  );
                 },
                 child: const SettingContainer(
                   child: Text('Profile'),
