@@ -174,7 +174,7 @@ class PlayerMain extends GetView<PlayerController> {
                   bottom: 4,
                   right: 4,
                   child: GestureDetector(
-                    onTap: () {
+                    onTap: () async {
                       var episode = controller.playlistEpisode.value;
                       var shareUrl = Uri(
                         scheme: 'https',
@@ -186,13 +186,20 @@ class PlayerMain extends GetView<PlayerController> {
                         },
                       );
 
-                      getShortUrl(shareUrl).then((value) {
+                      Get.dialog(const Center(
+                        child: CircularProgressIndicator(
+                          strokeCap: StrokeCap.round,
+                        ),
+                      ));
+                      await getShortUrl(shareUrl).then((value) {
                         var finalUrl = shareUrl.toString();
                         if (value != null) {
                           finalUrl = value;
                         }
                         Share.share('${episode.title}\n\n$finalUrl');
                       });
+
+                      Get.back();
                     },
                     child: Container(
                       alignment: Alignment.center,
@@ -608,7 +615,7 @@ class Subtitles extends GetView<SubtitleController> {
                           .bindLyricToMain(subtitle.toLrc())
                           .bindLyricToExt(translation.toLrc())
                           .getModel();
-                      return Lyrics(
+                      return LyricsWithShare(
                         model: model,
                         height: MediaQuery.of(context).size.height / 1.5,
                       );
@@ -616,7 +623,7 @@ class Subtitles extends GetView<SubtitleController> {
                   } else if (translationStatus == 'processing') {
                     return Column(
                       children: [
-                        Lyrics(
+                        LyricsWithShare(
                           model: model,
                           height: MediaQuery.of(context).size.height / 1.6,
                         ),
@@ -639,7 +646,7 @@ class Subtitles extends GetView<SubtitleController> {
                       ],
                     );
                   } else {
-                    return Lyrics(
+                    return LyricsWithShare(
                       model: model,
                       height: MediaQuery.of(context).size.height / 1.5,
                     );
@@ -650,6 +657,52 @@ class Subtitles extends GetView<SubtitleController> {
           ),
         );
       }),
+    );
+  }
+}
+
+class LyricsWithShare extends GetView<PlayerController> {
+  const LyricsWithShare({
+    super.key,
+    required this.model,
+    required this.height,
+  });
+
+  final LyricsReaderModel model;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Lyrics(
+          model: model,
+          height: height,
+        ),
+        Positioned(
+          right: 8,
+          bottom: 8,
+          child: IconButton(
+            style: const ButtonStyle(
+              alignment: Alignment.center,
+              padding: WidgetStatePropertyAll(EdgeInsets.all(8)),
+              backgroundColor: WidgetStatePropertyAll(Colors.black),
+            ),
+            onPressed: () {
+              Get.snackbar(
+                "Coming Soon",
+                "Export subtitles coming soon",
+                snackPosition: SnackPosition.BOTTOM,
+              );
+            },
+            icon: const Iconify(
+              Ic.baseline_offline_share,
+              size: 18,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
