@@ -11,6 +11,7 @@ import 'package:country_code_picker/country_code_picker.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ph.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends GetView<SettingsController> {
   const SettingsPage({super.key});
@@ -384,6 +385,48 @@ class SettingsPage extends GetView<SettingsController> {
                     ),
                   ],
                 ),
+              ),
+              Center(
+                child: Column(children: [
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () {
+                      launchUrl(
+                        Uri(scheme: 'https', host: 'privacy.anycast.website'),
+                        mode: LaunchMode.inAppBrowserView,
+                      );
+                    },
+                    child: Text(
+                      'Privacy Policy',
+                      style: GoogleFonts.comfortaa(
+                        color: Colors.blueAccent,
+                        fontSize: 12,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () {
+                      launchUrl(
+                        Uri(
+                          scheme: 'https',
+                          host: 'www.apple.com',
+                          path: '/legal/internet-services/itunes/dev/stdeula/',
+                        ),
+                        mode: LaunchMode.inAppBrowserView,
+                      );
+                    },
+                    child: Text(
+                      'Terms of Use (EULA)',
+                      style: GoogleFonts.comfortaa(
+                        color: Colors.blueAccent,
+                        fontSize: 12,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ]),
               ),
             ],
           ),
