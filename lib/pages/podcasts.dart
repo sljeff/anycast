@@ -40,8 +40,9 @@ class PodcastsPage extends StatelessWidget {
               TabBar(
                 tabs: [
                   Tab(
-                      text: 'Inbox',
-                      icon: Icon(FluentIcons.mail_inbox_all_24_filled)),
+                    text: 'Inbox',
+                    icon: Icon(FluentIcons.mail_inbox_all_24_filled),
+                  ),
                   Tab(
                     text: 'Subscriptions',
                     icon: Icon(FluentIcons.library_24_filled),

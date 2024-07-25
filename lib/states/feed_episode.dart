@@ -3,22 +3,26 @@ import 'dart:async';
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
-import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/utils/audio_handler.dart';
+import 'package:easy_refresh/easy_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class FeedEpisodeController extends GetxController {
   final episodes = <FeedEpisodeModel>[].obs;
+  final progress = 0.0.obs;
 
   final DatabaseHelper helper = DatabaseHelper();
   final MyAudioHandler audioHandler = MyAudioHandler();
   final scrollController = ScrollController();
-  final GlobalKey<RefreshIndicatorState> refreshIndicatorKey =
-      GlobalKey<RefreshIndicatorState>();
+  final refreshController = EasyRefreshController(
+    controlFinishRefresh: true,
+    controlFinishLoad: true,
+  );
   Timer? refresher;
+  DateTime? lastRefresh;
 
   @override
   void onInit() {
@@ -102,27 +106,13 @@ class FeedEpisodeController extends GetxController {
 
   void autoFetch() async {
     var now = DateTime.now();
-    var db = await DatabaseHelper().db;
-    var subcriptions = await SubscriptionModel.listAll(db);
 
-    if (subcriptions.isEmpty) {
+    if (lastRefresh != null &&
+        now.difference(lastRefresh!) < const Duration(minutes: 1)) {
       return;
     }
-
-    var latestUpdateTSs =
-        subcriptions.map((subscription) => subscription.lastUpdated);
-    var latestUpdateTS = latestUpdateTSs.reduce((a, b) {
-      if (a == null) return b;
-      if (b == null) return a;
-      return a.compareTo(b) > 0 ? a : b;
-    });
-    var latestUpdateTime = latestUpdateTS != null
-        ? DateTime.fromMillisecondsSinceEpoch(latestUpdateTS)
-        : now;
-
-    if (latestUpdateTime.isBefore(now.subtract(const Duration(hours: 1)))) {
-      refreshIndicatorKey.currentState?.show();
-    }
+    lastRefresh = now;
+    refreshController.callRefresh();
   }
 
   void initAutoRefresher() async {

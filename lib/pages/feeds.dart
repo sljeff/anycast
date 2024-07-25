@@ -18,6 +18,7 @@ import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
+import 'package:easy_refresh/easy_refresh.dart';
 
 class Feeds extends GetView<FeedEpisodeController> {
   const Feeds({super.key});
@@ -28,9 +29,37 @@ class Feeds extends GetView<FeedEpisodeController> {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 24, right: 24),
-      child: RefreshIndicator(
-        onRefresh: fetchNewEpisodes,
-        key: controller.refreshIndicatorKey,
+      child: EasyRefresh(
+        onRefresh: () async {
+          await fetchNewEpisodes();
+          controller.refreshController.finishRefresh();
+          controller.refreshController.resetFooter();
+        },
+        controller: controller.refreshController,
+        refreshOnStart: true,
+        header: BezierHeader(
+          clamping: true,
+          triggerOffset: 1,
+          spinInCenter: true,
+          spinWidget: Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16),
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                Obx(() {
+                  var percent = controller.progress.value;
+                  return LinearProgressIndicator(
+                    value: percent,
+                    color: Colors.green,
+                    backgroundColor: Colors.white.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(1),
+                    minHeight: 1,
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
         child: Obx(() {
           var episodes = controller.episodes;
           if (episodes.isEmpty) {
@@ -258,8 +287,17 @@ Future<void> fetchNewEpisodes() async {
     return;
   }
   var urls = subscriptions.map((e) => e.rssFeedUrl!).toList();
+  var controller = Get.find<FeedEpisodeController>();
+  controller.progress.value = 8 / urls.length;
+  controller.lastRefresh = DateTime.now();
 
-  var episodes = await fetchPodcastsByUrls(urls, onlyFistEpisode: false);
+  var episodes = await fetchPodcastsByUrls(
+    urls,
+    onlyFistEpisode: false,
+    onProgress: (progress, total) {
+      Get.find<FeedEpisodeController>().progress.value = (progress + 8) / total;
+    },
+  );
   var fetchedMap = <String, PodcastImportData>{};
   for (var episode in episodes) {
     fetchedMap[episode.subscription!.rssFeedUrl!] = episode;

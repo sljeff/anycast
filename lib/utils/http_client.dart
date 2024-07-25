@@ -9,7 +9,7 @@ import 'package:retry/retry.dart';
 
 Future<T> myRetry<T>(
   Future<T> Function() fn, {
-  int retryTimes = 3,
+  int retryTimes = 2,
 }) async {
   return retry(
     () => fn(),
@@ -72,9 +72,11 @@ Future<http.Response> reqWithAuth(
 
 Future<http.Response?> fetchWithRetry(String url) async {
   try {
-    return myRetry(
+    var res = myRetry(
       () => http.get(Uri.parse(url)).timeout(const Duration(seconds: 10)),
     );
+
+    return res;
   } catch (e) {
     return null;
   }
@@ -93,7 +95,6 @@ Future<Map<String, http.Response?>> fetchConcurrentWithRetry(
 
     if (futures.length >= maxConcurrent) {
       var responses = await Future.wait(futures);
-
       for (var response in responses) {
         results[tempUrls[responses.indexOf(response)]] = response;
       }

@@ -28,6 +28,7 @@ Future<List<PodcastImportData>> importPodcastsByUrls(List<String> rssFeedUrls) {
 Future<List<PodcastImportData>> fetchPodcastsByUrls(
   List<String> rssFeedUrls, {
   bool onlyFistEpisode = true,
+  Function(int, int)? onProgress,
 }) async {
   // use isolate
   final ReceivePort receivePort = ReceivePort();
@@ -37,7 +38,21 @@ Future<List<PodcastImportData>> fetchPodcastsByUrls(
     receivePort.sendPort,
   ]);
 
-  return (await receivePort.first) as List<PodcastImportData>;
+  List<PodcastImportData>? result;
+
+  await for (var o in receivePort) {
+    if (o is int) {
+      if (onProgress == null) continue;
+      onProgress(o, rssFeedUrls.length);
+    }
+
+    if (o is List<PodcastImportData>) {
+      result = o;
+      break;
+    }
+  }
+
+  return result ?? [];
 }
 
 void _fetchPodcastsByUrls(List<dynamic> args) async {
@@ -47,59 +62,68 @@ void _fetchPodcastsByUrls(List<dynamic> args) async {
 
   List<PodcastImportData> podcasts = [];
 
-  var responses = await fetchConcurrentWithRetry(rssFeedUrls);
-  var result = responses.entries.map((entry) {
-    var rssFeedUrl = entry.key;
-    var response = entry.value;
-    if (response == null) {
-      return null;
-    }
-    var body = utf8.decode(response.bodyBytes);
-    RssFeed channel;
-    try {
-      channel = RssFeed.parse(body);
-    } catch (error) {
-      print(error);
-      return null;
-    }
-    var subscription = SubscriptionModel.fromMap(Map<String, dynamic>.from({
-      'rssFeedUrl': rssFeedUrl,
-      'title': channel.title?.trim(),
-      'description': htmlToText(channel.description).trim(),
-      'imageUrl': channel.image?.url ?? (channel.itunes?.image?.href ?? ''),
-      'link': channel.link,
-      'categories': channel.categories?.map((e) => e.value).join(','),
-      'author': channel.itunes?.author,
-      'email': channel.itunes?.owner?.email,
-    }));
-    channel.items!.sort((a, b) {
-      return b.pubDate!.compareTo(a.pubDate!);
-    });
-    List<FeedEpisodeModel> feedEpisodes = [];
-    var length = onlyFistEpisode ? 1 : channel.items!.length;
-    for (var i = 0; i < length; i++) {
-      var item = channel.items![i];
-      var feedEpisode = FeedEpisodeModel.fromMap(Map<String, dynamic>.from({
-        'title': item.title?.trim(),
-        'description': item.itunes?.summary?.trim() ?? item.description?.trim(),
-        'duration': item.itunes?.duration?.inMilliseconds,
-        'enclosureUrl': item.enclosure?.url,
-        'pubDate': item.pubDate?.millisecondsSinceEpoch,
-        'imageUrl': item.itunes?.image?.href ?? subscription.imageUrl,
-        'channelTitle': subscription.title,
-        'rssFeedUrl': subscription.rssFeedUrl,
-      }));
-      feedEpisodes.add(feedEpisode);
-    }
-    subscription.lastUpdated = feedEpisodes[0].pubDate;
-    return PodcastImportData(subscription, feedEpisodes);
-  }).toList();
+  for (var i = 0; i < rssFeedUrls.length; i += 8) {
+    var end = i + 8 > rssFeedUrls.length ? rssFeedUrls.length : i + 8;
+    var chunk = rssFeedUrls.sublist(i, end);
+    var responses = await fetchConcurrentWithRetry(chunk);
 
-  for (PodcastImportData? podcast in result) {
-    if (podcast == null) {
-      continue;
+    // var responses = await fetchConcurrentWithRetry(rssFeedUrls);
+    var result = responses.entries.map((entry) {
+      var rssFeedUrl = entry.key;
+      var response = entry.value;
+      if (response == null) {
+        return null;
+      }
+      var body = utf8.decode(response.bodyBytes);
+      RssFeed channel;
+      try {
+        channel = RssFeed.parse(body);
+      } catch (error) {
+        print(error);
+        return null;
+      }
+      var subscription = SubscriptionModel.fromMap(Map<String, dynamic>.from({
+        'rssFeedUrl': rssFeedUrl,
+        'title': channel.title?.trim(),
+        'description': htmlToText(channel.description).trim(),
+        'imageUrl': channel.image?.url ?? (channel.itunes?.image?.href ?? ''),
+        'link': channel.link,
+        'categories': channel.categories?.map((e) => e.value).join(','),
+        'author': channel.itunes?.author,
+        'email': channel.itunes?.owner?.email,
+      }));
+      channel.items!.sort((a, b) {
+        return b.pubDate!.compareTo(a.pubDate!);
+      });
+      List<FeedEpisodeModel> feedEpisodes = [];
+      var length = onlyFistEpisode ? 1 : channel.items!.length;
+      for (var i = 0; i < length; i++) {
+        var item = channel.items![i];
+        var feedEpisode = FeedEpisodeModel.fromMap(Map<String, dynamic>.from({
+          'title': item.title?.trim(),
+          'description':
+              item.itunes?.summary?.trim() ?? item.description?.trim(),
+          'duration': item.itunes?.duration?.inMilliseconds,
+          'enclosureUrl': item.enclosure?.url,
+          'pubDate': item.pubDate?.millisecondsSinceEpoch,
+          'imageUrl': item.itunes?.image?.href ?? subscription.imageUrl,
+          'channelTitle': subscription.title,
+          'rssFeedUrl': subscription.rssFeedUrl,
+        }));
+        feedEpisodes.add(feedEpisode);
+      }
+      subscription.lastUpdated = feedEpisodes[0].pubDate;
+      return PodcastImportData(subscription, feedEpisodes);
+    }).toList();
+
+    for (PodcastImportData? podcast in result) {
+      if (podcast == null) {
+        continue;
+      }
+      podcasts.add(podcast);
     }
-    podcasts.add(podcast);
+
+    sendPort.send(end);
   }
 
   Isolate.exit(sendPort, podcasts);

@@ -257,7 +257,7 @@ class BarIcon extends GetView<HomeTabController> {
               var feedController = Get.find<FeedEpisodeController>();
               if (!feedController.scrollController.hasClients ||
                   feedController.scrollController.offset == 0) {
-                feedController.refreshIndicatorKey.currentState?.show();
+                feedController.refreshController.callRefresh();
               } else {
                 feedController.scrollController.animateTo(0,
                     duration: const Duration(milliseconds: 300),

@@ -85,6 +85,7 @@ dependencies:
   jiffy: ^6.3.1
   sentry_flutter: ^8.4.0
   modal_bottom_sheet: ^3.0.0
+  easy_refresh: ^3.4.0
 
 dev_dependencies:
   flutter_test:
