@@ -28,9 +28,12 @@ class FeedEpisodeController extends GetxController {
   void onInit() {
     super.onInit();
     load(episodes);
-    autoFetch();
 
     initAutoRefresher();
+
+    Future.delayed(const Duration(seconds: 2), () {
+      autoFetch();
+    });
   }
 
   void addMany(List<FeedEpisodeModel> episodes) {

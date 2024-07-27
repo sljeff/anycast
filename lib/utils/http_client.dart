@@ -11,8 +11,8 @@ Future<T> myRetry<T>(
   Future<T> Function() fn, {
   int retryTimes = 2,
 }) async {
-  return retry(
-    () => fn(),
+  return await retry(
+    () async => await fn(),
     retryIf: (e) => e is SocketException || e is TimeoutException,
     maxAttempts: retryTimes,
   );
@@ -72,7 +72,7 @@ Future<http.Response> reqWithAuth(
 
 Future<http.Response?> fetchWithRetry(String url) async {
   try {
-    var res = myRetry(
+    var res = await myRetry(
       () => http.get(Uri.parse(url)).timeout(const Duration(seconds: 10)),
     );
 
