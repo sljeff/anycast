@@ -99,7 +99,7 @@ class ImportExportBlock extends StatelessWidget {
                         if (value != null) {
                           Get.dialog(
                               const Center(child: CircularProgressIndicator()));
-                          parseOMPL(value.files.single.path).then((value) {
+                          parseOPML(value.files.single.path).then((value) {
                             importPodcastsByUrls(value).then((value) {
                               Get.find<FeedEpisodeController>().addMany(value
                                   .map((e) => e.feedEpisodes![0])

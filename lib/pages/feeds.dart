@@ -38,7 +38,7 @@ class Feeds extends GetView<FeedEpisodeController> {
         controller: controller.refreshController,
         refreshOnStart: true,
         header: BezierHeader(
-          clamping: true,
+          clamping: false,
           triggerOffset: 1,
           spinInCenter: true,
           spinWidget: Padding(
@@ -235,7 +235,7 @@ class ImportBlock extends StatelessWidget {
                                     color: Colors.white),
                                 SizedBox(width: 6),
                                 Text(
-                                  'Import OMPL',
+                                  'Import OPML',
                                   style: TextStyle(color: Colors.white),
                                 ),
                               ],
@@ -257,7 +257,7 @@ class ImportBlock extends StatelessWidget {
   }
 }
 
-Future<List<String>> parseOMPL(String? path) async {
+Future<List<String>> parseOPML(String? path) async {
   List<String> rssFeedUrls = [];
 
   if (path == null) {

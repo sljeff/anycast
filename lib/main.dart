@@ -3,6 +3,7 @@ import 'package:anycast/states/discover.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
+import 'package:anycast/states/share.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:anycast/states/subtitle.dart';
 import 'package:anycast/states/tab.dart';
@@ -78,6 +79,7 @@ class NavigationBarApp extends StatelessWidget {
     Get.put(TranslationController());
     Get.put(AuthController());
     Get.put(RevenueCatController());
+    Get.put(ShareController());
     return GetMaterialApp(
       theme: ThemeData(
         appBarTheme: const AppBarTheme(

@@ -165,7 +165,7 @@ class Card extends StatelessWidget {
                                   children: [
                                     ConstrainedBox(
                                       constraints: const BoxConstraints(
-                                        maxWidth: 140,
+                                        maxWidth: 130,
                                       ),
                                       child: Text(
                                         episode.channelTitle!,
@@ -180,22 +180,20 @@ class Card extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    SizedBox(
-                                      child: Text(
-                                        rightText,
-                                        textAlign: TextAlign.right,
-                                        style: const TextStyle(
-                                          decoration: TextDecoration.none,
-                                          color: Color(0xFF6B7280),
-                                          fontSize: 12,
-                                          fontFamily:
-                                              'PingFangSC-Regular,PingFang SC',
-                                          fontWeight: FontWeight.w400,
-                                          height: 0,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                    Text(
+                                      rightText,
+                                      textAlign: TextAlign.right,
+                                      style: const TextStyle(
+                                        decoration: TextDecoration.none,
+                                        color: Color(0xFF6B7280),
+                                        fontSize: 12,
+                                        fontFamily:
+                                            'PingFangSC-Regular,PingFang SC',
+                                        fontWeight: FontWeight.w400,
+                                        height: 0,
                                       ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),

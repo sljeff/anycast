@@ -16,13 +16,16 @@ class PodcastImportData {
   PodcastImportData(this.subscription, this.feedEpisodes);
 }
 
-Future<List<PodcastImportData>> importPodcastsByUrls(List<String> rssFeedUrls) {
+Future<List<PodcastImportData>> importPodcastsByUrls(
+  List<String> rssFeedUrls, {
+  Function(int, int)? onProgress,
+}) {
   // filter exsiting subscriptions
   var existingSubscriptions = Get.find<SubscriptionController>().subscriptions;
   var s = Set.from(existingSubscriptions.map((e) => e.rssFeedUrl));
   rssFeedUrls = rssFeedUrls.where((element) => !s.contains(element)).toList();
 
-  return fetchPodcastsByUrls(rssFeedUrls);
+  return fetchPodcastsByUrls(rssFeedUrls, onProgress: onProgress);
 }
 
 Future<List<PodcastImportData>> fetchPodcastsByUrls(
