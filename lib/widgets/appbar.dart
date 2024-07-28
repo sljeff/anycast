@@ -1,4 +1,5 @@
 import 'package:anycast/pages/discover.dart';
+import 'package:anycast/pages/settings.dart';
 import 'package:anycast/states/discover.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -8,11 +9,8 @@ import 'package:simple_gradient_text/simple_gradient_text.dart';
 
 class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
-  final IconData icon;
-  final VoidCallback? iconOnTap;
 
-  const MyAppBar(
-      {super.key, required this.title, required this.icon, this.iconOnTap});
+  const MyAppBar({super.key, required this.title});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +22,16 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
             Container(
               alignment: Alignment.centerRight,
               child: GestureDetector(
-                onTap: iconOnTap,
+                onTap: () {
+                  showMaterialModalBottomSheet(
+                    expand: true,
+                    context: context,
+                    builder: (context) {
+                      return const SettingsPage();
+                    },
+                    closeProgressThreshold: 0.9,
+                  );
+                },
                 child: Container(
                   height: 36,
                   width: 36,
@@ -34,7 +41,7 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Icon(
-                    icon,
+                    Icons.settings_rounded,
                     color: Colors.grey.shade400,
                     size: 24,
                   ),

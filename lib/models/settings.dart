@@ -31,7 +31,7 @@ Future<void> settingsTableCreator(DatabaseExecutor db) {
 
     db.rawInsert("""
       INSERT OR IGNORE INTO $tableName (id, darkMode, speed, skipSilence, autoSleepTimer, maxCacheCount, countryCode, targetLanguage, autoRefreshInterval, maxFeedEpisodes, maxHistoryEpisodes)
-      VALUES (1, 0, 1.0, 0, '0,0,0', 10, '$country', '$language', 180, 100, 100)
+      VALUES (1, 0, 1.0, 0, '0,0,0', 10, '$country', '$language', 300, 100, 100)
     """);
   });
 }

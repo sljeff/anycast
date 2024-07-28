@@ -1,4 +1,3 @@
-import 'package:anycast/pages/settings.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/api/podcasts.dart';
 import 'package:anycast/states/feed_episode.dart';
@@ -15,29 +14,17 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
-import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
 class Discover extends StatelessWidget {
   const Discover({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       appBar: MyAppBar(
         title: 'DISCOVER',
-        icon: Icons.settings_rounded,
-        iconOnTap: () {
-          showMaterialModalBottomSheet(
-            expand: true,
-            context: context,
-            builder: (context) {
-              return const SettingsPage();
-            },
-            closeProgressThreshold: 0.9,
-          );
-        },
       ),
-      body: const DiscoverBody(),
+      body: DiscoverBody(),
     );
   }
 }

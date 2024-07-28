@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
-import 'package:anycast/pages/podcasts.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/import_block.dart';
 import 'package:anycast/states/player.dart';
@@ -10,6 +9,7 @@ import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/animation.dart';
 import 'package:anycast/widgets/bottom_nav_bar.dart';
 import 'package:anycast/widgets/card.dart' as card;
+import 'package:anycast/widgets/import_export.dart';
 import 'package:get/get.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
@@ -68,12 +68,12 @@ class Feeds extends GetView<FeedEpisodeController> {
           return ListView.separated(
             controller: controller.scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.only(top: 12, bottom: 64),
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemCount: episodes.length,
             itemBuilder: (context, index) {
               var ep = episodes[index];
-              var key = GlobalKey();
+              var epBtnKey = GlobalKey();
               return card.Card(
                 episode: ep,
                 index: index,
@@ -89,12 +89,12 @@ class Feeds extends GetView<FeedEpisodeController> {
                     },
                   ),
                   card.CardBtn(
-                    key: key,
+                    key: epBtnKey,
                     icon: const Iconify(Ic.round_playlist_add),
                     onPressed: () {
-                      if (key.currentContext != null) {
+                      if (epBtnKey.currentContext != null) {
                         // icon in screen, show animation
-                        var currentContext = key.currentContext!;
+                        var currentContext = epBtnKey.currentContext!;
                         var r = currentContext.findRenderObject() as RenderBox;
                         var startOffset =
                             r.localToGlobal(r.size.center(Offset.zero));

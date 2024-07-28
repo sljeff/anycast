@@ -268,11 +268,13 @@ class Card extends StatelessWidget {
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
               height: clController.expandedIndex.value == index ? 60 : 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children:
-                    clController.expandedIndex.value == index ? actions : [],
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children:
+                      clController.expandedIndex.value == index ? actions : [],
+                ),
               ),
             ),
           ],
@@ -294,25 +296,30 @@ class CardBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        onPressed();
-      },
-      child: Container(
-        margin: const EdgeInsets.only(top: 12),
-        width: 48,
-        height: 48,
-        decoration: ShapeDecoration(
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(36),
-          ),
-        ),
-        child: FractionallySizedBox(
-          widthFactor: 0.5,
-          heightFactor: 0.5,
-          child: icon,
-        ),
+    // return GestureDetector(
+    //   onTap: () {
+    //     onPressed();
+    //   },
+    //   child: Container(
+    //     margin: const EdgeInsets.only(top: 12),
+    //     width: 48,
+    //     height: 48,
+    //     decoration:
+    //         const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+    //     child: FractionallySizedBox(
+    //       widthFactor: 0.5,
+    //       heightFactor: 0.5,
+    //       child: icon,
+    //     ),
+    //   ),
+    // );
+    return IconButton(
+      onPressed: onPressed,
+      icon: icon,
+      padding: const EdgeInsets.all(12),
+      style: IconButton.styleFrom(
+        shape: const CircleBorder(),
+        backgroundColor: Colors.white,
       ),
     );
   }
@@ -452,3 +459,5 @@ class PodcastCard extends StatelessWidget {
 
 const tablerTopology =
     '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><path fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19a2 2 0 1 0-4 0a2 2 0 0 0 4 0m8-14a2 2 0 1 0-4 0a2 2 0 0 0 4 0m-8 0a2 2 0 1 0-4 0a2 2 0 0 0 4 0m-4 7a2 2 0 1 0-4 0a2 2 0 0 0 4 0m12 7a2 2 0 1 0-4 0a2 2 0 0 0 4 0m-4-7a2 2 0 1 0-4 0a2 2 0 0 0 4 0m8 0a2 2 0 1 0-4 0a2 2 0 0 0 4 0M6 12h4m4 0h4m-3-5l-2 3M9 7l2 3m0 4l-2 3m4-3l2 3"/></svg>';
+const newDoc =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><path fill="white" d="M16.08 6.63c-.07-.1-.15-.19-.23-.27h-.01a2.85 2.85 0 0 0-1.11-.69l-1.38-.45c-.1-.04-.2-.11-.26-.2a.5.5 0 0 1-.1-.31a.5.5 0 0 1 .1-.31c.06-.09.15-.16.26-.2l1.38-.45c.42-.14.79-.38 1.1-.69c.29-.3.52-.67.67-1.07v-.03l.45-1.38c.04-.1.11-.2.2-.26a.5.5 0 0 1 .31-.1c.11 0 .22.04.31.1s.16.15.2.26l.45 1.38c.14.42.38.8.69 1.11c.31.32.69.55 1.11.69l1.38.45h.03c.1.04.19.11.26.2s.1.2.1.31a.5.5 0 0 1-.1.31c-.06.09-.15.16-.26.2l-1.38.45c-.42.14-.8.38-1.11.69c-.32.31-.55.69-.69 1.11l-.46 1.38v.03c-.04.09-.11.17-.19.23a.5.5 0 0 1-.31.1a.5.5 0 0 1-.31-.1a.52.52 0 0 1-.2-.26l-.45-1.38c-.1-.31-.25-.6-.45-.85m7.7 3.8l-.77-.24c-.24-.08-.45-.21-.62-.38c-.17-.18-.3-.39-.38-.62l-.25-.76a.33.33 0 0 0-.11-.15a.27.27 0 0 0-.34 0c-.05.04-.09.09-.11.15l-.25.76c-.07.23-.2.44-.37.61s-.38.3-.61.38l-.77.25c-.06.02-.11.06-.15.11a.27.27 0 0 0 0 .34c.04.05.09.09.15.11l.77.25c.23.07.45.21.62.38s.3.39.38.62l.25.76c.02.06.06.11.11.15a.27.27 0 0 0 .34 0c.05-.04.09-.09.11-.15l.25-.76c.08-.24.21-.45.38-.62c.18-.17.39-.3.62-.38l.77-.25c.06-.02.11-.06.15-.11s.05-.11.05-.17s-.01-.12-.05-.17s-.106-.08-.17-.11m-4.24 2.28l.26.8c.05.14.12.25.2.37v6.08c0 1.24-1.01 2.25-2.25 2.25H6.25C5.01 22.21 4 21.2 4 19.96V4.46c0-1.24 1.01-2.25 2.25-2.25h8.26c-.07.04-.15.08-.22.11l-1.42.46c-.4.15-.75.4-.99.75a2 2 0 0 0-.38 1.18c0 .43.13.84.37 1.18c.078.112.178.202.275.289l.045.041H7.75c-.41 0-.75.34-.75.75s.34.75.75.75h7.24l.035.058a1 1 0 0 1 .085.162l.46 1.41c.14.4.4.74.75.99c.35.24.76.37 1.18.37c0 .37.11.73.33 1.04s.52.53.91.67zm-11.79 5h8.5c.41 0 .75-.34.75-.75s-.34-.75-.75-.75h-8.5c-.41 0-.75.34-.75.75s.34.75.75.75m0-5h8.5c.41 0 .75-.34.75-.75s-.34-.75-.75-.75h-8.5c-.41 0-.75.34-.75.75s.34.75.75.75"/></svg>';

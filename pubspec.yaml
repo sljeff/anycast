@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+7
+version: 1.0.0+8
 
 environment:
   sdk: '>=3.2.3 <4.0.0'
@@ -46,7 +46,6 @@ dependencies:
       url: git@github.com:sljeff/webfeed_plus
       ref: 6bb4dbd
   xml: ^6.5.0
-  flutter_html: ^3.0.0-beta.2
   sanitize_html: ^2.1.0
   audio_service: ^0.18.12
   just_audio: ^0.9.36
@@ -87,6 +86,8 @@ dependencies:
   modal_bottom_sheet: ^3.0.0
   easy_refresh: ^3.4.0
   receive_sharing_intent: ^1.8.0
+  lottie: ^3.1.2
+  flutter_widget_from_html: ^0.9.1
 
 dev_dependencies:
   flutter_test:
@@ -133,6 +134,7 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/icon/icon.png
+    - assets/lottie/
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 

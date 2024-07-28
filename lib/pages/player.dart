@@ -23,6 +23,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
+import 'package:lottie/lottie.dart';
 import 'package:marquee/marquee.dart';
 import 'package:flutter_lyric/lyrics_reader.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
@@ -438,14 +439,14 @@ class Subtitles extends GetView<SubtitleController> {
           // a button to fetch subtitles
           return Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
+                Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
-                      'Generate transcript with AI',
+                      'Generate transcript with AI (Beta)',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white,
@@ -455,7 +456,7 @@ class Subtitles extends GetView<SubtitleController> {
                         height: 0,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(height: 8),
                     Container(
                       width: 20,
                       height: 20,
@@ -465,66 +466,49 @@ class Subtitles extends GetView<SubtitleController> {
                       ),
                       child: const Tooltip(
                         showDuration: Duration(seconds: 10),
-                        message:
-                            'The AI will generate a summary and subtitles for this episode. '
-                            'It may take a few minutes.',
+                        message: 'AI transcript may take about 2 ~ 5 minutes',
                         triggerMode: TooltipTriggerMode.tap,
                         child: Icon(
                           Icons.question_mark_rounded,
                           size: 12,
-                          color: Color(
-                            0xFF10B981,
-                          ),
+                          color: Colors.white70,
                         ),
                       ),
                     ),
                   ],
                 ),
-                GestureDetector(
-                  onTap: () {
+                const SizedBox(height: 32),
+                TextButton(
+                  onPressed: () {
                     controller.add(url);
                   },
-                  child: Container(
-                    width: 247,
-                    height: 75,
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 36, vertical: 24),
-                    decoration: ShapeDecoration(
-                      color: const Color(0xFF10B981),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
+                        horizontal: 48, vertical: 24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Iconify(newDoc),
+                          ),
+                        ],
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: Iconify(tablerTopology),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Generate',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontFamily: GoogleFonts.comfortaa().fontFamily,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 2.40,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 )
               ],
@@ -544,14 +528,19 @@ class Subtitles extends GetView<SubtitleController> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Lottie.asset('assets/lottie/robot_loading.json'),
                 const SizedBox(height: 24),
-                const CircularProgressIndicator(),
+                Text("Generating with AI ...", style: style),
+                const SizedBox(height: 8),
+                Text("It may take 2 ~ 5 minutes ...", style: style),
                 const SizedBox(height: 24),
-                Text("Generating with AI...", style: style),
-                const SizedBox(height: 8),
-                Text("It may take a few minutes...", style: style),
-                const SizedBox(height: 8),
-                Text("Feel free to explore or come back later.", style: style),
+                Text(
+                  "Feel free to explore or come back later.",
+                  style: GoogleFonts.comfortaa().copyWith(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           );
@@ -1374,23 +1363,22 @@ class MyUINetease extends LyricUI {
         );
 
   @override
-  TextStyle getPlayingExtTextStyle() =>
-      TextStyle(color: Colors.grey[300], fontSize: defaultExtSize);
+  TextStyle getPlayingExtTextStyle() => GoogleFonts.robotoMono()
+      .copyWith(color: Colors.grey[300], fontSize: defaultExtSize);
 
   @override
-  TextStyle getOtherExtTextStyle() => TextStyle(
-        color: Colors.grey[300],
-        fontSize: defaultExtSize,
-      );
+  TextStyle getOtherExtTextStyle() => GoogleFonts.robotoMono()
+      .copyWith(color: Colors.grey[300], fontSize: defaultExtSize);
 
   @override
-  TextStyle getOtherMainTextStyle() =>
-      TextStyle(color: Colors.grey[200], fontSize: otherMainSize);
+  TextStyle getOtherMainTextStyle() => GoogleFonts.robotoMono()
+      .copyWith(color: Colors.grey[200], fontSize: otherMainSize);
 
   @override
-  TextStyle getPlayingMainTextStyle() => TextStyle(
-        color: Colors.amber,
+  TextStyle getPlayingMainTextStyle() => GoogleFonts.robotoMono().copyWith(
+        color: Colors.greenAccent,
         fontSize: defaultSize,
+        fontWeight: FontWeight.w400,
       );
 
   @override

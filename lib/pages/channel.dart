@@ -1,5 +1,7 @@
 import 'package:anycast/api/share.dart';
 import 'package:anycast/states/cardlist.dart';
+import 'package:anycast/widgets/animation.dart';
+import 'package:anycast/widgets/bottom_nav_bar.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/feed_episode.dart';
@@ -127,14 +129,16 @@ class Channel extends StatelessWidget {
                                       queryParameters: {
                                         'rssfeedurl': rssFeedUrl,
                                       });
-                                  getShortUrl(shareUrl).then((value) {
-                                    var finalUrl = shareUrl.toString();
-                                    if (value != null) {
-                                      finalUrl = value;
-                                    }
-                                    Share.share(
-                                        '${subscription.title}\n$finalUrl');
-                                  });
+                                  Get.dialog(const Center(
+                                      child: CircularProgressIndicator()));
+                                  var value = await getShortUrl(shareUrl);
+                                  var finalUrl = shareUrl.toString();
+                                  if (value != null) {
+                                    finalUrl = value;
+                                  }
+                                  Share.share(
+                                      '${subscription.title}\n$finalUrl');
+                                  Get.back();
                                 },
                                 child: Container(
                                     width: 40,
@@ -292,7 +296,16 @@ class Channel extends StatelessWidget {
                   CardList(clController, rssFeedUrl),
                 ],
               ),
-            )
+            ),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                color: const Color(0xFF111316),
+                child: const SafeArea(top: false, child: PlayerBar()),
+              ),
+            ),
           ],
         );
       },
@@ -402,7 +415,8 @@ class CardList extends StatelessWidget {
             child: controller.isLoading.value
                 ? const Center(child: CircularProgressIndicator())
                 : ListView.separated(
-                    padding: const EdgeInsets.only(left: 12, right: 12),
+                    padding:
+                        const EdgeInsets.only(left: 12, right: 12, bottom: 120),
                     separatorBuilder: (context, index) =>
                         const SizedBox(height: 12),
                     itemCount: episodes.length,
@@ -419,6 +433,7 @@ class CardList extends StatelessWidget {
                               ep.enclosureUrl ==
                                   playerController
                                       .playlistEpisode.value.enclosureUrl;
+                          var epBtnKey = GlobalKey();
 
                           return card.Card(
                             episode: ep,
@@ -439,10 +454,37 @@ class CardList extends StatelessWidget {
                                 },
                               ),
                               card.CardBtn(
+                                key: epBtnKey,
                                 icon: inPlaylist
                                     ? const Iconify(Ic.round_playlist_add_check)
                                     : const Iconify(Ic.round_playlist_add),
                                 onPressed: () {
+                                  if (inPlaylist) {
+                                    return;
+                                  }
+                                  if (epBtnKey.currentContext != null) {
+                                    // icon in screen, show animation
+                                    var currentContext =
+                                        epBtnKey.currentContext!;
+                                    var r = currentContext.findRenderObject()
+                                        as RenderBox;
+                                    var startOffset = r.localToGlobal(
+                                        r.size.center(Offset.zero));
+                                    var endOffset =
+                                        BottomNavBar.getPlaylistPosition();
+                                    OverlayEntry? entry;
+                                    entry = OverlayEntry(
+                                      builder: (context) =>
+                                          AnimatedPlaylistIndicator(
+                                        startPosition: startOffset,
+                                        endPosition: endOffset,
+                                        onAnimationComplete: () {
+                                          entry?.remove();
+                                        },
+                                      ),
+                                    );
+                                    Overlay.of(context).insert(entry);
+                                  }
                                   feedsController.addToPlaylist(1, ep);
                                 },
                               ),

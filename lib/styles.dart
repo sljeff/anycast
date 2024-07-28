@@ -16,30 +16,35 @@ class DarkColor {
     fontSize: 16,
     fontWeight: FontWeight.w700,
     fontFamily: GoogleFonts.notoSans().fontFamily,
+    decoration: TextDecoration.none,
   );
   static TextStyle cardTextLight = TextStyle(
     color: primary,
     fontSize: 12,
     fontFamily: GoogleFonts.inter().fontFamily,
     fontWeight: FontWeight.w400,
+    decoration: TextDecoration.none,
   );
   static TextStyle defaultText = TextStyle(
     color: secondaryColor,
     fontSize: 12,
     fontFamily: GoogleFonts.inter().fontFamily,
     fontWeight: FontWeight.w400,
+    decoration: TextDecoration.none,
   );
   static TextStyle defaultTitle = TextStyle(
     color: primaryLightMax,
     fontSize: 16,
     fontFamily: GoogleFonts.notoSans().fontFamily,
     fontWeight: FontWeight.w700,
+    decoration: TextDecoration.none,
   );
   static TextStyle defaultMainText = TextStyle(
     color: primaryLightMax,
     fontSize: 14,
     fontWeight: FontWeight.w400,
     fontFamily: GoogleFonts.comfortaa().fontFamily,
+    decoration: TextDecoration.none,
   );
   static TextStyle mainTitle = TextStyle(
     color: primaryLightMax,
@@ -48,6 +53,7 @@ class DarkColor {
     fontWeight: FontWeight.w700,
     height: 0,
     letterSpacing: 4.40,
+    decoration: TextDecoration.none,
   );
   static TextStyle secondaryTitle = TextStyle(
     color: primaryLightMax,
@@ -56,5 +62,6 @@ class DarkColor {
     fontWeight: FontWeight.w700,
     height: 0,
     letterSpacing: 2.40,
+    decoration: TextDecoration.none,
   );
 }

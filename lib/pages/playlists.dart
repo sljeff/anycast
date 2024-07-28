@@ -11,6 +11,7 @@ import 'package:anycast/widgets/card.dart' as card;
 import 'package:anycast/widgets/detail.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/playlist.dart';
@@ -43,12 +44,8 @@ class Playlists extends GetView<PlaylistController> {
         return DefaultTabController(
           length: playlists.length,
           child: Scaffold(
-              appBar: MyAppBar(
+              appBar: const MyAppBar(
                 title: 'PLAYLIST',
-                icon: Icons.history_rounded,
-                iconOnTap: () {
-                  Get.dialog(const HistoryBlock());
-                },
               ),
               body: TabBarView(
                   children: episodesControllers
@@ -157,7 +154,7 @@ class PlaylistEpisodesList extends StatelessWidget {
               );
             },
             buildDefaultDragHandles: false,
-            padding: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.only(top: 12, bottom: 64),
             itemCount: controller.episodes.length,
             itemBuilder: (context, index) {
               var episode = controller.episodes[index];
@@ -183,7 +180,6 @@ class PlaylistEpisodesList extends StatelessWidget {
                           } else {
                             controller.moveToTop(episode);
                             playerController.playByEpisode(episode);
-                            clController.expand(0);
                           }
                         },
                       ),
@@ -215,7 +211,7 @@ class PlaylistEpisodesList extends StatelessWidget {
                             case 'processing':
                               Get.snackbar(
                                 'Generating',
-                                'Generating transcript may take a few minutes...',
+                                'Generating transcript may take 2 ~ 5 minutes...',
                                 snackPosition: SnackPosition.BOTTOM,
                               );
                           }
@@ -257,123 +253,166 @@ class HistoryBlock extends StatelessWidget {
 
       if (controller.episodes.isEmpty) {
         return const AlertDialog(
+            backgroundColor: Colors.green,
             title: Center(
-          child: Text(
-            'No history',
-            style: TextStyle(
-              color: Colors.white,
-              decoration: TextDecoration.none,
-            ),
-          ),
-        ));
+              child: Text(
+                'No history',
+                style: TextStyle(
+                  color: Colors.white,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ));
       }
 
       return Dialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 12),
-        child: SizedBox(
+        child: Container(
+          padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+          ),
           height: 400,
           width: 300,
-          child: ListView.separated(
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
-            itemCount: controller.episodes.length,
-            itemBuilder: (context, index) {
-              var episode = controller.episodes[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.grey,
-                    width: 1,
-                  ),
-                ),
-                child: GestureDetector(
-                  onTap: () {
-                    Get.bottomSheet(Detail(episode: episode, actions: [
-                      card.CardBtn(
-                          icon: const Iconify(Ic.round_play_arrow),
-                          onPressed: () {
-                            var ep = controller.toFeedEpisode(episode);
-                            Get.find<FeedEpisodeController>()
-                                .addToTop(1, ep)
-                                .then((value) {
-                              Get.find<PlayerController>().playByEpisode(value);
-                            });
-                          }),
-                      card.CardBtn(
-                          icon: const Iconify(Ic.round_clear),
-                          onPressed: () {
-                            controller.delete(episode.enclosureUrl!);
-                          }),
-                    ]));
-                  },
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: episode.imageUrl!,
-                          width: 48,
-                          height: 48,
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.separated(
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
+                  itemCount: controller.episodes.length,
+                  itemBuilder: (context, index) {
+                    var episode = controller.episodes[index];
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white30,
+                          width: 1,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      child: GestureDetector(
+                        onTap: () {
+                          showModalBottomSheet(
+                              useSafeArea: true,
+                              isScrollControlled: true,
+                              context: context,
+                              builder: (context) =>
+                                  Detail(episode: episode, actions: [
+                                    card.CardBtn(
+                                        icon:
+                                            const Iconify(Ic.round_play_arrow),
+                                        onPressed: () {
+                                          var ep =
+                                              controller.toFeedEpisode(episode);
+                                          Get.find<FeedEpisodeController>()
+                                              .addToTop(1, ep)
+                                              .then((value) {
+                                            Get.find<PlayerController>()
+                                                .playByEpisode(value);
+                                          });
+                                        }),
+                                    card.CardBtn(
+                                        icon: const Iconify(Ic.round_clear),
+                                        onPressed: () {
+                                          controller
+                                              .delete(episode.enclosureUrl!);
+                                        }),
+                                  ]));
+                        },
+                        child: Row(
                           children: [
-                            SizedBox(
-                              height: 20,
-                              child: Marquee(
-                                text: episode.title!,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontFamily:
-                                      GoogleFonts.comfortaa().fontFamily,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 2.40,
-                                ),
-                                blankSpace: 72,
-                                startAfter: const Duration(seconds: 1),
-                                startPadding: 12,
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: CachedNetworkImage(
+                                imageUrl: episode.imageUrl!,
+                                width: 48,
+                                height: 48,
                               ),
                             ),
-                            Text(
-                              episode.channelTitle!,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: TextStyle(
-                                color: const Color(0xFF10B981),
-                                fontSize: 12,
-                                fontFamily: GoogleFonts.comfortaa().fontFamily,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 2.40,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    height: 20,
+                                    child: Marquee(
+                                      text: episode.title!,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontFamily:
+                                            GoogleFonts.comfortaa().fontFamily,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 2.40,
+                                      ),
+                                      blankSpace: 72,
+                                      startAfter: const Duration(seconds: 1),
+                                      startPadding: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    episode.channelTitle!,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      color: const Color(0xFF10B981),
+                                      fontSize: 12,
+                                      fontFamily:
+                                          GoogleFonts.comfortaa().fontFamily,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 2.40,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                onPressed: () {
+                                  controller.delete(episode.enclosureUrl!);
+                                },
+                                padding: const EdgeInsets.all(6),
+                                style: IconButton.styleFrom(
+                                  shape: const CircleBorder(),
+                                  backgroundColor: Colors.white,
+                                ),
+                                icon: const Iconify(Ic.clear,
+                                    color: Colors.black),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      Container(
-                        alignment: Alignment.centerRight,
-                        child: IconButton(
-                          onPressed: () {
-                            controller.delete(episode.enclosureUrl!);
-                          },
-                          padding: const EdgeInsets.all(6),
-                          style: IconButton.styleFrom(
-                            shape: const CircleBorder(),
-                            backgroundColor: Colors.white,
-                          ),
-                          icon: const Iconify(Ic.clear, color: Colors.black),
-                        ),
-                      ),
-                    ],
+                    );
+                  },
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  controller.deleteAll();
+                },
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.red[400],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-              );
-            },
+                child: Text(
+                  "Clear All",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontFamily: GoogleFonts.comfortaa().fontFamily,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );

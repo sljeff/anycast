@@ -3,9 +3,8 @@ import 'package:anycast/states/subtitle.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
-import 'package:iconify_flutter/icons/uiw.dart';
 import 'package:iconify_flutter/icons/ic.dart';
-import 'package:iconify_flutter/icons/icon_park_solid.dart';
+import 'package:lottie/lottie.dart';
 
 class PlayIcon extends GetView<PlayerController> {
   final double size;
@@ -31,7 +30,12 @@ class PlayIcon extends GetView<PlayerController> {
       var isLoading = controller.isLoading.value;
 
       if (isLoading) {
-        return Iconify(Uiw.loading, size: size, color: color);
+        if (color == Colors.white) {
+          return Lottie.asset('assets/lottie/loading.json',
+              height: size, width: size);
+        }
+        return Lottie.asset('assets/lottie/loading_black.json',
+            height: size, width: size);
       }
       if (isPlaying) {
         return Iconify(Ic.round_pause, size: size, color: color);
@@ -60,13 +64,13 @@ class AIIcon extends GetView<SubtitleController> {
 
       switch (status) {
         case 'processing':
-          return const CircularProgressIndicator(strokeCap: StrokeCap.round);
+          return Lottie.asset('assets/lottie/robot_loading.json');
         case 'succeeded':
-          return Iconify(IconParkSolid.check_one, size: size, color: color);
+          return Iconify(Ic.round_check_circle, size: size, color: color);
         case 'failed':
           return Iconify(Ic.round_sms_failed, size: size, color: color);
         default:
-          return Iconify(aiTranscript, size: size, color: Colors.green[900]);
+          return Iconify(aiTranscript, size: size, color: Colors.black);
       }
     });
   }
