@@ -46,16 +46,18 @@ class Card extends StatelessWidget {
     var barWidth = MediaQuery.of(context).size.width - 48;
 
     var rightText =
-        '${formatDuration(episode.duration!)} • ${formatDatetime(episode.pubDate!)}';
+        '${formatDuration(episode.duration ?? 0)} • ${formatDatetime(episode.pubDate!)}';
     var playedWidth = 0.0;
     if (episode is PlaylistEpisodeModel) {
       var pe = episode as PlaylistEpisodeModel;
       if (pe.playedDuration != null && pe.playedDuration! > 0) {
         rightText = formatRemainingTime(
-          Duration(milliseconds: pe.duration!),
+          Duration(milliseconds: pe.duration ?? 0),
           Duration(milliseconds: pe.playedDuration!),
         );
-        playedWidth = (pe.playedDuration! / pe.duration!) * barWidth;
+        if (pe.duration != null) {
+          playedWidth = (pe.playedDuration! / pe.duration!) * barWidth;
+        }
       }
     }
 
@@ -73,12 +75,15 @@ class Card extends StatelessWidget {
                 episode.enclosureUrl) {
           back = Obx(() {
             var positionData = playerController.positionData.value;
-            playedWidth = positionData.position.inMilliseconds /
-                positionData.duration.inMilliseconds *
-                barWidth;
+            if (positionData.duration.inMilliseconds != 0 &&
+                positionData.position.inMilliseconds != 0) {
+              playedWidth = positionData.position.inMilliseconds /
+                  positionData.duration.inMilliseconds *
+                  barWidth;
+            }
             return Container(
               width: playedWidth,
-              height: 98,
+              height: 100,
               color: Colors.white.withOpacity(0.1),
             );
           });
@@ -165,7 +170,7 @@ class Card extends StatelessWidget {
                                   children: [
                                     ConstrainedBox(
                                       constraints: const BoxConstraints(
-                                        maxWidth: 130,
+                                        maxWidth: 128,
                                       ),
                                       child: Text(
                                         episode.channelTitle!,

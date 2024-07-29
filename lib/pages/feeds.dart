@@ -243,7 +243,19 @@ class ImportBlock extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Iconify(Ic.round_help, color: Colors.white),
+                        IconButton(
+                            onPressed: () {
+                              showModalBottomSheet(
+                                useSafeArea: true,
+                                isScrollControlled: true,
+                                context: context,
+                                builder: (context) {
+                                  return const ImportInstructions();
+                                },
+                              );
+                            },
+                            icon: const Iconify(Ic.round_help,
+                                color: Colors.grey)),
                       ],
                     ),
                   ],
@@ -257,28 +269,34 @@ class ImportBlock extends StatelessWidget {
   }
 }
 
-Future<List<String>> parseOPML(String? path) async {
-  List<String> rssFeedUrls = [];
+Future<List<OPML>> parseOPML(String? path) async {
+  List<OPML> opml = [];
 
   if (path == null) {
-    return rssFeedUrls;
+    return opml;
   }
 
   File file = File(path);
-  rssFeedUrls = await file.readAsString().then(
+  opml = await file.readAsString().then(
     (value) {
       XmlDocument document = XmlDocument.parse(value);
-      List<String> xmlUrls = [];
+      List<OPML> o = [];
       document.findAllElements('outline').forEach(
         (element) {
-          xmlUrls.add(element.getAttribute('xmlUrl')!);
+          var v = element.getAttribute('xmlUrl');
+          var t = element.getAttribute('title');
+          t ??= element.getAttribute('text');
+          if (v == null || t == null) {
+            return;
+          }
+          o.add(OPML(t, v));
         },
       );
-      return xmlUrls;
+      return o;
     },
   );
 
-  return rssFeedUrls;
+  return opml;
 }
 
 Future<void> fetchNewEpisodes() async {
@@ -331,4 +349,11 @@ Future<void> fetchNewEpisodes() async {
   if (updatedEpisodes.isNotEmpty) {
     Get.find<FeedEpisodeController>().addMany(updatedEpisodes);
   }
+}
+
+class OPML {
+  final String title;
+  final String url;
+
+  OPML(this.title, this.url);
 }

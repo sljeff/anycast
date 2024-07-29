@@ -81,6 +81,7 @@ class NavigationBarApp extends StatelessWidget {
     Get.put(RevenueCatController());
     Get.put(ShareController());
     return GetMaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         appBarTheme: const AppBarTheme(
           toolbarHeight: 156,

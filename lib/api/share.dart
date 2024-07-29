@@ -47,7 +47,7 @@ Future<String?> getShortUrl(Uri origin) async {
   }
   return Uri(
     scheme: 'https',
-    host: 's.anycast.website',
+    host: 's.kindjeff.com',
     path: '/${data['key']}',
   ).toString();
 }

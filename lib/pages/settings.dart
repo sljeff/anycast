@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:anycast/pages/login.dart';
 import 'package:anycast/pages/playlists.dart';
 import 'package:anycast/states/player.dart';
+import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/handler.dart';
 import 'package:anycast/widgets/import_export.dart';
 import 'package:flutter/cupertino.dart';
@@ -458,13 +459,16 @@ class SettingsPage extends GetView<SettingsController> {
                       children: [
                         SettingContainer(
                           child: GestureDetector(
-                            onTap: () => launchUrl(
-                              Uri(
+                            onTap: () async {
+                              var uri = Uri(
                                 scheme: 'mailto',
-                                path: 'kindjeff.com@gmail.com',
-                              ),
-                              mode: LaunchMode.inAppBrowserView,
-                            ),
+                                path: 'kindjeffcom@gmail.com',
+                                query: encodeQueryParameters(
+                                  {"subject": "Anycast Feedback"},
+                                ),
+                              );
+                              await launchUrl(uri);
+                            },
                             child: const Text(
                               'kindjeff.com@gmail.com',
                               style: TextStyle(

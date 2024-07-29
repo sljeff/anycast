@@ -73,7 +73,7 @@ class PlayerController extends GetxController {
       peController.updatePlayedDuration(myAudioHandler.playedDuration);
     });
 
-    myAudioHandler.playbackStateStream.listen((state) {
+    myAudioHandler.playbackStateStream.listen((state) async {
       isPlaying.value = state.playing;
       // loading or buffering
       isLoading.value = [
@@ -90,13 +90,20 @@ class PlayerController extends GetxController {
           pause();
           clear();
         } else {
-          playByEpisode(peController.episodes[0]);
+          if (Get.find<SettingsController>().continuousPlaying.value) {
+            playByEpisode(peController.episodes[0]);
+          } else {
+            playByEpisode(peController.episodes[0]).then((_) {
+              pause();
+            });
+          }
         }
       }
     });
 
     myAudioHandler.positionDataStream.listen((event) {
-      if (isLoading.value ||
+      if (!myAudioHandler.isPlaying ||
+          isLoading.value ||
           [
             event.bufferedPosition,
             event.position,
@@ -116,7 +123,7 @@ class PlayerController extends GetxController {
   }
 
   // The final method interact with the AudioHandler
-  void playByEpisode(PlaylistEpisodeModel episode) async {
+  Future<void> playByEpisode(PlaylistEpisodeModel episode) async {
     var playlistId = episode.playlistId!;
     var player = PlayerModel.fromMap({
       'currentPlaylistId': playlistId,
@@ -124,8 +131,6 @@ class PlayerController extends GetxController {
 
     this.player.value = player;
     _updateEpisode(episode);
-
-    myAudioHandler.playByEpisode(episode);
 
     Get.find<HistoryController>()
         .insert(HistoryEpisodeModel.fromMap(episode.toMap()));
@@ -133,9 +138,10 @@ class PlayerController extends GetxController {
     helper.db.then((db) {
       PlayerModel.update(db, player);
     });
+    return await myAudioHandler.playByEpisode(episode);
   }
 
-  void setByEpisode(PlaylistEpisodeModel episode) async {
+  Future<void> setByEpisode(PlaylistEpisodeModel episode) async {
     var playlistId = episode.playlistId!;
     var player = PlayerModel.fromMap({
       'currentPlaylistId': playlistId,
@@ -144,11 +150,11 @@ class PlayerController extends GetxController {
     this.player.value = player;
     _updateEpisode(episode);
 
-    myAudioHandler.setByEpisode(episode);
-
     helper.db.then((db) {
       PlayerModel.update(db, player);
     });
+
+    return await myAudioHandler.setByEpisode(episode);
   }
 
   Future<void> pause() async {
@@ -242,23 +248,27 @@ class PlayerController extends GetxController {
   }
 }
 
+const noCountdown = Duration(days: -1000);
+
 class SettingsController extends GetxController {
-  var isCounting = false.obs;
-  var countdownDuration = Duration.zero.obs;
+  final countdownDuration = noCountdown.obs;
+  final darkMode = false.obs;
+  final speed = 1.0.obs;
+  final skipSilence = false.obs;
+  final autoSleepStartHourIndex = 0.obs;
+  final autoSleepEndHourIndex = 0.obs;
+  final autoSleepCountdownMinIndex = 0.obs;
+  final maxCacheCount = 10.obs;
+  final countryCode = 'US'.obs;
+  final targetLanguage = 'en'.obs;
+  final autoRefreshInterval = 180.obs;
+  final maxFeedEpisodes = 100.obs;
+  final maxHistoryEpisodes = 100.obs;
+  final continuousPlaying = true.obs;
 
-  var darkMode = false.obs;
-  var speed = 1.0.obs;
-  var skipSilence = false.obs;
-  var autoSleepStartHourIndex = 0.obs;
-  var autoSleepEndHourIndex = 0.obs;
-  var autoSleepCountdownMinIndex = 0.obs;
-  var maxCacheCount = 10.obs;
-  var countryCode = 'US'.obs;
-  var targetLanguage = 'en'.obs;
-  var autoRefreshInterval = 180.obs;
-  var maxFeedEpisodes = 100.obs;
-  var maxHistoryEpisodes = 100.obs;
-
+  double get countdownValue => countdownDuration.value.inMinutes < 0
+      ? 0
+      : countdownDuration.value.inMinutes.toDouble();
   var hours = List.generate(24, (index) => index);
   var sleepMins = List.generate(7, (index) => index * 10);
   var sleepMinsText = [
@@ -294,6 +304,7 @@ class SettingsController extends GetxController {
             autoRefreshInterval.value = settings.autoRefreshInterval!;
             maxFeedEpisodes.value = settings.maxFeedEpisodes!;
             maxHistoryEpisodes.value = settings.maxHistoryEpisodes!;
+            continuousPlaying.value = settings.continuousPlaying!;
           })
         });
   }
@@ -306,16 +317,18 @@ class SettingsController extends GetxController {
     _scheduleCleanup();
 
     countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!isCounting.value) {
+      if (countdownDuration.value == noCountdown) {
         return;
       }
       if (countdownDuration.value.inSeconds <= 0) {
+        countdownDuration.value = noCountdown;
         Get.find<PlayerController>().pause();
-        isCounting.value = false;
         return;
       }
-      countdownDuration.value =
-          countdownDuration.value - const Duration(seconds: 1);
+      if (myAudioHandler.isPlaying) {
+        countdownDuration.value =
+            countdownDuration.value - const Duration(seconds: 1);
+      }
     });
 
     myAudioHandler.speedStream.listen((event) {
@@ -334,20 +347,12 @@ class SettingsController extends GetxController {
     });
   }
 
-  void start(Duration duration) {
+  void setCountdown(Duration duration) {
     countdownDuration.value = duration;
-    isCounting.value = true;
   }
 
-  void stop() {
-    countdownDuration.value = Duration.zero;
-    isCounting.value = false;
-  }
-
-  // only for display
-  void onChangeCountdown(Duration duration) {
-    countdownDuration.value = duration;
-    isCounting.value = false;
+  void stopCountdown() {
+    countdownDuration.value = noCountdown;
   }
 
   void setSpeed(double speed) {
@@ -396,7 +401,7 @@ class SettingsController extends GetxController {
   }
 
   void autoSetCountdown() {
-    if (isCounting.value) {
+    if (countdownDuration.value == noCountdown) {
       return;
     }
     var startHour = autoSleepStartHourIndex.value;
@@ -424,7 +429,7 @@ class SettingsController extends GetxController {
     if (duration == 0) {
       return;
     }
-    start(Duration(minutes: duration));
+    setCountdown(Duration(minutes: duration));
   }
 
   Future<void> setMaxCacheCount(int value) async {
@@ -470,6 +475,13 @@ class SettingsController extends GetxController {
     maxHistoryEpisodes.value = value;
     helper.db.then((db) {
       SettingsModel.set(db, 'maxHistoryEpisodes', value);
+    });
+  }
+
+  Future<void> setContinuousPlaying(bool value) async {
+    continuousPlaying.value = value;
+    helper.db.then((db) {
+      SettingsModel.setContinuousPlaying(db, value);
     });
   }
 }

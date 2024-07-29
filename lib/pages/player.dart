@@ -134,7 +134,7 @@ class PlayerSettings extends GetView<PlayerController> {
                 child: Obx(
                   () => SingleChildScrollView(
                       child: renderHtml(context,
-                          controller.playlistEpisode.value.description!)),
+                          controller.playlistEpisode.value.description ?? "")),
                 ),
               ),
             ),
@@ -167,7 +167,8 @@ class PlayerMain extends GetView<PlayerController> {
                     child: CachedNetworkImage(
                       width: size,
                       height: size,
-                      imageUrl: controller.playlistEpisode.value.imageUrl ?? '',
+                      imageUrl: controller.playlistEpisode.value.imageUrl ??
+                          'https://placehold.co/400/000000/FFF.png?text=No+Episode',
                     ),
                   );
                 }),
@@ -263,7 +264,7 @@ class TitleBar extends GetView<PlayerController> {
       var backgroundColor = controller.backgroundColor.value;
       var subscription = controller.channel.value;
       var imgUrl = subscription.imageUrl ?? '';
-      var title = controller.playlistEpisode.value.title!;
+      var title = controller.playlistEpisode.value.title ?? '';
       var channelTitle = subscription.title ?? '';
 
       Widget img = const Icon(
@@ -432,6 +433,9 @@ class Subtitles extends GetView<SubtitleController> {
       ),
       child: Obx(() {
         var playerController = Get.find<PlayerController>();
+        if (playerController.playlistEpisode.value.enclosureUrl == null) {
+          return const SizedBox();
+        }
         var url = playerController.playlistEpisode.value.enclosureUrl!;
 
         var status = controller.subtitleUrls[url];
@@ -1051,17 +1055,17 @@ class Settings extends GetView<SettingsController> {
                   child: SliderTheme(
                     data: sliderThemeData,
                     child: Slider(
-                      value: controller.countdownDuration.value.inMinutes
-                          .toDouble(),
+                      value: controller.countdownValue,
                       onChanged: (value) {
-                        controller.onChangeCountdown(
-                            Duration(minutes: value.toInt()));
+                        controller
+                            .setCountdown(Duration(minutes: value.toInt()));
                       },
                       onChangeEnd: (value) {
                         if (value == 0) {
-                          controller.stop();
+                          controller.stopCountdown();
                         } else {
-                          controller.start(Duration(minutes: value.toInt()));
+                          controller
+                              .setCountdown(Duration(minutes: value.toInt()));
                         }
                       },
                       min: 0,
@@ -1121,59 +1125,50 @@ class Settings extends GetView<SettingsController> {
               ],
             ),
             Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'SLEEP TIMER',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontFamily: GoogleFonts.comfortaa().fontFamily,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CONTINUOUS PLAY',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontFamily: GoogleFonts.comfortaa().fontFamily,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: SizedBox(
+                    width: 80,
+                    height: 64,
+                    child: FittedBox(
+                      fit: BoxFit.fill,
+                      child: Obx(
+                        () => Switch(
+                          activeColor: Colors.white,
+                          inactiveThumbColor: Colors.grey,
+                          inactiveTrackColor:
+                              const Color(0xFF232830).withOpacity(0.7),
+                          trackOutlineColor: WidgetStateColor.resolveWith(
+                              (states) =>
+                                  const Color(0xFF232830).withOpacity(0.3)),
+                          value: controller.continuousPlaying.value,
+                          onChanged: (value) {
+                            controller.setContinuousPlaying(value);
+                          },
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 48,
-                    width: 80,
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.black,
-                      ),
-                      onPressed: () {
-                        Get.bottomSheet(
-                          const AutoSleepPicker(),
-                          backgroundColor: Colors.blueGrey,
-                        );
-                      },
-                      child: Obx(
-                        () {
-                          var off =
-                              controller.autoSleepCountdownMinIndex.value ==
-                                      0 ||
-                                  controller.autoSleepStartHourIndex.value ==
-                                      controller.autoSleepEndHourIndex.value;
-                          return Text(
-                            off
-                                ? 'OFF'
-                                : controller.sleepMinsText[controller
-                                    .autoSleepCountdownMinIndex.value],
-                            style: const TextStyle(
-                              color: Colors.white,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  )
-                ]),
+                ),
+              ],
+            ),
             const Tooltip(
-              showDuration: Duration(seconds: 10),
-              message: 'A countdown will be enabled when a podcast starts '
-                  'within the time range you set.',
+              message: 'Auto play next episode after the current one ends.',
+              showDuration: Duration(milliseconds: 2000),
               triggerMode: TooltipTriggerMode.tap,
-              child: Icon(Icons.info_outline, size: 16),
+              child: Icon(Icons.info, color: Colors.grey),
             ),
           ],
         ),
@@ -1337,13 +1332,13 @@ class MyUINetease extends LyricUI {
   HighlightDirection highlightDirection;
 
   MyUINetease(
-      {this.defaultSize = 18,
+      {this.defaultSize = 16,
       this.defaultExtSize = 14,
-      this.otherMainSize = 16,
+      this.otherMainSize = 14,
       this.bias = 0.5,
       this.lineGap = 25,
-      this.inlineGap = 25,
-      this.lyricAlign = LyricAlign.CENTER,
+      this.inlineGap = 15,
+      this.lyricAlign = LyricAlign.LEFT,
       this.lyricBaseLine = LyricBaseLine.CENTER,
       this.highlight = true,
       this.highlightDirection = HighlightDirection.LTR});
@@ -1363,22 +1358,22 @@ class MyUINetease extends LyricUI {
         );
 
   @override
-  TextStyle getPlayingExtTextStyle() => GoogleFonts.robotoMono()
+  TextStyle getPlayingExtTextStyle() => GoogleFonts.mPlusRounded1c()
+      .copyWith(color: Colors.greenAccent, fontSize: defaultExtSize);
+
+  @override
+  TextStyle getOtherExtTextStyle() => GoogleFonts.mPlusRounded1c()
       .copyWith(color: Colors.grey[300], fontSize: defaultExtSize);
 
   @override
-  TextStyle getOtherExtTextStyle() => GoogleFonts.robotoMono()
-      .copyWith(color: Colors.grey[300], fontSize: defaultExtSize);
-
-  @override
-  TextStyle getOtherMainTextStyle() => GoogleFonts.robotoMono()
+  TextStyle getOtherMainTextStyle() => GoogleFonts.mPlusRounded1c()
       .copyWith(color: Colors.grey[200], fontSize: otherMainSize);
 
   @override
-  TextStyle getPlayingMainTextStyle() => GoogleFonts.robotoMono().copyWith(
+  TextStyle getPlayingMainTextStyle() => GoogleFonts.mPlusRounded1c().copyWith(
         color: Colors.greenAccent,
         fontSize: defaultSize,
-        fontWeight: FontWeight.w400,
+        fontWeight: FontWeight.w200,
       );
 
   @override

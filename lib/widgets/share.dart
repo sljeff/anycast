@@ -12,9 +12,39 @@ class ShareDialog extends GetView<ShareController> {
   @override
   Widget build(BuildContext context) {
     if (controller.sharedFile == null || controller.opmls.isEmpty) {
-      return const AlertDialog(
-        title: Text('Import Podcasts'),
-        content: Text('Oh no! Seems like there is no valid links in the file.'),
+      return AlertDialog(
+        title: Text(
+          'Import Podcasts',
+          style: GoogleFonts.comfortaa(
+            fontSize: 20,
+            color: Colors.white,
+            decoration: TextDecoration.none,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        content: Text(
+          'Oh no! Seems like there is no valid links in the file.',
+          style: GoogleFonts.comfortaa(
+            fontSize: 18,
+            color: Colors.white,
+            decoration: TextDecoration.none,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back();
+            },
+            child: Text(
+              'OK',
+              style: GoogleFonts.comfortaa(
+                fontSize: 18,
+                color: Colors.white,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ],
       );
     }
     return AlertDialog(
@@ -66,6 +96,9 @@ class ShareDialog extends GetView<ShareController> {
           onPressed: () {
             Get.back();
           },
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white70,
+          ),
           child: const Text('Close'),
         ),
         TextButton(
@@ -94,7 +127,18 @@ class ShareDialog extends GetView<ShareController> {
             Get.snackbar('Success', 'Import $titles successfully',
                 snackPosition: SnackPosition.BOTTOM);
           },
-          child: const Text('Import'),
+          style: TextButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+          ),
+          child: Text(
+            'Import',
+            style: GoogleFonts.comfortaa(
+              fontSize: 16,
+              color: Colors.black,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ],
     );

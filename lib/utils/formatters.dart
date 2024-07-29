@@ -20,6 +20,9 @@ String formatDatetime(int ts) {
 }
 
 String formatDuration(int ms) {
+  if (ms == 0) {
+    return '';
+  }
   var d = Duration(milliseconds: ms);
   // in 100m: show {n}m; else: show {n}h {m}m
   if (d.inMinutes < 100) {
@@ -33,8 +36,14 @@ String formatDuration(int ms) {
 // if not played: 73m, 1h 13m
 String formatRemainingTime(Duration duration, Duration playedDuration) {
   String remainingTime = '';
+  if (duration.inSeconds == 0) {
+    return '';
+  }
+
   // duration and playedDuration are both in milliseconds
   var remainingDuration = duration - playedDuration;
+  remainingDuration =
+      remainingDuration > Duration.zero ? remainingDuration : Duration.zero;
   // if less than 100 minutes, show minutes; otherwise show hours and minutes
   if (remainingDuration.inMinutes < 100) {
     remainingTime = '${remainingDuration.inMinutes}m';
@@ -119,4 +128,11 @@ String formatLrcTime(double time) {
   var seconds = (time % 60).floor();
   var milliseconds = ((time * 1000) % 1000).floor();
   return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}.${milliseconds.toString().padLeft(3, '0')}';
+}
+
+String? encodeQueryParameters(Map<String, String> params) {
+  return params.entries
+      .map((MapEntry<String, String> e) =>
+          '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+      .join('&');
 }

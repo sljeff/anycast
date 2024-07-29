@@ -24,6 +24,13 @@ List<TableCreator> tableCreators = [
   translationCreateTable,
 ];
 
+var migrations = {
+  // 3 -> 4
+  4: [
+    'ALTER TABLE settings ADD COLUMN continuousPlaying INTEGER DEFAULT 1',
+  ],
+};
+
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper.internal();
   factory DatabaseHelper() => _instance;
@@ -45,12 +52,27 @@ class DatabaseHelper {
     // await deleteDatabase(path);
 
     // create new
-    Database db =
-        await openDatabase(path, version: 3, onOpen: (Database db) async {
-      for (TableCreator tableCreator in tableCreators) {
-        await tableCreator(db);
-      }
-    });
+    Database db = await openDatabase(
+      path,
+      version: 4,
+      onCreate: (Database db, version) async {
+        for (TableCreator tableCreator in tableCreators) {
+          await tableCreator(db);
+        }
+      },
+      onUpgrade: (db, oldVersion, newVersion) {
+        var sorted = migrations.keys.toList()..sort();
+
+        for (int version in sorted) {
+          if (oldVersion < version) {
+            for (String sql in migrations[version]!) {
+              db.execute(sql);
+              print('executed $sql');
+            }
+          }
+        }
+      },
+    );
     return db;
   }
 

@@ -16,7 +16,8 @@ Future<void> settingsTableCreator(DatabaseExecutor db) {
       targetLanguage TEXT,
       autoRefreshInterval INTEGER,
       maxFeedEpisodes INTEGER,
-      maxHistoryEpisodes INTEGER
+      maxHistoryEpisodes INTEGER,
+      continuousPlaying INTEGER DEFAULT 1
     )
   """).then((v) {
     var code = Platform.localeName;
@@ -48,6 +49,7 @@ class SettingsModel {
   int? autoRefreshInterval; // seconds
   int? maxFeedEpisodes;
   int? maxHistoryEpisodes;
+  bool? continuousPlaying;
 
   Map<String, dynamic> toMap() {
     var map = <String, dynamic>{
@@ -61,6 +63,7 @@ class SettingsModel {
       'autoRefreshInterval': autoRefreshInterval,
       'maxFeedEpisodes': maxFeedEpisodes,
       'maxHistoryEpisodes': maxHistoryEpisodes,
+      'continuousPlaying': continuousPlaying,
     };
     if (id != null) {
       map['id'] = id;
@@ -81,6 +84,7 @@ class SettingsModel {
     autoRefreshInterval = map['autoRefreshInterval'];
     maxFeedEpisodes = map['maxFeedEpisodes'];
     maxHistoryEpisodes = map['maxHistoryEpisodes'];
+    continuousPlaying = map['continuousPlaying'] == 1;
   }
 
   static Future<SettingsModel> get(DatabaseExecutor db) async {
@@ -124,6 +128,15 @@ class SettingsModel {
       SET autoSleepTimer = ?
       WHERE id = 1
     """, [autoSleepTimer]);
+  }
+
+  static Future<int> setContinuousPlaying(
+      DatabaseExecutor db, bool continuousPlaying) async {
+    return db.rawUpdate("""
+      UPDATE $tableName
+      SET continuousPlaying = ?
+      WHERE id = 1
+    """, [continuousPlaying ? 1 : 0]);
   }
 
   static Future<void> set(

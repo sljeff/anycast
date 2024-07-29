@@ -1,17 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:anycast/pages/feeds.dart';
 import 'package:anycast/widgets/share.dart';
 import 'package:get/get.dart';
-import 'package:opml/opml.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-
-class OPML {
-  final String title;
-  final String url;
-
-  OPML(this.title, this.url);
-}
 
 class ShareController extends GetxController {
   late StreamSubscription _intentSub;
@@ -41,7 +33,7 @@ class ShareController extends GetxController {
       _sharedFiles.clear();
       _sharedFiles.addAll(value);
 
-      parseOPML().then((_) {
+      _parseOPML().then((_) {
         Get.dialog(const ShareDialog());
       });
     }, onError: (err) {
@@ -58,7 +50,7 @@ class ShareController extends GetxController {
       _sharedFiles.addAll(value);
 
       Future.delayed(const Duration(seconds: 2), () {
-        parseOPML().then((_) {
+        _parseOPML().then((_) {
           Get.dialog(const ShareDialog(), barrierDismissible: false);
         });
       });
@@ -68,7 +60,7 @@ class ShareController extends GetxController {
     });
   }
 
-  Future<void> parseOPML() async {
+  Future<void> _parseOPML() async {
     if (sharedFile == null) {
       return;
     }
@@ -76,19 +68,8 @@ class ShareController extends GetxController {
     if (path.startsWith('file://')) {
       path = Uri.parse(sharedFile!.path).toFilePath();
     }
-    var content = await File(path).readAsString();
-    final opml = OpmlDocument.parse(content);
 
-    var result = <OPML>[];
-    for (var outline in opml.body) {
-      if (outline.title == null || outline.xmlUrl == null) {
-        continue;
-      }
-      if (outline.title!.isEmpty || outline.xmlUrl!.isEmpty) {
-        continue;
-      }
-      result.add(OPML(outline.title!, outline.xmlUrl!));
-    }
+    var result = await parseOPML(path);
     _opmls.value = result;
   }
 }

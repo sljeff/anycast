@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/states/cache.dart';
-import 'package:anycast/states/player.dart';
+// import 'package:anycast/states/player.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
@@ -80,9 +80,9 @@ class MyAudioHandler extends BaseAudioHandler {
   Stream<bool> get skipSilenceEnabledStream => _player.skipSilenceEnabledStream;
 
   Future<void> playByEpisode(PlaylistEpisodeModel episode) async {
-    setByEpisode(episode);
+    await setByEpisode(episode);
 
-    play();
+    await play();
   }
 
   Future<void> setByEpisode(PlaylistEpisodeModel episode) async {
@@ -118,7 +118,7 @@ class MyAudioHandler extends BaseAudioHandler {
 
   @override
   Future<void> play() async {
-    Get.find<SettingsController>().autoSetCountdown();
+    // Get.find<SettingsController>().autoSetCountdown();
     await _player.play();
     return super.play();
   }

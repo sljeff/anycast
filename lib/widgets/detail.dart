@@ -137,7 +137,7 @@ class Detail extends StatelessWidget {
                             ),
                             const SizedBox(width: 12),
                             GestureDetector(
-                              onTap: () {
+                              onTap: () async {
                                 var shareUrl = Uri(
                                   scheme: 'https',
                                   host: 'share.anycast.website',
@@ -148,13 +148,20 @@ class Detail extends StatelessWidget {
                                   },
                                 );
 
-                                getShortUrl(shareUrl).then((value) {
+                                Get.dialog(const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeCap: StrokeCap.round,
+                                  ),
+                                ));
+                                await getShortUrl(shareUrl).then((value) {
                                   var finalUrl = shareUrl.toString();
                                   if (value != null) {
                                     finalUrl = value;
                                   }
                                   Share.share('${episode.title}\n\n$finalUrl');
                                 });
+
+                                Get.back();
                               },
                               child: Container(
                                 width: 40,
