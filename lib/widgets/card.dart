@@ -170,7 +170,7 @@ class Card extends StatelessWidget {
                                   children: [
                                     ConstrainedBox(
                                       constraints: const BoxConstraints(
-                                        maxWidth: 128,
+                                        maxWidth: 114,
                                       ),
                                       child: Text(
                                         episode.channelTitle!,

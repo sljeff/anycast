@@ -126,8 +126,7 @@ class PlayerSettings extends GetView<PlayerController> {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: Column(children: [
-          SizedBox(
-            height: 400,
+          Expanded(
             child: Scrollbar(
               child: SingleChildScrollView(
                 child: Obx(
@@ -138,7 +137,7 @@ class PlayerSettings extends GetView<PlayerController> {
             ),
           ),
           const SizedBox(height: 16),
-          const Expanded(child: Settings()),
+          const Settings(),
         ]),
       ),
     );
@@ -1028,6 +1027,7 @@ class Settings extends GetView<SettingsController> {
             ),
           ),
         ]),
+        const SizedBox(height: 16),
         Column(children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.start,
@@ -1079,6 +1079,7 @@ class Settings extends GetView<SettingsController> {
             ),
           )
         ]),
+        const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
