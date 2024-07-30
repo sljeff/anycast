@@ -32,6 +32,9 @@ class ChannelController extends GetxController {
   }
 
   void _updateColor() {
+    if (channel.value.imageUrl == null || channel.value.imageUrl!.isEmpty) {
+      return;
+    }
     updatePaletteGenerator(channel.value.imageUrl!).then((color) {
       backgroundColor.value = color;
     });

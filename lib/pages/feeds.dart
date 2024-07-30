@@ -63,7 +63,11 @@ class Feeds extends GetView<FeedEpisodeController> {
         child: Obx(() {
           var episodes = controller.episodes;
           if (episodes.isEmpty) {
-            return ImportBlock();
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              controller: controller.scrollController,
+              child: ImportBlock(),
+            );
           }
           return ListView.separated(
             controller: controller.scrollController,
@@ -147,6 +151,8 @@ class ImportBlock extends StatelessWidget {
         );
       }
       return Container(
+        height: 400,
+        width: double.infinity,
         alignment: Alignment.center,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,

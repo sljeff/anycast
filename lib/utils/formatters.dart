@@ -2,6 +2,7 @@ import 'package:anycast/styles.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:sanitize_html/sanitize_html.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -11,7 +12,11 @@ String formatDatetime(int ts) {
   // in a week: use timeago; in this year: use month and day; else: use yyyy-mm-dd
   var now = DateTime.now();
   if (dt.isAfter(now.subtract(const Duration(days: 7)))) {
-    return "${timeago.format(dt, locale: 'en_short')} ago";
+    var ago = timeago.format(dt, locale: 'en_short');
+    if (ago == 'now') {
+      return 'just now';
+    }
+    return "$ago ago";
   } else if (dt.year == now.year) {
     return '${dt.month}-${dt.day}';
   } else {
@@ -60,6 +65,9 @@ String formatRemainingTime(Duration duration, Duration playedDuration) {
 }
 
 Widget renderHtml(context, String html) {
+  if (html.isEmpty) {
+    return const SizedBox.shrink();
+  }
   // if starts with <
   if (html.trim().startsWith('<')) {
     var sanitized = sanitizeHtml(html).trim();
@@ -71,6 +79,16 @@ Widget renderHtml(context, String html) {
       textStyle: const TextStyle(
         color: Colors.white,
         fontSize: 14,
+        height: 1.2,
+        inherit: false,
+      ),
+      onErrorBuilder: (context, error, any) => Text(
+        error.toString(),
+        style: GoogleFonts.robotoMono(
+          color: Colors.red,
+          fontSize: 12,
+          decoration: TextDecoration.none,
+        ),
       ),
     );
   }

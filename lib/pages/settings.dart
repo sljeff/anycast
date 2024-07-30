@@ -31,56 +31,56 @@ const targetLangList = [
 ];
 
 const countryList = [
-  {'name': 'United States', 'code': 'US'},
-  {'name': '中国', 'code': 'CN'},
-  {'name': 'India', 'code': 'IN'},
-  {'name': 'Japan', 'code': 'JP'},
-  {'name': 'Deutschland', 'code': 'DE'},
-  {'name': 'United Kingdom', 'code': 'GB'},
-  {'name': 'France', 'code': 'FR'},
-  {'name': 'Brasil', 'code': 'BR'},
-  {'name': 'Italia', 'code': 'IT'},
-  {'name': 'Россия', 'code': 'RU'},
-  {'name': 'Canada', 'code': 'CA'},
-  {'name': '대한민국', 'code': 'KR'},
-  {'name': 'España', 'code': 'ES'},
-  {'name': 'Australia', 'code': 'AU'},
-  {'name': 'México', 'code': 'MX'},
-  {'name': 'Indonesia', 'code': 'ID'},
-  {'name': 'Nederland', 'code': 'NL'},
-  {'name': 'Türkiye', 'code': 'TR'},
-  {'name': 'Saudi Arabia', 'code': 'SA'},
-  {'name': 'Schweiz', 'code': 'CH'},
   {'name': 'Argentina', 'code': 'AR'},
-  {'name': 'Sverige', 'code': 'SE'},
-  {'name': 'Polska', 'code': 'PL'},
-  {'name': 'België / Belgique', 'code': 'BE'},
-  {'name': 'Norge', 'code': 'NO'},
+  {'name': 'Australia', 'code': 'AU'},
   {'name': 'Österreich', 'code': 'AT'},
-  {'name': 'Danmark', 'code': 'DK'},
-  {'name': 'ประเทศไทย', 'code': 'TH'},
-  {'name': 'Suomi', 'code': 'FI'},
-  {'name': 'Portugal', 'code': 'PT'},
-  {'name': 'Ελλάδα', 'code': 'GR'},
-  {'name': 'Israel', 'code': 'IL'},
-  {'name': 'Ireland', 'code': 'IE'},
+  {'name': 'Bangladesh', 'code': 'BD'},
+  {'name': 'België / Belgique', 'code': 'BE'},
+  {'name': 'Brasil', 'code': 'BR'},
+  {'name': 'Canada', 'code': 'CA'},
+  {'name': 'Schweiz', 'code': 'CH'},
+  {'name': 'Chile', 'code': 'CL'},
+  {'name': '中国', 'code': 'CN'},
+  {'name': 'Colombia', 'code': 'CO'},
   {'name': 'Česká republika', 'code': 'CZ'},
-  {'name': 'Singapore', 'code': 'SG'},
+  {'name': 'Deutschland', 'code': 'DE'},
+  {'name': 'Danmark', 'code': 'DK'},
+  {'name': 'Egypt', 'code': 'EG'},
+  {'name': 'مصر', 'code': 'EG'},
+  {'name': 'España', 'code': 'ES'},
+  {'name': 'Suomi', 'code': 'FI'},
+  {'name': 'France', 'code': 'FR'},
+  {'name': 'United Kingdom', 'code': 'GB'},
+  {'name': 'Ελλάδα', 'code': 'GR'},
+  {'name': 'Magyarország', 'code': 'HU'},
+  {'name': 'Indonesia', 'code': 'ID'},
+  {'name': 'Ireland', 'code': 'IE'},
+  {'name': 'Israel', 'code': 'IL'},
+  {'name': 'India', 'code': 'IN'},
+  {'name': 'Italia', 'code': 'IT'},
+  {'name': 'Japan', 'code': 'JP'},
+  {'name': '대한민국', 'code': 'KR'},
+  {'name': 'México', 'code': 'MX'},
+  {'name': 'Malaysia', 'code': 'MY'},
+  {'name': 'Nigeria', 'code': 'NG'},
+  {'name': 'Nederland', 'code': 'NL'},
+  {'name': 'Norge', 'code': 'NO'},
   {'name': 'New Zealand', 'code': 'NZ'},
+  {'name': 'Pakistan', 'code': 'PK'},
+  {'name': 'Polska', 'code': 'PL'},
+  {'name': 'Philippines', 'code': 'PH'},
+  {'name': 'Portugal', 'code': 'PT'},
+  {'name': 'România', 'code': 'RO'},
+  {'name': 'Россия', 'code': 'RU'},
+  {'name': 'Saudi Arabia', 'code': 'SA'},
+  {'name': 'Sverige', 'code': 'SE'},
+  {'name': 'Singapore', 'code': 'SG'},
+  {'name': 'ประเทศไทย', 'code': 'TH'},
+  {'name': 'Türkiye', 'code': 'TR'},
+  {'name': 'Україна', 'code': 'UA'},
+  {'name': 'United States', 'code': 'US'},
   {'name': 'Việt Nam', 'code': 'VN'},
   {'name': 'South Africa', 'code': 'ZA'},
-  {'name': 'Malaysia', 'code': 'MY'},
-  {'name': 'Chile', 'code': 'CL'},
-  {'name': 'Philippines', 'code': 'PH'},
-  {'name': 'Colombia', 'code': 'CO'},
-  {'name': 'Egypt', 'code': 'EG'},
-  {'name': 'România', 'code': 'RO'},
-  {'name': 'Україна', 'code': 'UA'},
-  {'name': 'Pakistan', 'code': 'PK'},
-  {'name': 'Magyarország', 'code': 'HU'},
-  {'name': 'مصر', 'code': 'EG'},
-  {'name': 'Bangladesh', 'code': 'BD'},
-  {'name': 'Nigeria', 'code': 'NG'}
 ];
 
 class SettingsPage extends GetView<SettingsController> {
@@ -107,36 +107,32 @@ class SettingsPage extends GetView<SettingsController> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   children: [
-                    SettingsGroup(
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            showMaterialModalBottomSheet(
-                              expand: true,
-                              context: context,
-                              builder: (context) {
-                                return const LoginPage();
-                              },
-                              closeProgressThreshold: 0.9,
-                            );
+                    GestureDetector(
+                      onTap: () {
+                        showMaterialModalBottomSheet(
+                          expand: true,
+                          context: context,
+                          builder: (context) {
+                            return const LoginPage();
                           },
-                          child: const SettingsGroup(
-                            children: [
-                              SettingContainer(
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.person),
-                                    SizedBox(width: 8),
-                                    Text('Account'),
-                                  ],
-                                ),
-                              )
-                            ],
-                          ),
-                        )
-                      ],
+                          closeProgressThreshold: 0.9,
+                        );
+                      },
+                      child: const SettingsGroup(
+                        children: [
+                          SettingContainer(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Icon(Icons.person),
+                                SizedBox(width: 8),
+                                Text('Account'),
+                              ],
+                            ),
+                          )
+                        ],
+                      ),
                     ),
                     SettingsGroup(title: "Transcript & Translation", children: [
                       SettingContainer(
@@ -548,7 +544,7 @@ class SettingContainer extends StatelessWidget {
     var c = Container(
       constraints: const BoxConstraints(minHeight: 48),
       alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       clipBehavior: Clip.antiAlias,
       decoration: const BoxDecoration(
         color: Color(0xFF232830),
@@ -582,7 +578,7 @@ class SettingsGroup extends StatelessWidget {
     if (title != null) {
       c = [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           alignment: Alignment.bottomLeft,
           child: Text(
             title!,
@@ -604,7 +600,7 @@ class SettingsGroup extends StatelessWidget {
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
+      margin: const EdgeInsets.symmetric(vertical: 12),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: const Color(0xFF232830),

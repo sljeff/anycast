@@ -124,22 +124,21 @@ class PlayerSettings extends GetView<PlayerController> {
     return DefaultTextStyle(
       style: const TextStyle(color: Colors.white),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: Column(children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.only(top: 16, bottom: 16),
-              height: 200,
-              child: Scrollbar(
+          SizedBox(
+            height: 400,
+            child: Scrollbar(
+              child: SingleChildScrollView(
                 child: Obx(
-                  () => SingleChildScrollView(
-                      child: renderHtml(context,
-                          controller.playlistEpisode.value.description ?? "")),
+                  () => renderHtml(context,
+                      controller.playlistEpisode.value.description ?? ""),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 280, child: Settings()),
+          const SizedBox(height: 16),
+          const Expanded(child: Settings()),
         ]),
       ),
     );

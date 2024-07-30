@@ -10,6 +10,7 @@ import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/icons/ri.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:jiffy/jiffy.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 
 class LoginPage extends GetView<AuthController> {
   const LoginPage({super.key});
@@ -381,6 +382,8 @@ class LoginPage extends GetView<AuthController> {
   }
 
   Widget _buildPaywall(BuildContext context) {
+    var slideController = CarouselController();
+
     return Card(
       color: const Color(0xFF1E1E1E),
       child: Padding(
@@ -394,14 +397,41 @@ class LoginPage extends GetView<AuthController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Anycast+ Plus'),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Anycast+ Plus'),
+                  Tooltip(
+                    message: 'Auto renewal is on.\n'
+                        'But you can easily cancel it at any time\nfrom App Store.',
+                    showDuration: Duration(milliseconds: 4000),
+                    triggerMode: TooltipTriggerMode.tap,
+                    child: Icon(Icons.info_outline, size: 16),
+                  ),
+                ],
+              ),
               const SizedBox(height: 15),
-              Container(
-                height: 150,
-                color: Colors.grey[800],
-                alignment: Alignment.center,
-                child: const Text('[功能展示轮播图]',
-                    style: TextStyle(fontStyle: FontStyle.italic)),
+              CarouselSlider(
+                items: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/images/subscription_intro.png',
+                    ),
+                  ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/images/subscription_intro_2.png',
+                    ),
+                  ),
+                ],
+                options: CarouselOptions(
+                  aspectRatio: 2 / 1,
+                  viewportFraction: 1,
+                  autoPlay: true,
+                ),
+                carouselController: slideController,
               ),
               const SizedBox(height: 15),
               FutureBuilder(
@@ -551,44 +581,58 @@ class LoginPage extends GetView<AuthController> {
       () {
         var rcController = Get.find<RevenueCatController>();
         var choosenPlan = rcController.choosenPlan.value;
+        final choosen = choosenPlan == plan.storeProduct.identifier;
         var background = Colors.grey[800];
 
-        if (choosenPlan == plan.storeProduct.identifier) {
-          background = Colors.greenAccent[700];
+        if (choosen) {
+          background = const Color.fromARGB(255, 56, 121, 58);
         }
 
-        return GestureDetector(
-          onTap: () {
-            rcController.choosenPlan.value = plan.storeProduct.identifier;
-          },
-          child: Card(
-            color: background,
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: DefaultTextStyle(
-                style: GoogleFonts.comfortaa(
-                  color: Colors.white,
-                  fontSize: 12,
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.comfortaa(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
+        return Column(
+          children: [
+            GestureDetector(
+              onTap: () {
+                rcController.choosenPlan.value = plan.storeProduct.identifier;
+              },
+              child: Card(
+                color: background,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 12, horizontal: 28),
+                  child: DefaultTextStyle(
+                    style: GoogleFonts.comfortaa(
+                      color: Colors.white,
+                      fontSize: 12,
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      '${plan.storeProduct.priceString}/$per',
+                    child: Column(
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.comfortaa(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '${plan.storeProduct.priceString}/$per',
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: 5),
+            Text(
+              'Auto Renewal: ${plan.storeProduct.priceString}',
+              style: GoogleFonts.comfortaa(
+                color: choosen ? Colors.green : Colors.white70,
+                fontSize: 10,
+              ),
+            ),
+          ],
         );
       },
     );

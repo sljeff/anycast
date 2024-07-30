@@ -73,7 +73,8 @@ class Detail extends StatelessWidget {
                               decoration: ShapeDecoration(
                                 image: DecorationImage(
                                   image: CachedNetworkImageProvider(
-                                    episode.imageUrl!,
+                                    episode.imageUrl ??
+                                        'https://placeholder.co/400/000000/FFF.png?text=No+Image',
                                   ),
                                   fit: BoxFit.fill,
                                 ),
@@ -186,7 +187,10 @@ class Detail extends StatelessWidget {
                           ],
                         ),
                       ),
-                      renderHtml(context, episode.description!),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: renderHtml(context, episode.description ?? ''),
+                      ),
                     ],
                   ),
                 ),
