@@ -270,7 +270,7 @@ class ImportInstructions extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Text(
-                  'Import OPML',
+                  'Import OPML from',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 20,

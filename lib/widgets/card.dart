@@ -301,23 +301,6 @@ class CardBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // return GestureDetector(
-    //   onTap: () {
-    //     onPressed();
-    //   },
-    //   child: Container(
-    //     margin: const EdgeInsets.only(top: 12),
-    //     width: 48,
-    //     height: 48,
-    //     decoration:
-    //         const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
-    //     child: FractionallySizedBox(
-    //       widthFactor: 0.5,
-    //       heightFactor: 0.5,
-    //       child: icon,
-    //     ),
-    //   ),
-    // );
     return IconButton(
       onPressed: onPressed,
       icon: icon,

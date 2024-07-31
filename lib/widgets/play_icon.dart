@@ -64,7 +64,10 @@ class AIIcon extends GetView<SubtitleController> {
 
       switch (status) {
         case 'processing':
-          return Lottie.asset('assets/lottie/robot_loading.json');
+          return SizedBox(
+            height: 24,
+            child: Lottie.asset('assets/lottie/robot_loading.json'),
+          );
         case 'succeeded':
           return Iconify(Ic.round_check_circle, size: size, color: color);
         case 'failed':
