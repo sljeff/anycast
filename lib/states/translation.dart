@@ -77,6 +77,14 @@ class TranslationController extends GetxController {
       translationUrls[url] = 'succeeded';
     });
   }
+
+  Future<void> remove(String url) async {
+    translationUrls.remove(url);
+
+    DatabaseHelper().db.then((db) async {
+      await TranslationModel.delete(db, url);
+    });
+  }
 }
 
 Future<String?> getDetectedLanguage(String url) async {

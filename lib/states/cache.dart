@@ -49,6 +49,7 @@ class CacheController extends GetxController {
   }
 
   void download(String url) {
+    set(url, DownloadProgress(url, 100, 0));
     cacheManager.getFileStream(url, withProgress: true).listen((event) {
       set(url, event);
     });
@@ -59,5 +60,10 @@ class CacheController extends GetxController {
       'anycast_episode',
       maxNrOfCacheObjects: Get.find<SettingsController>().maxCacheCount.value,
     ));
+  }
+
+  void remove(String url) {
+    key2FileResponse.remove(url);
+    cacheManager.removeFile(url);
   }
 }

@@ -17,7 +17,7 @@ class Subscriptions extends StatelessWidget {
           child: SizedBox(
             width: 300,
             child: Text(
-              'Whoops! \n\nLooks like your podcast galaxy is still unexplored.\n \nStart subscribing and fill it with stars of shows!',
+              'Whoops! \n\nLooks like your podcast galaxy is still unexplored.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white,

@@ -89,6 +89,10 @@ class RevenueCatController extends GetxController {
   void onInit() {
     super.onInit();
     initPlatformState();
+
+    if (Platform.isAndroid) {
+      choosenPlan.value = 'anycast_plus:monthly';
+    }
   }
 
   Future<void> initPlatformState() async {

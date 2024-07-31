@@ -39,7 +39,11 @@ class PlayerModel {
   }
 
   static Future<void> update(DatabaseExecutor db, PlayerModel player) async {
-    await db.update(tableName, player.toMap(), where: 'id = ?', whereArgs: [1]);
+    // await db.update(tableName, player.toMap(), where: 'id = ?', whereArgs: [1]);
+    // insert, on conflict replace
+    await db.rawInsert("""
+      INSERT OR REPLACE INTO $tableName (id, currentPlaylistId)
+      VALUES (1, ?)""", [player.currentPlaylistId]);
   }
 
   static Future<PlayerModel> get(DatabaseExecutor db) async {

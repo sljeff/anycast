@@ -6,6 +6,7 @@ import 'package:anycast/states/player.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/handler.dart';
 import 'package:anycast/widgets/import_export.dart';
+import 'package:anycast/widgets/privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -477,51 +478,7 @@ class SettingsPage extends GetView<SettingsController> {
                         ),
                       ],
                     ),
-                    Center(
-                      child: Column(children: [
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () {
-                            launchUrl(
-                              Uri(
-                                  scheme: 'https',
-                                  host: 'privacy.anycast.website'),
-                              mode: LaunchMode.inAppBrowserView,
-                            );
-                          },
-                          child: Text(
-                            'Privacy Policy',
-                            style: GoogleFonts.comfortaa(
-                              color: Colors.blueAccent,
-                              fontSize: 12,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () {
-                            launchUrl(
-                              Uri(
-                                scheme: 'https',
-                                host: 'www.apple.com',
-                                path:
-                                    '/legal/internet-services/itunes/dev/stdeula/',
-                              ),
-                              mode: LaunchMode.inAppBrowserView,
-                            );
-                          },
-                          child: Text(
-                            'Terms of Use (EULA)',
-                            style: GoogleFonts.comfortaa(
-                              color: Colors.blueAccent,
-                              fontSize: 12,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ]),
-                    ),
+                    const Privacy(),
                   ],
                 ),
               ),

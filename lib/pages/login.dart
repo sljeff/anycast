@@ -1,6 +1,7 @@
 import 'package:anycast/api/user.dart';
 import 'package:anycast/states/user.dart';
 import 'package:anycast/widgets/handler.dart';
+import 'package:anycast/widgets/privacy.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -125,6 +126,8 @@ class LoginPage extends GetView<AuthController> {
                     _buildSubscriptionInfo(),
                     const SizedBox(height: 20),
                     _buildPaywall(context),
+                    const SizedBox(height: 30),
+                    const Privacy(),
                     const SizedBox(height: 30),
                     const RemoveAccount(),
                   ],
@@ -400,7 +403,7 @@ class LoginPage extends GetView<AuthController> {
               const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Anycast+ Plus'),
+                  Text('Anycast+ Plus Plan'),
                   Tooltip(
                     message: 'Auto renewal is on.\n'
                         'But you can easily cancel it at any time\nfrom App Store.',
@@ -433,7 +436,6 @@ class LoginPage extends GetView<AuthController> {
                 ),
                 carouselController: slideController,
               ),
-              const SizedBox(height: 15),
               FutureBuilder(
                 future: Purchases.getOfferings(),
                 builder: (context, snapshot) {
@@ -452,6 +454,7 @@ class LoginPage extends GetView<AuthController> {
 
                   return Column(
                     children: [
+                      const PlusIntro(),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: planCards,
@@ -626,11 +629,88 @@ class LoginPage extends GetView<AuthController> {
             ),
             const SizedBox(height: 5),
             Text(
-              'Auto Renewal: ${plan.storeProduct.priceString}',
+              'Auto Renewal\n${plan.storeProduct.priceString}/${per.toLowerCase()}',
               style: GoogleFonts.comfortaa(
                 color: choosen ? Colors.green : Colors.white70,
                 fontSize: 10,
+                height: 1.2,
               ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class PlusIntro extends StatelessWidget {
+  const PlusIntro({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(
+      () {
+        var rcController = Get.find<RevenueCatController>();
+        var choosenPlan = rcController.choosenPlan.value;
+        var name = 'Monthly';
+        if (choosenPlan.contains('annual')) {
+          name = 'Annually';
+        }
+        return ExpansionTile(
+          tilePadding: const EdgeInsets.all(0),
+          initiallyExpanded: true,
+          collapsedIconColor: Colors.white,
+          iconColor: Colors.white,
+          title: Text(
+            "Anycast+ Plus ($name)",
+            style: GoogleFonts.comfortaa(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          childrenPadding: const EdgeInsets.only(left: 12, bottom: 12),
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                DefaultTextStyle(
+                    style: GoogleFonts.comfortaa(
+                      color: Colors.white,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text("- "),
+                            Text("50 TIMES",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                )),
+                            Text(" AI Transcription every month"),
+                          ],
+                        ),
+                        // 翻译：无限双语字幕翻译
+                        Row(
+                          children: [
+                            Text("- "),
+                            Text("Unlimited",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                )),
+                            Text(" subtitle translation"),
+                          ],
+                        ),
+                        // 翻译：导出字幕到你的笔记软件
+                        Text("- Export subtitle to your note app"),
+                      ],
+                    )),
+              ],
             ),
           ],
         );

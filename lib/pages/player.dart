@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:anycast/api/share.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
@@ -27,6 +29,7 @@ import 'package:lottie/lottie.dart';
 import 'package:marquee/marquee.dart';
 import 'package:flutter_lyric/lyrics_reader.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 class PlayerPage extends GetView<PlayerController> {
@@ -679,12 +682,10 @@ class LyricsWithShare extends GetView<PlayerController> {
               padding: WidgetStatePropertyAll(EdgeInsets.all(8)),
               backgroundColor: WidgetStatePropertyAll(Colors.black),
             ),
-            onPressed: () {
-              Get.snackbar(
-                "Coming Soon",
-                "Export subtitles coming soon",
-                snackPosition: SnackPosition.BOTTOM,
-              );
+            onPressed: () async {
+              Get.dialog(const Center(child: CircularProgressIndicator()));
+              await exportSubtitles(model);
+              Get.back();
             },
             icon: const Iconify(
               Ic.baseline_offline_share,
@@ -696,6 +697,43 @@ class LyricsWithShare extends GetView<PlayerController> {
       ],
     );
   }
+}
+
+// lrc format
+Future<void> exportSubtitles(LyricsReaderModel model) async {
+  var playerController = Get.find<PlayerController>();
+  var title = playerController.playlistEpisode.value.title ?? 'Subtitle';
+  var channelTitle = playerController.playlistEpisode.value.channelTitle ?? '';
+  var subject = '$title - $channelTitle';
+  if (channelTitle.isEmpty) {
+    subject = title;
+  }
+
+  var buffer = StringBuffer('# $subject\n\n---\n\n');
+  for (var t in model.lyrics) {
+    if (t.mainText == null || t.mainText!.isEmpty) {
+      continue;
+    }
+    var startTime = (t.startTime ?? 0) / 1000.0;
+    var s = formatLrcTime(startTime);
+
+    buffer.writeln('[$s]${t.mainText}');
+    if (t.extText?.isNotEmpty == true) {
+      buffer.writeln('[$s]${t.extText}');
+    }
+    buffer.writeln('\n');
+  }
+
+  var tempFile = await getTemporaryDirectory();
+  var file = File('${tempFile.path}/$subject.txt');
+
+  await file.writeAsString(buffer.toString());
+
+  Share.shareXFiles([
+    XFile(file.path, name: subject),
+  ], subject: subject);
+
+  // await Share.share(buffer.toString(), subject: subject);
 }
 
 class Lyrics extends GetView<PlayerController> {

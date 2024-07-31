@@ -2,8 +2,11 @@ import 'dart:io';
 
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
+import 'package:anycast/states/cache.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
+import 'package:anycast/states/subtitle.dart';
+import 'package:anycast/states/translation.dart';
 import 'package:get/get.dart';
 
 class PlaylistEpisodeController extends GetxController {
@@ -55,8 +58,13 @@ class PlaylistEpisodeController extends GetxController {
     episodes.removeAt(oldIndex);
     Get.find<PlaylistController>().removeFromSet(enclosureUrl);
 
-    helper.db.then(
-        (db) => {PlaylistEpisodeModel.deleteByEnclosureUrl(db, enclosureUrl)});
+    helper.db.then((db) {
+      PlaylistEpisodeModel.deleteByEnclosureUrl(db, enclosureUrl);
+    });
+
+    Get.find<SubtitleController>().remove(enclosureUrl);
+    Get.find<TranslationController>().remove(enclosureUrl);
+    Get.find<CacheController>().remove(enclosureUrl);
   }
 
   void removeTop() {

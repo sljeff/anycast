@@ -87,4 +87,12 @@ class TranslationModel {
     }
     return lrc;
   }
+
+  static Future<void> delete(DatabaseExecutor db, String enclosureUrl) async {
+    await db.delete(
+      tableName,
+      where: 'enclosureUrl = ?',
+      whereArgs: [enclosureUrl],
+    );
+  }
 }
