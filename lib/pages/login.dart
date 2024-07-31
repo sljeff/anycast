@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/icons/ri.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:jiffy/jiffy.dart';
 import 'package:carousel_slider/carousel_slider.dart';
@@ -81,7 +82,7 @@ class LoginPage extends GetView<AuthController> {
                             Get.back();
                           },
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 10),
                         // Apple Sign In Button
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
@@ -109,6 +110,33 @@ class LoginPage extends GetView<AuthController> {
                             );
                             await controller.signInWithGoogle();
                             Get.back();
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Iconify(Ic.email),
+                              SizedBox(width: 10),
+                              Text('Sign in with Email'),
+                            ],
+                          ),
+                          onPressed: () async {
+                            showMaterialModalBottomSheet(
+                                context: context,
+                                builder: (context) {
+                                  return const EmailLogin();
+                                });
                           },
                         ),
                       ],
@@ -144,6 +172,9 @@ class LoginPage extends GetView<AuthController> {
     var icon = Ic.round_apple;
     if (controller.user.value!.providerData[0].providerId == 'google.com') {
       icon = Ri.google_fill;
+    } else if (controller.user.value!.providerData[0].providerId ==
+        'password') {
+      icon = Ic.email;
     }
 
     return Card(
@@ -795,6 +826,171 @@ class RemoveAccount extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class EmailLogin extends StatefulWidget {
+  final inputDec = const InputDecoration(
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(10)),
+      borderSide: BorderSide(color: Colors.white, width: 2),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(10)),
+      borderSide: BorderSide(color: Colors.white, width: 2),
+    ),
+  );
+
+  const EmailLogin({
+    super.key,
+  });
+
+  @override
+  State<EmailLogin> createState() => _EmailLoginState();
+}
+
+class _EmailLoginState extends State<EmailLogin> {
+  var emailController = TextEditingController();
+  var passwordController = TextEditingController();
+  var passwordConfirmController = TextEditingController();
+
+  bool login = true;
+
+  void setLogin(bool value) {
+    setState(() {
+      login = value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var wd = login ? loginWidget() : registerWidget();
+    return SafeArea(
+      child: Column(
+        children: [
+          const Handler(),
+          const SizedBox(height: 100),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: wd,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget loginWidget() {
+    return Column(
+      children: [
+        TextField(
+          style: const TextStyle(color: Colors.white),
+          controller: emailController,
+          decoration: widget.inputDec.copyWith(
+            hintText: "Email",
+          ),
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          style: const TextStyle(color: Colors.white),
+          controller: passwordController,
+          decoration: widget.inputDec.copyWith(
+            hintText: "Password",
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+          ),
+          onPressed: () {
+            Get.find<AuthController>().loginWithEmail(
+              emailController.text,
+              passwordController.text,
+            );
+          },
+          child: const Text("Login"),
+        ),
+        const SizedBox(height: 20),
+        TextButton(
+          onPressed: () {
+            setLogin(false);
+          },
+          child: const Text("Don't have an account? Register"),
+        ),
+      ],
+    );
+  }
+
+  Widget registerWidget() {
+    return Column(
+      children: [
+        TextField(
+          style: const TextStyle(color: Colors.white),
+          controller: emailController,
+          decoration: widget.inputDec.copyWith(
+            hintText: "Email",
+          ),
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          style: const TextStyle(color: Colors.white),
+          controller: passwordController,
+          decoration: widget.inputDec.copyWith(
+            hintText: "Password",
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          style: const TextStyle(color: Colors.white),
+          controller: passwordConfirmController,
+          decoration: widget.inputDec.copyWith(
+            hintText: "Confirm Password",
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+          ),
+          onPressed: () {
+            if (passwordController.text != passwordConfirmController.text) {
+              Get.snackbar("Error", "Passwords don't match");
+              return;
+            }
+
+            Get.find<AuthController>().registerWithEmail(
+              emailController.text,
+              passwordController.text,
+            );
+          },
+          child: const Text("Register"),
+        ),
+        const SizedBox(height: 20),
+        TextButton(
+          onPressed: () {
+            setLogin(true);
+          },
+          child: const Text("Already have an account? Login"),
+        ),
+      ],
     );
   }
 }
