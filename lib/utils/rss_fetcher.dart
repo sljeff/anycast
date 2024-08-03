@@ -147,7 +147,7 @@ String htmlToText(String? html) {
     if (document.body == null) {
       return html;
     }
-    return document.body!.text;
+    return document.body!.text.trim();
   } catch (error) {
     print(error);
     return html;

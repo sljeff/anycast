@@ -284,7 +284,6 @@ class ImportInstructions extends StatelessWidget {
             Expanded(
               child: ListView(
                 controller: controller,
-                shrinkWrap: true,
                 children: const [
                   ExpansionInstruction(
                       title: 'Castro',

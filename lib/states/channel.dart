@@ -1,9 +1,9 @@
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/subscription.dart';
-import 'package:anycast/pages/channel.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
+import 'package:anycast/utils/formatters.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
@@ -14,6 +14,8 @@ class ChannelController extends GetxController {
   var subscribed = false.obs;
   var isReversed = false.obs;
   var backgroundColor = const Color(0xFF111316).obs;
+
+  get showEpisodes => isReversed.value ? episodes.reversed.toList() : episodes;
 
   var helper = DatabaseHelper();
   var subscriptionController = Get.find<SubscriptionController>();
@@ -54,9 +56,6 @@ class ChannelController extends GetxController {
     // add newest episode to feed
     if (episodes.isNotEmpty) {
       var newestEpisode = episodes.first;
-      if (isReversed.value) {
-        newestEpisode = episodes.last;
-      }
       Get.find<FeedEpisodeController>().addMany([newestEpisode]);
       channel.value.lastUpdated = newestEpisode.pubDate;
     }
@@ -66,10 +65,5 @@ class ChannelController extends GetxController {
   void unsubscribe() {
     subscribed.value = false;
     subscriptionController.remove(channel.value);
-  }
-
-  void reverseEpisodes() {
-    isReversed.value = !isReversed.value;
-    episodes.value = episodes.reversed.toList();
   }
 }

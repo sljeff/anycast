@@ -74,7 +74,9 @@ class BottomNavBar extends StatelessWidget {
 }
 
 class PlayerBar extends GetView<PlayerController> {
-  const PlayerBar({super.key});
+  final bool bottomSafe;
+
+  const PlayerBar({super.key, this.bottomSafe = false});
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +97,7 @@ class PlayerBar extends GetView<PlayerController> {
         playedWidth = 0;
       }
 
-      return GestureDetector(
+      var bar = GestureDetector(
         onTap: () {
           showMaterialModalBottomSheet(
             context: context,
@@ -228,6 +230,12 @@ class PlayerBar extends GetView<PlayerController> {
           ),
         ),
       );
+
+      if (bottomSafe) {
+        return SafeArea(child: bar);
+      } else {
+        return bar;
+      }
     });
   }
 }

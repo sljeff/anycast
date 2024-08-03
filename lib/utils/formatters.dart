@@ -1,8 +1,10 @@
 import 'package:anycast/styles.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:palette_generator/palette_generator.dart';
 import 'package:sanitize_html/sanitize_html.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -123,7 +125,7 @@ String urlToDomain(String url) {
   return uri.host;
 }
 
-Color getSafeColor(Color dynamicColor) {
+Color getTextSafeColor(Color dynamicColor) {
   // 定义亮度阈值，低于这个值就认为颜色太暗
   const double brightnessThreshold = 0.2;
 
@@ -132,12 +134,35 @@ Color getSafeColor(Color dynamicColor) {
 
   if (brightness < brightnessThreshold) {
     // 如果颜色太暗，返回一个替代颜色
-    // 这里使用浅灰色作为示例，您可以根据需要选择其他颜色
     return const Color(0xFF10B981);
   } else {
     // 如果颜色亮度足够，返回原始的动态颜色
     return dynamicColor;
   }
+}
+
+Color getBackgroundSafeColor(Color dynamicColor) {
+  const double brightnessThreshold = 0.7;
+
+  double brightness = dynamicColor.computeLuminance();
+
+  if (brightness > brightnessThreshold) {
+    return const Color(0xFF113336);
+  } else {
+    return dynamicColor;
+  }
+}
+
+Future<Color> updatePaletteGenerator(String imageUrl) async {
+  final PaletteGenerator generator =
+      await PaletteGenerator.fromImageProvider(CachedNetworkImageProvider(
+    imageUrl,
+  ));
+  final Color dominantColor =
+      generator.dominantColor?.color ?? const Color(0xFF111316);
+
+  return dominantColor;
+  // return getBackgroundSafeColor(dominantColor);
 }
 
 // seconds to mm:ss.xx
@@ -153,4 +178,14 @@ String? encodeQueryParameters(Map<String, String> params) {
       .map((MapEntry<String, String> e) =>
           '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
       .join('&');
+}
+
+double getTextWidth(String text, TextStyle style,
+    {double maxWidth = double.infinity}) {
+  final TextPainter textPainter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    maxLines: 1,
+    textDirection: TextDirection.ltr,
+  )..layout(minWidth: 0, maxWidth: maxWidth);
+  return textPainter.width;
 }

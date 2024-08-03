@@ -432,7 +432,7 @@ class SettingsPage extends GetView<SettingsController> {
                                       ),
                                       itemExtent: 36,
                                       onSelectedItemChanged: (index) {
-                                        controller.setMaxFeedEpisodes(
+                                        controller.setMaxHistoryEpisodes(
                                             [50, 100, 200, 300][index]);
                                       },
                                       children: const [
