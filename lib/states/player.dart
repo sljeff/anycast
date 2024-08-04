@@ -90,13 +90,14 @@ class PlayerController extends GetxController {
           pause();
           clear();
         } else {
-          if (Get.find<SettingsController>().continuousPlaying.value) {
-            playByEpisode(peController.episodes[0]);
-          } else {
-            playByEpisode(peController.episodes[0]).then((_) {
+          playByEpisode(peController.episodes[0]).then((_) {
+            if (!Get.find<SettingsController>().continuousPlaying.value) {
               pause();
-            });
-          }
+              Future.delayed(const Duration(milliseconds: 100), () {
+                initProgress();
+              });
+            }
+          });
         }
       }
     });
@@ -158,7 +159,7 @@ class PlayerController extends GetxController {
   }
 
   Future<void> pause() async {
-    return myAudioHandler.pause();
+    return await myAudioHandler.pause();
   }
 
   Future<void> play() async {
@@ -290,7 +291,7 @@ class SettingsController extends GetxController {
     helper.db.then((db) => {
           SettingsModel.get(db).then((settings) {
             darkMode.value = settings.darkMode!;
-            speed.value = settings.speed!;
+            setSpeed(settings.speed ?? 1);
             skipSilence.value = settings.skipSilence!;
             var autoSleepTimer = settings.autoSleepTimer!;
             var autoSleepTimers = autoSleepTimer.split(',');

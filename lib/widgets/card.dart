@@ -43,37 +43,33 @@ class Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var barWidth = MediaQuery.of(context).size.width - 48;
-
-    var rightText =
-        '${formatDuration(episode.duration ?? 0)} • ${formatDatetime(episode.pubDate!)}';
-    var playedWidth = 0.0;
-    if (episode is PlaylistEpisodeModel) {
-      var pe = episode as PlaylistEpisodeModel;
-      if (pe.playedDuration != null && pe.playedDuration! > 0) {
-        rightText = formatRemainingTime(
-          Duration(milliseconds: pe.duration ?? 0),
-          Duration(milliseconds: pe.playedDuration!),
-        );
-        if (pe.duration != null) {
-          playedWidth = (pe.playedDuration! / pe.duration!) * barWidth;
-        }
-      }
-    }
-
     return Obx(
       () {
+        var barWidth = MediaQuery.of(context).size.width - 48;
+
+        var rightText =
+            '${formatDuration(episode.duration ?? 0)} • ${formatDatetime(episode.pubDate!)}';
+        var playedWidth = 0.0;
+
         Widget back = Container(
           width: playedWidth,
           height: 100,
           color: Colors.white.withOpacity(0.1),
         );
 
-        var playerController = Get.find<PlayerController>();
-        if (episode is PlaylistEpisodeModel &&
-            playerController.playlistEpisode.value.enclosureUrl ==
-                episode.enclosureUrl) {
-          back = Obx(() {
+        if (episode is PlaylistEpisodeModel) {
+          var pe = episode as PlaylistEpisodeModel;
+          if (pe.playedDuration != null && pe.playedDuration! > 0) {
+            rightText = formatRemainingTime(
+              Duration(milliseconds: pe.duration ?? 0),
+              Duration(milliseconds: pe.playedDuration!),
+            );
+          }
+
+          var playerController = Get.find<PlayerController>();
+
+          if (pe.enclosureUrl ==
+              playerController.playlistEpisode.value.enclosureUrl) {
             var positionData = playerController.positionData.value;
             if (positionData.duration.inMilliseconds != 0 &&
                 positionData.position.inMilliseconds != 0) {
@@ -81,12 +77,22 @@ class Card extends StatelessWidget {
                   positionData.duration.inMilliseconds *
                   barWidth;
             }
-            return Container(
+            back = Container(
               width: playedWidth,
               height: 100,
               color: Colors.white.withOpacity(0.1),
             );
-          });
+          } else {
+            if (pe.duration != null) {
+              playedWidth =
+                  ((pe.playedDuration ?? 0) / pe.duration!) * barWidth;
+            }
+            back = Container(
+              width: playedWidth,
+              height: 100,
+              color: Colors.white.withOpacity(0.1),
+            );
+          }
         }
 
         return Column(
