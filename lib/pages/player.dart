@@ -66,7 +66,6 @@ class PlayerPage extends GetView<PlayerController> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SizedBox(height: 16),
               const Handler(),
               Expanded(
                 child: PageView(

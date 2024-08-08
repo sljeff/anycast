@@ -141,8 +141,9 @@ class Card extends StatelessWidget {
                               height: 80,
                               decoration: ShapeDecoration(
                                 image: DecorationImage(
-                                  image: CachedNetworkImageProvider(
-                                      episode.imageUrl!),
+                                  image: CachedNetworkImageProvider(episode
+                                          .imageUrl ??
+                                      'https://placeholder.co/48.png?text=NoImage'),
                                   fit: BoxFit.fill,
                                 ),
                                 shape: RoundedRectangleBorder(
@@ -374,8 +375,8 @@ class PodcastCard extends StatelessWidget {
                       decoration: ShapeDecoration(
                         image: DecorationImage(
                           image: CachedNetworkImageProvider(
-                            subscription.imageUrl!,
-                          ),
+                              subscription.imageUrl ??
+                                  'https://placeholder.co/48.png?text=NoImage'),
                           fit: BoxFit.fill,
                         ),
                         shape: RoundedRectangleBorder(

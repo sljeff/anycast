@@ -327,19 +327,18 @@ class LoginPage extends GetView<AuthController> {
             return const Text('...');
           }
           var user = snapshot.data!;
-          var total = 3;
           var right = ' Transcriptions left';
           if (user.plus == 1) {
-            total = 50;
             right = ' Transcriptions left (this month)';
           }
 
           return Row(
             children: [
-              Text('${user.remaining}/$total',
+              Text('${user.remaining}',
                   style: TextStyle(
                     color: Colors.green.shade200,
                     fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   )),
               Text(
                 right,

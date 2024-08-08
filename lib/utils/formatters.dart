@@ -26,6 +26,17 @@ String formatDatetime(int ts) {
   }
 }
 
+String formatDate(int ts) {
+  var dt = DateTime.fromMillisecondsSinceEpoch(ts);
+
+  var now = DateTime.now();
+  if (dt.year == now.year) {
+    return '${dt.month}-${dt.day}';
+  }
+
+  return '${dt.year}-${dt.month}-${dt.day}';
+}
+
 String formatDuration(int ms) {
   if (ms == 0) {
     return '';

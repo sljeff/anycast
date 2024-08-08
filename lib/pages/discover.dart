@@ -5,6 +5,7 @@ import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/utils/keepalive.dart';
 import 'package:anycast/widgets/appbar.dart';
+import 'package:anycast/widgets/bottom_nav_bar.dart';
 import 'package:anycast/widgets/card.dart' as card;
 import 'package:anycast/widgets/card.dart';
 import 'package:anycast/widgets/handler.dart';
@@ -109,9 +110,10 @@ class SearchPage extends StatelessWidget {
   Widget build(BuildContext context) {
     var clController = Get.put(CardListController());
 
-    return Container(
-      color: const Color(0xFF111316),
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: const Color(0xFF111316),
+      bottomNavigationBar: const PlayerBar(),
+      body: SafeArea(
         child: Column(
           children: [
             GestureDetector(

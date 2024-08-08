@@ -327,7 +327,8 @@ class HistoryBlock extends StatelessWidget {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: CachedNetworkImage(
-                                imageUrl: episode.imageUrl!,
+                                imageUrl: episode.imageUrl ??
+                                    "https://placeholder.co/48.png?text=NoImage",
                                 width: 48,
                                 height: 48,
                               ),

@@ -9,6 +9,7 @@ import 'package:anycast/widgets/handler.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
@@ -91,7 +92,7 @@ class Detail extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    episode.title!,
+                                    episode.title ?? '',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 16,
@@ -102,36 +103,58 @@ class Detail extends StatelessWidget {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  GestureDetector(
-                                    onTap: () {
-                                      var s = SubscriptionModel.empty();
-                                      s.rssFeedUrl = episode.rssFeedUrl;
-                                      s.title = episode.channelTitle;
-                                      s.rssFeedUrl = episode.rssFeedUrl;
-                                      Get.lazyPut(
-                                          () => ChannelController(channel: s),
-                                          tag: s.rssFeedUrl);
-                                      showMaterialModalBottomSheet(
-                                        context: context,
-                                        builder: (context) => Channel(
-                                          rssFeedUrl: s.rssFeedUrl!,
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            var s = SubscriptionModel.empty();
+                                            s.rssFeedUrl = episode.rssFeedUrl;
+                                            s.title = episode.channelTitle;
+                                            s.rssFeedUrl = episode.rssFeedUrl;
+                                            Get.lazyPut(
+                                                () => ChannelController(
+                                                    channel: s),
+                                                tag: s.rssFeedUrl);
+                                            showMaterialModalBottomSheet(
+                                              context: context,
+                                              builder: (context) => Channel(
+                                                rssFeedUrl: s.rssFeedUrl!,
+                                              ),
+                                              expand: true,
+                                              closeProgressThreshold: 0.9,
+                                            );
+                                          },
+                                          child: Text(
+                                            episode.channelTitle!,
+                                            style: const TextStyle(
+                                              color: Color(0xFF6EE7B7),
+                                              fontSize: 12,
+                                              fontFamily:
+                                                  'PingFangSC-Regular,PingFang SC',
+                                              fontWeight: FontWeight.w500,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                              decorationColor:
+                                                  Color(0xFF6EE7B7),
+                                            ),
+                                          ),
                                         ),
-                                        expand: true,
-                                        closeProgressThreshold: 0.9,
-                                      );
-                                    },
-                                    child: Text(
-                                      episode.channelTitle!,
-                                      style: const TextStyle(
-                                        color: Color(0xFF6EE7B7),
-                                        fontSize: 12,
-                                        fontFamily:
-                                            'PingFangSC-Regular,PingFang SC',
-                                        fontWeight: FontWeight.w500,
-                                        decoration: TextDecoration.underline,
-                                        decorationColor: Color(0xFF6EE7B7),
                                       ),
-                                    ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        formatDate(episode.pubDate!),
+                                        style: GoogleFonts.comfortaa(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w300,
+                                          color: Colors.white.withOpacity(0.5),
+                                        ),
+                                      )
+                                    ],
                                   ),
                                 ],
                               ),

@@ -149,8 +149,8 @@ class PlayerBar extends GetView<PlayerController> {
                         child: CachedNetworkImage(
                           width: 36,
                           height: 36,
-                          imageUrl:
-                              controller.playlistEpisode.value.imageUrl ?? '',
+                          imageUrl: controller.playlistEpisode.value.imageUrl ??
+                              'https://placeholder.co/48.png?text=NoImage',
                         ),
                       ),
                       const SizedBox(width: 8),

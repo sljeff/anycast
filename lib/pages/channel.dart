@@ -489,6 +489,9 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                             ),
                           ),
                           onPressed: () {
+                            if (controller.isLoading.value) {
+                              return;
+                            }
                             var feedsController =
                                 Get.find<FeedEpisodeController>();
                             feedsController
@@ -497,21 +500,32 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                               Get.find<PlayerController>().playByEpisode(pe);
                             });
                           },
-                          child: Row(
-                            children: [
-                              const Iconify(Ic.round_play_arrow),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Lastest Episode',
-                                style: TextStyle(
-                                  color: const Color(0xFF111316),
-                                  fontSize: 16,
-                                  fontFamily:
-                                      GoogleFonts.comfortaa().fontFamily,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
+                          child: Obx(
+                            () {
+                              if (controller.isLoading.value) {
+                                return const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator());
+                              }
+                              return Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Iconify(Ic.round_play_arrow),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Latest Episode',
+                                    style: TextStyle(
+                                      color: const Color(0xFF111316),
+                                      fontSize: 16,
+                                      fontFamily:
+                                          GoogleFonts.comfortaa().fontFamily,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
                       )
