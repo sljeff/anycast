@@ -70,72 +70,72 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> registerWithEmail(String email, String password) async {
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      Get.back();
-    } on FirebaseAuthException catch (e) {
-      var title = 'Firebase Error';
-      var detail = e.message ?? '';
-      if (e.code == 'weak-password') {
-        title = 'Weak Password';
-        detail = 'The password provided is too weak.';
-      } else if (e.code == 'email-already-in-use') {
-        title = 'Email Already In Use';
-        detail = 'The account already exists for that email.';
-      }
-      Get.dialog(
-        AlertDialog(
-          titleTextStyle: const TextStyle(
-            color: Colors.white,
-            decoration: TextDecoration.none,
-          ),
-          contentTextStyle: const TextStyle(
-            color: Colors.white,
-            decoration: TextDecoration.none,
-          ),
-          title: Text(title),
-          content: Text(detail),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Get.back();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    } catch (e) {
-      Get.dialog(
-        AlertDialog(
-          titleTextStyle: const TextStyle(
-            color: Colors.white,
-            decoration: TextDecoration.none,
-          ),
-          contentTextStyle: const TextStyle(
-            color: Colors.white,
-            decoration: TextDecoration.none,
-          ),
-          title: const Text('Error'),
-          content: Text(e.toString()),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Get.back();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-  }
+  // Future<void> registerWithEmail(String email, String password) async {
+  //   try {
+  //     await FirebaseAuth.instance.createUserWithEmailAndPassword(
+  //       email: email,
+  //       password: password,
+  //     );
+  //     Get.back();
+  //   } on FirebaseAuthException catch (e) {
+  //     var title = 'Firebase Error';
+  //     var detail = e.message ?? '';
+  //     if (e.code == 'weak-password') {
+  //       title = 'Weak Password';
+  //       detail = 'The password provided is too weak.';
+  //     } else if (e.code == 'email-already-in-use') {
+  //       title = 'Email Already In Use';
+  //       detail = 'The account already exists for that email.';
+  //     }
+  //     Get.dialog(
+  //       AlertDialog(
+  //         titleTextStyle: const TextStyle(
+  //           color: Colors.white,
+  //           decoration: TextDecoration.none,
+  //         ),
+  //         contentTextStyle: const TextStyle(
+  //           color: Colors.white,
+  //           decoration: TextDecoration.none,
+  //         ),
+  //         title: Text(title),
+  //         content: Text(detail),
+  //         actions: [
+  //           TextButton(
+  //             onPressed: () {
+  //               Get.back();
+  //             },
+  //             child: const Text('OK'),
+  //           ),
+  //         ],
+  //       ),
+  //     );
+  //     return;
+  //   } catch (e) {
+  //     Get.dialog(
+  //       AlertDialog(
+  //         titleTextStyle: const TextStyle(
+  //           color: Colors.white,
+  //           decoration: TextDecoration.none,
+  //         ),
+  //         contentTextStyle: const TextStyle(
+  //           color: Colors.white,
+  //           decoration: TextDecoration.none,
+  //         ),
+  //         title: const Text('Error'),
+  //         content: Text(e.toString()),
+  //         actions: [
+  //           TextButton(
+  //             onPressed: () {
+  //               Get.back();
+  //             },
+  //             child: const Text('OK'),
+  //           ),
+  //         ],
+  //       ),
+  //     );
+  //     return;
+  //   }
+  // }
 
   Future<void> loginWithEmail(String email, String password) async {
     try {

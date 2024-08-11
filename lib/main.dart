@@ -1,4 +1,5 @@
 import 'package:anycast/states/cache.dart';
+import 'package:anycast/states/chat.dart';
 import 'package:anycast/states/discover.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/player.dart';
@@ -80,6 +81,7 @@ class NavigationBarApp extends StatelessWidget {
     Get.put(AuthController());
     Get.put(RevenueCatController());
     Get.put(ShareController());
+    Get.put(ChatController());
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

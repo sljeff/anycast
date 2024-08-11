@@ -97,3 +97,26 @@ Future<List<Subtitle>?> getTranslation(
   }
   return result;
 }
+
+Future<String> chatAPI(String enclosureUrl, String input,
+    List<Map<String, String>> history) async {
+  var url = Uri(
+    host: host,
+    scheme: 'https',
+    path: '/subtitles/chat',
+  );
+
+  var resp = await reqWithAuth(url.toString(), method: "POST", data: {
+    'enclosure_url': enclosureUrl,
+    'user_input': input,
+    'history': history,
+  });
+
+  if (resp.statusCode < 200 || resp.statusCode >= 300) {
+    return resp.body;
+  }
+
+  var body = utf8.decode(resp.bodyBytes);
+  Map<String, dynamic> data = jsonDecode(body);
+  return data['result'];
+}

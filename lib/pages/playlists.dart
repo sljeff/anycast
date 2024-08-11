@@ -11,7 +11,6 @@ import 'package:anycast/widgets/card.dart' as card;
 import 'package:anycast/widgets/detail.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/playlist.dart';

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:anycast/api/share.dart';
@@ -6,6 +7,7 @@ import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/models/subtitle.dart';
 import 'package:anycast/models/translation.dart';
+import 'package:anycast/pages/chat.dart';
 import 'package:anycast/states/channel.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/subtitle.dart';
@@ -13,6 +15,7 @@ import 'package:anycast/states/translation.dart';
 import 'package:anycast/utils/audio_handler.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/pages/channel.dart';
+import 'package:anycast/widgets/animation.dart';
 import 'package:anycast/widgets/card.dart';
 import 'package:anycast/widgets/handler.dart';
 import 'package:anycast/widgets/play_icon.dart';
@@ -31,6 +34,9 @@ import 'package:flutter_lyric/lyrics_reader.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+
+const aiChat =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><g fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" color="white"><path d="M14.17 20.89c4.184-.277 7.516-3.657 7.79-7.9c.053-.83.053-1.69 0-2.52c-.274-4.242-3.606-7.62-7.79-7.899a33 33 0 0 0-4.34 0c-4.184.278-7.516 3.657-7.79 7.9a20 20 0 0 0 0 2.52c.1 1.545.783 2.976 1.588 4.184c.467.845.159 1.9-.328 2.823c-.35.665-.526.997-.385 1.237c.14.24.455.248 1.084.263c1.245.03 2.084-.322 2.75-.813c.377-.279.566-.418.696-.434s.387.09.899.3c.46.19.995.307 1.485.34c1.425.094 2.914.094 4.342 0"/><path d="m7.5 15l1.842-5.526a.694.694 0 0 1 1.316 0L12.5 15m3-6v6m-7-2h3"/></g></svg>';
 
 class PlayerPage extends GetView<PlayerController> {
   const PlayerPage({super.key});
@@ -240,14 +246,59 @@ class PlayerAI extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    return const DefaultTextStyle(
-      style: TextStyle(
+    return DefaultTextStyle(
+      style: const TextStyle(
         color: Colors.white,
         decoration: TextDecoration.none,
       ),
-      child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Subtitles(),
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        alignment: Alignment.center,
+        decoration: ShapeDecoration(
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(width: 1, color: Color(0xFF232830)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        child: LayoutBuilder(builder: (context, constraints) {
+          var height = constraints.maxHeight;
+          return Column(
+            children: [
+              Container(
+                height: 60,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                alignment: Alignment.center,
+                child: Row(children: [
+                  Obx(
+                    () => ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: controller.channel.value.imageUrl ??
+                            'https://placehold.co/400/000000/FFF.png?text=NoChannel',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Obx(
+                    () => Expanded(
+                      child: Text(controller.playlistEpisode.value.title ?? "",
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.comfortaa(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          )),
+                    ),
+                  ),
+                ]),
+              ),
+              Divider(height: 1, color: Colors.grey[800]),
+              Subtitles(height: height - 62),
+            ],
+          );
+        }),
       ),
     );
   }
@@ -416,32 +467,27 @@ class MyProgressBar extends GetView<PlayerController> {
 }
 
 class Subtitles extends GetView<SubtitleController> {
+  final double height;
+
   const Subtitles({
     super.key,
+    required this.height,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      alignment: Alignment.center,
-      decoration: ShapeDecoration(
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(width: 1, color: Color(0xFF232830)),
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
-      child: Obx(() {
-        var playerController = Get.find<PlayerController>();
-        if (playerController.playlistEpisode.value.enclosureUrl == null) {
-          return const SizedBox();
-        }
-        var url = playerController.playlistEpisode.value.enclosureUrl!;
+    return Obx(() {
+      var playerController = Get.find<PlayerController>();
+      if (playerController.playlistEpisode.value.enclosureUrl == null) {
+        return const SizedBox();
+      }
+      var url = playerController.playlistEpisode.value.enclosureUrl!;
 
-        var status = controller.subtitleUrls[url];
-        if (status == null) {
-          // a button to fetch subtitles
-          return Center(
+      var status = controller.subtitleUrls[url];
+      if (status == null) {
+        // a button to fetch subtitles
+        return Expanded(
+          child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -517,18 +563,20 @@ class Subtitles extends GetView<SubtitleController> {
                 )
               ],
             ),
-          );
-        }
+          ),
+        );
+      }
 
-        if (status == 'processing') {
-          // a progress indicator
-          var style = TextStyle(
-            color: Colors.white,
-            fontFamily: GoogleFonts.comfortaa().fontFamily,
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-          );
-          return Center(
+      if (status == 'processing') {
+        // a progress indicator
+        var style = TextStyle(
+          color: Colors.white,
+          fontFamily: GoogleFonts.comfortaa().fontFamily,
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+        );
+        return Expanded(
+          child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -547,110 +595,100 @@ class Subtitles extends GetView<SubtitleController> {
                 ),
               ],
             ),
-          );
-        }
-
-        if (status == 'failed') {
-          // a button to retry
-          return Center(
-            child: TextButton(
-              onPressed: () {
-                controller.add(url);
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.blue,
-              ),
-              child: const Text('Retry'),
-            ),
-          );
-        }
-
-        var helper = DatabaseHelper();
-        return SingleChildScrollView(
-          child: FutureBuilder(
-            future: helper.db.then((db) async {
-              var subtitle = await SubtitleModel.get(db, url);
-              if (subtitle.subtitle == null ||
-                  subtitle.subtitle!.trim().isEmpty ||
-                  subtitle.subtitle == 'null') {
-                SubtitleModel.delete(db, url);
-                controller.subtitleUrls[url] = 'processing';
-                return null;
-              }
-              return subtitle;
-            }),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const SizedBox.shrink();
-              }
-              var subtitle = snapshot.data!;
-
-              var model = LyricsModelBuilder.create()
-                  .bindLyricToMain(subtitle.toLrc())
-                  .getModel();
-              return Obx(
-                () {
-                  var translationStatus =
-                      Get.find<TranslationController>().translationUrls[url];
-                  if (translationStatus == 'succeeded') {
-                    var language =
-                        Get.find<SettingsController>().targetLanguage.value;
-                    return FutureBuilder(future: helper.db.then((db) {
-                      return TranslationModel.get(db, url, language);
-                    }), builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const SizedBox.shrink();
-                      }
-
-                      var translation = snapshot.data!;
-                      model = LyricsModelBuilder.create()
-                          .bindLyricToMain(subtitle.toLrc())
-                          .bindLyricToExt(translation.toLrc())
-                          .getModel();
-                      return LyricsWithShare(
-                        model: model,
-                        height: MediaQuery.of(context).size.height / 1.5,
-                      );
-                    });
-                  } else if (translationStatus == 'processing') {
-                    return Column(
-                      children: [
-                        LyricsWithShare(
-                          model: model,
-                          height: MediaQuery.of(context).size.height / 1.6,
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const RefreshProgressIndicator(),
-                            Text(
-                              "Translating subtitles...",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontFamily: GoogleFonts.comfortaa().fontFamily,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  } else {
-                    return LyricsWithShare(
-                      model: model,
-                      height: MediaQuery.of(context).size.height / 1.5,
-                    );
-                  }
-                },
-              );
-            },
           ),
         );
-      }),
-    );
+      }
+
+      if (status == 'failed') {
+        // a button to retry
+        return Center(
+          child: TextButton(
+            onPressed: () {
+              controller.add(url);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.blue,
+            ),
+            child: const Text('Retry'),
+          ),
+        );
+      }
+
+      var helper = DatabaseHelper();
+      return SingleChildScrollView(
+        child: FutureBuilder(
+          future: helper.db.then((db) async {
+            var subtitle = await SubtitleModel.get(db, url);
+            if (subtitle.subtitle == null ||
+                subtitle.subtitle!.trim().isEmpty ||
+                subtitle.subtitle == 'null') {
+              SubtitleModel.delete(db, url);
+              controller.subtitleUrls[url] = 'processing';
+              return null;
+            }
+            return subtitle;
+          }),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const SizedBox.shrink();
+            }
+            var subtitle = snapshot.data!;
+
+            var model = LyricsModelBuilder.create()
+                .bindLyricToMain(subtitle.toLrc())
+                .getModel();
+            return Obx(
+              () {
+                var translationStatus =
+                    Get.find<TranslationController>().translationUrls[url];
+                if (translationStatus == 'succeeded') {
+                  var language =
+                      Get.find<SettingsController>().targetLanguage.value;
+                  return FutureBuilder(future: helper.db.then((db) {
+                    return TranslationModel.get(db, url, language);
+                  }), builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const SizedBox.shrink();
+                    }
+
+                    var translation = snapshot.data!;
+                    model = LyricsModelBuilder.create()
+                        .bindLyricToMain(subtitle.toLrc())
+                        .bindLyricToExt(translation.toLrc())
+                        .getModel();
+                    return LyricsWithShare(model: model, height: height);
+                  });
+                } else if (translationStatus == 'processing') {
+                  return Column(
+                    children: [
+                      LyricsWithShare(model: model, height: height - 48),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const RefreshProgressIndicator(),
+                          Text(
+                            "Translating subtitles...",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontFamily: GoogleFonts.comfortaa().fontFamily,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                } else {
+                  return LyricsWithShare(model: model, height: height);
+                }
+              },
+            );
+          },
+        ),
+      );
+    });
   }
 }
 
@@ -673,24 +711,61 @@ class LyricsWithShare extends GetView<PlayerController> {
           height: height,
         ),
         Positioned(
-          right: 8,
-          bottom: 8,
-          child: IconButton(
-            style: const ButtonStyle(
-              alignment: Alignment.center,
-              padding: WidgetStatePropertyAll(EdgeInsets.all(8)),
-              backgroundColor: WidgetStatePropertyAll(Colors.black),
+          right: 0,
+          bottom: 0,
+          child: Container(
+            padding: const EdgeInsets.only(right: 0),
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
             ),
-            onPressed: () async {
-              Get.dialog(const Center(child: CircularProgressIndicator()));
-              await exportSubtitles(model);
-              Get.back();
-            },
-            icon: const Iconify(
-              Ic.baseline_offline_share,
-              size: 18,
-              color: Colors.white,
-            ),
+            child: Row(children: [
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: GestureDetector(
+                  child: const Iconify(aiChat, color: Colors.green, size: 24),
+                  onTap: () {
+                    showMaterialModalBottomSheet(
+                      context: context,
+                      builder: (context) =>
+                          Chat(episode: controller.playlistEpisode.value),
+                      expand: true,
+                      closeProgressThreshold: 0.9,
+                    );
+                  },
+                ),
+              ),
+              PopupMenuButton(
+                color: Colors.black87,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                      height: 20,
+                      value: 'export',
+                      child: Row(children: [
+                        const Iconify(
+                          Ic.baseline_offline_share,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text("Export subtitles",
+                            style: GoogleFonts.comfortaa()
+                                .copyWith(color: Colors.white)),
+                      ])),
+                ],
+                onSelected: (value) {
+                  exportSubtitles(model);
+                },
+                child: const Icon(Icons.more_vert_rounded, color: Colors.grey),
+              ),
+            ]),
           ),
         ),
       ],
@@ -752,6 +827,16 @@ class Lyrics extends GetView<PlayerController> {
       () => LyricsReader(
         onTap: () {
           controller.togglePlay();
+
+          var overlayEntry = OverlayEntry(
+            builder: (context) => Center(
+              child: PlayPauseAnimation(isPlaying: !controller.isPlaying.value),
+            ),
+          );
+          Overlay.of(context).insert(overlayEntry);
+          Future.delayed(const Duration(milliseconds: 500), () {
+            overlayEntry.remove();
+          });
         },
         position: controller.positionData.value.position.inMilliseconds,
         model: model,

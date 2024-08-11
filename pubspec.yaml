@@ -88,6 +88,9 @@ dependencies:
   lottie: ^3.1.2
   flutter_widget_from_html: ^0.9.1
   carousel_slider: ^4.2.1
+  flutter_chat_ui: ^1.6.14
+  flutter_chat_types: ^3.6.2
+  uuid: ^4.4.2
 
 dev_dependencies:
   flutter_test:

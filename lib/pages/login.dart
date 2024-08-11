@@ -61,7 +61,7 @@ class LoginPage extends GetView<AuthController> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(24),
                             ),
                           ),
                           child: const Row(
@@ -91,7 +91,7 @@ class LoginPage extends GetView<AuthController> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(24),
                             ),
                           ),
                           child: const Row(
@@ -115,20 +115,20 @@ class LoginPage extends GetView<AuthController> {
                         const SizedBox(height: 10),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
+                            backgroundColor: Colors.black12,
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Iconify(Ic.email),
+                              Iconify(Ic.email, color: Colors.white, size: 16),
                               SizedBox(width: 10),
-                              Text('Sign in with Email'),
+                              Text(
+                                'Sign in with Email',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ],
                           ),
                           onPressed: () async {
@@ -922,7 +922,22 @@ class _EmailLoginState extends State<EmailLogin> {
         const SizedBox(height: 20),
         TextButton(
           onPressed: () {
-            setLogin(false);
+            // setLogin(false);
+            Get.dialog(
+              AlertDialog(
+                title: Text("Sorry!",
+                    style: GoogleFonts.comfortaa(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14)),
+                content: Text(
+                  "Please sign in with Apple or Google.\n\n"
+                  "We don't support email registration yet.",
+                  style:
+                      GoogleFonts.comfortaa(color: Colors.white, fontSize: 14),
+                ),
+              ),
+            );
           },
           child: const Text("Don't have an account? Register"),
         ),
@@ -975,10 +990,10 @@ class _EmailLoginState extends State<EmailLogin> {
               return;
             }
 
-            Get.find<AuthController>().registerWithEmail(
-              emailController.text,
-              passwordController.text,
-            );
+            // Get.find<AuthController>().registerWithEmail(
+            //   emailController.text,
+            //   passwordController.text,
+            // );
           },
           child: const Text("Register"),
         ),
