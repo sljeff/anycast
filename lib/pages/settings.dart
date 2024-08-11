@@ -31,7 +31,7 @@ const targetLangList = [
   {'name': 'Pусский', 'code': 'ru'},
 ];
 
-const countryList = [
+var countryList = [
   {'name': 'Argentina', 'code': 'AR'},
   {'name': 'Australia', 'code': 'AU'},
   {'name': 'Österreich', 'code': 'AT'},
@@ -46,7 +46,6 @@ const countryList = [
   {'name': 'Česká republika', 'code': 'CZ'},
   {'name': 'Deutschland', 'code': 'DE'},
   {'name': 'Danmark', 'code': 'DK'},
-  {'name': 'Egypt', 'code': 'EG'},
   {'name': 'مصر', 'code': 'EG'},
   {'name': 'España', 'code': 'ES'},
   {'name': 'Suomi', 'code': 'FI'},
@@ -59,7 +58,7 @@ const countryList = [
   {'name': 'Israel', 'code': 'IL'},
   {'name': 'India', 'code': 'IN'},
   {'name': 'Italia', 'code': 'IT'},
-  {'name': 'Japan', 'code': 'JP'},
+  {'name': '日本', 'code': 'JP'},
   {'name': '대한민국', 'code': 'KR'},
   {'name': 'México', 'code': 'MX'},
   {'name': 'Malaysia', 'code': 'MY'},
@@ -89,6 +88,7 @@ class SettingsPage extends GetView<SettingsController> {
 
   @override
   Widget build(BuildContext context) {
+    countryList.sort((a, b) => a['name']!.compareTo(b['name']!));
     return Container(
       color: const Color(0xFF111316),
       child: SafeArea(
@@ -166,6 +166,7 @@ class SettingsPage extends GetView<SettingsController> {
                               child: Obx(
                                 () {
                                   return CountryCodePicker(
+                                    hideSearch: true,
                                     countryList: countryList,
                                     padding: const EdgeInsets.all(0),
                                     showFlag: false,
@@ -578,6 +579,7 @@ class LanguagePicker extends GetView<SettingsController> {
     return Obx(
       () => CountryCodePicker(
         showFlag: false,
+        hideSearch: true,
         barrierColor: Colors.transparent,
         dialogBackgroundColor: Colors.black,
         boxDecoration: BoxDecoration(
