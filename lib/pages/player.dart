@@ -43,11 +43,13 @@ class PlayerPage extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    controller.pageIndex.value = 1;
-    return Stack(
-      children: [
-        Container(
-          height: MediaQuery.of(context).size.height / 2,
+    return PopScope(
+      onPopInvoked: (didPop) {
+        if (didPop) {
+          controller.pageIndex.value = 1;
+        }
+      },
+      child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -55,42 +57,32 @@ class PlayerPage extends GetView<PlayerController> {
               colors: [
                 controller.backgroundColor.value,
                 const Color(0xFF111316),
+                const Color(0xFF111316),
               ],
             ),
           ),
-        ),
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            height: MediaQuery.of(context).size.height / 2,
-            color: const Color(0xFF111316),
-          ),
-        ),
-        SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Handler(),
-              Expanded(
-                child: PageView(
-                  controller: controller.pageController,
-                  children: const [
-                    PlayerSettings(),
-                    PlayerMain(),
-                    PlayerAI(),
-                  ],
-                  onPageChanged: (index) {
-                    controller.pageIndex.value = index;
-                  },
+          child: SafeArea(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Handler(),
+                Expanded(
+                  child: PageView(
+                    controller: controller.pageController,
+                    children: const [
+                      PlayerSettings(),
+                      PlayerMain(),
+                      PlayerAI(),
+                    ],
+                    onPageChanged: (index) {
+                      controller.pageIndex.value = index;
+                    },
+                  ),
                 ),
-              ),
-              const PageTab(),
-            ],
-          ),
-        )
-      ],
+                const PageTab(),
+              ],
+            ),
+          )),
     );
   }
 }

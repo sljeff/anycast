@@ -2,6 +2,17 @@ import 'package:anycast/api/subtitles.dart';
 import 'package:get/get.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:uuid/uuid.dart';
+import 'package:flutter_chat_ui/flutter_chat_ui.dart' as chat;
+
+class MyInputTextController extends chat.InputTextFieldController {
+  var isDisposed = false;
+
+  @override
+  void dispose() {
+    isDisposed = true;
+    super.dispose();
+  }
+}
 
 class ChatController extends GetxController {
   final Rx<List<types.Message>> messages = Rx<List<types.Message>>([]);
@@ -9,6 +20,16 @@ class ChatController extends GetxController {
 
   final human = const types.User(id: 'human');
   final ai = const types.User(id: 'ai');
+
+  var _inputTextController = MyInputTextController();
+
+  MyInputTextController getTC() {
+    // if is disposed, create a new one
+    if (_inputTextController.isDisposed) {
+      _inputTextController = MyInputTextController();
+    }
+    return _inputTextController;
+  }
 
   void sendMessage(types.PartialText message, String enclosureUrl) {
     final textMessage = types.TextMessage(

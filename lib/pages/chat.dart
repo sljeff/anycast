@@ -15,7 +15,6 @@ class Chat extends GetView<ChatController> {
 
   @override
   Widget build(BuildContext context) {
-    final textEditingController = chat.InputTextFieldController();
     return PopScope(
       onPopInvoked: (didPop) {
         if (didPop) {
@@ -72,7 +71,9 @@ class Chat extends GetView<ChatController> {
                   return;
                 }
 
-                textEditingController.clear();
+                var inputTextController = controller.getTC();
+
+                inputTextController.clear();
 
                 final enclosureUrl = episode.enclosureUrl!;
                 controller.sendMessage(text, enclosureUrl);
@@ -90,7 +91,7 @@ class Chat extends GetView<ChatController> {
               inputOptions: chat.InputOptions(
                 inputClearMode: chat.InputClearMode.never,
                 autocorrect: false,
-                textEditingController: textEditingController,
+                textEditingController: controller.getTC(),
               ),
             );
           },
