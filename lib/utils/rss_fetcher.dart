@@ -19,10 +19,11 @@ class PodcastImportData {
 Future<List<PodcastImportData>> importPodcastsByUrls(
   List<String> rssFeedUrls, {
   Function(int, int)? onProgress,
-}) {
+}) async {
   // filter exsiting subscriptions
   var existingSubscriptions = Get.find<SubscriptionController>().subscriptions;
   var s = Set.from(existingSubscriptions.map((e) => e.rssFeedUrl));
+  s = {};
   rssFeedUrls = rssFeedUrls.where((element) => !s.contains(element)).toList();
 
   return fetchPodcastsByUrls(rssFeedUrls, onProgress: onProgress);
@@ -100,8 +101,14 @@ void _fetchPodcastsByUrls(List<dynamic> args) async {
       });
       List<FeedEpisodeModel> feedEpisodes = [];
       var length = onlyFistEpisode ? 1 : channel.items!.length;
+      if (channel.items!.isEmpty) {
+        length = 0;
+      }
       for (var i = 0; i < length; i++) {
         var item = channel.items![i];
+        if (item.enclosure == null) {
+          continue;
+        }
         var feedEpisode = FeedEpisodeModel.fromMap(Map<String, dynamic>.from({
           'title': item.title?.trim(),
           'description':
@@ -115,7 +122,11 @@ void _fetchPodcastsByUrls(List<dynamic> args) async {
         }));
         feedEpisodes.add(feedEpisode);
       }
-      subscription.lastUpdated = feedEpisodes[0].pubDate;
+      if (feedEpisodes.isEmpty) {
+        subscription.lastUpdated = DateTime.now().millisecondsSinceEpoch;
+      } else {
+        subscription.lastUpdated = feedEpisodes[0].pubDate;
+      }
       return PodcastImportData(subscription, feedEpisodes);
     }).toList();
 

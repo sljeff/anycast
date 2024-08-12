@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/cardlist.dart';
-import 'package:anycast/states/import_block.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/tab.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
@@ -66,7 +65,7 @@ class Feeds extends GetView<FeedEpisodeController> {
             return SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               controller: controller.scrollController,
-              child: ImportBlock(),
+              child: const ImportBlock(),
             );
           }
           return ListView.separated(
@@ -124,6 +123,7 @@ class Feeds extends GetView<FeedEpisodeController> {
                   card.CardBtn(
                     icon: const Iconify(Ic.round_clear),
                     onPressed: () {
+                      print(ep.enclosureUrl);
                       controller.removeByEnclosureUrls([ep.enclosureUrl!]);
                     },
                   ),
@@ -138,140 +138,131 @@ class Feeds extends GetView<FeedEpisodeController> {
 }
 
 class ImportBlock extends StatelessWidget {
-  final ImportBlockController controller = Get.put(ImportBlockController());
-
-  ImportBlock({super.key});
+  const ImportBlock({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      if (controller.isLoading.value) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
-      }
-      return Container(
-        height: 400,
-        width: double.infinity,
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              alignment: Alignment.center,
-              height: 240,
-              child: Text(
-                'It’s empty here.\n\nLet\'s change that!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontFamily: GoogleFonts.comfortaa().fontFamily,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2.40,
-                ),
+    return Container(
+      height: 400,
+      width: double.infinity,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            alignment: Alignment.center,
+            height: 240,
+            child: Text(
+              'It’s empty here.\n\nLet\'s change that!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontFamily: GoogleFonts.comfortaa().fontFamily,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 2.40,
               ),
             ),
-            Expanded(
-              child: SizedBox(
-                width: 220,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(
-                      style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: const Color(0xFF10B981),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 16,
-                            horizontal: 36,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          textStyle: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontFamily: GoogleFonts.comfortaa().fontFamily,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 2.40,
-                          )),
-                      onPressed: () {
-                        Get.find<HomeTabController>().onItemTapped(2);
-                      },
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Iconify(Ic.outline_explore,
-                              color: Colors.white, size: 24),
-                          SizedBox(width: 8),
-                          Text('Explore'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        SizedBox(
-                          height: 48,
-                          child: TextButton(
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              side: const BorderSide(
-                                  color: Colors.white, width: 1),
-                              textStyle: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontFamily: GoogleFonts.comfortaa().fontFamily,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            onPressed: () {
-                              Get.dialog(const ImportExportBlock());
-                            },
-                            child: const Row(
-                              children: [
-                                Iconify(Ic.round_file_download,
-                                    color: Colors.white),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Import OPML',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ],
-                            ),
-                          ),
+          ),
+          Expanded(
+            child: SizedBox(
+              width: 220,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextButton(
+                    style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: const Color(0xFF10B981),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 36,
                         ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                            onPressed: () {
-                              showModalBottomSheet(
-                                useSafeArea: true,
-                                isScrollControlled: true,
-                                context: context,
-                                builder: (context) {
-                                  return const ImportInstructions();
-                                },
-                              );
-                            },
-                            icon: const Iconify(Ic.round_help,
-                                color: Colors.grey)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        textStyle: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontFamily: GoogleFonts.comfortaa().fontFamily,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 2.40,
+                        )),
+                    onPressed: () {
+                      Get.find<HomeTabController>().onItemTapped(2);
+                    },
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Iconify(Ic.outline_explore,
+                            color: Colors.white, size: 24),
+                        SizedBox(width: 8),
+                        Text('Explore'),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      SizedBox(
+                        height: 48,
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            side:
+                                const BorderSide(color: Colors.white, width: 1),
+                            textStyle: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontFamily: GoogleFonts.comfortaa().fontFamily,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          onPressed: () {
+                            Get.dialog(const ImportExportBlock());
+                          },
+                          child: const Row(
+                            children: [
+                              Iconify(Ic.round_file_download,
+                                  color: Colors.white),
+                              SizedBox(width: 6),
+                              Text(
+                                'Import OPML',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                          onPressed: () {
+                            showModalBottomSheet(
+                              useSafeArea: true,
+                              isScrollControlled: true,
+                              context: context,
+                              builder: (context) {
+                                return const ImportInstructions();
+                              },
+                            );
+                          },
+                          icon:
+                              const Iconify(Ic.round_help, color: Colors.grey)),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      );
-    });
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -340,7 +331,7 @@ Future<void> fetchNewEpisodes() async {
     }
     updatedSubscriptions.add(fetched.subscription!);
     // if lastUpdated is null, add the first episode
-    if (subscription.lastUpdated == null) {
+    if (subscription.lastUpdated == null && fetched.feedEpisodes!.isNotEmpty) {
       updatedEpisodes.add(fetched.feedEpisodes![0]);
       continue;
     }

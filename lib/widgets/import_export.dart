@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/feed_episode.dart';
+import 'package:anycast/states/import_indicator.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:anycast/widgets/handler.dart';
+import 'package:anycast/widgets/import_indicator.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/pages/feeds.dart';
@@ -74,12 +76,21 @@ class ImportExportBlock extends StatelessWidget {
                           .pickFiles(type: FileType.any)
                           .then((value) {
                         if (value != null) {
-                          Get.dialog(
-                              const Center(child: CircularProgressIndicator()));
+                          Get.dialog(const ImportIndicator());
                           parseOPML(value.files.single.path).then((value) {
                             var urls = value.map((e) => e.url).toList();
-                            importPodcastsByUrls(urls).then((value) {
+                            importPodcastsByUrls(
+                              urls,
+                              onProgress: (p0, p1) {
+                                Get.find<ImportIndicatorController>()
+                                    .progress
+                                    .value = p0 / p1;
+                              },
+                            ).then((value) {
                               Get.find<FeedEpisodeController>().addMany(value
+                                  .where((e) =>
+                                      e.feedEpisodes != null &&
+                                      e.feedEpisodes!.isNotEmpty)
                                   .map((e) => e.feedEpisodes![0])
                                   .toList());
                               Get.find<SubscriptionController>().addMany(

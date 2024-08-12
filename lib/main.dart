@@ -2,6 +2,7 @@ import 'package:anycast/states/cache.dart';
 import 'package:anycast/states/chat.dart';
 import 'package:anycast/states/discover.dart';
 import 'package:anycast/states/feed_episode.dart';
+import 'package:anycast/states/import_indicator.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/share.dart';
@@ -82,6 +83,7 @@ class NavigationBarApp extends StatelessWidget {
     Get.put(RevenueCatController());
     Get.put(ShareController());
     Get.put(ChatController());
+    Get.put(ImportIndicatorController());
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

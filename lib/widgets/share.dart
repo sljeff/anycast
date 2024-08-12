@@ -110,8 +110,11 @@ class ShareDialog extends GetView<ShareController> {
                 controller.progress.value = progress / total;
               },
             );
-            Get.find<FeedEpisodeController>()
-                .addMany(result.map((e) => e.feedEpisodes![0]).toList());
+            Get.find<FeedEpisodeController>().addMany(result
+                .where(
+                    (e) => e.feedEpisodes != null && e.feedEpisodes!.isNotEmpty)
+                .map((e) => e.feedEpisodes![0])
+                .toList());
             Get.find<SubscriptionController>()
                 .addMany(result.map((e) => e.subscription!).toList());
 
