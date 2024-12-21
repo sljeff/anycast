@@ -32,7 +32,8 @@ Future<List<PodcastImportData>> importPodcastsByUrls(
 Future<List<PodcastImportData>> fetchPodcastsByUrls(
   List<String> rssFeedUrls, {
   bool onlyFistEpisode = true,
-  Function(int, int)? onProgress,
+  Function(int, int)? onProgress, // (process, total)
+  Function(List<PodcastImportData?>)? onSave,
 }) async {
   // use isolate
   final ReceivePort receivePort = ReceivePort();
@@ -45,9 +46,13 @@ Future<List<PodcastImportData>> fetchPodcastsByUrls(
   List<PodcastImportData>? result;
 
   await for (var o in receivePort) {
-    if (o is int) {
-      if (onProgress == null) continue;
-      onProgress(o, rssFeedUrls.length);
+    if (o is TempResult) {
+      if (onProgress != null) {
+        onProgress(o.process, o.total);
+      }
+      if (onSave != null) {
+        onSave(o.podcasts);
+      }
     }
 
     if (o is List<PodcastImportData>) {
@@ -57,6 +62,14 @@ Future<List<PodcastImportData>> fetchPodcastsByUrls(
   }
 
   return result ?? [];
+}
+
+class TempResult {
+  int process;
+  int total;
+  List<PodcastImportData?> podcasts;
+
+  TempResult(this.process, this.total, this.podcasts);
 }
 
 void _fetchPodcastsByUrls(List<dynamic> args) async {
@@ -137,7 +150,7 @@ void _fetchPodcastsByUrls(List<dynamic> args) async {
       podcasts.add(podcast);
     }
 
-    sendPort.send(end);
+    sendPort.send(TempResult(i, rssFeedUrls.length, result));
   }
 
   Isolate.exit(sendPort, podcasts);

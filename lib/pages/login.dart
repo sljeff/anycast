@@ -415,7 +415,7 @@ class LoginPage extends GetView<AuthController> {
   }
 
   Widget _buildPaywall(BuildContext context) {
-    var slideController = CarouselController();
+    var slideController = CarouselSliderController();
 
     return Card(
       color: const Color(0xFF1E1E1E),

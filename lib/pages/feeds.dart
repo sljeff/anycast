@@ -303,18 +303,26 @@ Future<void> fetchNewEpisodes() async {
   }
   var urls = subscriptions.map((e) => e.rssFeedUrl!).toList();
   var controller = Get.find<FeedEpisodeController>();
-  controller.progress.value = 8 / urls.length;
+  controller.progress.value = 0;
   controller.lastRefresh = DateTime.now();
 
-  var episodes = await fetchPodcastsByUrls(
+  await fetchPodcastsByUrls(
     urls,
     onlyFistEpisode: false,
     onProgress: (progress, total) {
-      Get.find<FeedEpisodeController>().progress.value = (progress + 8) / total;
+      Get.find<FeedEpisodeController>().progress.value = progress / total;
+    },
+    onSave: (episodes) {
+      saveNewEpisodes(episodes, subscriptions);
     },
   );
+}
+
+void saveNewEpisodes(
+    List<PodcastImportData?> episodes, List<SubscriptionModel> subscriptions) {
   var fetchedMap = <String, PodcastImportData>{};
   for (var episode in episodes) {
+    if (episode == null) continue;
     fetchedMap[episode.subscription!.rssFeedUrl!] = episode;
   }
 
