@@ -84,7 +84,10 @@ dependencies:
   sentry_flutter: ^8.11.2
   modal_bottom_sheet: ^3.0.0
   easy_refresh: ^3.4.0
-  receive_sharing_intent: ^1.8.0
+  receive_sharing_intent:
+    git:
+      url: https://github.com/KasemJaffer/receive_sharing_intent
+      ref: master
   lottie: ^3.1.2
   flutter_widget_from_html: ^0.9.1
   carousel_slider: ^5.0.0

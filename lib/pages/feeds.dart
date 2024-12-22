@@ -310,7 +310,7 @@ Future<void> fetchNewEpisodes() async {
     urls,
     onlyFistEpisode: false,
     onProgress: (progress, total) {
-      Get.find<FeedEpisodeController>().progress.value = progress / total;
+      Get.find<FeedEpisodeController>().progress.value = (progress + 8) / total;
     },
     onSave: (episodes) {
       saveNewEpisodes(episodes, subscriptions);
