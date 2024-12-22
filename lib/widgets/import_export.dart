@@ -302,20 +302,20 @@ class ImportInstructions extends StatelessWidget {
                           '2. Tap the Settings icon on the top left.\n'
                           '3. Scroll down to "User Data" and tap it.\n'
                           '4. Click "Export Subscriptions"\n'
-                          '5. Share to "Anycast+"'),
+                          '5. Share to "Anycast"'),
                   ExpansionInstruction(
                       title: 'Overcast',
                       description: '1. Open Overcast.\n'
                           '2. Tap the Settings icon on the top left.\n'
                           '3. Scroll down to "Export OPML" and tap it.\n'
-                          '4. Share to "Anycast+"'),
+                          '4. Share to "Anycast"'),
                   ExpansionInstruction(
                       title: "Pocket Casts",
                       description: '1. Open Pocket Casts -> Profile\n'
                           '2. Tap Settings icon on the top right\n'
                           '3. Scroll down to "Export Podcasts"\n'
                           '4. Click "Export Podcasts"\n'
-                          '5. Share to "Anycast+"'),
+                          '5. Share to "Anycast"'),
                   ExpansionInstruction(
                       title: '小宇宙',
                       description: '1. 打开小宇宙 -> 订阅\n'
@@ -323,11 +323,11 @@ class ImportInstructions extends StatelessWidget {
                           '3. 点击右上角的分享按钮\n'
                           '4. 选中所有想要导入的频道\n'
                           '5. 点击 "导出 OPML"\n'
-                          '6. 分享到 "Anycast+"'),
+                          '6. 分享到 "Anycast"'),
                   ExpansionInstruction(
                       title: 'Other Apps using OPML',
                       description: '1. Find your OPML file\n'
-                          '2. Share to "Anycast+"'),
+                          '2. Share to "Anycast"'),
                 ],
               ),
             ),

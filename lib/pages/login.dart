@@ -400,7 +400,7 @@ class LoginPage extends GetView<AuthController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Anycast+ Plus',
+                const Text('Anycast Plus',
                     style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text('Plan expires on $expiration'),
@@ -433,7 +433,7 @@ class LoginPage extends GetView<AuthController> {
               const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Anycast+ Plus Plan'),
+                  Text('Anycast Plus Plan'),
                   Tooltip(
                     message: 'Auto renewal is on.\n'
                         'But you can easily cancel it at any time\nfrom App Store.',
@@ -694,7 +694,7 @@ class PlusIntro extends StatelessWidget {
           collapsedIconColor: Colors.white,
           iconColor: Colors.white,
           title: Text(
-            "Anycast+ Plus ($name)",
+            "Anycast Plus ($name)",
             style: GoogleFonts.comfortaa(
               color: Colors.white,
               fontSize: 14,

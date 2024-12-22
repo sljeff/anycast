@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AuthController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -227,10 +228,10 @@ class RevenueCatController extends GetxController {
 
   Future<void> initPlatformState() async {
     var configuration =
-        PurchasesConfiguration('IOS_KEY');
+        PurchasesConfiguration(dotenv.env['PURCHASES_IOS_API_KEY']!);
     if (Platform.isAndroid) {
       configuration =
-          PurchasesConfiguration('ANDROID_KEY');
+          PurchasesConfiguration(dotenv.env['PURCHASES_ANDROID_API_KEY']!);
     }
     var user = Get.find<AuthController>().user.value;
     if (user?.uid != null) {
