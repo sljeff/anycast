@@ -122,7 +122,7 @@ class NavigationBarApp extends StatelessWidget {
             ),
           ),
         ),
-        tabBarTheme: TabBarTheme(
+        tabBarTheme: TabBarThemeData(
           labelColor: const Color(0xFF6EE7B7),
           indicatorColor: const Color(0xFF6EE7B7),
           indicatorSize: TabBarIndicatorSize.label,

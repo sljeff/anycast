@@ -12,7 +12,7 @@ class HandlerState extends State<Handler> with SingleTickerProviderStateMixin {
   late Animation<Offset> _animation;
 
   // 使用 static 变量来跟踪动画是否已经显示过
-  static bool _hasShownAnimation = false;
+  static const bool _hasShownAnimation = false;
 
   @override
   void initState() {

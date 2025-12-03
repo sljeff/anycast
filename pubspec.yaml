@@ -47,7 +47,7 @@ dependencies:
       ref: 6bb4dbd
   xml: ^6.5.0
   sanitize_html: ^2.1.0
-  audio_service: ^0.18.12
+  audio_service: ^0.18.18
   just_audio: ^0.9.36
   marquee: ^2.2.3
   audio_video_progress_bar: ^2.0.1
@@ -79,7 +79,7 @@ dependencies:
   firebase_core: ^3.9.0
   firebase_auth: ^5.3.4
   google_sign_in: ^6.2.1
-  purchases_flutter: ^6.30.2
+  purchases_flutter: ^8.0.0
   jiffy: ^6.3.1
   sentry_flutter: ^8.11.2
   modal_bottom_sheet: ^3.0.0
@@ -88,7 +88,7 @@ dependencies:
     git:
       url: https://github.com/KasemJaffer/receive_sharing_intent
       ref: master
-  lottie: ^3.1.2
+  lottie: ^3.3.2
   flutter_widget_from_html: ^0.9.1
   carousel_slider: ^5.0.0
   flutter_chat_ui: ^1.6.14

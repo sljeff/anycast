@@ -1220,7 +1220,7 @@ class Settings extends GetView<SettingsController> {
                       fit: BoxFit.fill,
                       child: Obx(
                         () => Switch(
-                          activeColor: Colors.white,
+                          activeThumbColor: Colors.white,
                           inactiveThumbColor: Colors.grey,
                           inactiveTrackColor:
                               const Color(0xFF232830).withOpacity(0.7),
@@ -1260,7 +1260,7 @@ class Settings extends GetView<SettingsController> {
                       fit: BoxFit.fill,
                       child: Obx(
                         () => Switch(
-                          activeColor: Colors.white,
+                          activeThumbColor: Colors.white,
                           inactiveThumbColor: Colors.grey,
                           inactiveTrackColor:
                               const Color(0xFF232830).withOpacity(0.7),
