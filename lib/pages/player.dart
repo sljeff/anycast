@@ -726,7 +726,7 @@ class LyricsWithShare extends GetView<PlayerController> {
                     showMaterialModalBottomSheet(
                       context: context,
                       builder: (context) =>
-                          Chat(episode: controller.playlistEpisode.value),
+                          ChatPage(episode: controller.playlistEpisode.value),
                       expand: true,
                       closeProgressThreshold: 0.9,
                     );

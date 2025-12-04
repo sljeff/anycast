@@ -1,86 +1,86 @@
 import 'package:anycast/api/subtitles.dart';
 import 'package:get/get.dart';
-import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
+import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:uuid/uuid.dart';
-import 'package:flutter_chat_ui/flutter_chat_ui.dart' as chat;
-
-class MyInputTextController extends chat.InputTextFieldController {
-  var isDisposed = false;
-
-  @override
-  void dispose() {
-    isDisposed = true;
-    super.dispose();
-  }
-}
 
 class ChatController extends GetxController {
-  final Rx<List<types.Message>> messages = Rx<List<types.Message>>([]);
+  final chatController = InMemoryChatController();
   final isLoading = false.obs;
 
-  final human = const types.User(id: 'human');
-  final ai = const types.User(id: 'ai');
+  static const humanId = 'human';
+  static const aiId = 'ai';
 
-  var _inputTextController = MyInputTextController();
+  String? _currentAiMessageId;
 
-  MyInputTextController getTC() {
-    // if is disposed, create a new one
-    if (_inputTextController.isDisposed) {
-      _inputTextController = MyInputTextController();
-    }
-    return _inputTextController;
-  }
+  void sendMessage(String text, String enclosureUrl) {
+    if (isLoading.value) return;
 
-  void sendMessage(types.PartialText message, String enclosureUrl) {
-    final textMessage = types.TextMessage(
+    final userMsg = TextMessage(
       id: const Uuid().v4(),
-      text: message.text,
-      author: human,
+      authorId: humanId,
+      createdAt: DateTime.now().toUtc(),
+      text: text,
     );
-
-    messages.value = [textMessage, ...messages.value];
+    chatController.insertMessage(userMsg);
 
     List<Map<String, String>> history = [];
-    if (messages.value.length > 1) {
-      for (int i = 1; i <= 10 && i < messages.value.length; i++) {
-        history.add({
-          messages.value[i].author.id:
-              (messages.value[i] as types.TextMessage).text,
-        });
+    final messages = chatController.messages;
+    // 获取最近 10 条历史消息
+    for (int i = 0; i < messages.length && i < 10; i++) {
+      final msg = messages[i];
+      if (msg is TextMessage) {
+        history.add({msg.authorId: msg.text});
       }
     }
     history = history.reversed.toList();
 
-    send2AI(enclosureUrl, textMessage.text, history);
+    send2AI(enclosureUrl, text, history);
   }
 
   void send2AI(
       String enclosureUrl, String input, List<Map<String, String>> history) {
     isLoading.value = true;
 
-    messages.value = [
-      types.TextMessage(
-        id: const Uuid().v4(),
-        text: '...',
-        author: ai,
-      ),
-      ...messages.value,
-    ];
+    // AI 占位消息
+    _currentAiMessageId = const Uuid().v4();
+    final aiPlaceholder = TextMessage(
+      id: _currentAiMessageId!,
+      authorId: aiId,
+      createdAt: DateTime.now().toUtc(),
+      text: '...',
+    );
+    chatController.insertMessage(aiPlaceholder);
 
     chatAPI(enclosureUrl, input, history).then((result) {
-      messages.value = [
-        types.TextMessage(
-          id: const Uuid().v4(),
-          text: result,
-          author: ai,
-        ),
-        ...messages.value.skip(1),
-      ];
+      // 替换占位消息为实际响应
+      final oldMessage = chatController.messages
+          .whereType<TextMessage>()
+          .firstWhere((m) => m.id == _currentAiMessageId);
+
+      final newMessage = TextMessage(
+        id: const Uuid().v4(),
+        authorId: aiId,
+        createdAt: DateTime.now().toUtc(),
+        text: result,
+      );
+
+      chatController.updateMessage(oldMessage, newMessage);
+      _currentAiMessageId = null;
       isLoading.value = false;
     });
   }
 
   void clearMessages() {
-    messages.value = [];
+    // 清空所有消息
+    final allMessages = List<Message>.from(chatController.messages);
+    for (final msg in allMessages) {
+      chatController.removeMessage(msg);
+    }
+  }
+
+  @override
+  void onClose() {
+    chatController.dispose();
+    super.onClose();
   }
 }
