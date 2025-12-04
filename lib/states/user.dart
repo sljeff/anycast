@@ -9,9 +9,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AuthController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   Rx<User?> user = Rx<User?>(null);
+  bool _googleSignInInitialized = false;
 
   @override
   void onInit() {
@@ -23,6 +24,13 @@ class AuthController extends GetxController {
         loginToRevenueCat();
       }
     });
+  }
+
+  /// Initialize GoogleSignIn. Must be called before using Google Sign-In.
+  Future<void> initGoogleSignIn() async {
+    if (_googleSignInInitialized) return;
+    await _googleSignIn.initialize();
+    _googleSignInInitialized = true;
   }
 
   Future<String?> getToken() async {
@@ -44,17 +52,34 @@ class AuthController extends GetxController {
 
   Future<void> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      // Ensure GoogleSignIn is initialized
+      await initGoogleSignIn();
+
+      // Use the new authenticate() API for google_sign_in 7.x
+      final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
       if (googleUser == null) return;
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      // Get the ID token from the authenticated user
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+
+      // Request access token through authorization
+      final authorization =
+          await googleUser.authorizationClient.authorizeScopes([]);
+      final String? accessToken = authorization.accessToken;
+
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
+        accessToken: accessToken,
+        idToken: idToken,
       );
 
       await _auth.signInWithCredential(credential);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        // User canceled the sign-in
+        return;
+      }
+      print('Error signing in with Google: $e');
     } catch (e) {
       print('Error signing in with Google: $e');
     }
@@ -203,7 +228,10 @@ class AuthController extends GetxController {
   Future<void> signOut() async {
     Get.find<RevenueCatController>().signOut();
     await _auth.signOut();
-    await _googleSignIn.signOut();
+    // Ensure GoogleSignIn is initialized before signing out
+    if (_googleSignInInitialized) {
+      await _googleSignIn.signOut();
+    }
   }
 }
 
@@ -251,8 +279,10 @@ class RevenueCatController extends GetxController {
 
   Future<void> purchasePackage(Package package) async {
     try {
-      CustomerInfo customerInfo = await Purchases.purchasePackage(package);
-      _updateCustomerInfo(customerInfo);
+      // purchases_flutter 9.x uses PurchaseParams instead of deprecated purchasePackage
+      final purchaseParams = PurchaseParams.package(package);
+      PurchaseResult result = await Purchases.purchase(purchaseParams);
+      _updateCustomerInfo(result.customerInfo);
     } catch (e) {
       print('Error purchasing package: $e');
     }

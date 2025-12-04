@@ -16,7 +16,7 @@ class Chat extends GetView<ChatController> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
           controller.clearMessages();
         }

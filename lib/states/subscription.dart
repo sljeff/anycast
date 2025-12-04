@@ -21,7 +21,7 @@ class SubscriptionController extends GetxController {
         });
   }
 
-  void addMany(subscriptions) {
+  void addMany(List<SubscriptionModel> subscriptions) {
     helper.db.then((db) => {
           SubscriptionModel.addMany(db, subscriptions).then((_) {
             load();

@@ -140,12 +140,16 @@ class ImportExportBlock extends StatelessWidget {
                           '${appDocDirectory.path}/anycast_subscriptions.xml');
                       await f.writeAsBytes(
                           const Utf8Encoder().convert(opml.toString()));
-                      Share.shareXFiles([
-                        XFile(
-                          f.path,
-                          mimeType: 'text/xml',
-                        )
-                      ]);
+                      SharePlus.instance.share(
+                        ShareParams(
+                          files: [
+                            XFile(
+                              f.path,
+                              mimeType: 'text/xml',
+                            )
+                          ],
+                        ),
+                      );
                     },
                     child: Text(
                       'Export',

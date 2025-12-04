@@ -54,7 +54,7 @@ class Card extends StatelessWidget {
         Widget back = Container(
           width: playedWidth,
           height: 100,
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
         );
 
         if (episode is PlaylistEpisodeModel) {
@@ -80,7 +80,7 @@ class Card extends StatelessWidget {
             back = Container(
               width: playedWidth,
               height: 100,
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
             );
           } else {
             if (pe.duration != null) {
@@ -90,7 +90,7 @@ class Card extends StatelessWidget {
             back = Container(
               width: playedWidth,
               height: 100,
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
             );
           }
         }
@@ -248,7 +248,7 @@ class Card extends StatelessWidget {
                                     height: 16,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(8),
-                                      color: Colors.blue.withOpacity(0.7),
+                                      color: Colors.blue.withValues(alpha: 0.7),
                                     ),
                                     alignment: Alignment.center,
                                     child: const Iconify(
@@ -262,7 +262,7 @@ class Card extends StatelessWidget {
                               if (progress >= 1) {
                                 return Iconify(
                                   IconParkSolid.check_one,
-                                  color: Colors.green.withOpacity(0.7),
+                                  color: Colors.green.withValues(alpha: 0.7),
                                   size: 16,
                                 );
                               }

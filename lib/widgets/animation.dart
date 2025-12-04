@@ -68,7 +68,7 @@ class AnimatedPlaylistIndicatorState extends State<AnimatedPlaylistIndicator>
                 width: _widthAnimation.value,
                 height: _heightAnimation.value,
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(_backOpacityAnimation.value),
+                  color: Colors.black.withValues(alpha: _backOpacityAnimation.value),
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: const Icon(Icons.play_arrow, color: Colors.white),

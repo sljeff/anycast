@@ -160,7 +160,7 @@ class ImportProgressIndicator extends GetView<ShareController> {
           return CircularProgressIndicator(
             value: progress,
             color: Colors.green,
-            backgroundColor: Colors.white.withOpacity(0.4),
+            backgroundColor: Colors.white.withValues(alpha: 0.4),
             strokeWidth: 2,
             strokeCap: StrokeCap.round,
           );

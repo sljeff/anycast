@@ -44,7 +44,7 @@ class PlayerPage extends GetView<PlayerController> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
           controller.pageIndex.value = 1;
         }
@@ -196,7 +196,9 @@ class PlayerMain extends GetView<PlayerController> {
                         if (value != null) {
                           finalUrl = value;
                         }
-                        Share.share('${episode.title}\n\n$finalUrl');
+                        SharePlus.instance.share(
+                          ShareParams(text: '${episode.title}\n\n$finalUrl'),
+                        );
                       });
 
                       Get.back();
@@ -208,7 +210,7 @@ class PlayerMain extends GetView<PlayerController> {
                       padding: const EdgeInsets.all(8),
                       clipBehavior: Clip.antiAlias,
                       decoration: ShapeDecoration(
-                        color: Colors.black.withOpacity(0.6),
+                        color: Colors.black.withValues(alpha: 0.6),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
@@ -216,7 +218,7 @@ class PlayerMain extends GetView<PlayerController> {
                       child: Iconify(
                         Ic.round_ios_share,
                         size: 18,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -443,14 +445,14 @@ class MyProgressBar extends GetView<PlayerController> {
             fontWeight: FontWeight.w700,
           ),
           thumbColor: Colors.white,
-          thumbGlowColor: Colors.black.withOpacity(0.2),
+          thumbGlowColor: Colors.black.withValues(alpha: 0.2),
           thumbCanPaintOutsideBar: false,
           thumbRadius: 16,
           thumbGlowRadius: 20,
           barHeight: 40,
           barCapShape: BarCapShape.round,
           baseBarColor: const Color(0xFF232830),
-          bufferedBarColor: Colors.white.withOpacity(0.05),
+          bufferedBarColor: Colors.white.withValues(alpha: 0.05),
           progressBarColor: Colors.white,
         );
       },
@@ -795,9 +797,12 @@ Future<void> exportSubtitles(LyricsReaderModel model) async {
 
   await file.writeAsString(buffer.toString());
 
-  Share.shareXFiles([
-    XFile(file.path, name: subject),
-  ], subject: subject);
+  SharePlus.instance.share(
+    ShareParams(
+      files: [XFile(file.path, name: subject)],
+      subject: subject,
+    ),
+  );
 
   // await Share.share(buffer.toString(), subject: subject);
 }
@@ -839,7 +844,7 @@ class Lyrics extends GetView<PlayerController> {
           child: Text(
             'No Transcript',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.64),
+              color: Colors.white.withValues(alpha: 0.64),
             ),
           ),
         ),
@@ -884,7 +889,7 @@ class Lyrics extends GetView<PlayerController> {
                       CircleBorder(),
                     ),
                     backgroundColor: WidgetStatePropertyAll(
-                      Colors.white.withOpacity(0.8),
+                      Colors.white.withValues(alpha: 0.8),
                     ),
                   ),
                   icon: const Icon(Icons.play_arrow_rounded,
@@ -1072,7 +1077,7 @@ class Settings extends GetView<SettingsController> {
   Widget build(BuildContext context) {
     SliderThemeData sliderThemeData = SliderTheme.of(context).copyWith(
       activeTrackColor: const Color(0xFF6B7280),
-      inactiveTrackColor: const Color(0xFF6B7280).withOpacity(0.3),
+      inactiveTrackColor: const Color(0xFF6B7280).withValues(alpha: 0.3),
       trackHeight: 0,
       trackShape: const RoundedRectSliderTrackShape(),
       thumbColor: Colors.white,
@@ -1223,10 +1228,10 @@ class Settings extends GetView<SettingsController> {
                           activeThumbColor: Colors.white,
                           inactiveThumbColor: Colors.grey,
                           inactiveTrackColor:
-                              const Color(0xFF232830).withOpacity(0.7),
+                              const Color(0xFF232830).withValues(alpha: 0.7),
                           trackOutlineColor: WidgetStateColor.resolveWith(
                               (states) =>
-                                  const Color(0xFF232830).withOpacity(0.3)),
+                                  const Color(0xFF232830).withValues(alpha: 0.3)),
                           value: controller.skipSilence.value,
                           onChanged: (value) {
                             controller.setSkipSilence(value);
@@ -1263,10 +1268,10 @@ class Settings extends GetView<SettingsController> {
                           activeThumbColor: Colors.white,
                           inactiveThumbColor: Colors.grey,
                           inactiveTrackColor:
-                              const Color(0xFF232830).withOpacity(0.7),
+                              const Color(0xFF232830).withValues(alpha: 0.7),
                           trackOutlineColor: WidgetStateColor.resolveWith(
                               (states) =>
-                                  const Color(0xFF232830).withOpacity(0.3)),
+                                  const Color(0xFF232830).withValues(alpha: 0.3)),
                           value: controller.continuousPlaying.value,
                           onChanged: (value) {
                             controller.setContinuousPlaying(value);

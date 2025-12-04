@@ -119,7 +119,7 @@ class PlayerBar extends GetView<PlayerController> {
           height: 58,
           margin: const EdgeInsets.only(left: 12, right: 12),
           decoration: ShapeDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -134,7 +134,7 @@ class PlayerBar extends GetView<PlayerController> {
                   child: Container(
                     width: playedWidth,
                     height: 58,
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                   ),
                 ),
                 Padding(

@@ -151,7 +151,7 @@ class Detail extends StatelessWidget {
                                         style: GoogleFonts.comfortaa(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w300,
-                                          color: Colors.white.withOpacity(0.5),
+                                          color: Colors.white.withValues(alpha: 0.5),
                                         ),
                                       )
                                     ],
@@ -182,7 +182,10 @@ class Detail extends StatelessWidget {
                                   if (value != null) {
                                     finalUrl = value;
                                   }
-                                  Share.share('${episode.title}\n\n$finalUrl');
+                                  SharePlus.instance.share(
+                                    ShareParams(
+                                        text: '${episode.title}\n\n$finalUrl'),
+                                  );
                                 });
 
                                 Get.back();
@@ -191,7 +194,7 @@ class Detail extends StatelessWidget {
                                 width: 40,
                                 height: 40,
                                 decoration: ShapeDecoration(
-                                  color: Colors.white.withOpacity(0.1),
+                                  color: Colors.white.withValues(alpha: 0.1),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(20),
                                   ),

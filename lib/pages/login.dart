@@ -213,7 +213,7 @@ class LoginPage extends GetView<AuthController> {
                   ),
                 ),
                 PopupMenuButton(
-                    color: Colors.black.withOpacity(0.9),
+                    color: Colors.black.withValues(alpha: 0.9),
                     shadowColor: Colors.black87,
                     iconColor: Colors.white70,
                     itemBuilder: (context) {

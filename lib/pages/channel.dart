@@ -34,7 +34,7 @@ class Channel extends StatelessWidget {
     var controller = Get.find<ChannelController>(tag: rssFeedUrl);
 
     return PopScope(
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
           Future.delayed(const Duration(milliseconds: 500), () {
             Get.delete<ChannelController>(tag: rssFeedUrl);
@@ -341,7 +341,7 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                 height: 40,
                 padding: const EdgeInsets.all(8),
                 decoration: ShapeDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -371,7 +371,9 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                   if (value != null) {
                     finalUrl = value;
                   }
-                  Share.share('${subscription.title}\n$finalUrl');
+                  SharePlus.instance.share(
+                    ShareParams(text: '${subscription.title}\n$finalUrl'),
+                  );
                   Get.back();
                 },
                 child: Container(
@@ -379,7 +381,7 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                     height: 40,
                     padding: const EdgeInsets.all(8),
                     decoration: ShapeDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -557,7 +559,7 @@ class SubscriptionButton extends StatelessWidget {
           width: 16, height: 16, child: CircularProgressIndicator());
       String text = 'Loading...';
       Color textColor = Colors.white;
-      Color backgroundColor = Colors.white.withOpacity(0.1);
+      Color backgroundColor = Colors.white.withValues(alpha: 0.1);
 
       if (!loading) {
         if (subscribed) {
@@ -736,7 +738,7 @@ class ChannelSearch extends StatelessWidget {
   Widget build(BuildContext context) {
     var clController = Get.put(CardListController(), tag: 'search-$rssFeedUrl');
     return PopScope(
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
           Get.delete<CardListController>(tag: 'search-$rssFeedUrl');
         }

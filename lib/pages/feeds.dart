@@ -50,7 +50,7 @@ class Feeds extends GetView<FeedEpisodeController> {
                   return LinearProgressIndicator(
                     value: percent,
                     color: Colors.green,
-                    backgroundColor: Colors.white.withOpacity(0.4),
+                    backgroundColor: Colors.white.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(1),
                     minHeight: 1,
                   );

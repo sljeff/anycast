@@ -77,7 +77,7 @@ String formatRemainingTime(Duration duration, Duration playedDuration) {
   }
 }
 
-Widget renderHtml(context, String html) {
+Widget renderHtml(BuildContext context, String html) {
   if (html.isEmpty) {
     return const SizedBox.shrink();
   }

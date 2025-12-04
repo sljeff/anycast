@@ -15,7 +15,7 @@ class ChannelController extends GetxController {
   var isReversed = false.obs;
   var backgroundColor = const Color(0xFF111316).obs;
 
-  get showEpisodes => isReversed.value ? episodes.reversed.toList() : episodes;
+  List<FeedEpisodeModel> get showEpisodes => isReversed.value ? episodes.reversed.toList() : episodes;
 
   var helper = DatabaseHelper();
   var subscriptionController = Get.find<SubscriptionController>();
