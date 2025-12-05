@@ -23,14 +23,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
-import 'package:flutter_lyric/lyrics_reader_model.dart';
+import 'package:flutter_lyric/flutter_lyric.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:lottie/lottie.dart';
 import 'package:marquee/marquee.dart';
-import 'package:flutter_lyric/lyrics_reader.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -629,9 +628,6 @@ class Subtitles extends GetView<SubtitleController> {
             }
             var subtitle = snapshot.data!;
 
-            var model = LyricsModelBuilder.create()
-                .bindLyricToMain(subtitle.toLrc())
-                .getModel();
             return Obx(
               () {
                 var translationStatus =
@@ -647,16 +643,19 @@ class Subtitles extends GetView<SubtitleController> {
                     }
 
                     var translation = snapshot.data!;
-                    model = LyricsModelBuilder.create()
-                        .bindLyricToMain(subtitle.toLrc())
-                        .bindLyricToExt(translation.toLrc())
-                        .getModel();
-                    return LyricsWithShare(model: model, height: height);
+                    return LyricsWithShare(
+                      mainLyric: subtitle.toLrc(),
+                      translationLyric: translation.toLrc(),
+                      height: height,
+                    );
                   });
                 } else if (translationStatus == 'processing') {
                   return Column(
                     children: [
-                      LyricsWithShare(model: model, height: height - 48),
+                      LyricsWithShare(
+                        mainLyric: subtitle.toLrc(),
+                        height: height - 48,
+                      ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -675,7 +674,10 @@ class Subtitles extends GetView<SubtitleController> {
                     ],
                   );
                 } else {
-                  return LyricsWithShare(model: model, height: height);
+                  return LyricsWithShare(
+                    mainLyric: subtitle.toLrc(),
+                    height: height,
+                  );
                 }
               },
             );
@@ -686,23 +688,198 @@ class Subtitles extends GetView<SubtitleController> {
   }
 }
 
-class LyricsWithShare extends GetView<PlayerController> {
+class LyricsWithShare extends StatefulWidget {
   const LyricsWithShare({
     super.key,
-    required this.model,
+    required this.mainLyric,
+    this.translationLyric,
     required this.height,
   });
 
-  final LyricsReaderModel model;
+  final String mainLyric;
+  final String? translationLyric;
   final double height;
 
   @override
+  State<LyricsWithShare> createState() => _LyricsWithShareState();
+}
+
+class _LyricsWithShareState extends State<LyricsWithShare>
+    with AutomaticKeepAliveClientMixin {
+  late LyricController _lyricController;
+  final PlayerController _playerController = Get.find<PlayerController>();
+  late Worker _progressWorker;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  // 使用预设样式并自定义
+  static final _lyricStyle = LyricStyles.default1.copyWith(
+    textStyle: GoogleFonts.mPlusRounded1c().copyWith(
+      color: Colors.grey[200],
+      fontSize: 14,
+    ),
+    activeStyle: GoogleFonts.mPlusRounded1c().copyWith(
+      color: Colors.greenAccent,
+      fontSize: 16,
+      fontWeight: FontWeight.w200,
+    ),
+    translationStyle: GoogleFonts.mPlusRounded1c().copyWith(
+      color: Colors.greenAccent,
+      fontSize: 14,
+    ),
+    translationActiveColor: Colors.grey[300],
+    lineGap: 12, // 减小行间距
+    translationLineGap: 6, // 减小翻译行间距
+    textAlign: TextAlign.left,
+    anchorPosition: 0.5,
+    contentPadding: const EdgeInsets.only(
+        top: 100, left: 20, right: 20, bottom: 20), // 覆盖默认的 top: 500
+    // 选择模式配置：拖拽后自动恢复
+    selectLineResumeMode: SelectionAutoResumeMode.neverResume,
+    selectLineResumeDuration: const Duration(milliseconds: 300),
+    activeLineResumeDuration: const Duration(milliseconds: 3000),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _lyricController = LyricController();
+    _loadLyrics();
+
+    // 立即同步当前播放进度
+    _lyricController
+        .setProgress(_playerController.positionData.value.position);
+
+    // 设置点击歌词行回调 - 用于切换播放/暂停
+    _lyricController.setOnTapLineCallback((Duration position) {
+      _playerController.togglePlay();
+
+      var overlayEntry = OverlayEntry(
+        builder: (context) => Center(
+          child:
+              PlayPauseAnimation(isPlaying: !_playerController.isPlaying.value),
+        ),
+      );
+      Overlay.of(context).insert(overlayEntry);
+      Future.delayed(const Duration(milliseconds: 500), () {
+        overlayEntry.remove();
+      });
+    });
+
+    // 监听播放进度变化
+    _progressWorker = ever(_playerController.positionData, (positionData) {
+      _lyricController.setProgress(positionData.position);
+    });
+  }
+
+  void _loadLyrics() {
+    _lyricController.loadLyric(
+      widget.mainLyric,
+      translationLyric: widget.translationLyric,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant LyricsWithShare oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mainLyric != widget.mainLyric ||
+        oldWidget.translationLyric != widget.translationLyric) {
+      _loadLyrics();
+    }
+  }
+
+  @override
+  void dispose() {
+    _progressWorker.dispose();
+    _lyricController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin 需要
     return Stack(
       children: [
-        Lyrics(
-          model: model,
-          height: height,
+        SizedBox(
+          width: double.infinity,
+          height: widget.height,
+          child: LyricView(
+            controller: _lyricController,
+            style: _lyricStyle,
+          ),
+        ),
+        // 滚动时显示的时间横条和播放按钮
+        SelectListenableBuilder(
+          controller: _lyricController,
+          builder: (SelectionState state, Widget? child) {
+            return Positioned(
+              top: state.centerY,
+              left: 12,
+              right: 12,
+              child: FractionalTranslation(
+                translation: const Offset(0, -0.5),
+                child: Row(
+                  children: [
+                    // 左侧时间显示
+                    Text(
+                      "${state.duration.inMinutes.toString().padLeft(2, '0')}:${(state.duration.inSeconds % 60).toString().padLeft(2, '0')}",
+                      style: GoogleFonts.comfortaa(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black54,
+                            offset: Offset(1, 1),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // 中间白线
+                    Expanded(
+                      child: Container(
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(1),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // 右侧播放按钮
+                    GestureDetector(
+                      onTap: () {
+                        _lyricController.stopSelection();
+                        _playerController.seek(state.duration);
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Color(0xFF10B981),
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
         Positioned(
           right: 0,
@@ -725,8 +902,8 @@ class LyricsWithShare extends GetView<PlayerController> {
                   onTap: () {
                     showMaterialModalBottomSheet(
                       context: context,
-                      builder: (context) =>
-                          ChatPage(episode: controller.playlistEpisode.value),
+                      builder: (context) => ChatPage(
+                          episode: _playerController.playlistEpisode.value),
                       expand: true,
                       closeProgressThreshold: 0.9,
                     );
@@ -755,7 +932,10 @@ class LyricsWithShare extends GetView<PlayerController> {
                       ])),
                 ],
                 onSelected: (value) {
-                  exportSubtitles(model);
+                  exportSubtitles(
+                    widget.mainLyric,
+                    widget.translationLyric,
+                  );
                 },
                 child: const Icon(Icons.more_vert_rounded, color: Colors.grey),
               ),
@@ -768,7 +948,7 @@ class LyricsWithShare extends GetView<PlayerController> {
 }
 
 // lrc format
-Future<void> exportSubtitles(LyricsReaderModel model) async {
+Future<void> exportSubtitles(String mainLyric, String? translationLyric) async {
   var playerController = Get.find<PlayerController>();
   var title = playerController.playlistEpisode.value.title ?? 'Subtitle';
   var channelTitle = playerController.playlistEpisode.value.channelTitle ?? '';
@@ -778,18 +958,10 @@ Future<void> exportSubtitles(LyricsReaderModel model) async {
   }
 
   var buffer = StringBuffer('# $subject\n\n---\n\n');
-  for (var t in model.lyrics) {
-    if (t.mainText == null || t.mainText!.isEmpty) {
-      continue;
-    }
-    var startTime = (t.startTime ?? 0) / 1000.0;
-    var s = formatLrcTime(startTime);
-
-    buffer.writeln('[$s]${t.mainText}');
-    if (t.extText?.isNotEmpty == true) {
-      buffer.writeln('[$s]${t.extText}');
-    }
-    buffer.writeln('\n');
+  buffer.writeln(mainLyric);
+  if (translationLyric != null && translationLyric.isNotEmpty) {
+    buffer.writeln('\n--- Translation ---\n');
+    buffer.writeln(translationLyric);
   }
 
   var tempFile = await getTemporaryDirectory();
@@ -803,103 +975,6 @@ Future<void> exportSubtitles(LyricsReaderModel model) async {
       subject: subject,
     ),
   );
-
-  // await Share.share(buffer.toString(), subject: subject);
-}
-
-class Lyrics extends GetView<PlayerController> {
-  const Lyrics({
-    super.key,
-    required this.model,
-    required this.height,
-  });
-
-  final LyricsReaderModel model;
-  final double height;
-  static final lyricUI = MyUINetease(highlight: false);
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(
-      () => LyricsReader(
-        onTap: () {
-          controller.togglePlay();
-
-          var overlayEntry = OverlayEntry(
-            builder: (context) => Center(
-              child: PlayPauseAnimation(isPlaying: !controller.isPlaying.value),
-            ),
-          );
-          Overlay.of(context).insert(overlayEntry);
-          Future.delayed(const Duration(milliseconds: 500), () {
-            overlayEntry.remove();
-          });
-        },
-        position: controller.positionData.value.position.inMilliseconds,
-        model: model,
-        lyricUi: lyricUI,
-        size: Size(double.infinity, height),
-        playing: controller.isPlaying.value,
-        emptyBuilder: () => Center(
-          child: Text(
-            'No Transcript',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.64),
-            ),
-          ),
-        ),
-        selectLineBuilder: (progress, confirm) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                formatTime(Duration(milliseconds: progress)),
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: GoogleFonts.comfortaa().fontFamily,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 24,
-                  shadows: const [
-                    Shadow(
-                      color: Colors.black,
-                      offset: Offset(1, 1),
-                      blurRadius: 4,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  decoration: const BoxDecoration(color: Colors.white),
-                  height: 2,
-                  width: double.infinity,
-                ),
-              ),
-              IconButton(
-                  onPressed: () {
-                    confirm.call();
-                    controller.seek(Duration(milliseconds: progress));
-                  },
-                  tooltip: 'Seek',
-                  iconSize: 24,
-                  style: ButtonStyle(
-                    shape: const WidgetStatePropertyAll(
-                      CircleBorder(),
-                    ),
-                    backgroundColor: WidgetStatePropertyAll(
-                      Colors.white.withValues(alpha: 0.8),
-                    ),
-                  ),
-                  icon: const Icon(Icons.play_arrow_rounded,
-                      color: Color(0xFF10B981)))
-            ],
-          );
-        },
-      ),
-    );
-  }
 }
 
 class PageTabButton extends GetView<PlayerController> {
@@ -1230,8 +1305,8 @@ class Settings extends GetView<SettingsController> {
                           inactiveTrackColor:
                               const Color(0xFF232830).withValues(alpha: 0.7),
                           trackOutlineColor: WidgetStateColor.resolveWith(
-                              (states) =>
-                                  const Color(0xFF232830).withValues(alpha: 0.3)),
+                              (states) => const Color(0xFF232830)
+                                  .withValues(alpha: 0.3)),
                           value: controller.skipSilence.value,
                           onChanged: (value) {
                             controller.setSkipSilence(value);
@@ -1270,8 +1345,8 @@ class Settings extends GetView<SettingsController> {
                           inactiveTrackColor:
                               const Color(0xFF232830).withValues(alpha: 0.7),
                           trackOutlineColor: WidgetStateColor.resolveWith(
-                              (states) =>
-                                  const Color(0xFF232830).withValues(alpha: 0.3)),
+                              (states) => const Color(0xFF232830)
+                                  .withValues(alpha: 0.3)),
                           value: controller.continuousPlaying.value,
                           onChanged: (value) {
                             controller.setContinuousPlaying(value);
@@ -1436,83 +1511,4 @@ class AutoSleepPicker extends GetView<SettingsController> {
       ),
     );
   }
-}
-
-class MyUINetease extends LyricUI {
-  double defaultSize;
-  double defaultExtSize;
-  double otherMainSize;
-  double bias;
-  double lineGap;
-  double inlineGap;
-  LyricAlign lyricAlign;
-  LyricBaseLine lyricBaseLine;
-  bool highlight;
-  HighlightDirection highlightDirection;
-
-  MyUINetease(
-      {this.defaultSize = 16,
-      this.defaultExtSize = 14,
-      this.otherMainSize = 14,
-      this.bias = 0.5,
-      this.lineGap = 25,
-      this.inlineGap = 15,
-      this.lyricAlign = LyricAlign.LEFT,
-      this.lyricBaseLine = LyricBaseLine.CENTER,
-      this.highlight = true,
-      this.highlightDirection = HighlightDirection.LTR});
-
-  MyUINetease.clone(MyUINetease uiNetease)
-      : this(
-          defaultSize: uiNetease.defaultSize,
-          defaultExtSize: uiNetease.defaultExtSize,
-          otherMainSize: uiNetease.otherMainSize,
-          bias: uiNetease.bias,
-          lineGap: uiNetease.lineGap,
-          inlineGap: uiNetease.inlineGap,
-          lyricAlign: uiNetease.lyricAlign,
-          lyricBaseLine: uiNetease.lyricBaseLine,
-          highlight: uiNetease.highlight,
-          highlightDirection: uiNetease.highlightDirection,
-        );
-
-  @override
-  TextStyle getPlayingExtTextStyle() => GoogleFonts.mPlusRounded1c()
-      .copyWith(color: Colors.greenAccent, fontSize: defaultExtSize);
-
-  @override
-  TextStyle getOtherExtTextStyle() => GoogleFonts.mPlusRounded1c()
-      .copyWith(color: Colors.grey[300], fontSize: defaultExtSize);
-
-  @override
-  TextStyle getOtherMainTextStyle() => GoogleFonts.mPlusRounded1c()
-      .copyWith(color: Colors.grey[200], fontSize: otherMainSize);
-
-  @override
-  TextStyle getPlayingMainTextStyle() => GoogleFonts.mPlusRounded1c().copyWith(
-        color: Colors.greenAccent,
-        fontSize: defaultSize,
-        fontWeight: FontWeight.w200,
-      );
-
-  @override
-  double getInlineSpace() => inlineGap;
-
-  @override
-  double getLineSpace() => lineGap;
-
-  @override
-  double getPlayingLineBias() => bias;
-
-  @override
-  LyricAlign getLyricHorizontalAlign() => lyricAlign;
-
-  @override
-  LyricBaseLine getBiasBaseLine() => lyricBaseLine;
-
-  @override
-  bool enableHighlight() => highlight;
-
-  @override
-  HighlightDirection getHighlightDirection() => highlightDirection;
 }
