@@ -12,8 +12,8 @@ const headers = {'Content-Type': 'application/json'};
 Future<String?> getShortUrl(Uri origin) async {
   var api = Uri(
     scheme: 'https',
-    host: 's.anycast.website',
-    path: '/',
+    host: 'anycast.website',
+    path: '/api/shortlink',
   );
 
   Object? err;

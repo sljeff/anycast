@@ -360,7 +360,7 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                 onTap: () async {
                   var shareUrl = Uri(
                       scheme: 'https',
-                      host: 'share.anycast.website',
+                      host: 'anycast.website',
                       path: 'channel',
                       queryParameters: {
                         'rssfeedurl': rssFeedUrl,

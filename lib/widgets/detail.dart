@@ -164,7 +164,7 @@ class Detail extends StatelessWidget {
                               onTap: () async {
                                 var shareUrl = Uri(
                                   scheme: 'https',
-                                  host: 'share.anycast.website',
+                                  host: 'anycast.website',
                                   path: 'player',
                                   queryParameters: {
                                     'rssfeedurl': episode.rssFeedUrl!,

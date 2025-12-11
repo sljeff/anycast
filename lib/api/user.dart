@@ -5,7 +5,7 @@ import 'package:anycast/utils/http_client.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:jiffy/jiffy.dart';
 
-const host = 'https://api.anycast.website';
+const host = 'https://anycast.website';
 
 class User {
   late String uid;
@@ -31,7 +31,7 @@ class User {
 }
 
 Future<User?> getUser() async {
-  var resp = await reqWithAuth('$host/user', method: 'GET');
+  var resp = await reqWithAuth('$host/api/user', method: 'GET');
 
   if (resp.statusCode == 401) {
     ErrorHandler.handle401();
@@ -49,7 +49,7 @@ Future<User?> getUser() async {
 }
 
 Future<bool?> deleteUser() async {
-  var resp = await reqWithAuth('$host/user', method: 'DELETE');
+  var resp = await reqWithAuth('$host/api/user', method: 'DELETE');
 
   if (resp.statusCode != 200) {
     ErrorHandler.handle(resp.statusCode, resp);

@@ -177,7 +177,7 @@ class PlayerMain extends GetView<PlayerController> {
                       var episode = controller.playlistEpisode.value;
                       var shareUrl = Uri(
                         scheme: 'https',
-                        host: 'share.anycast.website',
+                        host: 'anycast.website',
                         path: 'player',
                         queryParameters: {
                           'rssfeedurl': episode.rssFeedUrl,

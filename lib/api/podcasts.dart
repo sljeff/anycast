@@ -5,13 +5,13 @@ import 'package:anycast/models/subscription.dart';
 import 'package:anycast/utils/http_client.dart';
 import 'package:http/http.dart' as http;
 
-const host = 'api.anycast.website';
+const host = 'anycast.website';
 
 Future<List<SubscriptionModel>> searchChannels(String searchText) async {
   var url = Uri(
     host: host,
     scheme: 'https',
-    path: '/search_channel/v2',
+    path: '/api/search/channels',
     queryParameters: {
       'keyword': searchText,
       'limit': '20',
@@ -53,7 +53,7 @@ Future<List<EpisodeWithChannel>> searchEpisodes(String searchText) async {
   var url = Uri(
     host: host,
     scheme: 'https',
-    path: '/search_episode',
+    path: '/api/search/episodes',
     queryParameters: {
       'keyword': searchText,
       'limit': '20',
@@ -103,7 +103,7 @@ Future<List<Category>> listCategories() async {
   var url = Uri(
     host: host,
     scheme: 'https',
-    path: '/categories',
+    path: '/api/categories',
   );
 
   var response = await http.get(url);
@@ -127,7 +127,7 @@ Future<List<SubscriptionModel>> listChannelsByCategoryId(
   var url = Uri(
     host: host,
     scheme: 'https',
-    path: '/top_channels/v2',
+    path: '/api/top-channels',
     queryParameters: {
       'category_id': categoryId,
       'country': country,

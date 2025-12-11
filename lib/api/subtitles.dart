@@ -3,7 +3,7 @@ import 'package:anycast/api/error_handler.dart';
 import 'package:anycast/utils/http_client.dart';
 import 'package:http/http.dart' as http;
 
-const host = 'api.anycast.website';
+const host = 'anycast.website';
 
 class Subtitle {
   double? start;
@@ -36,7 +36,7 @@ Future<SubtitleResult> getSubtitles(String enclosureUrl) async {
   var url = Uri(
     host: host,
     scheme: 'https',
-    path: '/subtitles',
+    path: '/api/subtitles',
   );
   var req = {'enclosure_url': enclosureUrl};
 
@@ -75,7 +75,7 @@ Future<List<Subtitle>?> getTranslation(
   var url = Uri(
     host: host,
     scheme: 'https',
-    path: '/subtitles/translate',
+    path: '/api/subtitles/translate',
   );
   var req = jsonEncode({'enclosure_url': enclosureUrl, 'language': language});
   var headers = {'Content-Type': 'application/json'};
@@ -103,7 +103,7 @@ Future<String> chatAPI(String enclosureUrl, String input,
   var url = Uri(
     host: host,
     scheme: 'https',
-    path: '/subtitles/chat',
+    path: '/api/subtitles/chat',
   );
 
   var resp = await reqWithAuth(url.toString(), method: "POST", data: {
