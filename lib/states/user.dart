@@ -1,11 +1,19 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+@visibleForTesting
+OAuthCredential firebaseCredentialFromGoogleAuthentication(
+  GoogleSignInAuthentication authentication,
+) {
+  return GoogleAuthProvider.credential(idToken: authentication.idToken);
+}
 
 class AuthController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -56,22 +64,11 @@ class AuthController extends GetxController {
       await initGoogleSignIn();
 
       // Use the new authenticate() API for google_sign_in 7.x
-      final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
-      if (googleUser == null) return;
+      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
 
       // Get the ID token from the authenticated user
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
-
-      // Request access token through authorization
-      final authorization =
-          await googleUser.authorizationClient.authorizeScopes([]);
-      final String? accessToken = authorization.accessToken;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: accessToken,
-        idToken: idToken,
-      );
+      final credential = firebaseCredentialFromGoogleAuthentication(googleAuth);
 
       await _auth.signInWithCredential(credential);
     } on GoogleSignInException catch (e) {
@@ -226,7 +223,7 @@ class AuthController extends GetxController {
   }
 
   Future<void> signOut() async {
-    Get.find<RevenueCatController>().signOut();
+    await Get.find<RevenueCatController>().signOut();
     await _auth.signOut();
     // Ensure GoogleSignIn is initialized before signing out
     if (_googleSignInInitialized) {
@@ -308,9 +305,16 @@ class RevenueCatController extends GetxController {
     _isSubscribed.value = customerInfo.entitlements.active.isNotEmpty;
   }
 
-  void signOut() {
-    Purchases.logOut();
-    _isSubscribed.value = false;
+  Future<void> signOut() async {
+    try {
+      await Purchases.logOut();
+    } on PlatformException catch (error) {
+      // RevenueCat requires a network request to log out. Signing out of the
+      // app must still succeed when the device is offline.
+      debugPrint('Error logging out of RevenueCat: ${error.code}');
+    } finally {
+      _isSubscribed.value = false;
+    }
   }
 
   @override
