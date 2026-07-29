@@ -102,7 +102,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sdkmanager --install \
+          android_sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          sdkmanager="${android_sdk_root%/}/cmdline-tools/latest/bin/sdkmanager"
+          if [[ -z "${android_sdk_root}" || ! -x "${sdkmanager}" ]]; then
+            echo "Android SDK manager was not found." >&2
+            exit 1
+          fi
+          "${sdkmanager}" --install \
             "platforms;android-36" \
             "build-tools;36.0.0" \
             "ndk;28.2.13676358" >/dev/null
@@ -237,6 +243,12 @@ jobs:
         with:
           xcode-version: 16.4
 
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: 3.3.11
+          bundler-cache: true
+
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
@@ -248,10 +260,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$(pod --version)" != "1.16.2" ]]; then
-            echo "Expected CocoaPods 1.16.2 on the pinned runner." >&2
-            exit 1
-          fi
+          test "$(bundle exec pod --version)" = "1.16.2"
 
       - name: Install locked dependencies
         shell: bash
@@ -260,7 +269,7 @@ jobs:
           flutter pub get --enforce-lockfile
           (
             cd ios
-            pod install --deployment
+            bundle exec pod install --deployment
           )
 
       - name: Fetch reviewed app configuration
