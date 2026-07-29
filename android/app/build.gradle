@@ -31,6 +31,40 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def signingPropertyEncoding = keystoreProperties.getProperty('anycast.signing.encoding')
+def signingProperty = { String name ->
+    if (signingPropertyEncoding == null) {
+        return keystoreProperties.getProperty(name)
+    }
+    if (signingPropertyEncoding != 'base64') {
+        throw new GradleException(
+            "Unsupported Android signing property encoding: ${signingPropertyEncoding}"
+        )
+    }
+
+    def encodedValue = keystoreProperties.getProperty("${name}Base64")
+    if (encodedValue == null) {
+        throw new GradleException("Missing Base64 Android signing property: ${name}")
+    }
+
+    try {
+        return new String(
+            java.util.Base64.getDecoder().decode(encodedValue),
+            java.nio.charset.StandardCharsets.UTF_8
+        )
+    } catch (IllegalArgumentException exception) {
+        throw new GradleException(
+            "Invalid Base64 Android signing property: ${name}",
+            exception
+        )
+    }
+}
+
+def signingKeyAlias = signingProperty('keyAlias')
+def signingKeyPassword = signingProperty('keyPassword')
+def signingStoreFile = signingProperty('storeFile')
+def signingStorePassword = signingProperty('storePassword')
+
 android {
     namespace "com.kindjeff.anycast"
     compileSdkVersion flutter.compileSdkVersion
@@ -64,16 +98,15 @@ android {
 
     signingConfigs {
         release {
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-            storePassword keystoreProperties['storePassword']
+            keyAlias signingKeyAlias
+            keyPassword signingKeyPassword
+            storeFile signingStoreFile ? file(signingStoreFile) : null
+            storePassword signingStorePassword
         }
     }
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // key.properties is generated locally or by the protected release workflow.
             signingConfig signingConfigs.release
         }
     }

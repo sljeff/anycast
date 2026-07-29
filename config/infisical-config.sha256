@@ -1,0 +1,5 @@
+# Reviewed hashes for executable/client configuration fetched from Infisical.
+cec5134000d06c6e2c27c7aa3435c7f11f093ceafbbd59fc63cad704f5e576e0  .env
+e00b2f899f77f85fc6bc4c22fa245d60c461d27eb0034dd254e727768d696b57  android/app/google-services.json
+0af8773601723e332a240f09315e4efdda729adeca6f0b339a1e7a2e89e84262  ios/Runner/GoogleService-Info.plist
+4b1fe6a1d021f804374872eb1bcdfb2e528aa22a20f8fbd239229f1032fdc966  lib/firebase_options.dart

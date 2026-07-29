@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.2.0+37
+version: 1.2.1+38
 
 environment:
   sdk: '>=3.2.3 <4.0.0'
@@ -43,8 +43,8 @@ dependencies:
   timeago: ^3.3.0
   webfeed_plus:
     git:
-      url: git@github.com:sljeff/webfeed_plus
-      ref: 6bb4dbd
+      url: https://github.com/sljeff/webfeed_plus.git
+      ref: 6bb4dbd776e9dec3ea876ba1dffd20f9c67805f5
   xml: ^6.5.0
   sanitize_html: ^2.1.0
   audio_service: ^0.18.18
@@ -68,7 +68,8 @@ dependencies:
   palette_generator: ^0.3.3+3
   flutter_cache_manager_plus:
     git:
-      url: git@github.com:sljeff/flutter_cache_manager
+      url: https://github.com/sljeff/flutter_cache_manager.git
+      ref: 51211c98591e590b302ca97c87af70460b526076
       path: flutter_cache_manager
   percent_indicator: ^4.2.3
   retry: ^3.1.2
@@ -84,8 +85,8 @@ dependencies:
   easy_refresh: ^3.4.0
   receive_sharing_intent:
     git:
-      url: https://github.com/KasemJaffer/receive_sharing_intent
-      ref: master
+      url: https://github.com/KasemJaffer/receive_sharing_intent.git
+      ref: 2cea396843cd3ab1b5ec4334be4233864637874e
   lottie: ^3.3.2
   flutter_widget_from_html: ^0.16.1
   carousel_slider: ^5.0.0

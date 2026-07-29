@@ -1,0 +1,217 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Analyze and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.38.3
+          cache: false
+
+      - name: Generate synthetic test configuration
+        run: ./scripts/ci_config.sh
+
+      - name: Install locked Dart dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
+  android:
+    name: Build Android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Set up Java
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: 17.0.20+8
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.38.3
+          cache: false
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          set -euo pipefail
+          android_sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          sdkmanager="${android_sdk_root%/}/cmdline-tools/latest/bin/sdkmanager"
+          if [[ -z "${android_sdk_root}" || ! -x "${sdkmanager}" ]]; then
+            echo "Android SDK manager was not found." >&2
+            exit 1
+          fi
+          "${sdkmanager}" --install \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" >/dev/null
+
+      - name: Create test configuration
+        run: ./scripts/ci_config.sh
+
+      - name: Install locked Dart dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Set up test signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_keystore="${RUNNER_TEMP%/}/anycast-ci-upload.jks"
+          cleanup_test_keystore() {
+            rm -f -- "${test_keystore}"
+          }
+          trap cleanup_test_keystore EXIT
+
+          # Exercise Java Properties escape sequences in the signing round trip.
+          test_password="ci\\n\\u0041-$(openssl rand -hex 16)"
+          keytool -genkeypair \
+            -keystore "${test_keystore}" \
+            -storepass "${test_password}" \
+            -keypass "${test_password}" \
+            -alias anycast-ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 1 \
+            -dname 'CN=Anycast CI' >/dev/null 2>&1
+
+          export ANDROID_UPLOAD_KEYSTORE_B64
+          ANDROID_UPLOAD_KEYSTORE_B64="$(base64 -w 0 "${test_keystore}")"
+          export ANDROID_KEY_ALIAS=anycast-ci
+          export ANDROID_KEY_PASSWORD="${test_password}"
+          export ANDROID_STORE_PASSWORD="${test_password}"
+          ./scripts/prepare_android_signing.sh
+
+          cleanup_test_keystore
+          trap - EXIT
+          unset test_password
+
+      - name: Build Android release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build appbundle --release
+          jarsigner -verify \
+            build/app/outputs/bundle/release/app-release.aab >/dev/null
+
+      - name: Clean up test signing and configuration
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          rm -f -- \
+            .env \
+            android/app/google-services.json \
+            android/key.properties \
+            ios/Runner/GoogleService-Info.plist \
+            lib/firebase_options.dart
+          signing_dir="${RUNNER_TEMP%/}/anycast-android-signing"
+          if [[ -d "${signing_dir}" &&
+                "${signing_dir}" == "${RUNNER_TEMP%/}/anycast-android-signing" ]]; then
+            rm -rf -- "${signing_dir}"
+          fi
+          exit 0
+
+  ios:
+    name: Build iOS
+    runs-on: macos-15
+    timeout-minutes: 50
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: 16.4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: 3.3.11
+          bundler-cache: true
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.38.3
+          cache: false
+
+      - name: Verify CocoaPods toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(bundle exec pod --version)" = "1.16.2"
+
+      - name: Create test configuration
+        run: ./scripts/ci_config.sh
+
+      - name: Install locked dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get --enforce-lockfile
+          (
+            cd ios
+            bundle exec pod install --deployment
+          )
+
+      - name: Build iOS without signing
+        run: flutter build ios --release --no-codesign
+
+      - name: Clean up test configuration
+        if: always()
+        shell: bash
+        run: |
+          rm -f -- \
+            .env \
+            android/app/google-services.json \
+            ios/Runner/GoogleService-Info.plist \
+            lib/firebase_options.dart

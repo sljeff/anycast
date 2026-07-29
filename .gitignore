@@ -3,13 +3,20 @@
 /ios/Runner/GoogleService-Info.plist
 /lib/firebase_options.dart
 *.env
+.env.*
+!.env.example
+*.keystore
+*.p12
+*.mobileprovision
+AuthKey_*.p8
+.sentryclirc
+sentry.properties
 
 # Do not remove or rename entries in this file, only add new ones
 # See https://github.com/flutter/flutter/issues/128635 for more context.
 
 # Miscellaneous
 *.class
-*.lock
 *.log
 *.pyc
 *.swp
@@ -71,11 +78,8 @@ unlinked.ds
 unlinked_spec.ds
 
 # Android related
-**/android/**/gradle-wrapper.jar
 .gradle/
 **/android/captures/
-**/android/gradlew
-**/android/gradlew.bat
 **/android/local.properties
 **/android/**/GeneratedPluginRegistrant.java
 **/android/key.properties
