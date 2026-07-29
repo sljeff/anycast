@@ -215,8 +215,6 @@ jobs:
       - name: Upload to Google Play Internal
         env:
           GOOGLE_PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
-          ANDROID_PACKAGE_NAME: ${{ vars.ANDROID_PACKAGE_NAME }}
-          PLAY_TRACK: ${{ vars.PLAY_TRACK }}
           AAB_PATH: build/app/outputs/bundle/release/app-release.aab
           RELEASE_NAME: ${{ needs.validate.outputs.release_name }}
         run: ./scripts/upload_play.sh

@@ -68,11 +68,21 @@ keytool -list \
   -storepass "${ANDROID_STORE_PASSWORD}" \
   -alias "${ANDROID_KEY_ALIAS}" >/dev/null
 
+write_base64_property() {
+  local property_name="$1"
+  local property_value="$2"
+
+  printf '%s=' "${property_name}"
+  printf '%s' "${property_value}" | base64 | tr -d '\r\n'
+  printf '\n'
+}
+
 {
-  printf 'storePassword=%s\n' "${ANDROID_STORE_PASSWORD}"
-  printf 'keyPassword=%s\n' "${ANDROID_KEY_PASSWORD}"
-  printf 'keyAlias=%s\n' "${ANDROID_KEY_ALIAS}"
-  printf 'storeFile=%s\n' "${KEYSTORE_PATH}"
+  printf 'anycast.signing.encoding=base64\n'
+  write_base64_property storePasswordBase64 "${ANDROID_STORE_PASSWORD}"
+  write_base64_property keyPasswordBase64 "${ANDROID_KEY_PASSWORD}"
+  write_base64_property keyAliasBase64 "${ANDROID_KEY_ALIAS}"
+  write_base64_property storeFileBase64 "${KEYSTORE_PATH}"
 } >"${KEY_PROPERTIES_PATH}"
 chmod 600 "${KEY_PROPERTIES_PATH}"
 

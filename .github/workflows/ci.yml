@@ -106,7 +106,8 @@ jobs:
           }
           trap cleanup_test_keystore EXIT
 
-          test_password="$(openssl rand -hex 16)"
+          # Exercise Java Properties escape sequences in the signing round trip.
+          test_password="ci\\n\\u0041-$(openssl rand -hex 16)"
           keytool -genkeypair \
             -keystore "${test_keystore}" \
             -storepass "${test_password}" \

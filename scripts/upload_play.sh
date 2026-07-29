@@ -5,11 +5,11 @@ set +x
 
 readonly API_ROOT="https://androidpublisher.googleapis.com/androidpublisher/v3"
 readonly UPLOAD_ROOT="https://androidpublisher.googleapis.com/upload/androidpublisher/v3"
+readonly PACKAGE_NAME="com.kindjeff.anycast"
+readonly TARGET_TRACK="internal"
 
 required_variables=(
   GOOGLE_PLAY_ACCESS_TOKEN
-  ANDROID_PACKAGE_NAME
-  PLAY_TRACK
   AAB_PATH
   RELEASE_NAME
 )
@@ -20,16 +20,6 @@ for variable_name in "${required_variables[@]}"; do
     exit 1
   fi
 done
-
-if [[ ! "${ANDROID_PACKAGE_NAME}" =~ ^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$ ]]; then
-  echo "Invalid Android package name" >&2
-  exit 1
-fi
-
-if [[ ! "${PLAY_TRACK}" =~ ^[A-Za-z0-9._-]+$ ]]; then
-  echo "Invalid Google Play track name" >&2
-  exit 1
-fi
 
 if [[ ! -f "${AAB_PATH}" || -L "${AAB_PATH}" ]]; then
   echo "Signed AAB is missing or is a symbolic link: ${AAB_PATH}" >&2
@@ -45,7 +35,7 @@ edit_response="$(
     --header "${authorization_header}" \
     --header 'Content-Type: application/json' \
     --data '{}' \
-    "${API_ROOT}/applications/${ANDROID_PACKAGE_NAME}/edits"
+    "${API_ROOT}/applications/${PACKAGE_NAME}/edits"
 )"
 edit_id="$(jq -er '.id' <<<"${edit_response}")"
 unset edit_response
@@ -61,7 +51,7 @@ cleanup_edit() {
     curl --silent --show-error \
       --request DELETE \
       --header "${authorization_header}" \
-      "${API_ROOT}/applications/${ANDROID_PACKAGE_NAME}/edits/${edit_id}" \
+      "${API_ROOT}/applications/${PACKAGE_NAME}/edits/${edit_id}" \
       >/dev/null || true
   fi
 }
@@ -71,7 +61,7 @@ tracks_response="$(
   curl --fail-with-body --silent --show-error \
     --request GET \
     --header "${authorization_header}" \
-    "${API_ROOT}/applications/${ANDROID_PACKAGE_NAME}/edits/${edit_id}/tracks"
+    "${API_ROOT}/applications/${PACKAGE_NAME}/edits/${edit_id}/tracks"
 )"
 
 if ! jq -e '.tracks | type == "array"' \
@@ -80,19 +70,10 @@ if ! jq -e '.tracks | type == "array"' \
   exit 1
 fi
 
-selected_track="${PLAY_TRACK}"
-if jq -e \
-  --arg track "${selected_track}" \
+if ! jq -e \
+  --arg track "${TARGET_TRACK}" \
   'any(.tracks[]?; .track == $track)' \
   <<<"${tracks_response}" >/dev/null; then
-  :
-elif [[ "${selected_track}" == "internal" ]] &&
-     jq -e \
-       'any(.tracks[]?; .track == "qa")' \
-       <<<"${tracks_response}" >/dev/null; then
-  selected_track="qa"
-  echo "Google Play track internal is unavailable; using qa." >&2
-else
   available_tracks="$(
     jq -r \
       '[
@@ -105,11 +86,10 @@ else
       <<<"${tracks_response}"
   )"
   echo \
-    "Requested Google Play track ${selected_track} is unavailable. Available tracks: ${available_tracks}" \
+    "Required Google Play track ${TARGET_TRACK} is unavailable. Available tracks: ${available_tracks}" \
     >&2
   exit 1
 fi
-readonly selected_track
 unset tracks_response
 
 bundle_response="$(
@@ -118,7 +98,7 @@ bundle_response="$(
     --header "${authorization_header}" \
     --header 'Content-Type: application/octet-stream' \
     --data-binary "@${AAB_PATH}" \
-    "${UPLOAD_ROOT}/applications/${ANDROID_PACKAGE_NAME}/edits/${edit_id}/bundles?uploadType=media"
+    "${UPLOAD_ROOT}/applications/${PACKAGE_NAME}/edits/${edit_id}/bundles?uploadType=media"
 )"
 version_code="$(jq -er '.versionCode | tostring' <<<"${bundle_response}")"
 unset bundle_response
@@ -130,7 +110,7 @@ fi
 
 track_payload="$(
   jq -cn \
-    --arg track "${selected_track}" \
+    --arg track "${TARGET_TRACK}" \
     --arg release_name "${RELEASE_NAME}" \
     --arg version_code "${version_code}" \
     '{
@@ -148,15 +128,15 @@ curl --fail-with-body --silent --show-error \
   --header "${authorization_header}" \
   --header 'Content-Type: application/json' \
   --data "${track_payload}" \
-  "${API_ROOT}/applications/${ANDROID_PACKAGE_NAME}/edits/${edit_id}/tracks/${selected_track}" \
+  "${API_ROOT}/applications/${PACKAGE_NAME}/edits/${edit_id}/tracks/${TARGET_TRACK}" \
   >/dev/null
 unset track_payload
 
 curl --fail-with-body --silent --show-error \
   --request POST \
   --header "${authorization_header}" \
-  "${API_ROOT}/applications/${ANDROID_PACKAGE_NAME}/edits/${edit_id}:commit" \
+  "${API_ROOT}/applications/${PACKAGE_NAME}/edits/${edit_id}:commit" \
   >/dev/null
 
 committed=true
-echo "Uploaded Android version code ${version_code} to Play track ${selected_track}."
+echo "Uploaded Android version code ${version_code} to Play track ${TARGET_TRACK}."
