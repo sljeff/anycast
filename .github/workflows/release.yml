@@ -1,0 +1,19 @@
+name: Store candidate
+
+on:
+  push:
+    tags:
+      - "rc-*"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: anycast-store-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish candidate builds
+    uses: sljeff/anycast/.github/workflows/release-core.yml@main
