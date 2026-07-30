@@ -1,5 +1,5 @@
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class Privacy extends StatelessWidget {
@@ -11,7 +11,7 @@ class Privacy extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Column(children: [
-        const SizedBox(height: 8),
+        const SizedBox(height: AnycastSpacing.md),
         GestureDetector(
           onTap: () {
             launchUrl(
@@ -21,14 +21,13 @@ class Privacy extends StatelessWidget {
           },
           child: Text(
             'Privacy Policy',
-            style: GoogleFonts.comfortaa(
-              color: Colors.blueAccent,
-              fontSize: 12,
-              decoration: TextDecoration.underline,
-            ),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AnycastSpacing.md),
         GestureDetector(
           onTap: () {
             launchUrl(
@@ -42,11 +41,10 @@ class Privacy extends StatelessWidget {
           },
           child: Text(
             'Terms of Use (EULA)',
-            style: GoogleFonts.comfortaa(
-              color: Colors.blueAccent,
-              fontSize: 12,
-              decoration: TextDecoration.underline,
-            ),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
           ),
         ),
       ]),

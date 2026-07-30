@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'package:anycast/design_system/anycast_components.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/history.dart';
@@ -16,10 +18,8 @@ import 'package:flutter/material.dart';
 import 'package:anycast/states/playlist.dart';
 import 'package:anycast/states/playlist_episode.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
-import 'package:marquee/marquee.dart';
 
 class Playlists extends GetView<PlaylistController> {
   const Playlists({super.key});
@@ -69,56 +69,17 @@ class PlaylistEpisodesList extends StatelessWidget {
     return Obx(
       () {
         if (controller.episodes.isEmpty) {
-          return Column(
-            children: [
-              Container(
-                alignment: Alignment.center,
-                height: 300,
-                child: Text(
-                  'All caught up?\n\nExplore new shows!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontFamily: GoogleFonts.comfortaa().fontFamily,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2.40,
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 262,
-                child: TextButton(
-                  onPressed: () {
-                    Get.find<HomeTabController>().onItemTapped(2);
-                  },
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Iconify(
-                        Ic.baseline_explore,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Explore',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontFamily: GoogleFonts.comfortaa().fontFamily,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 2.40,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          return AnycastEmptyState(
+            icon: Icons.queue_music_rounded,
+            title: 'All caught up?',
+            message: 'Explore new shows!',
+            action: FilledButton.icon(
+              onPressed: () {
+                Get.find<HomeTabController>().onItemTapped(2);
+              },
+              icon: const Icon(Icons.explore_rounded),
+              label: const Text('Explore'),
+            ),
           );
         }
 
@@ -130,13 +91,13 @@ class PlaylistEpisodesList extends StatelessWidget {
             tag: 'playlits${controller.playlistId}');
 
         return Container(
-          padding: const EdgeInsets.only(left: 24, right: 24),
+          padding: const EdgeInsets.symmetric(horizontal: AnycastSpacing.pageH),
           child: ReorderableListView.builder(
             onReorder: controller.move,
             onReorderStart: (index) {
               clController.close();
             },
-            footer: const SizedBox(height: 12),
+            footer: const SizedBox(height: AnycastSpacing.gap),
             proxyDecorator:
                 (Widget child, int index, Animation<double> animation) {
               return AnimatedBuilder(
@@ -153,13 +114,16 @@ class PlaylistEpisodesList extends StatelessWidget {
               );
             },
             buildDefaultDragHandles: false,
-            padding: const EdgeInsets.only(top: 12, bottom: 64),
+            padding: const EdgeInsets.only(
+              top: AnycastSpacing.gap,
+              bottom: AnycastSpacing.pageBottomSafe,
+            ),
             itemCount: controller.episodes.length,
             itemBuilder: (context, index) {
               var episode = controller.episodes[index];
               return Padding(
                 key: Key(episode.enclosureUrl!),
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: AnycastSpacing.gap),
                 child: MyReorderableDelayedDragStartListener(
                   delay: const Duration(milliseconds: 150),
                   index: index,
@@ -186,7 +150,6 @@ class PlaylistEpisodesList extends StatelessWidget {
                         icon: AIIcon(
                           size: 24,
                           enclosureUrl: episode.enclosureUrl!,
-                          color: Colors.black,
                         ),
                         onPressed: () {
                           var stController = Get.find<SubtitleController>();
@@ -252,22 +215,19 @@ class HistoryBlock extends StatelessWidget {
 
       if (controller.episodes.isEmpty) {
         return const AlertDialog(
-            backgroundColor: Colors.green,
-            title: Center(
-              child: Text(
-                'No history',
-                style: TextStyle(
-                  color: Colors.white,
-                  decoration: TextDecoration.none,
-                ),
-              ),
-            ));
+          title: Text('No history'),
+        );
       }
 
       return Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 12),
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: AnycastSpacing.pageH),
         child: Container(
-          padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
+          padding: const EdgeInsets.only(
+            left: AnycastSpacing.gap,
+            right: AnycastSpacing.gap,
+            top: AnycastSpacing.gap,
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -278,17 +238,22 @@ class HistoryBlock extends StatelessWidget {
               Expanded(
                 child: ListView.separated(
                   separatorBuilder: (context, index) =>
-                      const SizedBox(height: 12),
-                  padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
+                      const SizedBox(height: AnycastSpacing.gap),
+                  padding: const EdgeInsets.only(
+                    left: AnycastSpacing.gap,
+                    right: AnycastSpacing.gap,
+                    top: AnycastSpacing.gap,
+                  ),
                   itemCount: controller.episodes.length,
                   itemBuilder: (context, index) {
                     var episode = controller.episodes[index];
                     return Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(AnycastSpacing.gap),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(AnycastRadius.md),
                         border: Border.all(
-                          color: Colors.white30,
+                          color: Theme.of(context).colorScheme.outlineVariant,
                           width: 1,
                         ),
                       ),
@@ -332,40 +297,30 @@ class HistoryBlock extends StatelessWidget {
                                 height: 48,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AnycastSpacing.gap),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  SizedBox(
-                                    height: 20,
-                                    child: Marquee(
-                                      text: episode.title!,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontFamily:
-                                            GoogleFonts.comfortaa().fontFamily,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 2.40,
-                                      ),
-                                      blankSpace: 72,
-                                      startAfter: const Duration(seconds: 1),
-                                      startPadding: 12,
-                                    ),
+                                  Text(
+                                    episode.title!,
+                                    style:
+                                        Theme.of(context).textTheme.titleMedium,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
                                     episode.channelTitle!,
                                     overflow: TextOverflow.ellipsis,
                                     maxLines: 1,
-                                    style: TextStyle(
-                                      color: const Color(0xFF10B981),
-                                      fontSize: 12,
-                                      fontFamily:
-                                          GoogleFonts.comfortaa().fontFamily,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 2.40,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        ),
                                   ),
                                 ],
                               ),
@@ -376,13 +331,20 @@ class HistoryBlock extends StatelessWidget {
                                 onPressed: () {
                                   controller.delete(episode.enclosureUrl!);
                                 },
-                                padding: const EdgeInsets.all(6),
+                                padding:
+                                    const EdgeInsets.all(AnycastSpacing.sm),
                                 style: IconButton.styleFrom(
                                   shape: const CircleBorder(),
-                                  backgroundColor: Colors.white,
+                                  backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .inverseSurface,
                                 ),
-                                icon: const Iconify(Ic.clear,
-                                    color: Colors.black),
+                                icon: Iconify(
+                                  Ic.clear,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onInverseSurface,
+                                ),
                               ),
                             ),
                           ],
@@ -404,12 +366,9 @@ class HistoryBlock extends StatelessWidget {
                 ),
                 child: Text(
                   "Clear All",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontFamily: GoogleFonts.comfortaa().fontFamily,
-                    fontWeight: FontWeight.w400,
-                  ),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onError,
+                      ),
                 ),
               ),
             ],

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/import_indicator.dart';
@@ -12,9 +13,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/pages/feeds.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:iconify_flutter/iconify_flutter.dart';
-import 'package:iconify_flutter/icons/ic.dart';
 import 'package:opml/opml.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -27,22 +25,14 @@ class ImportExportBlock extends StatelessWidget {
     var textController = TextEditingController();
 
     return AlertDialog(
-      titleTextStyle: GoogleFonts.comfortaa(
-        fontSize: 20,
-      ),
-      contentTextStyle: GoogleFonts.comfortaa(
-        fontSize: 18,
-      ),
+      titleTextStyle: Theme.of(context).textTheme.headlineMedium,
+      contentTextStyle: Theme.of(context).textTheme.bodyLarge,
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
+          Text(
             'Import/Export',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: Colors.white70,
-            ),
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
           IconButton(
             onPressed: () {
@@ -55,7 +45,10 @@ class ImportExportBlock extends StatelessWidget {
                 },
               );
             },
-            icon: const Iconify(Ic.round_help, color: Colors.white70),
+            icon: Icon(
+              Icons.help_outline_rounded,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           )
         ],
       ),
@@ -66,7 +59,9 @@ class ImportExportBlock extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AnycastSpacing.pageHeader,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -113,21 +108,21 @@ class ImportExportBlock extends StatelessWidget {
                       });
                     },
                     style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
+                      backgroundColor:
+                          Theme.of(context).colorScheme.inverseSurface,
+                      foregroundColor:
+                          Theme.of(context).colorScheme.onInverseSurface,
                       padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 48,
+                        vertical: AnycastSpacing.gap,
+                        horizontal: AnycastSpacing.xxl,
                       ),
                     ),
                     child: Text(
                       'Import',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        letterSpacing: 2.40,
-                        fontFamily: GoogleFonts.comfortaa().fontFamily,
-                      ),
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onInverseSurface,
+                          ),
                     ),
                   ),
                   TextButton(
@@ -153,13 +148,9 @@ class ImportExportBlock extends StatelessWidget {
                     },
                     child: Text(
                       'Export',
-                      style: TextStyle(
-                        color: const Color(0xFF10B981),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                        letterSpacing: 2.40,
-                        fontFamily: GoogleFonts.comfortaa().fontFamily,
-                      ),
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                     ),
                   ),
                 ],
@@ -167,7 +158,9 @@ class ImportExportBlock extends StatelessWidget {
             ),
             // input rss feed url
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AnycastSpacing.pageHeader,
+              ),
               child:
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Expanded(
@@ -177,26 +170,9 @@ class ImportExportBlock extends StatelessWidget {
                     keyboardType: TextInputType.url,
                     decoration: const InputDecoration(
                       hintText: 'RSS Feed URL',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                        borderSide: BorderSide(color: Colors.white),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                        borderSide: BorderSide(color: Colors.white),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                        borderSide: BorderSide(color: Colors.white),
-                      ),
                     ),
                     controller: textController,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontFamily: GoogleFonts.comfortaa().fontFamily,
-                      fontWeight: FontWeight.w400,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium,
                     onChanged: (value) {
                       textController.text = value;
                     },
@@ -217,18 +193,20 @@ class ImportExportBlock extends StatelessWidget {
                               child: AlertDialog(
                             title: Text(
                               'Error',
-                              style: GoogleFonts.comfortaa(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 18,
-                                color: Colors.red,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.red,
+                                  ),
                             ),
                             content: Text(
                               'Invalid RSS Feed URL',
-                              style: GoogleFonts.comfortaa(
-                                fontSize: 14,
-                                color: Colors.red,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: Colors.red),
                             ),
                             actions: [
                               TextButton(
@@ -273,29 +251,27 @@ class ImportInstructions extends StatelessWidget {
       minChildSize: 0.6,
       expand: false,
       builder: (context, controller) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AnycastSpacing.pageHeader,
+          vertical: AnycastSpacing.pageH,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Handler(),
-            const SizedBox(height: 32),
+            const SizedBox(height: AnycastSpacing.large),
             Row(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Text(
                   'Import OPML from',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontFamily: GoogleFonts.comfortaa().fontFamily,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AnycastSpacing.md),
             Expanded(
               child: ListView(
                 controller: controller,
@@ -352,8 +328,8 @@ class ExpansionInstruction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ExpansionTile(
-      collapsedIconColor: Colors.white,
-      iconColor: Colors.green,
+      collapsedIconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+      iconColor: Theme.of(context).colorScheme.primary,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
@@ -362,22 +338,17 @@ class ExpansionInstruction extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: GoogleFonts.comfortaa(
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
-          color: Colors.white,
-        ),
+        style: Theme.of(context).textTheme.titleMedium,
       ),
       children: [
         Container(
           alignment: Alignment.topLeft,
-          padding: const EdgeInsets.only(left: 32),
+          padding: const EdgeInsets.only(left: AnycastSpacing.large),
           child: Text(
             description,
-            style: GoogleFonts.comfortaa(
-              fontSize: 12,
-              color: Colors.white,
-            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
           ),
         ),
       ],

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:anycast/api/share.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subscription.dart';
@@ -55,8 +56,8 @@ class PlayerPage extends GetView<PlayerController> {
               end: Alignment.bottomCenter,
               colors: [
                 controller.backgroundColor.value,
-                const Color(0xFF111316),
-                const Color(0xFF111316),
+                AnycastColor.playerBackground,
+                AnycastColor.playerBackground,
               ],
             ),
           ),
@@ -93,11 +94,14 @@ class PageTab extends GetView<PlayerController> {
   Widget build(BuildContext context) {
     return Container(
       height: 56,
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(AnycastSpacing.xs),
       decoration: ShapeDecoration(
-        color: const Color(0x19232830),
+        color: AnycastColor.sandAlpha4(Brightness.dark),
         shape: RoundedRectangleBorder(
-          side: const BorderSide(width: 1, color: Color(0xFF4B5563)),
+          side: const BorderSide(
+            width: 1,
+            color: AnycastColor.sandDark6,
+          ),
           borderRadius: BorderRadius.circular(36),
         ),
       ),
@@ -121,9 +125,14 @@ class PlayerSettings extends GetView<PlayerController> {
   @override
   Widget build(BuildContext context) {
     return DefaultTextStyle(
-      style: const TextStyle(color: Colors.white),
+      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+            color: AnycastColor.playerText,
+          ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AnycastSpacing.pageHeader,
+          vertical: AnycastSpacing.pageH,
+        ),
         child: Column(children: [
           Expanded(
             child: Scrollbar(
@@ -135,7 +144,7 @@ class PlayerSettings extends GetView<PlayerController> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AnycastSpacing.pageH),
           const Settings(),
         ]),
       ),
@@ -148,11 +157,15 @@ class PlayerMain extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    var size = Get.width - 48;
+    var size = Get.width - AnycastSpacing.pageHeader * 2;
     return DefaultTextStyle(
-      style: const TextStyle(color: Colors.white),
+      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+            color: AnycastColor.playerText,
+          ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AnycastSpacing.pageHeader,
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -240,17 +253,22 @@ class PlayerAI extends GetView<PlayerController> {
   @override
   Widget build(BuildContext context) {
     return DefaultTextStyle(
-      style: const TextStyle(
-        color: Colors.white,
-        decoration: TextDecoration.none,
-      ),
+      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+            color: AnycastColor.playerText,
+            decoration: TextDecoration.none,
+          ),
       child: Container(
-        margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        margin: const EdgeInsets.all(AnycastSpacing.pageHeader),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AnycastSpacing.gap,
+        ),
         alignment: Alignment.center,
         decoration: ShapeDecoration(
           shape: RoundedRectangleBorder(
-            side: const BorderSide(width: 1, color: Color(0xFF232830)),
+            side: const BorderSide(
+              width: 1,
+              color: AnycastColor.sandDark4,
+            ),
             borderRadius: BorderRadius.circular(8),
           ),
         ),
@@ -260,7 +278,9 @@ class PlayerAI extends GetView<PlayerController> {
             children: [
               Container(
                 height: 60,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  vertical: AnycastSpacing.gap,
+                ),
                 alignment: Alignment.center,
                 child: Row(children: [
                   Obx(
@@ -272,17 +292,16 @@ class PlayerAI extends GetView<PlayerController> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AnycastSpacing.gap),
                   Obx(
                     () => Expanded(
                       child: Text(controller.playlistEpisode.value.title ?? "",
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.comfortaa(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          )),
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AnycastColor.playerText,
+                                  )),
                     ),
                   ),
                 ]),
@@ -302,7 +321,10 @@ class TitleBar extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    var rightWidth = MediaQuery.of(context).size.width - 24 * 2 - 64 - 6;
+    var rightWidth = MediaQuery.of(context).size.width -
+        AnycastSpacing.pageHeader * 2 -
+        64 -
+        AnycastSpacing.sm;
     return Obx(() {
       var episode = controller.playlistEpisode.value;
       var backgroundColor = controller.backgroundColor.value;
@@ -336,18 +358,15 @@ class TitleBar extends GetView<PlayerController> {
       }
 
       // marquee or text
-      var titleStyle = const TextStyle(
-        fontSize: 24,
-        color: Colors.white,
-        fontFamily: 'PingFang SC',
-        fontWeight: FontWeight.w600,
-      );
+      var titleStyle = Theme.of(context).textTheme.headlineMedium!.copyWith(
+            color: AnycastColor.playerText,
+          );
       Widget titleWidget = Text(
         title,
         style: titleStyle,
       );
       // if text width > rightWidth, use marquee
-      if (title.length * 24 > rightWidth) {
+      if (title.length * 22 > rightWidth) {
         titleWidget = Marquee(
           text: title,
           pauseAfterRound: const Duration(seconds: 1),
@@ -361,7 +380,7 @@ class TitleBar extends GetView<PlayerController> {
           borderRadius: BorderRadius.circular(12),
           child: img,
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: AnycastSpacing.sm),
         SizedBox(
           width: rightWidth,
           child: Column(
@@ -372,7 +391,7 @@ class TitleBar extends GetView<PlayerController> {
                 height: 34,
                 child: titleWidget,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AnycastSpacing.sm),
               GestureDetector(
                 onTap: () {
                   jumpToChannel(episode, context, subscription);
@@ -381,12 +400,10 @@ class TitleBar extends GetView<PlayerController> {
                   height: 24,
                   child: Text(
                     channelTitle,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: getTextSafeColor(backgroundColor),
-                      fontFamily: 'PingFang SC',
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: getTextSafeColor(backgroundColor),
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ),
               ),
@@ -436,12 +453,10 @@ class MyProgressBar extends GetView<PlayerController> {
           },
           timeLabelLocation: TimeLabelLocation.above,
           timeLabelType: TimeLabelType.remainingTime,
-          timeLabelPadding: 4,
-          timeLabelTextStyle: TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontFamily: GoogleFonts.comfortaa().fontFamily,
-            fontWeight: FontWeight.w700,
+          timeLabelPadding: AnycastSpacing.xs,
+          timeLabelTextStyle: Theme.of(context).textTheme.labelMedium!.copyWith(
+            color: AnycastColor.playerText,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
           thumbColor: Colors.white,
           thumbGlowColor: Colors.black.withValues(alpha: 0.2),
@@ -450,8 +465,8 @@ class MyProgressBar extends GetView<PlayerController> {
           thumbGlowRadius: 20,
           barHeight: 40,
           barCapShape: BarCapShape.round,
-          baseBarColor: const Color(0xFF232830),
-          bufferedBarColor: Colors.white.withValues(alpha: 0.05),
+          baseBarColor: AnycastColor.sandDark4,
+          bufferedBarColor: AnycastColor.sandAlpha3(Brightness.dark),
           progressBarColor: Colors.white,
         );
       },
@@ -491,20 +506,16 @@ class Subtitles extends GetView<SubtitleController> {
                     Text(
                       'Generate transcript with AI (Beta)',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontFamily: GoogleFonts.comfortaa().fontFamily,
-                        fontWeight: FontWeight.w400,
-                        height: 0,
-                      ),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AnycastColor.playerText,
+                          ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AnycastSpacing.md),
                     Container(
                       width: 20,
                       height: 20,
                       decoration: const ShapeDecoration(
-                        color: Color(0xFF059669),
+                        color: AnycastColor.goldDark9,
                         shape: OvalBorder(),
                       ),
                       child: const Tooltip(
@@ -514,22 +525,24 @@ class Subtitles extends GetView<SubtitleController> {
                         child: Icon(
                           Icons.question_mark_rounded,
                           size: 12,
-                          color: Colors.white70,
+                          color: AnycastColor.sand12,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: AnycastSpacing.large),
                 TextButton(
                   onPressed: () {
                     controller.add(url);
                   },
                   style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
+                    backgroundColor: AnycastColor.goldDark9,
+                    foregroundColor: AnycastColor.sand12,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 48, vertical: 24),
+                      horizontal: AnycastSpacing.xxl,
+                      vertical: AnycastSpacing.pageHeader,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(24),
                     ),
@@ -562,29 +575,26 @@ class Subtitles extends GetView<SubtitleController> {
 
       if (status == 'processing') {
         // a progress indicator
-        var style = TextStyle(
-          color: Colors.white,
-          fontFamily: GoogleFonts.comfortaa().fontFamily,
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
-        );
+        var style = Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AnycastColor.playerText,
+              fontWeight: FontWeight.w600,
+            );
         return Expanded(
           child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Lottie.asset('assets/lottie/robot_loading.json'),
-                const SizedBox(height: 24),
+                const SizedBox(height: AnycastSpacing.pageHeader),
                 Text("Generating with AI ...", style: style),
-                const SizedBox(height: 8),
+                const SizedBox(height: AnycastSpacing.md),
                 Text("It may take 2 ~ 5 minutes ...", style: style),
-                const SizedBox(height: 24),
+                const SizedBox(height: AnycastSpacing.pageHeader),
                 Text(
                   "Feel free to explore or come back later.",
-                  style: GoogleFonts.comfortaa().copyWith(
-                    color: Colors.white,
-                    fontSize: 12,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AnycastColor.playerText,
+                      ),
                 ),
               ],
             ),
@@ -600,8 +610,8 @@ class Subtitles extends GetView<SubtitleController> {
               controller.add(url);
             },
             style: TextButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.blue,
+              foregroundColor: AnycastColor.sand12,
+              backgroundColor: AnycastColor.goldDark9,
             ),
             child: const Text('Retry'),
           ),
@@ -662,12 +672,13 @@ class Subtitles extends GetView<SubtitleController> {
                           const RefreshProgressIndicator(),
                           Text(
                             "Translating subtitles...",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontFamily: GoogleFonts.comfortaa().fontFamily,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: AnycastColor.playerText,
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ),
                         ],
                       ),
@@ -720,12 +731,12 @@ class _LyricsWithShareState extends State<LyricsWithShare>
       fontSize: 14,
     ),
     activeStyle: GoogleFonts.mPlusRounded1c().copyWith(
-      color: Colors.greenAccent,
+      color: AnycastColor.goldDark9,
       fontSize: 16,
       fontWeight: FontWeight.w200,
     ),
     translationStyle: GoogleFonts.mPlusRounded1c().copyWith(
-      color: Colors.greenAccent,
+      color: AnycastColor.goldDark9,
       fontSize: 14,
     ),
     translationActiveColor: Colors.grey[300],
@@ -748,8 +759,7 @@ class _LyricsWithShareState extends State<LyricsWithShare>
     _loadLyrics();
 
     // 立即同步当前播放进度
-    _lyricController
-        .setProgress(_playerController.positionData.value.position);
+    _lyricController.setProgress(_playerController.positionData.value.position);
 
     // 设置点击歌词行回调 - 用于切换播放/暂停
     _lyricController.setOnTapLineCallback((Duration position) {
@@ -815,8 +825,8 @@ class _LyricsWithShareState extends State<LyricsWithShare>
           builder: (SelectionState state, Widget? child) {
             return Positioned(
               top: state.centerY,
-              left: 12,
-              right: 12,
+              left: AnycastSpacing.gap,
+              right: AnycastSpacing.gap,
               child: FractionalTranslation(
                 translation: const Offset(0, -0.5),
                 child: Row(
@@ -824,10 +834,9 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                     // 左侧时间显示
                     Text(
                       "${state.duration.inMinutes.toString().padLeft(2, '0')}:${(state.duration.inSeconds % 60).toString().padLeft(2, '0')}",
-                      style: GoogleFonts.comfortaa(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: AnycastColor.playerText,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                         shadows: const [
                           Shadow(
                             color: Colors.black54,
@@ -865,12 +874,12 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: AnycastColor.sandAlpha8(Brightness.dark),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
                           Icons.play_arrow_rounded,
-                          color: Color(0xFF10B981),
+                          color: AnycastColor.goldDark9,
                           size: 24,
                         ),
                       ),
@@ -898,7 +907,11 @@ class _LyricsWithShareState extends State<LyricsWithShare>
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: GestureDetector(
-                  child: const Iconify(aiChat, color: Colors.green, size: 24),
+                  child: const Iconify(
+                    aiChat,
+                    color: AnycastColor.goldDark9,
+                    size: 24,
+                  ),
                   onTap: () {
                     showMaterialModalBottomSheet(
                       context: context,
@@ -1050,7 +1063,7 @@ class Controls extends GetView<PlayerController> {
           width: 72,
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            color: Color(0xFF10B981),
+            color: AnycastColor.goldDark9,
           ),
           child: IconButton(
             onPressed: () {
@@ -1151,8 +1164,8 @@ class Settings extends GetView<SettingsController> {
   @override
   Widget build(BuildContext context) {
     SliderThemeData sliderThemeData = SliderTheme.of(context).copyWith(
-      activeTrackColor: const Color(0xFF6B7280),
-      inactiveTrackColor: const Color(0xFF6B7280).withValues(alpha: 0.3),
+      activeTrackColor: AnycastColor.sandDark9,
+      inactiveTrackColor: AnycastColor.sandAlpha8(Brightness.dark),
       trackHeight: 0,
       trackShape: const RoundedRectSliderTrackShape(),
       thumbColor: Colors.white,
@@ -1162,11 +1175,11 @@ class Settings extends GetView<SettingsController> {
       showValueIndicator: ShowValueIndicator.never,
       tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 4),
       activeTickMarkColor: Colors.white,
-      inactiveTickMarkColor: const Color(0xFF232830),
+      inactiveTickMarkColor: AnycastColor.sandDark3,
       valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
-      valueIndicatorColor: const Color(0xFF111316),
+      valueIndicatorColor: AnycastColor.sandDark1,
       valueIndicatorTextStyle: TextStyle(
-        color: const Color(0xFF111316),
+        color: AnycastColor.sandDark1,
         fontSize: 14,
         fontFamily: GoogleFonts.comfortaa().fontFamily,
         fontWeight: FontWeight.w400,
@@ -1196,14 +1209,14 @@ class Settings extends GetView<SettingsController> {
             child: Obx(
               () => Material(
                 shape: const StadiumBorder(),
-                color: const Color(0xFF232830),
+                color: AnycastColor.sandDark3,
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: SliderTheme(
                     data: sliderThemeData.copyWith(
-                      activeTrackColor: Colors.grey,
-                      inactiveTrackColor: Colors.blue,
-                      inactiveTickMarkColor: Colors.white,
+                      activeTrackColor: AnycastColor.goldDark9,
+                      inactiveTrackColor: AnycastColor.sandDark6,
+                      inactiveTickMarkColor: AnycastColor.sandDark12,
                     ),
                     child: Slider(
                       value: controller.speed.value,
@@ -1241,7 +1254,7 @@ class Settings extends GetView<SettingsController> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Obx(
               () => Material(
-                color: const Color(0xFF232830),
+                color: AnycastColor.sandDark3,
                 shape: const StadiumBorder(),
                 child: Padding(
                   padding: const EdgeInsets.all(4),
@@ -1303,10 +1316,11 @@ class Settings extends GetView<SettingsController> {
                           activeThumbColor: Colors.white,
                           inactiveThumbColor: Colors.grey,
                           inactiveTrackColor:
-                              const Color(0xFF232830).withValues(alpha: 0.7),
+                              AnycastColor.sandAlpha5(Brightness.dark),
                           trackOutlineColor: WidgetStateColor.resolveWith(
-                              (states) => const Color(0xFF232830)
-                                  .withValues(alpha: 0.3)),
+                            (states) =>
+                                AnycastColor.sandAlpha3(Brightness.dark),
+                          ),
                           value: controller.skipSilence.value,
                           onChanged: (value) {
                             controller.setSkipSilence(value);
@@ -1343,10 +1357,11 @@ class Settings extends GetView<SettingsController> {
                           activeThumbColor: Colors.white,
                           inactiveThumbColor: Colors.grey,
                           inactiveTrackColor:
-                              const Color(0xFF232830).withValues(alpha: 0.7),
+                              AnycastColor.sandAlpha5(Brightness.dark),
                           trackOutlineColor: WidgetStateColor.resolveWith(
-                              (states) => const Color(0xFF232830)
-                                  .withValues(alpha: 0.3)),
+                            (states) =>
+                                AnycastColor.sandAlpha3(Brightness.dark),
+                          ),
                           value: controller.continuousPlaying.value,
                           onChanged: (value) {
                             controller.setContinuousPlaying(value);

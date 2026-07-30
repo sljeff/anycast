@@ -1,3 +1,4 @@
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -43,8 +44,10 @@ class ExpandableText extends StatelessWidget {
                   actions: [
                     IconButton(
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
+                        backgroundColor:
+                            Theme.of(context).colorScheme.inverseSurface,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onInverseSurface,
                       ),
                       icon: const Icon(Icons.close),
                       onPressed: () => Get.back(),
@@ -58,8 +61,11 @@ class ExpandableText extends StatelessWidget {
               width: constraints.maxWidth,
               decoration: ShapeDecoration(
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                color: AnycastColor.goldAlpha3(
+                  Theme.of(context).brightness,
+                ),
               ),
               child: Text(
                 text.replaceAll('\n\n', '\n'),

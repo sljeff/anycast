@@ -1,3 +1,4 @@
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/api/podcasts.dart';
 import 'package:anycast/states/feed_episode.dart';
@@ -12,7 +13,6 @@ import 'package:anycast/widgets/handler.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 
@@ -64,24 +64,33 @@ class DiscoverBody extends StatelessWidget {
                       ),
                       builder: ((context, snapshot) {
                         if (!snapshot.hasData) {
-                          return const Center(
+                          return Center(
                             child: CircularProgressIndicator(),
                           );
                         }
                         var channels = snapshot.data!;
                         if (channels.isEmpty) {
-                          return const Center(
+                          return Center(
                             child: Text(
                               'Network Error',
-                              style: TextStyle(color: Colors.white),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
                             ),
                           );
                         }
                         return ListView.separated(
                             padding: const EdgeInsets.only(
-                                left: 12, right: 12, top: 12),
+                              top: AnycastSpacing.gap,
+                              bottom: AnycastSpacing.pageBottomSafe,
+                            ),
                             separatorBuilder: (context, index) =>
-                                const SizedBox(height: 12),
+                                const SizedBox(height: AnycastSpacing.gap),
                             itemCount: channels.length,
                             itemBuilder: (context, index) {
                               return PodcastCard(
@@ -111,7 +120,6 @@ class SearchPage extends StatelessWidget {
     var clController = Get.put(CardListController());
 
     return Scaffold(
-      backgroundColor: const Color(0xFF111316),
       bottomNavigationBar: const PlayerBar(),
       body: SafeArea(
         child: Column(
@@ -122,58 +130,37 @@ class SearchPage extends StatelessWidget {
                 Navigator.pop(context);
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AnycastSpacing.gap),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   'You are searching for',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontFamily: GoogleFonts.comfortaa().fontFamily,
-                    fontWeight: FontWeight.w700,
-                    decoration: TextDecoration.none,
-                  ),
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AnycastSpacing.md),
                 Text(
                   searchText,
-                  style: TextStyle(
-                      color: const Color(0xFF6EE7B7),
-                      fontSize: 16,
-                      fontFamily: GoogleFonts.comfortaa().fontFamily,
-                      fontWeight: FontWeight.w400,
-                      decoration: TextDecoration.none),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AnycastSpacing.gap),
             Expanded(
               child: DefaultTabController(
                 length: 2,
                 child: Column(
                   children: [
                     Material(
+                      color: Colors.transparent,
                       child: TabBar(
                         tabs: const [
                           Tab(text: 'Channels'),
                           Tab(text: 'Episodes'),
                         ],
-                        indicatorColor: const Color(0xFF6EE7B7),
-                        labelColor: const Color(0xFF6EE7B7),
-                        unselectedLabelColor: Colors.white,
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontFamily: GoogleFonts.comfortaa().fontFamily,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        unselectedLabelStyle: TextStyle(
-                          fontSize: 12,
-                          fontFamily: GoogleFonts.comfortaa().fontFamily,
-                          fontWeight: FontWeight.w400,
-                        ),
                       ),
                     ),
                     Expanded(
@@ -183,27 +170,29 @@ class SearchPage extends StatelessWidget {
                             future: searchChannels(searchText),
                             builder: (context, snapshot) {
                               if (!snapshot.hasData) {
-                                return const Center(
+                                return Center(
                                   child: CircularProgressIndicator(),
                                 );
                               }
                               var subscriptions = snapshot.data!;
                               if (subscriptions.isEmpty) {
-                                return const Center(
+                                return Center(
                                   child: Text(
                                     'No results',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      decoration: TextDecoration.none,
-                                    ),
+                                    style:
+                                        Theme.of(context).textTheme.bodyLarge,
                                   ),
                                 );
                               }
                               return ListView.separated(
                                   padding: const EdgeInsets.only(
-                                      left: 12, right: 12, top: 12),
+                                    top: AnycastSpacing.gap,
+                                    bottom: AnycastSpacing.pageBottomSafe,
+                                  ),
                                   separatorBuilder: (context, index) =>
-                                      const SizedBox(height: 12),
+                                      const SizedBox(
+                                        height: AnycastSpacing.gap,
+                                      ),
                                   itemCount: subscriptions.length,
                                   itemBuilder: (context, index) {
                                     return card.PodcastCard(
@@ -216,27 +205,31 @@ class SearchPage extends StatelessWidget {
                             future: searchEpisodes(searchText),
                             builder: (context, snapshot) {
                               if (!snapshot.hasData) {
-                                return const Center(
+                                return Center(
                                   child: CircularProgressIndicator(),
                                 );
                               }
                               var episodes = snapshot.data!;
                               if (episodes.isEmpty) {
-                                return const Center(
+                                return Center(
                                   child: Text(
                                     'No results',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      decoration: TextDecoration.none,
-                                    ),
+                                    style:
+                                        Theme.of(context).textTheme.bodyLarge,
                                   ),
                                 );
                               }
                               return ListView.separated(
-                                  padding: const EdgeInsets.only(
-                                      left: 12, right: 12, top: 12),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    AnycastSpacing.pageH,
+                                    AnycastSpacing.gap,
+                                    AnycastSpacing.pageH,
+                                    AnycastSpacing.pageBottomSafe,
+                                  ),
                                   separatorBuilder: (context, index) =>
-                                      const SizedBox(height: 12),
+                                      const SizedBox(
+                                        height: AnycastSpacing.gap,
+                                      ),
                                   itemCount: episodes.length,
                                   itemBuilder: (context, index) {
                                     var ep = episodes[index].episode!;

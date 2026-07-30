@@ -1,3 +1,5 @@
+import 'package:anycast/design_system/anycast_components.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/pages/player.dart';
 import 'package:anycast/states/feed_episode.dart';
@@ -7,8 +9,6 @@ import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:remixicon/remixicon.dart';
 
@@ -25,44 +25,45 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment(0.00, -1.00),
-          end: Alignment(0, 1),
-          colors: [Color(0xF014171A), Color(0xFF16191D)],
-        ),
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(
+        AnycastSpacing.pageH,
+        AnycastSpacing.md,
+        AnycastSpacing.pageH,
+        AnycastSpacing.md,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const PlayerBar(),
-          Container(
-            height: 96,
-            width: double.infinity,
-            padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
+          const SizedBox(height: AnycastSpacing.md),
+          AnycastGlassSurface(
+            borderRadius: BorderRadius.circular(AnycastRadius.pill),
+            padding: const EdgeInsets.all(AnycastSpacing.xs),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const BarIcon(
-                  icon: Icons.home_rounded,
-                  index: 0,
-                  text: 'Podcast',
+                const Expanded(
+                  child: BarIcon(
+                    icon: Icons.home_rounded,
+                    index: 0,
+                    text: 'Podcast',
+                  ),
                 ),
-                BarIcon(
-                  key: playlistKey,
-                  icon: Icons.video_library_rounded,
-                  index: 1,
-                  text: 'Playlist',
+                Expanded(
+                  child: BarIcon(
+                    key: playlistKey,
+                    icon: Icons.video_library_rounded,
+                    index: 1,
+                    text: 'Playlist',
+                  ),
                 ),
-                BarIcon(
-                  icon: MdiIcons.cloudSearch,
-                  index: 2,
-                  text: 'Discover',
+                Expanded(
+                  child: BarIcon(
+                    icon: Icons.travel_explore_rounded,
+                    index: 2,
+                    text: 'Discover',
+                  ),
                 ),
               ],
             ),
@@ -91,7 +92,8 @@ class PlayerBar extends GetView<PlayerController> {
       var posPercent = postion.value.position.inMilliseconds /
           postion.value.duration.inMilliseconds;
       // width of played bar * posPercent
-      var barWidth = MediaQuery.of(context).size.width - 12 * 2;
+      var barWidth =
+          MediaQuery.of(context).size.width - AnycastSpacing.pageH * 2;
       var playedWidth = barWidth * posPercent;
       if (playedWidth < 0 || playedWidth > barWidth || playedWidth.isNaN) {
         playedWidth = 0;
@@ -115,17 +117,10 @@ class PlayerBar extends GetView<PlayerController> {
             closeProgressThreshold: 0.9,
           );
         },
-        child: Container(
-          height: 58,
-          margin: const EdgeInsets.only(left: 12, right: 12),
-          decoration: ShapeDecoration(
-            color: Colors.white.withValues(alpha: 0.1),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
+        child: AnycastGlassSurface(
+          borderRadius: BorderRadius.circular(AnycastRadius.card),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AnycastRadius.card),
             child: Stack(
               children: [
                 Positioned(
@@ -133,19 +128,23 @@ class PlayerBar extends GetView<PlayerController> {
                   top: 0,
                   child: Container(
                     width: playedWidth,
-                    height: 58,
-                    color: Colors.white.withValues(alpha: 0.2),
+                    height: 56,
+                    color: AnycastColor.goldAlpha9(
+                      Theme.of(context).brightness,
+                    ),
                   ),
                 ),
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AnycastSpacing.gap,
+                    vertical: AnycastSpacing.sm,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AnycastRadius.sm),
                         child: CachedNetworkImage(
                           width: 36,
                           height: 36,
@@ -153,7 +152,7 @@ class PlayerBar extends GetView<PlayerController> {
                               'https://placeholder.co/48.png?text=NoImage',
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AnycastSpacing.gap),
                       Expanded(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -164,11 +163,7 @@ class PlayerBar extends GetView<PlayerController> {
                               width: double.infinity,
                               child: Text(
                                 episode.title!,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -177,17 +172,23 @@ class PlayerBar extends GetView<PlayerController> {
                               PlaylistEpisodeModel.getPlayedAndTotalTime(
                                   postion.value.position.inMilliseconds,
                                   postion.value.duration.inMilliseconds),
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
                               ),
                               maxLines: 1,
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AnycastSpacing.pageH),
                       GestureDetector(
                         onTap: () {
                           if (controller.isPlaying.value) {
@@ -196,12 +197,12 @@ class PlayerBar extends GetView<PlayerController> {
                             controller.play();
                           }
                         },
-                        child: const SizedBox(
-                          width: 40,
-                          height: 40,
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
                           child: PlayIcon(
                             size: 32,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -212,12 +213,12 @@ class PlayerBar extends GetView<PlayerController> {
                                   postion.value.position.inMilliseconds +
                                       30000));
                         },
-                        child: const SizedBox(
-                          width: 40,
-                          height: 40,
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
                           child: Icon(
                             Remix.forward_30_fill,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onSurface,
                             size: 32,
                           ),
                         ),
@@ -256,8 +257,13 @@ class BarIcon extends GetView<HomeTabController> {
   Widget build(BuildContext context) {
     return Obx(() {
       var isSelected = controller.selectedIndex.value == index;
-      var color =
-          isSelected ? const Color(0xFF6EE7B7) : const Color(0xFF6b7280);
+      final theme = Theme.of(context);
+      final iconColor = isSelected
+          ? theme.colorScheme.onPrimaryContainer
+          : theme.colorScheme.onSurfaceVariant;
+      final textColor = isSelected
+          ? theme.colorScheme.onPrimaryContainer
+          : theme.colorScheme.onSurfaceVariant;
 
       return GestureDetector(
           onTap: () {
@@ -275,37 +281,30 @@ class BarIcon extends GetView<HomeTabController> {
 
             controller.onItemTapped(index);
           },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                alignment: Alignment.center,
-                width: 48,
-                height: 48,
-                decoration: ShapeDecoration(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(36),
+          child: AnimatedContainer(
+            duration: AnycastMotion.quick,
+            curve: AnycastMotion.standardCurve,
+            height: 56,
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AnycastColor.sandAlpha2(theme.brightness)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(AnycastRadius.pill),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: iconColor, size: 24),
+                const SizedBox(height: AnycastSpacing.xs),
+                Text(
+                  text,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: textColor,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 24,
-                ),
-              ),
-              Text(
-                text,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontFamily: GoogleFonts.comfortaa().fontFamily,
-                  fontWeight: FontWeight.w400,
-                  height: 0,
-                ),
-              ),
-            ],
+              ],
+            ),
           ));
     });
   }

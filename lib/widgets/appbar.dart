@@ -1,11 +1,10 @@
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/pages/discover.dart';
 import 'package:anycast/pages/settings.dart';
 import 'package:anycast/states/discover.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
-import 'package:simple_gradient_text/simple_gradient_text.dart';
 
 class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -14,64 +13,65 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return AppBar(
       title: Padding(
-        padding: const EdgeInsets.only(left: 24, right: 24, top: 8),
+        padding: const EdgeInsets.fromLTRB(
+          AnycastSpacing.pageH,
+          AnycastSpacing.xs,
+          AnycastSpacing.pageH,
+          AnycastSpacing.gap,
+        ),
         child: Column(
           children: [
-            Container(
-              alignment: Alignment.centerRight,
-              child: GestureDetector(
-                onTap: () {
-                  showMaterialModalBottomSheet(
-                    expand: true,
-                    context: context,
-                    builder: (context) {
-                      return const SettingsPage();
-                    },
-                    closeProgressThreshold: 0.9,
-                  );
-                },
-                child: Container(
-                  height: 36,
-                  width: 36,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF232830),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Icon(
-                    Icons.settings_rounded,
-                    color: Colors.grey.shade400,
-                    size: 24,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    _displayTitle(title),
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    style: theme.textTheme.displayLarge,
                   ),
                 ),
-              ),
-            ),
-            Container(
-              alignment: Alignment.centerLeft,
-              height: 48,
-              child: GradientText(
-                title,
-                gradientDirection: GradientDirection.ttb,
-                colors: const [
-                  Color(0xFF059669),
-                  Color(0x00059669),
-                ],
-                style: TextStyle(
-                  fontSize: 44,
-                  fontFamily: GoogleFonts.comfortaa().fontFamily,
-                  fontWeight: FontWeight.w700,
-                  height: 0,
-                  letterSpacing: 4.40,
+                const SizedBox(width: AnycastSpacing.gap),
+                IconButton(
+                  tooltip: 'Settings',
+                  onPressed: () {
+                    showMaterialModalBottomSheet(
+                      expand: true,
+                      context: context,
+                      builder: (context) {
+                        return const SettingsPage();
+                      },
+                      closeProgressThreshold: 0.9,
+                    );
+                  },
+                  style: IconButton.styleFrom(
+                    fixedSize: const Size(
+                      AnycastSpacing.xxl,
+                      AnycastSpacing.xxl,
+                    ),
+                    backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                    foregroundColor: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  icon: const Icon(Icons.settings_rounded, size: 26),
                 ),
-              ),
+              ],
             ),
+            const SizedBox(height: AnycastSpacing.gap),
             const SearchBar(),
           ],
         ),
       ),
     );
+  }
+
+  String _displayTitle(String value) {
+    if (value.isEmpty) return value;
+    final lower = value.toLowerCase();
+    return '${lower[0].toUpperCase()}${lower.substring(1)}';
   }
 
   @override
@@ -83,9 +83,9 @@ class SearchBar extends GetView<DiscoverController> {
 
   @override
   Widget build(BuildContext context) {
-    var searchBar = Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    final theme = Theme.of(context);
+    var searchBar = SizedBox(
+      height: 48,
       child: TextField(
         onTapOutside: (event) {
           FocusScope.of(context).unfocus();
@@ -106,38 +106,12 @@ class SearchBar extends GetView<DiscoverController> {
           );
         },
         controller: controller.searchController,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.w400,
-        ),
+        style: theme.textTheme.bodyLarge,
         decoration: InputDecoration(
-          hintText: 'Shows,Episodes,and more',
-          hintStyle: TextStyle(
-            color: const Color(0xFF4B5563),
-            fontSize: 16,
-            fontFamily: GoogleFonts.comfortaa().fontFamily,
-            fontWeight: FontWeight.w400,
-            height: 0,
-          ),
+          hintText: 'Shows, episodes, and more',
           prefixIcon: const Icon(
-            Icons.search,
-            color: Color(0xFF4B5563),
+            Icons.search_rounded,
             size: 24,
-          ),
-          filled: true,
-          fillColor: const Color(0xFF232830),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
-              color: Color(0xFF232830),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
-              color: Color(0xFF232830),
-            ),
           ),
         ),
       ),
@@ -148,25 +122,14 @@ class SearchBar extends GetView<DiscoverController> {
       if (controller.searchText.value.isNotEmpty) {
         cancel = Row(
           children: [
-            const SizedBox(
-              width: 16,
-            ),
-            GestureDetector(
-              onTap: () {
+            const SizedBox(width: AnycastSpacing.md),
+            TextButton(
+              onPressed: () {
                 controller.searchController.clear();
                 controller.searchText.value = '';
                 FocusScope.of(context).requestFocus(FocusNode());
               },
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: const Color(0xFF34D399),
-                  fontSize: 16,
-                  fontFamily: GoogleFonts.comfortaa().fontFamily,
-                  fontWeight: FontWeight.w400,
-                  height: 0,
-                ),
-              ),
+              child: const Text('Cancel'),
             ),
           ],
         );

@@ -1,4 +1,4 @@
-import 'package:anycast/styles.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -89,12 +89,10 @@ Widget renderHtml(BuildContext context, String html) {
     }
     return HtmlWidget(
       sanitized,
-      textStyle: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        height: 1.2,
-        inherit: false,
-      ),
+      textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+            inherit: false,
+          ),
       onErrorBuilder: (context, error, any) => Text(
         error.toString(),
         style: GoogleFonts.robotoMono(
@@ -106,7 +104,7 @@ Widget renderHtml(BuildContext context, String html) {
     );
   }
 
-  return Text(html, style: DarkColor.defaultMainText);
+  return Text(html, style: Theme.of(context).textTheme.bodyMedium);
 }
 
 String formatCountdown(Duration duration) {
@@ -145,7 +143,7 @@ Color getTextSafeColor(Color dynamicColor) {
 
   if (brightness < brightnessThreshold) {
     // 如果颜色太暗，返回一个替代颜色
-    return const Color(0xFF10B981);
+    return AnycastColor.goldDark9;
   } else {
     // 如果颜色亮度足够，返回原始的动态颜色
     return dynamicColor;
@@ -170,7 +168,7 @@ Future<Color> updatePaletteGenerator(String imageUrl) async {
     imageUrl,
   ));
   final Color dominantColor =
-      generator.dominantColor?.color ?? const Color(0xFF111316);
+      generator.dominantColor?.color ?? AnycastColor.playerWarm;
 
   return dominantColor;
   // return getBackgroundSafeColor(dominantColor);

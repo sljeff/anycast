@@ -7,6 +7,7 @@
 播放列表的卡片有背景表示播放进度
 */
 import 'package:anycast/models/episode.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
@@ -20,7 +21,6 @@ import 'package:anycast/widgets/detail.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/icons/icon_park_solid.dart';
@@ -43,9 +43,11 @@ class Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Obx(
       () {
-        var barWidth = MediaQuery.of(context).size.width - 48;
+        var barWidth =
+            MediaQuery.of(context).size.width - AnycastSpacing.pageH * 2;
 
         var rightText =
             '${formatDuration(episode.duration ?? 0)} • ${formatDatetime(episode.pubDate!)}';
@@ -54,7 +56,7 @@ class Card extends StatelessWidget {
         Widget back = Container(
           width: playedWidth,
           height: 100,
-          color: Colors.white.withValues(alpha: 0.1),
+          color: AnycastColor.goldAlpha9(theme.brightness),
         );
 
         if (episode is PlaylistEpisodeModel) {
@@ -80,7 +82,7 @@ class Card extends StatelessWidget {
             back = Container(
               width: playedWidth,
               height: 100,
-              color: Colors.white.withValues(alpha: 0.1),
+              color: AnycastColor.goldAlpha9(theme.brightness),
             );
           } else {
             if (pe.duration != null) {
@@ -90,7 +92,7 @@ class Card extends StatelessWidget {
             back = Container(
               width: playedWidth,
               height: 100,
-              color: Colors.white.withValues(alpha: 0.1),
+              color: AnycastColor.goldAlpha9(theme.brightness),
             );
           }
         }
@@ -98,7 +100,7 @@ class Card extends StatelessWidget {
         return Column(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AnycastRadius.card),
               child: Stack(
                 children: [
                   Positioned(
@@ -111,15 +113,13 @@ class Card extends StatelessWidget {
                       clController.expand(index);
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: ShapeDecoration(
-                        shape: RoundedRectangleBorder(
-                          side: BorderSide(
-                            color: Colors.grey.shade800,
-                            width: 1,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
+                      padding: const EdgeInsets.all(AnycastSpacing.gap),
+                      decoration: BoxDecoration(
+                        color: AnycastColor.sandAlpha2(theme.brightness),
+                        border: Border.all(
+                          color: theme.colorScheme.outlineVariant,
                         ),
+                        borderRadius: BorderRadius.circular(AnycastRadius.card),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -152,7 +152,7 @@ class Card extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AnycastSpacing.gap),
                           Expanded(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -160,14 +160,7 @@ class Card extends StatelessWidget {
                               children: [
                                 Text(
                                   episode.title!,
-                                  style: const TextStyle(
-                                    decoration: TextDecoration.none,
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontFamily:
-                                        'PingFangSC-Regular,PingFang SC',
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: theme.textTheme.titleLarge,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -181,13 +174,9 @@ class Card extends StatelessWidget {
                                       ),
                                       child: Text(
                                         episode.channelTitle!,
-                                        style: const TextStyle(
-                                          decoration: TextDecoration.none,
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontFamily:
-                                              'PingFangSC-Regular,PingFang SC',
-                                          fontWeight: FontWeight.w500,
+                                        style: theme.textTheme.labelMedium
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w600,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
@@ -195,14 +184,13 @@ class Card extends StatelessWidget {
                                     Text(
                                       rightText,
                                       textAlign: TextAlign.right,
-                                      style: const TextStyle(
-                                        decoration: TextDecoration.none,
-                                        color: Color(0xFF6B7280),
-                                        fontSize: 12,
-                                        fontFamily:
-                                            'PingFangSC-Regular,PingFang SC',
-                                        fontWeight: FontWeight.w400,
-                                        height: 0,
+                                      style:
+                                          theme.textTheme.labelMedium?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures(),
+                                        ],
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -211,13 +199,8 @@ class Card extends StatelessWidget {
                                 ),
                                 Text(
                                   htmlToText(episode.description),
-                                  style: TextStyle(
-                                    decoration: TextDecoration.none,
-                                    color: const Color(0xFF6B7280),
-                                    fontSize: 12,
-                                    fontFamily: GoogleFonts.inter().fontFamily,
-                                    fontWeight: FontWeight.w400,
-                                    height: 0,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -230,8 +213,8 @@ class Card extends StatelessWidget {
                     ),
                   ),
                   Positioned(
-                      right: 12,
-                      bottom: 16,
+                      right: AnycastSpacing.gap,
+                      bottom: AnycastSpacing.pageH,
                       child: episode is! PlaylistEpisodeModel
                           ? const SizedBox.shrink()
                           : Obx(() {
@@ -248,12 +231,12 @@ class Card extends StatelessWidget {
                                     height: 16,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(8),
-                                      color: Colors.blue.withValues(alpha: 0.7),
+                                      color: theme.colorScheme.primary,
                                     ),
                                     alignment: Alignment.center,
-                                    child: const Iconify(
+                                    child: Iconify(
                                       Ic.round_download,
-                                      color: Colors.white,
+                                      color: theme.colorScheme.onPrimary,
                                       size: 12,
                                     ),
                                   ),
@@ -262,7 +245,7 @@ class Card extends StatelessWidget {
                               if (progress >= 1) {
                                 return Iconify(
                                   IconParkSolid.check_one,
-                                  color: Colors.green.withValues(alpha: 0.7),
+                                  color: AnycastColor.grass9,
                                   size: 16,
                                 );
                               }
@@ -270,7 +253,7 @@ class Card extends StatelessWidget {
                                 radius: 8,
                                 lineWidth: 3,
                                 percent: progress,
-                                progressColor: Colors.blue,
+                                progressColor: theme.colorScheme.primary,
                               );
                             })),
                 ],
@@ -281,7 +264,7 @@ class Card extends StatelessWidget {
               curve: Curves.easeInOut,
               height: clController.expandedIndex.value == index ? 60 : 0,
               child: Padding(
-                padding: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.only(top: AnycastSpacing.gap),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children:
@@ -308,13 +291,18 @@ class CardBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = Theme.of(context).colorScheme.onInverseSurface;
     return IconButton(
       onPressed: onPressed,
-      icon: icon,
-      padding: const EdgeInsets.all(12),
+      icon: ColorFiltered(
+        colorFilter: ColorFilter.mode(foreground, BlendMode.srcIn),
+        child: icon,
+      ),
+      padding: const EdgeInsets.all(AnycastSpacing.md),
       style: IconButton.styleFrom(
         shape: const CircleBorder(),
-        backgroundColor: Colors.white,
+        foregroundColor: foreground,
+        backgroundColor: Theme.of(context).colorScheme.inverseSurface,
       ),
     );
   }
@@ -327,6 +315,7 @@ class PodcastCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () {
         Get.lazyPut(() => ChannelController(channel: subscription),
@@ -341,11 +330,12 @@ class PodcastCard extends StatelessWidget {
         );
       },
       child: Container(
-        padding: const EdgeInsets.only(left: 12, right: 12),
-        decoration: ShapeDecoration(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+        margin: const EdgeInsets.symmetric(horizontal: AnycastSpacing.pageH),
+        padding: const EdgeInsets.all(AnycastSpacing.gap),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(AnycastRadius.card),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -353,96 +343,73 @@ class PodcastCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: ShapeDecoration(
-                  shape: RoundedRectangleBorder(
-                    side: BorderSide(
-                      width: 1,
-                      color: Colors.grey.shade800,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: ShapeDecoration(
-                        image: DecorationImage(
-                          image: CachedNetworkImageProvider(
-                              subscription.imageUrl ??
-                                  'https://placeholder.co/48.png?text=NoImage'),
-                          fit: BoxFit.fill,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: ShapeDecoration(
+                      image: DecorationImage(
+                        image: CachedNetworkImageProvider(
+                            subscription.imageUrl ??
+                                'https://placeholder.co/48.png?text=NoImage'),
+                        fit: BoxFit.fill,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AnycastRadius.md),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Container(
-                        decoration: ShapeDecoration(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              clipBehavior: Clip.antiAlias,
-                              decoration: const BoxDecoration(),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: SizedBox(
-                                      child: Text(
-                                        subscription.title!,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          decoration: TextDecoration.none,
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontFamily: GoogleFonts.comfortaa()
-                                              .fontFamily,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
+                  ),
+                  const SizedBox(width: AnycastSpacing.gap),
+                  Expanded(
+                    child: Container(
+                      decoration: ShapeDecoration(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            clipBehavior: Clip.antiAlias,
+                            decoration: const BoxDecoration(),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: SizedBox(
+                                    child: Text(
+                                      subscription.title!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.titleMedium,
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              subscription.description!,
-                              style: const TextStyle(
-                                decoration: TextDecoration.none,
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontFamily: 'PingFangSC-Regular,PingFang SC',
-                                fontWeight: FontWeight.w400,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: AnycastSpacing.xxs),
+                          Text(
+                            subscription.description!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
-                          ],
-                        ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ],

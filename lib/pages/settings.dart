@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/pages/login.dart';
 import 'package:anycast/pages/playlists.dart';
 import 'package:anycast/states/player.dart';
@@ -10,7 +11,6 @@ import 'package:anycast/widgets/privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ph.dart';
@@ -90,23 +90,22 @@ class SettingsPage extends GetView<SettingsController> {
   Widget build(BuildContext context) {
     countryList.sort((a, b) => a['name']!.compareTo(b['name']!));
     return Container(
-      color: const Color(0xFF111316),
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
         child: DefaultTextStyle(
-          style: TextStyle(
-            color: Colors.white,
-            decoration: TextDecoration.none,
-            fontFamily: GoogleFonts.comfortaa().fontFamily,
-            fontWeight: FontWeight.w400,
-            fontSize: 14,
-          ),
+          style: Theme.of(context).textTheme.titleMedium!,
           child: Column(
             children: [
               const Handler(),
-              const SizedBox(height: 12),
+              const SizedBox(height: AnycastSpacing.gap),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.fromLTRB(
+                    AnycastSpacing.pageH,
+                    0,
+                    AnycastSpacing.pageH,
+                    AnycastSpacing.pageBottomSafe,
+                  ),
                   children: [
                     GestureDetector(
                       onTap: () {
@@ -127,7 +126,7 @@ class SettingsPage extends GetView<SettingsController> {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Icon(Icons.person),
-                                SizedBox(width: 8),
+                                SizedBox(width: AnycastSpacing.md),
                                 Text('Account'),
                               ],
                             ),
@@ -143,7 +142,7 @@ class SettingsPage extends GetView<SettingsController> {
                             const Row(
                               children: [
                                 Text('Country'),
-                                SizedBox(width: 8),
+                                SizedBox(width: AnycastSpacing.md),
                                 Tooltip(
                                   triggerMode: TooltipTriggerMode.tap,
                                   showDuration: Duration(milliseconds: 2000),
@@ -156,11 +155,14 @@ class SettingsPage extends GetView<SettingsController> {
                             Container(
                               alignment: Alignment.center,
                               width: 160,
-                              decoration: const ShapeDecoration(
-                                color: Color(0xFF111316),
+                              decoration: ShapeDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHigh,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(12)),
+                                  borderRadius: BorderRadius.circular(
+                                    AnycastRadius.md,
+                                  ),
                                 ),
                               ),
                               child: Obx(
@@ -171,27 +173,20 @@ class SettingsPage extends GetView<SettingsController> {
                                     padding: const EdgeInsets.all(0),
                                     showFlag: false,
                                     barrierColor: Colors.transparent,
-                                    dialogBackgroundColor: Colors.black,
+                                    dialogBackgroundColor:
+                                        Theme.of(context).colorScheme.surface,
                                     boxDecoration: BoxDecoration(
-                                      color: Colors.black,
-                                      borderRadius: BorderRadius.circular(12),
+                                      color:
+                                          Theme.of(context).colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(
+                                        AnycastRadius.card,
+                                      ),
                                     ),
-                                    closeIcon: const Icon(Icons.close,
-                                        color: Colors.white),
-                                    textStyle: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontFamily:
-                                          GoogleFonts.comfortaa().fontFamily,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                    dialogTextStyle: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontFamily:
-                                          GoogleFonts.comfortaa().fontFamily,
-                                      fontWeight: FontWeight.w400,
-                                    ),
+                                    closeIcon: const Icon(Icons.close_rounded),
+                                    textStyle:
+                                        Theme.of(context).textTheme.bodyMedium,
+                                    dialogTextStyle:
+                                        Theme.of(context).textTheme.bodyLarge,
                                     onChanged: (value) {
                                       controller.setCountryCode(value.code!);
                                     },
@@ -232,8 +227,6 @@ class SettingsPage extends GetView<SettingsController> {
 
                                     controller.setTargetLanguage(language);
                                   },
-                                  thumbColor:
-                                      WidgetStateProperty.all(Colors.grey),
                                 ),
                               );
                             }),
@@ -254,7 +247,7 @@ class SettingsPage extends GetView<SettingsController> {
                               children: [
                                 Row(children: [
                                   Text('Target Language'),
-                                  SizedBox(width: 8),
+                                  SizedBox(width: AnycastSpacing.md),
                                   Tooltip(
                                     triggerMode: TooltipTriggerMode.tap,
                                     showDuration: Duration(milliseconds: 2000),
@@ -301,7 +294,7 @@ class SettingsPage extends GetView<SettingsController> {
                               const Row(
                                 children: [
                                   Text('Auto Refresh Interval'),
-                                  SizedBox(width: 8),
+                                  SizedBox(width: AnycastSpacing.md),
                                   Tooltip(
                                     triggerMode: TooltipTriggerMode.tap,
                                     showDuration: Duration(milliseconds: 2000),
@@ -312,8 +305,6 @@ class SettingsPage extends GetView<SettingsController> {
                                 ],
                               ),
                               TextButton(
-                                  style: TextButton.styleFrom(
-                                      backgroundColor: const Color(0xFF111316)),
                                   child: Obx(() => Text(
                                         '${controller.autoRefreshInterval.value ~/ 60} min',
                                       )),
@@ -344,7 +335,8 @@ class SettingsPage extends GetView<SettingsController> {
                                           Center(child: Text('30 min')),
                                         ],
                                       )),
-                                      backgroundColor: Colors.black,
+                                      backgroundColor:
+                                          Theme.of(context).colorScheme.surface,
                                     );
                                   })
                             ],
@@ -356,7 +348,7 @@ class SettingsPage extends GetView<SettingsController> {
                             children: [
                               const Row(children: [
                                 Text('Max Episodes in Inbox'),
-                                SizedBox(width: 8),
+                                SizedBox(width: AnycastSpacing.md),
                                 Tooltip(
                                   triggerMode: TooltipTriggerMode.tap,
                                   showDuration: Duration(milliseconds: 2000),
@@ -366,8 +358,6 @@ class SettingsPage extends GetView<SettingsController> {
                                 ),
                               ]),
                               TextButton(
-                                style: TextButton.styleFrom(
-                                    backgroundColor: const Color(0xFF111316)),
                                 child: Obx(() => Text(controller
                                     .maxFeedEpisodes.value
                                     .toString())),
@@ -393,7 +383,8 @@ class SettingsPage extends GetView<SettingsController> {
                                         Center(child: Text('300')),
                                       ],
                                     )),
-                                    backgroundColor: Colors.black,
+                                    backgroundColor:
+                                        Theme.of(context).colorScheme.surface,
                                   );
                                 },
                               ),
@@ -406,7 +397,7 @@ class SettingsPage extends GetView<SettingsController> {
                             children: [
                               const Row(children: [
                                 Text('Max Episodes in History'),
-                                SizedBox(width: 8),
+                                SizedBox(width: AnycastSpacing.md),
                                 Tooltip(
                                   triggerMode: TooltipTriggerMode.tap,
                                   showDuration: Duration(milliseconds: 2000),
@@ -416,8 +407,6 @@ class SettingsPage extends GetView<SettingsController> {
                                 ),
                               ]),
                               TextButton(
-                                style: TextButton.styleFrom(
-                                    backgroundColor: const Color(0xFF111316)),
                                 child: Obx(() => Text(controller
                                     .maxHistoryEpisodes.value
                                     .toString())),
@@ -443,7 +432,8 @@ class SettingsPage extends GetView<SettingsController> {
                                         Center(child: Text('300')),
                                       ],
                                     )),
-                                    backgroundColor: Colors.black,
+                                    backgroundColor:
+                                        Theme.of(context).colorScheme.surface,
                                   );
                                 },
                               ),
@@ -467,13 +457,15 @@ class SettingsPage extends GetView<SettingsController> {
                               );
                               await launchUrl(uri);
                             },
-                            child: const Text(
+                            child: Text(
                               'kindjeff.com@gmail.com',
-                              style: TextStyle(
-                                color: Colors.blueAccent,
-                                fontSize: 12,
-                                decoration: TextDecoration.underline,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(
+                                    color: AnycastColor.gold10,
+                                    decoration: TextDecoration.underline,
+                                  ),
                             ),
                           ),
                         ),
@@ -500,12 +492,15 @@ class SettingContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var c = Container(
-      constraints: const BoxConstraints(minHeight: 48),
+      constraints: const BoxConstraints(minHeight: 52),
       alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AnycastSpacing.pageHeader,
+        vertical: AnycastSpacing.row,
+      ),
       clipBehavior: Clip.antiAlias,
-      decoration: const BoxDecoration(
-        color: Color(0xFF232830),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
       ),
       child: child,
     );
@@ -515,7 +510,10 @@ class SettingContainer extends StatelessWidget {
     } else {
       return Row(
         children: [
-          const Iconify(Ph.arrow_elbow_down_right_bold, color: Colors.white),
+          Iconify(
+            Ph.arrow_elbow_down_right_bold,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           Expanded(child: c),
         ],
       );
@@ -536,33 +534,33 @@ class SettingsGroup extends StatelessWidget {
     if (title != null) {
       c = [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AnycastSpacing.pageHeader,
+            vertical: AnycastSpacing.gap,
+          ),
           alignment: Alignment.bottomLeft,
           child: Text(
             title!,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontFamily: GoogleFonts.comfortaa()
-                  .copyWith(fontWeight: FontWeight.bold)
-                  .fontFamily,
-            ),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w400,
+                ),
           ),
         ),
-        const Divider(
-          color: Colors.white70,
-          height: 1,
-        ),
+        const Divider(height: 1),
         ...c,
       ];
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12),
+      margin: const EdgeInsets.only(bottom: AnycastSpacing.sectionGap),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: const Color(0xFF232830),
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surface,
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(AnycastRadius.card),
       ),
       child: Column(
         children: c,
@@ -581,24 +579,14 @@ class LanguagePicker extends GetView<SettingsController> {
         showFlag: false,
         hideSearch: true,
         barrierColor: Colors.transparent,
-        dialogBackgroundColor: Colors.black,
+        dialogBackgroundColor: Theme.of(context).colorScheme.surface,
         boxDecoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(12),
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(AnycastRadius.card),
         ),
-        closeIcon: const Icon(Icons.close, color: Colors.white),
-        textStyle: TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontFamily: GoogleFonts.comfortaa().fontFamily,
-          fontWeight: FontWeight.w400,
-        ),
-        dialogTextStyle: TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontFamily: GoogleFonts.comfortaa().fontFamily,
-          fontWeight: FontWeight.w400,
-        ),
+        closeIcon: const Icon(Icons.close_rounded),
+        textStyle: Theme.of(context).textTheme.bodyMedium,
+        dialogTextStyle: Theme.of(context).textTheme.bodyLarge,
         onChanged: (value) {
           controller.setTargetLanguage(value.code!);
         },
@@ -624,7 +612,7 @@ class SettingsBottomContainer extends StatelessWidget {
       alignment: Alignment.center,
       child: Column(
         children: [
-          const SizedBox(height: 12),
+          const SizedBox(height: AnycastSpacing.gap),
           const Handler(),
           Expanded(
             child: Column(
