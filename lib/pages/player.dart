@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:anycast/api/share.dart';
 import 'package:anycast/design_system/anycast_theme.dart';
@@ -49,40 +50,95 @@ class PlayerPage extends GetView<PlayerController> {
           controller.pageIndex.value = 1;
         }
       },
-      child: Container(
+      child: Theme(
+        data: AnycastTheme.dark,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Obx(
+              () => _PlayerBackground(
+                imageUrl: controller.playlistEpisode.value.imageUrl,
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Handler(),
+                  Expanded(
+                    child: PageView(
+                      controller: controller.pageController,
+                      children: const [
+                        PlayerSettings(),
+                        PlayerMain(),
+                        PlayerAI(),
+                      ],
+                      onPageChanged: (index) {
+                        controller.pageIndex.value = index;
+                      },
+                    ),
+                  ),
+                  const PageTab(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerBackground extends StatelessWidget {
+  const _PlayerBackground({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    const stops = [0.0, .25, .5, .745, 1.0];
+    if (imageUrl == null || imageUrl!.isEmpty) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: AnycastColor.playerGradientColors,
+            stops: stops,
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ImageFiltered(
+          imageFilter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+          child: Transform.scale(
+            scale: 1.15,
+            child: CachedNetworkImage(
+              imageUrl: imageUrl!,
+              fit: BoxFit.cover,
+              placeholder: (context, url) =>
+                  const ColoredBox(color: AnycastColor.playerWarm),
+              errorWidget: (context, url, error) =>
+                  const ColoredBox(color: AnycastColor.playerWarm),
+            ),
+          ),
+        ),
+        ColoredBox(color: Colors.black.withValues(alpha: .50)),
+        const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                controller.backgroundColor.value,
-                AnycastColor.playerBackground,
-                AnycastColor.playerBackground,
-              ],
+              colors: AnycastColor.playerGradientOverlayColors,
+              stops: stops,
             ),
           ),
-          child: SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Handler(),
-                Expanded(
-                  child: PageView(
-                    controller: controller.pageController,
-                    children: const [
-                      PlayerSettings(),
-                      PlayerMain(),
-                      PlayerAI(),
-                    ],
-                    onPageChanged: (index) {
-                      controller.pageIndex.value = index;
-                    },
-                  ),
-                ),
-                const PageTab(),
-              ],
-            ),
-          )),
+        ),
+      ],
     );
   }
 }
@@ -96,11 +152,11 @@ class PageTab extends GetView<PlayerController> {
       height: 56,
       padding: const EdgeInsets.all(AnycastSpacing.xs),
       decoration: ShapeDecoration(
-        color: AnycastColor.sandAlpha4(Brightness.dark),
+        color: AnycastColor.sandAlpha3(Brightness.dark),
         shape: RoundedRectangleBorder(
-          side: const BorderSide(
+          side: BorderSide(
             width: 1,
-            color: AnycastColor.sandDark6,
+            color: AnycastColor.sandAlpha4(Brightness.dark),
           ),
           borderRadius: BorderRadius.circular(36),
         ),
@@ -327,7 +383,6 @@ class TitleBar extends GetView<PlayerController> {
         AnycastSpacing.sm;
     return Obx(() {
       var episode = controller.playlistEpisode.value;
-      var backgroundColor = controller.backgroundColor.value;
       var subscription = controller.channel.value;
       var imgUrl = subscription.imageUrl ?? '';
       var title = controller.playlistEpisode.value.title ?? '';
@@ -401,7 +456,7 @@ class TitleBar extends GetView<PlayerController> {
                   child: Text(
                     channelTitle,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: getTextSafeColor(backgroundColor),
+                          color: AnycastColor.playerSecondary,
                           fontWeight: FontWeight.w600,
                         ),
                   ),
@@ -444,30 +499,61 @@ class MyProgressBar extends GetView<PlayerController> {
             controller.positionData.value.duration == Duration.zero) {
           controller.initProgress();
         }
-        return ProgressBar(
-          progress: position,
-          buffered: bufferedPosition,
-          total: duration,
-          onSeek: (duration) {
-            controller.seek(duration);
-          },
-          timeLabelLocation: TimeLabelLocation.above,
-          timeLabelType: TimeLabelType.remainingTime,
-          timeLabelPadding: AnycastSpacing.xs,
-          timeLabelTextStyle: Theme.of(context).textTheme.labelMedium!.copyWith(
-            color: AnycastColor.playerText,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-          thumbColor: Colors.white,
-          thumbGlowColor: Colors.black.withValues(alpha: 0.2),
-          thumbCanPaintOutsideBar: false,
-          thumbRadius: 16,
-          thumbGlowRadius: 20,
-          barHeight: 40,
-          barCapShape: BarCapShape.round,
-          baseBarColor: AnycastColor.sandDark4,
-          bufferedBarColor: AnycastColor.sandAlpha3(Brightness.dark),
-          progressBarColor: Colors.white,
+        final state = playbackProgressVisualState(
+          hasEpisode:
+              controller.playlistEpisode.value.enclosureUrl?.isNotEmpty == true,
+          isLoading: controller.isLoading.value,
+          duration: duration,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (state.message != null) ...[
+              Text(
+                state.message!,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AnycastColor.playerSecondary,
+                    ),
+              ),
+              const SizedBox(height: AnycastSpacing.xs),
+            ],
+            IgnorePointer(
+              ignoring: !state.allowsSeek,
+              child: Opacity(
+                opacity: state.allowsSeek ? 1 : .48,
+                child: ProgressBar(
+                  progress: position,
+                  buffered: bufferedPosition,
+                  total: duration,
+                  onSeek: state.allowsSeek
+                      ? (duration) {
+                          controller.seek(duration);
+                        }
+                      : null,
+                  timeLabelLocation: state.allowsSeek
+                      ? TimeLabelLocation.above
+                      : TimeLabelLocation.none,
+                  timeLabelType: TimeLabelType.remainingTime,
+                  timeLabelPadding: AnycastSpacing.xs,
+                  timeLabelTextStyle:
+                      Theme.of(context).textTheme.labelMedium!.copyWith(
+                    color: AnycastColor.playerSecondary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                  thumbColor: AnycastColor.playerText,
+                  thumbGlowColor: Colors.black.withValues(alpha: 0.2),
+                  thumbCanPaintOutsideBar: false,
+                  thumbRadius: AnycastSpacing.md,
+                  thumbGlowRadius: AnycastSpacing.chip,
+                  barHeight: AnycastSpacing.playerProgress,
+                  barCapShape: BarCapShape.round,
+                  baseBarColor: AnycastColor.sandAlpha3(Brightness.dark),
+                  bufferedBarColor: AnycastColor.sandAlpha4(Brightness.dark),
+                  progressBarColor: AnycastColor.playerText,
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -1003,7 +1089,7 @@ class PageTabButton extends GetView<PlayerController> {
         var isSelect = controller.pageIndex.value == index;
         var dec = isSelect
             ? ShapeDecoration(
-                color: Colors.white,
+                color: AnycastColor.sandAlpha4(Brightness.dark),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(36),
                 ),
@@ -1022,7 +1108,9 @@ class PageTabButton extends GetView<PlayerController> {
           child: GestureDetector(
             child: Iconify(
               icon,
-              color: isSelect ? Colors.black : Colors.white,
+              color: isSelect
+                  ? AnycastColor.playerText
+                  : AnycastColor.playerSecondary,
             ),
             onTap: () {
               controller.pageController.animateToPage(
@@ -1045,52 +1133,62 @@ class Controls extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        IconButton(
-          onPressed: () {
-            myAudioHandler.seekByRelative(const Duration(seconds: -10));
-          },
-          icon: const Icon(
-            Icons.replay_10,
-            size: 48,
-            color: Colors.white,
-          ),
-        ),
-        Container(
-          height: 72,
-          width: 72,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: AnycastColor.goldDark9,
-          ),
-          child: IconButton(
-            onPressed: () {
-              if (controller.isPlaying.value) {
-                controller.pause();
-              } else {
-                controller.play();
-              }
-            },
-            icon: const PlayIcon(
+    return Obx(() {
+      final controlsEnabled = !controller.isLoading.value &&
+          controller.playlistEpisode.value.enclosureUrl?.isNotEmpty == true;
+      final buttonStyle = IconButton.styleFrom(
+        foregroundColor: AnycastColor.playerText,
+        disabledForegroundColor: AnycastColor.playerText.withValues(alpha: .38),
+        backgroundColor: Colors.transparent,
+        disabledBackgroundColor: Colors.transparent,
+      );
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          IconButton(
+            style: buttonStyle,
+            onPressed: controlsEnabled
+                ? () {
+                    myAudioHandler.seekByRelative(const Duration(seconds: -10));
+                  }
+                : null,
+            icon: const Icon(
+              Icons.replay_10,
               size: 48,
-              color: Colors.white,
             ),
           ),
-        ),
-        IconButton(
-          onPressed: () {
-            myAudioHandler.seekByRelative(const Duration(seconds: 30));
-          },
-          icon: const Icon(
-            Icons.forward_30,
-            color: Colors.white,
-            size: 48,
+          SizedBox(
+            height: 72,
+            width: 72,
+            child: IconButton(
+              style: buttonStyle,
+              onPressed: controlsEnabled
+                  ? () {
+                      if (controller.isPlaying.value) {
+                        controller.pause();
+                      } else {
+                        controller.play();
+                      }
+                    }
+                  : null,
+              icon: const PlayIcon(size: 48),
+            ),
           ),
-        ),
-      ],
-    );
+          IconButton(
+            style: buttonStyle,
+            onPressed: controlsEnabled
+                ? () {
+                    myAudioHandler.seekByRelative(const Duration(seconds: 30));
+                  }
+                : null,
+            icon: const Icon(
+              Icons.forward_30,
+              size: 48,
+            ),
+          ),
+        ],
+      );
+    });
   }
 }
 
@@ -1163,28 +1261,32 @@ class Settings extends GetView<SettingsController> {
 
   @override
   Widget build(BuildContext context) {
+    final sectionLabelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AnycastColor.playerSecondary,
+          fontWeight: FontWeight.w600,
+        );
     SliderThemeData sliderThemeData = SliderTheme.of(context).copyWith(
-      activeTrackColor: AnycastColor.sandDark9,
-      inactiveTrackColor: AnycastColor.sandAlpha8(Brightness.dark),
-      trackHeight: 0,
+      activeTrackColor: AnycastColor.goldDark9,
+      inactiveTrackColor: AnycastColor.sandAlpha4(Brightness.dark),
+      trackHeight: AnycastSpacing.compactProgress,
       trackShape: const RoundedRectSliderTrackShape(),
-      thumbColor: Colors.white,
+      thumbColor: AnycastColor.playerText,
       thumbShape: const CustomSliderThumbCircle(thumbRadius: 20),
       overlayColor: Colors.transparent,
       overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
       showValueIndicator: ShowValueIndicator.never,
       tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 4),
-      activeTickMarkColor: Colors.white,
-      inactiveTickMarkColor: AnycastColor.sandDark3,
+      activeTickMarkColor: AnycastColor.playerBackground,
+      inactiveTickMarkColor: AnycastColor.playerSecondary,
       valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
-      valueIndicatorColor: AnycastColor.sandDark1,
-      valueIndicatorTextStyle: TextStyle(
-        color: AnycastColor.sandDark1,
-        fontSize: 14,
-        fontFamily: GoogleFonts.comfortaa().fontFamily,
-        fontWeight: FontWeight.w400,
+      valueIndicatorColor: AnycastColor.playerBackground,
+      valueIndicatorTextStyle:
+          Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: AnycastColor.playerBackground,
+        fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
+    final sliderSurface = AnycastColor.sandAlpha3(Brightness.dark);
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1195,29 +1297,20 @@ class Settings extends GetView<SettingsController> {
             children: [
               Text(
                 'SPEED',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontFamily: GoogleFonts.comfortaa().fontFamily,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: sectionLabelStyle,
               ),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AnycastSpacing.md),
             child: Obx(
               () => Material(
                 shape: const StadiumBorder(),
-                color: AnycastColor.sandDark3,
+                color: sliderSurface,
                 child: Padding(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(AnycastSpacing.xs),
                   child: SliderTheme(
-                    data: sliderThemeData.copyWith(
-                      activeTrackColor: AnycastColor.goldDark9,
-                      inactiveTrackColor: AnycastColor.sandDark6,
-                      inactiveTickMarkColor: AnycastColor.sandDark12,
-                    ),
+                    data: sliderThemeData,
                     child: Slider(
                       value: controller.speed.value,
                       onChanged: (value) {
@@ -1234,30 +1327,25 @@ class Settings extends GetView<SettingsController> {
             ),
           ),
         ]),
-        const SizedBox(height: 16),
+        const SizedBox(height: AnycastSpacing.pageH),
         Column(children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Text(
                 'COUNTDOWN',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontFamily: GoogleFonts.comfortaa().fontFamily,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: sectionLabelStyle,
               ),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AnycastSpacing.md),
             child: Obx(
               () => Material(
-                color: AnycastColor.sandDark3,
+                color: sliderSurface,
                 shape: const StadiumBorder(),
                 child: Padding(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(AnycastSpacing.xs),
                   child: SliderTheme(
                     data: sliderThemeData,
                     child: Slider(
@@ -1286,7 +1374,7 @@ class Settings extends GetView<SettingsController> {
             ),
           )
         ]),
-        const SizedBox(height: 16),
+        const SizedBox(height: AnycastSpacing.pageH),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1297,12 +1385,7 @@ class Settings extends GetView<SettingsController> {
               children: [
                 Text(
                   'SKIP SILENCE',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontFamily: GoogleFonts.comfortaa().fontFamily,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: sectionLabelStyle,
                 ),
                 Material(
                   color: Colors.transparent,
@@ -1313,8 +1396,8 @@ class Settings extends GetView<SettingsController> {
                       fit: BoxFit.fill,
                       child: Obx(
                         () => Switch(
-                          activeThumbColor: Colors.white,
-                          inactiveThumbColor: Colors.grey,
+                          activeThumbColor: AnycastColor.playerBackground,
+                          inactiveThumbColor: AnycastColor.playerSecondary,
                           inactiveTrackColor:
                               AnycastColor.sandAlpha5(Brightness.dark),
                           trackOutlineColor: WidgetStateColor.resolveWith(
@@ -1338,12 +1421,7 @@ class Settings extends GetView<SettingsController> {
               children: [
                 Text(
                   'CONTINUOUS PLAY',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontFamily: GoogleFonts.comfortaa().fontFamily,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: sectionLabelStyle,
                 ),
                 Material(
                   color: Colors.transparent,
@@ -1354,8 +1432,8 @@ class Settings extends GetView<SettingsController> {
                       fit: BoxFit.fill,
                       child: Obx(
                         () => Switch(
-                          activeThumbColor: Colors.white,
-                          inactiveThumbColor: Colors.grey,
+                          activeThumbColor: AnycastColor.playerBackground,
+                          inactiveThumbColor: AnycastColor.playerSecondary,
                           inactiveTrackColor:
                               AnycastColor.sandAlpha5(Brightness.dark),
                           trackOutlineColor: WidgetStateColor.resolveWith(
@@ -1377,7 +1455,10 @@ class Settings extends GetView<SettingsController> {
               message: 'Auto play next episode after the current one ends.',
               showDuration: Duration(milliseconds: 2000),
               triggerMode: TooltipTriggerMode.tap,
-              child: Icon(Icons.info, color: Colors.grey),
+              child: Icon(
+                Icons.info,
+                color: AnycastColor.playerSecondary,
+              ),
             ),
           ],
         ),

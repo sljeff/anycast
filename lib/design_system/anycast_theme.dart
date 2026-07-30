@@ -28,7 +28,11 @@ abstract final class AnycastColor {
   static const goldDark10 = Color(0xFFD8C8AE);
   static const goldSoft = Color(0xFFF4F0E7);
   static const orange10 = Color(0xFFEF5F00);
-  static const grass9 = Color(0xFF46A758);
+  static Color grass9(Brightness brightness) => _dynamic(
+        brightness,
+        const Color(0xFF46A758),
+        const Color(0xFF63C174),
+      );
 
   static Color sandAlpha2(Brightness brightness) => _dynamic(
         brightness,
@@ -119,6 +123,18 @@ abstract final class AnycastColor {
   static const playerText = Color(0xFFEEEEEC);
   static const playerSecondary = Color(0xFFB5B3AD);
 
+  static const playerGradientOverlayColors = [
+    Color.fromRGBO(0, 0, 0, .20),
+    Color.fromRGBO(0, 0, 0, .25),
+    Color.fromRGBO(0, 0, 0, .376),
+    Color.fromRGBO(0, 0, 0, .40),
+    Color.fromRGBO(0, 0, 0, .50),
+  ];
+
+  static List<Color> get playerGradientColors => playerGradientOverlayColors
+      .map((color) => Color.alphaBlend(color, playerWarm))
+      .toList(growable: false);
+
   static Color _dynamic(
     Brightness brightness,
     Color light,
@@ -146,6 +162,8 @@ abstract final class AnycastSpacing {
   static const xl = 40.0;
   static const xxl = 48.0;
 
+  static const compactProgress = xs;
+  static const playerProgress = sm;
   static const floatingOutset = pageHeader - pageH;
   static const sheetTitleH = 64.0;
   static const rowH = 70.0;
@@ -183,7 +201,7 @@ abstract final class AnycastTheme {
     final outline = isDark ? AnycastColor.sandDark6 : AnycastColor.sand6;
     final onSurface = isDark ? AnycastColor.sandDark12 : AnycastColor.sand12;
     final onSurfaceVariant =
-        isDark ? AnycastColor.sandDark9 : AnycastColor.sand9;
+        isDark ? AnycastColor.sandDark11 : AnycastColor.sand11;
     final sandAlpha2 = AnycastColor.sandAlpha2(brightness);
     final sandAlpha4 = AnycastColor.sandAlpha4(brightness);
     final goldAlpha2 = AnycastColor.goldAlpha2(brightness);
@@ -514,6 +532,9 @@ abstract final class AnycastTheme {
         activeTrackColor: scheme.primary,
         inactiveTrackColor: surfaceContainer,
         thumbColor: scheme.primary,
+        disabledActiveTrackColor: scheme.primary.withValues(alpha: .38),
+        disabledInactiveTrackColor: sandAlpha2,
+        disabledThumbColor: onSurfaceVariant.withValues(alpha: .38),
         overlayColor: goldAlpha3,
         valueIndicatorColor: scheme.inverseSurface,
         valueIndicatorTextStyle: textTheme.labelMedium?.copyWith(
@@ -594,16 +615,22 @@ abstract final class AnycastTheme {
         circularTrackColor: surfaceContainer,
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? scheme.onPrimary
-              : onSurfaceVariant,
-        ),
-        trackColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? scheme.primary
-              : surfaceContainer,
-        ),
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          final isSelected = states.contains(WidgetState.selected);
+          if (states.contains(WidgetState.disabled)) {
+            return (isSelected ? scheme.onPrimary : onSurfaceVariant)
+                .withValues(alpha: .38);
+          }
+          return isSelected ? scheme.onPrimary : onSurfaceVariant;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          final isSelected = states.contains(WidgetState.selected);
+          if (states.contains(WidgetState.disabled)) {
+            return (isSelected ? scheme.primary : surfaceContainer)
+                .withValues(alpha: .38);
+          }
+          return isSelected ? scheme.primary : surfaceContainer;
+        }),
       ),
     );
   }

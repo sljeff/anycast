@@ -7,6 +7,7 @@
 播放列表的卡片有背景表示播放进度
 */
 import 'package:anycast/models/episode.dart';
+import 'package:anycast/design_system/anycast_components.dart';
 import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subscription.dart';
@@ -46,18 +47,9 @@ class Card extends StatelessWidget {
     final theme = Theme.of(context);
     return Obx(
       () {
-        var barWidth =
-            MediaQuery.of(context).size.width - AnycastSpacing.pageH * 2;
-
         var rightText =
             '${formatDuration(episode.duration ?? 0)} • ${formatDatetime(episode.pubDate!)}';
-        var playedWidth = 0.0;
-
-        Widget back = Container(
-          width: playedWidth,
-          height: 100,
-          color: AnycastColor.goldAlpha9(theme.brightness),
-        );
+        var playedProgress = 0.0;
 
         if (episode is PlaylistEpisodeModel) {
           var pe = episode as PlaylistEpisodeModel;
@@ -73,26 +65,18 @@ class Card extends StatelessWidget {
           if (pe.enclosureUrl ==
               playerController.playlistEpisode.value.enclosureUrl) {
             var positionData = playerController.positionData.value;
-            if (positionData.duration.inMilliseconds != 0 &&
-                positionData.position.inMilliseconds != 0) {
-              playedWidth = positionData.position.inMilliseconds /
-                  positionData.duration.inMilliseconds *
-                  barWidth;
-            }
-            back = Container(
-              width: playedWidth,
-              height: 100,
-              color: AnycastColor.goldAlpha9(theme.brightness),
+            playedProgress = playbackProgress(
+              positionData.position,
+              positionData.duration,
+            );
+            rightText = formatRemainingTime(
+              positionData.duration,
+              positionData.position,
             );
           } else {
-            if (pe.duration != null) {
-              playedWidth =
-                  ((pe.playedDuration ?? 0) / pe.duration!) * barWidth;
-            }
-            back = Container(
-              width: playedWidth,
-              height: 100,
-              color: AnycastColor.goldAlpha9(theme.brightness),
+            playedProgress = playbackProgress(
+              Duration(milliseconds: pe.playedDuration ?? 0),
+              Duration(milliseconds: pe.duration ?? 0),
             );
           }
         }
@@ -103,11 +87,6 @@ class Card extends StatelessWidget {
               borderRadius: BorderRadius.circular(AnycastRadius.card),
               child: Stack(
                 children: [
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    child: back,
-                  ),
                   GestureDetector(
                     onTap: () {
                       clController.expand(index);
@@ -186,8 +165,7 @@ class Card extends StatelessWidget {
                                       textAlign: TextAlign.right,
                                       style:
                                           theme.textTheme.labelMedium?.copyWith(
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant,
+                                        color: theme.colorScheme.secondary,
                                         fontFeatures: const [
                                           FontFeature.tabularFigures(),
                                         ],
@@ -212,6 +190,16 @@ class Card extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (episode is PlaylistEpisodeModel)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: AnycastCompactProgress(
+                        key: const Key('episode-progress-track'),
+                        value: playedProgress,
+                      ),
+                    ),
                   Positioned(
                       right: AnycastSpacing.gap,
                       bottom: AnycastSpacing.pageH,
@@ -245,7 +233,7 @@ class Card extends StatelessWidget {
                               if (progress >= 1) {
                                 return Iconify(
                                   IconParkSolid.check_one,
-                                  color: AnycastColor.grass9,
+                                  color: AnycastColor.grass9(theme.brightness),
                                   size: 16,
                                 );
                               }

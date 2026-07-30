@@ -1,5 +1,7 @@
+import 'package:anycast/design_system/anycast_components.dart';
 import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/main.dart';
+import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/card.dart' as episode_card;
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:flutter/material.dart';
@@ -39,6 +41,8 @@ void main() {
       [2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 36, 40, 48],
     );
     expect(AnycastSpacing.pageBottomSafe, 88);
+    expect(AnycastSpacing.compactProgress, 4);
+    expect(AnycastSpacing.playerProgress, 6);
   });
 
   test('Anycast 2.0 typography keeps its semantic size hierarchy', () {
@@ -75,7 +79,119 @@ void main() {
     expect(dark.colorScheme.inverseSurface, AnycastColor.sandDark12);
   });
 
+  test('light and dark secondary text keeps readable endpoint contrast', () {
+    for (final theme in [AnycastTheme.light, AnycastTheme.dark]) {
+      final color = theme.colorScheme.onSurfaceVariant;
+
+      expect(
+        contrastRatio(color, theme.scaffoldBackgroundColor),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrastRatio(color, theme.colorScheme.surface),
+        greaterThanOrEqualTo(4.5),
+      );
+    }
+  });
+
+  test('player gradient keeps dark text-safe stops', () {
+    final colors = AnycastColor.playerGradientColors;
+
+    expect(colors, hasLength(5));
+    for (var index = 1; index < colors.length; index++) {
+      expect(
+        colors[index].computeLuminance(),
+        lessThan(colors[index - 1].computeLuminance()),
+      );
+    }
+    for (final color in colors) {
+      expect(
+        contrastRatio(color, AnycastColor.playerText),
+        greaterThanOrEqualTo(4.5),
+      );
+    }
+  });
+
+  test('playback progress covers unknown, partial, and completed states', () {
+    expect(playbackProgress(Duration.zero, Duration.zero), 0);
+    expect(
+      playbackProgress(
+        const Duration(seconds: -1),
+        const Duration(seconds: 10),
+      ),
+      0,
+    );
+    expect(
+      playbackProgress(
+        const Duration(seconds: 5),
+        const Duration(seconds: 10),
+      ),
+      .5,
+    );
+    expect(
+      playbackProgress(
+        const Duration(seconds: 10),
+        const Duration(seconds: 10),
+      ),
+      1,
+    );
+    expect(
+      playbackProgress(
+        const Duration(seconds: 12),
+        const Duration(seconds: 10),
+      ),
+      1,
+    );
+  });
+
+  test('playback progress visual states gate seeking', () {
+    expect(
+      playbackProgressVisualState(
+        hasEpisode: false,
+        isLoading: false,
+        duration: Duration.zero,
+      ),
+      PlaybackProgressVisualState.disabled,
+    );
+    expect(
+      playbackProgressVisualState(
+        hasEpisode: true,
+        isLoading: true,
+        duration: const Duration(seconds: 10),
+      ),
+      PlaybackProgressVisualState.loading,
+    );
+    expect(
+      playbackProgressVisualState(
+        hasEpisode: true,
+        isLoading: false,
+        duration: Duration.zero,
+      ),
+      PlaybackProgressVisualState.unknown,
+    );
+    expect(
+      playbackProgressVisualState(
+        hasEpisode: true,
+        isLoading: false,
+        duration: const Duration(seconds: 10),
+      ),
+      PlaybackProgressVisualState.normal,
+    );
+    expect(PlaybackProgressVisualState.normal.allowsSeek, isTrue);
+    expect(PlaybackProgressVisualState.loading.allowsSeek, isFalse);
+    expect(PlaybackProgressVisualState.unknown.allowsSeek, isFalse);
+    expect(PlaybackProgressVisualState.disabled.allowsSeek, isFalse);
+  });
+
   test('Anycast alpha colors match the UIKit sand and gold scales', () {
+    expect(
+      AnycastColor.grass9(Brightness.light),
+      const Color(0xFF46A758),
+    );
+    expect(
+      AnycastColor.grass9(Brightness.dark),
+      const Color(0xFF63C174),
+    );
     expect(
       [
         AnycastColor.sandAlpha2(Brightness.light),
@@ -187,6 +303,38 @@ void main() {
     }
   });
 
+  testWidgets('compact progress covers light and dark playback states',
+      (tester) async {
+    for (final theme in [AnycastTheme.light, AnycastTheme.dark]) {
+      for (final value in [0.0, .5, 1.0]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            darkTheme: theme,
+            themeMode: theme.brightness == Brightness.dark
+                ? ThemeMode.dark
+                : ThemeMode.light,
+            home: Scaffold(
+              body: AnycastCompactProgress(value: value),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final indicator = tester.widget<LinearProgressIndicator>(
+          find.byType(LinearProgressIndicator),
+        );
+        expect(indicator.value, value);
+        expect(indicator.minHeight, AnycastSpacing.compactProgress);
+        expect(indicator.color, theme.colorScheme.primary);
+        expect(
+          indicator.backgroundColor,
+          AnycastColor.sandAlpha4(theme.brightness),
+        );
+      }
+    }
+  });
+
   test('Anycast controls do not fall back to Material purple', () {
     const materialPurple = Color(0xFF6750A4);
     const materialInversePurple = Color(0xFF322F35);
@@ -226,6 +374,28 @@ void main() {
         theme.colorScheme.primary,
       );
       expect(theme.progressIndicatorTheme.color, theme.colorScheme.primary);
+      expect(
+        theme.sliderTheme.disabledActiveTrackColor,
+        theme.colorScheme.primary.withValues(alpha: .38),
+      );
+      expect(
+        theme.sliderTheme.disabledThumbColor,
+        theme.colorScheme.onSurfaceVariant.withValues(alpha: .38),
+      );
+      expect(
+        theme.switchTheme.thumbColor?.resolve({
+          WidgetState.selected,
+          WidgetState.disabled,
+        }),
+        theme.colorScheme.onPrimary.withValues(alpha: .38),
+      );
+      expect(
+        theme.switchTheme.trackColor?.resolve({
+          WidgetState.selected,
+          WidgetState.disabled,
+        }),
+        theme.colorScheme.primary.withValues(alpha: .38),
+      );
       expect(
         theme.hoverColor,
         AnycastColor.goldAlpha2(theme.brightness),

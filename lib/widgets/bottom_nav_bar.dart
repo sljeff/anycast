@@ -5,6 +5,7 @@ import 'package:anycast/pages/player.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/tab.dart';
+import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -89,15 +90,10 @@ class PlayerBar extends GetView<PlayerController> {
       }
 
       var postion = controller.positionData;
-      var posPercent = postion.value.position.inMilliseconds /
-          postion.value.duration.inMilliseconds;
-      // width of played bar * posPercent
-      var barWidth =
-          MediaQuery.of(context).size.width - AnycastSpacing.pageH * 2;
-      var playedWidth = barWidth * posPercent;
-      if (playedWidth < 0 || playedWidth > barWidth || playedWidth.isNaN) {
-        playedWidth = 0;
-      }
+      final posPercent = playbackProgress(
+        postion.value.position,
+        postion.value.duration,
+      );
 
       var bar = GestureDetector(
         onTap: () {
@@ -125,13 +121,11 @@ class PlayerBar extends GetView<PlayerController> {
               children: [
                 Positioned(
                   left: 0,
-                  top: 0,
-                  child: Container(
-                    width: playedWidth,
-                    height: 56,
-                    color: AnycastColor.goldAlpha9(
-                      Theme.of(context).brightness,
-                    ),
+                  right: 0,
+                  bottom: 0,
+                  child: AnycastCompactProgress(
+                    key: const Key('mini-player-progress-track'),
+                    value: posPercent,
                   ),
                 ),
                 Padding(
@@ -176,9 +170,7 @@ class PlayerBar extends GetView<PlayerController> {
                                   .textTheme
                                   .labelSmall
                                   ?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                color: Theme.of(context).colorScheme.secondary,
                                 fontFeatures: const [
                                   FontFeature.tabularFigures(),
                                 ],

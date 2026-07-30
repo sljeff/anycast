@@ -115,3 +115,23 @@ class AnycastEmptyState extends StatelessWidget {
     );
   }
 }
+
+class AnycastCompactProgress extends StatelessWidget {
+  final double value;
+
+  const AnycastCompactProgress({
+    super.key,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return LinearProgressIndicator(
+      value: value.clamp(0.0, 1.0).toDouble(),
+      minHeight: AnycastSpacing.compactProgress,
+      color: theme.colorScheme.primary,
+      backgroundColor: AnycastColor.sandAlpha4(theme.brightness),
+    );
+  }
+}

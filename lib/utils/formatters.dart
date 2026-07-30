@@ -77,6 +77,44 @@ String formatRemainingTime(Duration duration, Duration playedDuration) {
   }
 }
 
+double playbackProgress(Duration position, Duration duration) {
+  if (duration <= Duration.zero) {
+    return 0;
+  }
+  return (position.inMilliseconds / duration.inMilliseconds)
+      .clamp(0.0, 1.0)
+      .toDouble();
+}
+
+enum PlaybackProgressVisualState {
+  normal(null, true),
+  loading('Loading…', false),
+  unknown('Duration unavailable', false),
+  disabled('Playback unavailable', false);
+
+  const PlaybackProgressVisualState(this.message, this.allowsSeek);
+
+  final String? message;
+  final bool allowsSeek;
+}
+
+PlaybackProgressVisualState playbackProgressVisualState({
+  required bool hasEpisode,
+  required bool isLoading,
+  required Duration duration,
+}) {
+  if (!hasEpisode) {
+    return PlaybackProgressVisualState.disabled;
+  }
+  if (isLoading) {
+    return PlaybackProgressVisualState.loading;
+  }
+  if (duration <= Duration.zero) {
+    return PlaybackProgressVisualState.unknown;
+  }
+  return PlaybackProgressVisualState.normal;
+}
+
 Widget renderHtml(BuildContext context, String html) {
   if (html.isEmpty) {
     return const SizedBox.shrink();
@@ -132,22 +170,6 @@ String formatTime(Duration duration) {
 String urlToDomain(String url) {
   var uri = Uri.parse(url);
   return uri.host;
-}
-
-Color getTextSafeColor(Color dynamicColor) {
-  // 定义亮度阈值，低于这个值就认为颜色太暗
-  const double brightnessThreshold = 0.2;
-
-  // 计算颜色的亮度
-  double brightness = dynamicColor.computeLuminance();
-
-  if (brightness < brightnessThreshold) {
-    // 如果颜色太暗，返回一个替代颜色
-    return AnycastColor.goldDark9;
-  } else {
-    // 如果颜色亮度足够，返回原始的动态颜色
-    return dynamicColor;
-  }
 }
 
 Color getBackgroundSafeColor(Color dynamicColor) {

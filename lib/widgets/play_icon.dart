@@ -1,3 +1,4 @@
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/states/player.dart';
 import 'package:anycast/states/subtitle.dart';
 import 'package:flutter/material.dart';
@@ -20,9 +21,9 @@ class PlayIcon extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    final resolvedColor = color ??
-        IconTheme.of(context).color ??
-        Theme.of(context).colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final resolvedColor =
+        color ?? IconTheme.of(context).color ?? theme.colorScheme.onSurface;
     return Obx(() {
       if (enclosureUrl != '' &&
           controller.playlistEpisode.value.enclosureUrl != enclosureUrl) {
@@ -66,9 +67,9 @@ class AIIcon extends GetView<SubtitleController> {
 
   @override
   Widget build(BuildContext context) {
-    final resolvedColor = color ??
-        IconTheme.of(context).color ??
-        Theme.of(context).colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final resolvedColor =
+        color ?? IconTheme.of(context).color ?? theme.colorScheme.onSurface;
     return Obx(() {
       var status = controller.subtitleUrls[enclosureUrl];
 
@@ -82,10 +83,14 @@ class AIIcon extends GetView<SubtitleController> {
           return Iconify(
             Ic.round_check_circle,
             size: size,
-            color: resolvedColor,
+            color: AnycastColor.grass9(theme.brightness),
           );
         case 'failed':
-          return Iconify(Ic.round_sms_failed, size: size, color: resolvedColor);
+          return Iconify(
+            Ic.round_sms_failed,
+            size: size,
+            color: theme.colorScheme.error,
+          );
         default:
           return Iconify(aiTranscript, size: size, color: resolvedColor);
       }
