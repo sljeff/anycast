@@ -24,10 +24,10 @@ import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter_lyric/flutter_lyric.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:lottie/lottie.dart';
@@ -44,45 +44,48 @@ class PlayerPage extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
-          controller.pageIndex.value = 1;
-        }
-      },
-      child: Theme(
-        data: AnycastTheme.dark,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Obx(
-              () => _PlayerBackground(
-                imageUrl: controller.playlistEpisode.value.imageUrl,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: PopScope(
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) {
+            controller.pageIndex.value = 1;
+          }
+        },
+        child: Theme(
+          data: AnycastTheme.dark,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Obx(
+                () => _PlayerBackground(
+                  imageUrl: controller.playlistEpisode.value.imageUrl,
+                ),
               ),
-            ),
-            SafeArea(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Handler(),
-                  Expanded(
-                    child: PageView(
-                      controller: controller.pageController,
-                      children: const [
-                        PlayerSettings(),
-                        PlayerMain(),
-                        PlayerAI(),
-                      ],
-                      onPageChanged: (index) {
-                        controller.pageIndex.value = index;
-                      },
+              SafeArea(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Handler(),
+                    Expanded(
+                      child: PageView(
+                        controller: controller.pageController,
+                        children: const [
+                          PlayerSettings(),
+                          PlayerMain(),
+                          PlayerAI(),
+                        ],
+                        onPageChanged: (index) {
+                          controller.pageIndex.value = index;
+                        },
+                      ),
                     ),
-                  ),
-                  const PageTab(),
-                ],
+                    const PageTab(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -127,7 +130,7 @@ class _PlayerBackground extends StatelessWidget {
             ),
           ),
         ),
-        ColoredBox(color: Colors.black.withValues(alpha: .50)),
+        const ColoredBox(color: AnycastColor.playerArtworkScrim),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -320,12 +323,13 @@ class PlayerAI extends GetView<PlayerController> {
         ),
         alignment: Alignment.center,
         decoration: ShapeDecoration(
+          color: AnycastColor.transcriptSurface,
           shape: RoundedRectangleBorder(
-            side: const BorderSide(
+            side: BorderSide(
               width: 1,
-              color: AnycastColor.sandDark4,
+              color: AnycastColor.sandAlpha4(Brightness.dark),
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AnycastRadius.md),
           ),
         ),
         child: LayoutBuilder(builder: (context, constraints) {
@@ -340,12 +344,8 @@ class PlayerAI extends GetView<PlayerController> {
                 alignment: Alignment.center,
                 child: Row(children: [
                   Obx(
-                    () => ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: controller.channel.value.imageUrl ??
-                            'https://placehold.co/400/000000/FFF.png?text=NoChannel',
-                      ),
+                    () => _TranscriptArtwork(
+                      imageUrl: controller.channel.value.imageUrl,
                     ),
                   ),
                   const SizedBox(width: AnycastSpacing.gap),
@@ -362,12 +362,130 @@ class PlayerAI extends GetView<PlayerController> {
                   ),
                 ]),
               ),
-              Divider(height: 1, color: Colors.grey[800]),
+              Divider(
+                height: 1,
+                color: AnycastColor.sandAlpha4(Brightness.dark),
+              ),
               Subtitles(height: height - 62),
             ],
           );
         }),
       ),
+    );
+  }
+}
+
+class _TranscriptArtwork extends StatelessWidget {
+  const _TranscriptArtwork({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AnycastRadius.sm),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: CachedNetworkImage(
+          imageUrl: imageUrl ?? '',
+          fit: BoxFit.cover,
+          placeholder: (context, url) => const ColoredBox(
+            color: AnycastColor.playerBackground,
+            child: Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AnycastColor.goldDark9,
+                ),
+              ),
+            ),
+          ),
+          errorWidget: (context, url, error) => const ColoredBox(
+            color: AnycastColor.playerBackground,
+            child: Icon(
+              Icons.podcasts_rounded,
+              size: 20,
+              color: AnycastColor.playerSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TranscriptStatusPanel extends StatelessWidget {
+  const _TranscriptStatusPanel({
+    required this.visual,
+    required this.title,
+    required this.message,
+    this.action,
+  });
+
+  final Widget visual;
+  final String title;
+  final String message;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AnycastSpacing.pageH),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            visual,
+            const SizedBox(height: AnycastSpacing.cardInner),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AnycastColor.playerText,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: AnycastSpacing.md),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AnycastColor.playerSecondary,
+                  ),
+            ),
+            if (action != null) ...[
+              const SizedBox(height: AnycastSpacing.pageHeader),
+              action!,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TranscriptStatusIcon extends StatelessWidget {
+  const _TranscriptStatusIcon({
+    required this.icon,
+    this.color = AnycastColor.playerText,
+  });
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: AnycastColor.sandAlpha3(Brightness.dark),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: color, size: 30),
     );
   }
 }
@@ -572,140 +690,90 @@ class Subtitles extends GetView<SubtitleController> {
   Widget build(BuildContext context) {
     return Obx(() {
       var playerController = Get.find<PlayerController>();
-      if (playerController.playlistEpisode.value.enclosureUrl == null) {
-        return const SizedBox();
-      }
-      var url = playerController.playlistEpisode.value.enclosureUrl!;
+      final url =
+          playerController.playlistEpisode.value.enclosureUrl?.trim() ?? '';
+      final status = url.isEmpty ? null : controller.subtitleUrls[url];
+      final visualState = transcriptVisualState(
+        hasEpisode: url.isNotEmpty,
+        status: status,
+        hasTranscript: false,
+      );
 
-      var status = controller.subtitleUrls[url];
-      if (status == null) {
-        // a button to fetch subtitles
+      if (visualState == TranscriptVisualState.unavailable) {
+        return const Expanded(
+          child: _TranscriptStatusPanel(
+            visual: _TranscriptStatusIcon(
+              icon: Icons.description_outlined,
+            ),
+            title: 'Transcript unavailable',
+            message: 'Choose an episode to view or generate its transcript.',
+          ),
+        );
+      }
+
+      if (visualState == TranscriptVisualState.prompt) {
         return Expanded(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Generate transcript with AI (Beta)',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AnycastColor.playerText,
-                          ),
-                    ),
-                    const SizedBox(height: AnycastSpacing.md),
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: const ShapeDecoration(
-                        color: AnycastColor.goldDark9,
-                        shape: OvalBorder(),
-                      ),
-                      child: const Tooltip(
-                        showDuration: Duration(seconds: 10),
-                        message: 'AI transcript may take about 2 ~ 5 minutes',
-                        triggerMode: TooltipTriggerMode.tap,
-                        child: Icon(
-                          Icons.question_mark_rounded,
-                          size: 12,
-                          color: AnycastColor.sand12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AnycastSpacing.large),
-                TextButton(
-                  onPressed: () {
-                    controller.add(url);
-                  },
-                  style: TextButton.styleFrom(
-                    backgroundColor: AnycastColor.goldDark9,
-                    foregroundColor: AnycastColor.sand12,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AnycastSpacing.xxl,
-                      vertical: AnycastSpacing.pageHeader,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Iconify(newDoc),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                )
-              ],
+          child: _TranscriptStatusPanel(
+            visual: const _TranscriptStatusIcon(
+              icon: Icons.auto_awesome_rounded,
+              color: AnycastColor.goldDark9,
+            ),
+            title: 'Generate transcript with AI',
+            message:
+                'Generation usually takes 2–5 minutes. You can leave this screen and come back later.',
+            action: FilledButton.icon(
+              onPressed: () {
+                controller.add(url);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: AnycastColor.goldDark9,
+                foregroundColor: AnycastColor.sand12,
+              ),
+              icon: const Icon(Icons.description_rounded),
+              label: const Text('Generate transcript'),
             ),
           ),
         );
       }
 
-      if (status == 'processing') {
-        // a progress indicator
-        var style = Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AnycastColor.playerText,
-              fontWeight: FontWeight.w600,
-            );
+      if (visualState == TranscriptVisualState.processing) {
         return Expanded(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Lottie.asset('assets/lottie/robot_loading.json'),
-                const SizedBox(height: AnycastSpacing.pageHeader),
-                Text("Generating with AI ...", style: style),
-                const SizedBox(height: AnycastSpacing.md),
-                Text("It may take 2 ~ 5 minutes ...", style: style),
-                const SizedBox(height: AnycastSpacing.pageHeader),
-                Text(
-                  "Feel free to explore or come back later.",
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AnycastColor.playerText,
-                      ),
-                ),
-              ],
+          child: _TranscriptStatusPanel(
+            visual: SizedBox(
+              width: 112,
+              height: 112,
+              child: Lottie.asset('assets/lottie/robot_loading.json'),
             ),
+            title: 'Generating transcript…',
+            message:
+                'This usually takes 2–5 minutes. You can keep listening and return later.',
           ),
         );
       }
 
-      if (status == 'failed') {
-        // a button to retry
-        return Center(
-          child: TextButton(
-            onPressed: () {
-              controller.add(url);
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: AnycastColor.sand12,
-              backgroundColor: AnycastColor.goldDark9,
+      if (visualState == TranscriptVisualState.failed) {
+        return Expanded(
+          child: _TranscriptStatusPanel(
+            visual: _TranscriptStatusIcon(
+              icon: Icons.error_outline_rounded,
+              color: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Retry'),
+            title: 'Transcript generation failed',
+            message:
+                'Nothing was changed. Try generating the transcript again.',
+            action: FilledButton.icon(
+              onPressed: () {
+                controller.add(url);
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+            ),
           ),
         );
       }
 
       var helper = DatabaseHelper();
-      return SingleChildScrollView(
+      return Expanded(
         child: FutureBuilder(
           future: helper.db.then((db) async {
             var subtitle = await SubtitleModel.get(db, url);
@@ -719,8 +787,34 @@ class Subtitles extends GetView<SubtitleController> {
             return subtitle;
           }),
           builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return _TranscriptStatusPanel(
+                visual: _TranscriptStatusIcon(
+                  icon: Icons.sync_problem_rounded,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                title: 'Couldn’t load transcript',
+                message: 'The saved transcript is temporarily unavailable.',
+                action: FilledButton.icon(
+                  onPressed: controller.subtitleUrls.refresh,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try again'),
+                ),
+              );
+            }
             if (!snapshot.hasData) {
-              return const SizedBox.shrink();
+              return const _TranscriptStatusPanel(
+                visual: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: AnycastColor.goldDark9,
+                  ),
+                ),
+                title: 'Loading transcript…',
+                message: 'Preparing the saved transcript for playback.',
+              );
             }
             var subtitle = snapshot.data!;
 
@@ -734,8 +828,32 @@ class Subtitles extends GetView<SubtitleController> {
                   return FutureBuilder(future: helper.db.then((db) {
                     return TranslationModel.get(db, url, language);
                   }), builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Column(
+                        children: [
+                          LyricsWithShare(
+                            mainLyric: subtitle.toLrc(),
+                            height: height - AnycastSpacing.xxl,
+                          ),
+                          const _TranscriptInlineStatus(
+                            message: 'Translation unavailable',
+                            showProgress: false,
+                          ),
+                        ],
+                      );
+                    }
                     if (!snapshot.hasData) {
-                      return const SizedBox.shrink();
+                      return Column(
+                        children: [
+                          LyricsWithShare(
+                            mainLyric: subtitle.toLrc(),
+                            height: height - AnycastSpacing.xxl,
+                          ),
+                          const _TranscriptInlineStatus(
+                            message: 'Loading translation…',
+                          ),
+                        ],
+                      );
                     }
 
                     var translation = snapshot.data!;
@@ -750,23 +868,10 @@ class Subtitles extends GetView<SubtitleController> {
                     children: [
                       LyricsWithShare(
                         mainLyric: subtitle.toLrc(),
-                        height: height - 48,
+                        height: height - AnycastSpacing.xxl,
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const RefreshProgressIndicator(),
-                          Text(
-                            "Translating subtitles...",
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: AnycastColor.playerText,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ],
+                      const _TranscriptInlineStatus(
+                        message: 'Translating transcript…',
                       ),
                     ],
                   );
@@ -782,6 +887,46 @@ class Subtitles extends GetView<SubtitleController> {
         ),
       );
     });
+  }
+}
+
+class _TranscriptInlineStatus extends StatelessWidget {
+  const _TranscriptInlineStatus({
+    required this.message,
+    this.showProgress = true,
+  });
+
+  final String message;
+  final bool showProgress;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: AnycastSpacing.xxl,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (showProgress) ...[
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AnycastColor.goldDark9,
+              ),
+            ),
+            const SizedBox(width: AnycastSpacing.md),
+          ],
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AnycastColor.playerSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -812,20 +957,27 @@ class _LyricsWithShareState extends State<LyricsWithShare>
 
   // 使用预设样式并自定义
   static final _lyricStyle = LyricStyles.default1.copyWith(
-    textStyle: GoogleFonts.mPlusRounded1c().copyWith(
-      color: Colors.grey[200],
+    textStyle: const TextStyle(
+      fontFamily: '.AppleSystemUIFont',
+      color: AnycastColor.playerSecondary,
       fontSize: 14,
+      height: 1.35,
     ),
-    activeStyle: GoogleFonts.mPlusRounded1c().copyWith(
-      color: AnycastColor.goldDark9,
+    activeStyle: const TextStyle(
+      fontFamily: '.AppleSystemUIFont',
+      color: AnycastColor.playerText,
       fontSize: 16,
-      fontWeight: FontWeight.w200,
+      height: 1.35,
+      fontWeight: FontWeight.w700,
     ),
-    translationStyle: GoogleFonts.mPlusRounded1c().copyWith(
+    translationStyle: const TextStyle(
+      fontFamily: '.AppleSystemUIFont',
       color: AnycastColor.goldDark9,
       fontSize: 14,
+      height: 1.35,
+      fontWeight: FontWeight.w500,
     ),
-    translationActiveColor: Colors.grey[300],
+    translationActiveColor: AnycastColor.playerText,
     lineGap: 12, // 减小行间距
     translationLineGap: 6, // 减小翻译行间距
     textAlign: TextAlign.left,
@@ -938,7 +1090,7 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                       child: Container(
                         height: 2,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AnycastColor.playerText,
                           borderRadius: BorderRadius.circular(1),
                           boxShadow: const [
                             BoxShadow(
@@ -983,7 +1135,7 @@ class _LyricsWithShareState extends State<LyricsWithShare>
             padding: const EdgeInsets.only(right: 0),
             clipBehavior: Clip.antiAlias,
             decoration: const BoxDecoration(
-              color: Colors.black87,
+              color: AnycastColor.playerBackground,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(20),
                 bottomRight: Radius.circular(20),
@@ -1010,7 +1162,7 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                 ),
               ),
               PopupMenuButton(
-                color: Colors.black87,
+                color: AnycastColor.playerBackground,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1021,13 +1173,18 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                       child: Row(children: [
                         const Iconify(
                           Ic.baseline_offline_share,
-                          color: Colors.white,
+                          color: AnycastColor.playerText,
                           size: 20,
                         ),
-                        const SizedBox(width: 8),
-                        Text("Export subtitles",
-                            style: GoogleFonts.comfortaa()
-                                .copyWith(color: Colors.white)),
+                        const SizedBox(width: AnycastSpacing.md),
+                        Text(
+                          'Export transcript',
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AnycastColor.playerText,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
                       ])),
                 ],
                 onSelected: (value) {
@@ -1036,7 +1193,10 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                     widget.translationLyric,
                   );
                 },
-                child: const Icon(Icons.more_vert_rounded, color: Colors.grey),
+                child: const Icon(
+                  Icons.more_vert_rounded,
+                  color: AnycastColor.playerSecondary,
+                ),
               ),
             ]),
           ),

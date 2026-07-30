@@ -121,7 +121,9 @@ abstract final class AnycastColor {
   static const playerWarm = Color(0xFF867D75);
   static const playerBackground = Color(0xFF222221);
   static const playerText = Color(0xFFEEEEEC);
-  static const playerSecondary = Color(0xFFB5B3AD);
+  static const playerSecondary = Color(0xFFD2D0CA);
+  static const playerArtworkScrim = Color.fromRGBO(0, 0, 0, .50);
+  static const transcriptSurface = Color.fromRGBO(0, 0, 0, .32);
 
   static const playerGradientOverlayColors = [
     Color.fromRGBO(0, 0, 0, .20),

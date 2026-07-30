@@ -135,3 +135,67 @@ class AnycastCompactProgress extends StatelessWidget {
     );
   }
 }
+
+enum AnycastCollectionVisualState {
+  loading,
+  error,
+  empty,
+  content,
+}
+
+AnycastCollectionVisualState anycastCollectionVisualState({
+  required bool isLoading,
+  required bool hasError,
+  required bool isEmpty,
+}) {
+  if (isLoading) {
+    return AnycastCollectionVisualState.loading;
+  }
+  if (hasError) {
+    return AnycastCollectionVisualState.error;
+  }
+  if (isEmpty) {
+    return AnycastCollectionVisualState.empty;
+  }
+  return AnycastCollectionVisualState.content;
+}
+
+class AnycastLoadingState extends StatelessWidget {
+  final String label;
+
+  const AnycastLoadingState({
+    super.key,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AnycastSpacing.large),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: AnycastSpacing.pageH),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

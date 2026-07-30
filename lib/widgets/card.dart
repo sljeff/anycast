@@ -336,18 +336,32 @@ class PodcastCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: ShapeDecoration(
-                      image: DecorationImage(
-                        image: CachedNetworkImageProvider(
-                            subscription.imageUrl ??
-                                'https://placeholder.co/48.png?text=NoImage'),
-                        fit: BoxFit.fill,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AnycastRadius.md),
+                    child: CachedNetworkImage(
+                      imageUrl: subscription.imageUrl ?? '',
+                      fit: BoxFit.cover,
+                      width: 64,
+                      height: 64,
+                      placeholder: (context, url) => ColoredBox(
+                        color: theme.colorScheme.surfaceContainer,
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AnycastRadius.md),
+                      errorWidget: (context, url, error) => ColoredBox(
+                        color: theme.colorScheme.surfaceContainer,
+                        child: Icon(
+                          Icons.podcasts_rounded,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),

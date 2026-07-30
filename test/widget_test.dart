@@ -1,9 +1,11 @@
 import 'package:anycast/design_system/anycast_components.dart';
 import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/main.dart';
+import 'package:anycast/models/subscription.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/card.dart' as episode_card;
 import 'package:anycast/widgets/play_icon.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -112,6 +114,39 @@ void main() {
     }
   });
 
+  test('transcript surface keeps secondary copy readable over bright artwork',
+      () {
+    final artwork = Color.alphaBlend(
+      AnycastColor.playerArtworkScrim,
+      Colors.white,
+    );
+    final gradient = Color.alphaBlend(
+      AnycastColor.playerGradientOverlayColors.first,
+      artwork,
+    );
+    final surface = Color.alphaBlend(
+      AnycastColor.transcriptSurface,
+      gradient,
+    );
+
+    expect(
+      contrastRatio(surface, AnycastColor.playerSecondary),
+      greaterThanOrEqualTo(4.5),
+    );
+    expect(
+      contrastRatio(surface, AnycastColor.playerText),
+      greaterThanOrEqualTo(4.5),
+    );
+    expect(
+      contrastRatio(surface, AnycastColor.goldDark9),
+      greaterThanOrEqualTo(4.5),
+    );
+    expect(
+      contrastRatio(AnycastColor.goldDark9, AnycastColor.sand12),
+      greaterThanOrEqualTo(4.5),
+    );
+  });
+
   test('playback progress covers unknown, partial, and completed states', () {
     expect(playbackProgress(Duration.zero, Duration.zero), 0);
     expect(
@@ -181,6 +216,100 @@ void main() {
     expect(PlaybackProgressVisualState.loading.allowsSeek, isFalse);
     expect(PlaybackProgressVisualState.unknown.allowsSeek, isFalse);
     expect(PlaybackProgressVisualState.disabled.allowsSeek, isFalse);
+  });
+
+  test('transcript visual states cover every async endpoint', () {
+    expect(
+      transcriptVisualState(
+        hasEpisode: false,
+        status: null,
+        hasTranscript: false,
+      ),
+      TranscriptVisualState.unavailable,
+    );
+    expect(
+      transcriptVisualState(
+        hasEpisode: true,
+        status: null,
+        hasTranscript: false,
+      ),
+      TranscriptVisualState.prompt,
+    );
+    expect(
+      transcriptVisualState(
+        hasEpisode: true,
+        status: 'processing',
+        hasTranscript: false,
+      ),
+      TranscriptVisualState.processing,
+    );
+    expect(
+      transcriptVisualState(
+        hasEpisode: true,
+        status: 'failed',
+        hasTranscript: false,
+      ),
+      TranscriptVisualState.failed,
+    );
+    expect(
+      transcriptVisualState(
+        hasEpisode: true,
+        status: 'succeeded',
+        hasTranscript: false,
+      ),
+      TranscriptVisualState.loading,
+    );
+    expect(
+      transcriptVisualState(
+        hasEpisode: true,
+        status: 'succeeded',
+        hasTranscript: true,
+      ),
+      TranscriptVisualState.ready,
+    );
+    expect(
+      transcriptVisualState(
+        hasEpisode: true,
+        status: 'unexpected',
+        hasTranscript: false,
+      ),
+      TranscriptVisualState.failed,
+    );
+  });
+
+  test('collection visual states prioritize loading and errors', () {
+    expect(
+      anycastCollectionVisualState(
+        isLoading: true,
+        hasError: true,
+        isEmpty: true,
+      ),
+      AnycastCollectionVisualState.loading,
+    );
+    expect(
+      anycastCollectionVisualState(
+        isLoading: false,
+        hasError: true,
+        isEmpty: true,
+      ),
+      AnycastCollectionVisualState.error,
+    );
+    expect(
+      anycastCollectionVisualState(
+        isLoading: false,
+        hasError: false,
+        isEmpty: true,
+      ),
+      AnycastCollectionVisualState.empty,
+    );
+    expect(
+      anycastCollectionVisualState(
+        isLoading: false,
+        hasError: false,
+        isEmpty: false,
+      ),
+      AnycastCollectionVisualState.content,
+    );
   });
 
   test('Anycast alpha colors match the UIKit sand and gold scales', () {
@@ -332,6 +461,97 @@ void main() {
           AnycastColor.sandAlpha4(theme.brightness),
         );
       }
+    }
+  });
+
+  testWidgets('loading state stays readable in light and dark themes',
+      (tester) async {
+    for (final theme in [AnycastTheme.light, AnycastTheme.dark]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey(theme.brightness),
+          theme: theme,
+          darkTheme: theme,
+          themeMode: theme.brightness == Brightness.dark
+              ? ThemeMode.dark
+              : ThemeMode.light,
+          home: const Scaffold(
+            body: AnycastLoadingState(label: 'Loading subscriptions…'),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final indicator = tester.widget<CircularProgressIndicator>(
+        find.byType(CircularProgressIndicator),
+      );
+      final label = tester.widget<Text>(
+        find.text('Loading subscriptions…'),
+      );
+      expect(indicator.color, theme.colorScheme.primary);
+      expect(label.style?.color, theme.colorScheme.onSurfaceVariant);
+      expect(
+        contrastRatio(
+          label.style!.color!,
+          theme.scaffoldBackgroundColor,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+    }
+  });
+
+  testWidgets('subscription cards cover content and artwork fallback states',
+      (tester) async {
+    final subscription = SubscriptionModel.fromMap({
+      'rssFeedUrl': 'https://example.com/feed.xml',
+      'title': 'Design Details',
+      'description': 'A podcast about product design.',
+      'imageUrl': '',
+    });
+
+    for (final theme in [AnycastTheme.light, AnycastTheme.dark]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey(theme.brightness),
+          theme: theme,
+          home: Scaffold(
+            body: episode_card.PodcastCard(subscription: subscription),
+          ),
+        ),
+      );
+
+      expect(find.text('Design Details'), findsOneWidget);
+      expect(find.text('A podcast about product design.'), findsOneWidget);
+
+      final artwork = tester.widget<CachedNetworkImage>(
+        find.byType(CachedNetworkImage),
+      );
+      final artworkContext = tester.element(find.byType(CachedNetworkImage));
+      final placeholder = artwork.placeholder!(artworkContext, '');
+      final fallback = artwork.errorWidget!(
+        artworkContext,
+        '',
+        StateError('missing artwork'),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey('fallback-${theme.brightness}'),
+          theme: theme,
+          home: Scaffold(
+            body: Row(children: [placeholder, fallback]),
+          ),
+        ),
+      );
+
+      final indicator = tester.widget<CircularProgressIndicator>(
+        find.byType(CircularProgressIndicator),
+      );
+      final icon = tester.widget<Icon>(
+        find.byIcon(Icons.podcasts_rounded),
+      );
+      expect(indicator.color, theme.colorScheme.primary);
+      expect(icon.color, theme.colorScheme.onSurfaceVariant);
     }
   });
 

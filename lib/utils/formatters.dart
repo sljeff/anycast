@@ -115,6 +115,40 @@ PlaybackProgressVisualState playbackProgressVisualState({
   return PlaybackProgressVisualState.normal;
 }
 
+enum TranscriptVisualState {
+  unavailable,
+  prompt,
+  processing,
+  failed,
+  loading,
+  ready,
+}
+
+TranscriptVisualState transcriptVisualState({
+  required bool hasEpisode,
+  required String? status,
+  required bool hasTranscript,
+}) {
+  if (!hasEpisode) {
+    return TranscriptVisualState.unavailable;
+  }
+  if (status == null) {
+    return TranscriptVisualState.prompt;
+  }
+  if (status == 'processing') {
+    return TranscriptVisualState.processing;
+  }
+  if (status == 'failed') {
+    return TranscriptVisualState.failed;
+  }
+  if (status == 'succeeded') {
+    return hasTranscript
+        ? TranscriptVisualState.ready
+        : TranscriptVisualState.loading;
+  }
+  return TranscriptVisualState.failed;
+}
+
 Widget renderHtml(BuildContext context, String html) {
   if (html.isEmpty) {
     return const SizedBox.shrink();
