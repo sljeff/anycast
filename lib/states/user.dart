@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -13,6 +14,61 @@ OAuthCredential firebaseCredentialFromGoogleAuthentication(
   GoogleSignInAuthentication authentication,
 ) {
   return GoogleAuthProvider.credential(idToken: authentication.idToken);
+}
+
+class EmailLoginFeedbackDialog extends StatelessWidget {
+  const EmailLoginFeedbackDialog({
+    required this.title,
+    required this.detail,
+    required this.onDismiss,
+    super.key,
+  });
+
+  final String title;
+  final String detail;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      backgroundColor: theme.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
+      titlePadding: const EdgeInsets.fromLTRB(
+        AnycastSpacing.pageHeader,
+        AnycastSpacing.pageHeader,
+        AnycastSpacing.pageHeader,
+        0,
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(
+        AnycastSpacing.pageHeader,
+        AnycastSpacing.gap,
+        AnycastSpacing.pageHeader,
+        0,
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(
+        AnycastSpacing.pageH,
+        AnycastSpacing.md,
+        AnycastSpacing.pageH,
+        AnycastSpacing.pageH,
+      ),
+      titleTextStyle: theme.textTheme.headlineSmall?.copyWith(
+        color: theme.colorScheme.onSurface,
+      ),
+      contentTextStyle: theme.textTheme.bodyLarge?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+      title: Text(title),
+      content: Text(detail),
+      actions: [
+        TextButton(
+          onPressed: onDismiss,
+          child: const Text('OK'),
+        ),
+      ],
+    );
+  }
 }
 
 class AuthController extends GetxController {
@@ -175,47 +231,20 @@ class AuthController extends GetxController {
         title = 'Wrong Password';
         detail = 'Wrong password provided for that user.';
       }
-      Get.dialog(AlertDialog(
-          titleTextStyle: const TextStyle(
-            color: Colors.white,
-            decoration: TextDecoration.none,
-          ),
-          contentTextStyle: const TextStyle(
-            color: Colors.white,
-            decoration: TextDecoration.none,
-          ),
-          title: Text(title),
-          content: Text(detail),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Get.back();
-              },
-              child: const Text('OK'),
-            ),
-          ]));
+      Get.dialog(
+        EmailLoginFeedbackDialog(
+          title: title,
+          detail: detail,
+          onDismiss: Get.back,
+        ),
+      );
       return;
     } catch (e) {
       Get.dialog(
-        AlertDialog(
-          titleTextStyle: const TextStyle(
-            color: Colors.white,
-            decoration: TextDecoration.none,
-          ),
-          contentTextStyle: const TextStyle(
-            color: Colors.white,
-            decoration: TextDecoration.none,
-          ),
-          title: const Text('Error'),
-          content: Text(e.toString()),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Get.back();
-              },
-              child: const Text('OK'),
-            ),
-          ],
+        EmailLoginFeedbackDialog(
+          title: 'Error',
+          detail: e.toString(),
+          onDismiss: Get.back,
         ),
       );
       return;

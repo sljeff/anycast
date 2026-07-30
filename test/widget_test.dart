@@ -2,6 +2,7 @@ import 'package:anycast/design_system/anycast_components.dart';
 import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/main.dart';
 import 'package:anycast/models/subscription.dart';
+import 'package:anycast/states/user.dart';
 import 'package:anycast/utils/formatters.dart';
 import 'package:anycast/widgets/card.dart' as episode_card;
 import 'package:anycast/widgets/play_icon.dart';
@@ -93,6 +94,92 @@ void main() {
         contrastRatio(color, theme.colorScheme.surface),
         greaterThanOrEqualTo(4.5),
       );
+    }
+  });
+
+  testWidgets(
+      'email login feedback stays readable in both themes and large text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final theme in [AnycastTheme.light, AnycastTheme.dark]) {
+      for (final textScale in [1.0, 2.5]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            key: ValueKey('${theme.brightness}-$textScale'),
+            theme: theme,
+            darkTheme: theme,
+            themeMode: theme.brightness == Brightness.dark
+                ? ThemeMode.dark
+                : ThemeMode.light,
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(textScale),
+                ),
+                child: child!,
+              );
+            },
+            home: Builder(
+              builder: (context) {
+                return Scaffold(
+                  body: TextButton(
+                    onPressed: () {
+                      showDialog<void>(
+                        context: context,
+                        builder: (dialogContext) {
+                          return EmailLoginFeedbackDialog(
+                            title: 'User Not Found',
+                            detail: 'No user found for that email.',
+                            onDismiss: () {
+                              Navigator.of(dialogContext).pop();
+                            },
+                          );
+                        },
+                      );
+                    },
+                    child: const Text('Show feedback'),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Show feedback'));
+        await tester.pumpAndSettle();
+
+        final dialog = tester.widget<AlertDialog>(find.byType(AlertDialog));
+        final titleStyle =
+            DefaultTextStyle.of(tester.element(find.text('User Not Found')))
+                .style;
+        final detailStyle = DefaultTextStyle.of(
+          tester.element(find.text('No user found for that email.')),
+        ).style;
+
+        expect(dialog.backgroundColor, theme.colorScheme.surface);
+        expect(titleStyle.color, theme.colorScheme.onSurface);
+        expect(detailStyle.color, theme.colorScheme.onSurfaceVariant);
+        expect(titleStyle.fontWeight, FontWeight.w600);
+        expect(detailStyle.fontWeight, FontWeight.w400);
+        expect(
+          contrastRatio(titleStyle.color!, dialog.backgroundColor!),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          contrastRatio(detailStyle.color!, dialog.backgroundColor!),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(find.text('OK'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+      }
     }
   });
 
