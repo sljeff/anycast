@@ -116,6 +116,10 @@ infisical login
 ./scripts/bootstrap.sh
 ```
 
+For a personal-team iPhone visual preview that does not change repository or
+release signing settings, follow
+[iOS personal-team device preview](docs/ios-physical-device-preview.md).
+
 The bootstrap script writes the ignored files locally with restrictive
 permissions. It also verifies the generated client configuration against
 reviewed SHA-256 digests, so an Infisical value change requires a corresponding
