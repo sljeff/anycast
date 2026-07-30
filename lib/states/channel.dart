@@ -1,10 +1,10 @@
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/formatters.dart';
-import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 class ChannelController extends GetxController {
@@ -13,9 +13,10 @@ class ChannelController extends GetxController {
   var isLoading = true.obs;
   var subscribed = false.obs;
   var isReversed = false.obs;
-  var backgroundColor = const Color(0xFF111316).obs;
+  var backgroundColor = AnycastColor.playerWarm.obs;
 
-  List<FeedEpisodeModel> get showEpisodes => isReversed.value ? episodes.reversed.toList() : episodes;
+  List<FeedEpisodeModel> get showEpisodes =>
+      isReversed.value ? episodes.reversed.toList() : episodes;
 
   var helper = DatabaseHelper();
   var subscriptionController = Get.find<SubscriptionController>();

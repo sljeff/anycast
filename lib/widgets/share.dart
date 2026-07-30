@@ -4,7 +4,6 @@ import 'package:anycast/states/subscription.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class ShareDialog extends GetView<ShareController> {
   const ShareDialog({super.key});
@@ -15,20 +14,11 @@ class ShareDialog extends GetView<ShareController> {
       return AlertDialog(
         title: Text(
           'Import Podcasts',
-          style: GoogleFonts.comfortaa(
-            fontSize: 20,
-            color: Colors.white,
-            decoration: TextDecoration.none,
-            fontWeight: FontWeight.w400,
-          ),
+          style: Theme.of(context).textTheme.headlineMedium,
         ),
         content: Text(
           'Oh no! Seems like there is no valid links in the file.',
-          style: GoogleFonts.comfortaa(
-            fontSize: 18,
-            color: Colors.white,
-            decoration: TextDecoration.none,
-          ),
+          style: Theme.of(context).textTheme.bodyLarge,
         ),
         actions: [
           TextButton(
@@ -37,28 +27,15 @@ class ShareDialog extends GetView<ShareController> {
             },
             child: Text(
               'OK',
-              style: GoogleFonts.comfortaa(
-                fontSize: 18,
-                color: Colors.white,
-                decoration: TextDecoration.none,
-              ),
+              style: Theme.of(context).textTheme.labelLarge,
             ),
           ),
         ],
       );
     }
     return AlertDialog(
-      titleTextStyle: GoogleFonts.comfortaa(
-        fontSize: 20,
-        color: Colors.white,
-        decoration: TextDecoration.none,
-        fontWeight: FontWeight.w400,
-      ),
-      contentTextStyle: GoogleFonts.comfortaa(
-        fontSize: 18,
-        color: Colors.white,
-        decoration: TextDecoration.none,
-      ),
+      titleTextStyle: Theme.of(context).textTheme.headlineMedium,
+      contentTextStyle: Theme.of(context).textTheme.bodyLarge,
       title: const Text("Import Podcasts"),
       content: SizedBox(
         width: Get.width * 0.8,
@@ -73,14 +50,10 @@ class ShareDialog extends GetView<ShareController> {
               itemCount: opmls.length,
               itemBuilder: (context, index) {
                 return Card(
-                  color: Colors.black,
                   child: ListTile(
                     title: Text(
                       opmls[index].title,
-                      style: GoogleFonts.comfortaa(
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
+                      style: Theme.of(context).textTheme.titleMedium,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -97,7 +70,7 @@ class ShareDialog extends GetView<ShareController> {
             Get.back();
           },
           style: TextButton.styleFrom(
-            foregroundColor: Colors.white70,
+            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           child: const Text('Close'),
         ),
@@ -131,16 +104,14 @@ class ShareDialog extends GetView<ShareController> {
                 snackPosition: SnackPosition.BOTTOM);
           },
           style: TextButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
+            backgroundColor: Theme.of(context).colorScheme.inverseSurface,
+            foregroundColor: Theme.of(context).colorScheme.onInverseSurface,
           ),
           child: Text(
             'Import',
-            style: GoogleFonts.comfortaa(
-              fontSize: 16,
-              color: Colors.black,
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onInverseSurface,
+                ),
           ),
         ),
       ],
@@ -159,8 +130,9 @@ class ImportProgressIndicator extends GetView<ShareController> {
           var progress = controller.progress.value;
           return CircularProgressIndicator(
             value: progress,
-            color: Colors.green,
-            backgroundColor: Colors.white.withValues(alpha: 0.4),
+            color: Theme.of(context).colorScheme.primary,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
             strokeWidth: 2,
             strokeCap: StrokeCap.round,
           );

@@ -1,4 +1,4 @@
-import 'package:anycast/styles.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/utils/rss_fetcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -77,6 +77,78 @@ String formatRemainingTime(Duration duration, Duration playedDuration) {
   }
 }
 
+double playbackProgress(Duration position, Duration duration) {
+  if (duration <= Duration.zero) {
+    return 0;
+  }
+  return (position.inMilliseconds / duration.inMilliseconds)
+      .clamp(0.0, 1.0)
+      .toDouble();
+}
+
+enum PlaybackProgressVisualState {
+  normal(null, true),
+  loading('Loading…', false),
+  unknown('Duration unavailable', false),
+  disabled('Playback unavailable', false);
+
+  const PlaybackProgressVisualState(this.message, this.allowsSeek);
+
+  final String? message;
+  final bool allowsSeek;
+}
+
+PlaybackProgressVisualState playbackProgressVisualState({
+  required bool hasEpisode,
+  required bool isLoading,
+  required Duration duration,
+}) {
+  if (!hasEpisode) {
+    return PlaybackProgressVisualState.disabled;
+  }
+  if (isLoading) {
+    return PlaybackProgressVisualState.loading;
+  }
+  if (duration <= Duration.zero) {
+    return PlaybackProgressVisualState.unknown;
+  }
+  return PlaybackProgressVisualState.normal;
+}
+
+enum TranscriptVisualState {
+  unavailable,
+  prompt,
+  processing,
+  failed,
+  loading,
+  ready,
+}
+
+TranscriptVisualState transcriptVisualState({
+  required bool hasEpisode,
+  required String? status,
+  required bool hasTranscript,
+}) {
+  if (!hasEpisode) {
+    return TranscriptVisualState.unavailable;
+  }
+  if (status == null) {
+    return TranscriptVisualState.prompt;
+  }
+  if (status == 'processing') {
+    return TranscriptVisualState.processing;
+  }
+  if (status == 'failed') {
+    return TranscriptVisualState.failed;
+  }
+  if (status == 'succeeded') {
+    return hasTranscript
+        ? TranscriptVisualState.ready
+        : TranscriptVisualState.loading;
+  }
+  return TranscriptVisualState.failed;
+}
+
 Widget renderHtml(BuildContext context, String html) {
   if (html.isEmpty) {
     return const SizedBox.shrink();
@@ -89,12 +161,10 @@ Widget renderHtml(BuildContext context, String html) {
     }
     return HtmlWidget(
       sanitized,
-      textStyle: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        height: 1.2,
-        inherit: false,
-      ),
+      textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+            inherit: false,
+          ),
       onErrorBuilder: (context, error, any) => Text(
         error.toString(),
         style: GoogleFonts.robotoMono(
@@ -106,7 +176,7 @@ Widget renderHtml(BuildContext context, String html) {
     );
   }
 
-  return Text(html, style: DarkColor.defaultMainText);
+  return Text(html, style: Theme.of(context).textTheme.bodyMedium);
 }
 
 String formatCountdown(Duration duration) {
@@ -136,22 +206,6 @@ String urlToDomain(String url) {
   return uri.host;
 }
 
-Color getTextSafeColor(Color dynamicColor) {
-  // 定义亮度阈值，低于这个值就认为颜色太暗
-  const double brightnessThreshold = 0.2;
-
-  // 计算颜色的亮度
-  double brightness = dynamicColor.computeLuminance();
-
-  if (brightness < brightnessThreshold) {
-    // 如果颜色太暗，返回一个替代颜色
-    return const Color(0xFF10B981);
-  } else {
-    // 如果颜色亮度足够，返回原始的动态颜色
-    return dynamicColor;
-  }
-}
-
 Color getBackgroundSafeColor(Color dynamicColor) {
   const double brightnessThreshold = 0.7;
 
@@ -170,7 +224,7 @@ Future<Color> updatePaletteGenerator(String imageUrl) async {
     imageUrl,
   ));
   final Color dominantColor =
-      generator.dominantColor?.color ?? const Color(0xFF111316);
+      generator.dominantColor?.color ?? AnycastColor.playerWarm;
 
   return dominantColor;
   // return getBackgroundSafeColor(dominantColor);

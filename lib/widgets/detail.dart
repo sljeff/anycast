@@ -1,4 +1,5 @@
 import 'package:anycast/api/share.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/pages/channel.dart';
@@ -9,7 +10,6 @@ import 'package:anycast/widgets/handler.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
@@ -44,7 +44,10 @@ class Detail extends StatelessWidget {
       expand: false,
       builder: (BuildContext context, ScrollController scrollController) {
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AnycastSpacing.pageHeader,
+            vertical: AnycastSpacing.pageH,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.start,
@@ -62,7 +65,7 @@ class Detail extends StatelessWidget {
                   child: Column(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.all(AnycastSpacing.md),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.start,
@@ -84,7 +87,7 @@ class Detail extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AnycastSpacing.gap),
                             Expanded(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -93,16 +96,11 @@ class Detail extends StatelessWidget {
                                 children: [
                                   Text(
                                     episode.title ?? '',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontFamily:
-                                          'PingFangSC-Regular,PingFang SC',
-                                      fontWeight: FontWeight.w500,
-                                      height: 0,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineMedium,
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: AnycastSpacing.xs),
                                   Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
@@ -131,27 +129,39 @@ class Detail extends StatelessWidget {
                                           },
                                           child: Text(
                                             episode.channelTitle!,
-                                            style: const TextStyle(
-                                              color: Color(0xFF6EE7B7),
-                                              fontSize: 12,
-                                              fontFamily:
-                                                  'PingFangSC-Regular,PingFang SC',
-                                              fontWeight: FontWeight.w500,
-                                              decoration:
-                                                  TextDecoration.underline,
-                                              decorationColor:
-                                                  Color(0xFF6EE7B7),
-                                            ),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary,
+                                                  fontWeight: FontWeight.w600,
+                                                  decoration:
+                                                      TextDecoration.underline,
+                                                  decorationColor:
+                                                      Theme.of(context)
+                                                          .colorScheme
+                                                          .primary,
+                                                ),
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
+                                      const SizedBox(
+                                        width: AnycastSpacing.gap,
+                                      ),
                                       Text(
                                         formatDate(episode.pubDate!),
-                                        style: GoogleFonts.comfortaa(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w300,
-                                          color: Colors.white.withValues(alpha: 0.5),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures(),
+                                          ],
                                         ),
                                       )
                                     ],
@@ -159,7 +169,7 @@ class Detail extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AnycastSpacing.gap),
                             GestureDetector(
                               onTap: () async {
                                 var shareUrl = Uri(
@@ -191,21 +201,24 @@ class Detail extends StatelessWidget {
                                 Get.back();
                               },
                               child: Container(
-                                width: 40,
-                                height: 40,
+                                width: 44,
+                                height: 44,
                                 decoration: ShapeDecoration(
-                                  color: Colors.white.withValues(alpha: 0.1),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHigh,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                 ),
-                                child: const FractionallySizedBox(
+                                child: FractionallySizedBox(
                                   widthFactor: 0.6,
                                   heightFactor: 0.6,
                                   child: Iconify(
                                     Ic.round_ios_share,
                                     size: 24,
-                                    color: Colors.white,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -214,7 +227,7 @@ class Detail extends StatelessWidget {
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.all(AnycastSpacing.md),
                         child: renderHtml(context, episode.description ?? ''),
                       ),
                     ],

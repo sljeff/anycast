@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/api/share.dart';
 import 'package:anycast/states/cardlist.dart';
 import 'package:anycast/widgets/animation.dart';
@@ -19,7 +20,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 
@@ -50,7 +50,7 @@ class Channel extends StatelessWidget {
 
           return Scaffold(
             bottomNavigationBar: const PlayerBar(bottomSafe: true),
-            backgroundColor: const Color(0xFF111316),
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             body: CustomScrollView(
               slivers: [
                 SliverPersistentHeader(
@@ -61,7 +61,9 @@ class Channel extends StatelessWidget {
                 ),
                 SliverToBoxAdapter(
                     child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AnycastSpacing.pageHeader,
+                  ),
                   child: Column(
                     children: [
                       SearchBar(rssFeedUrl: rssFeedUrl),
@@ -77,7 +79,7 @@ class Channel extends StatelessWidget {
                                 controller.isReversed.value = false;
                               },
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: AnycastSpacing.pageH),
                             OrderChooser(
                               text: "Oldest",
                               choosed: isReversed,
@@ -90,7 +92,7 @@ class Channel extends StatelessWidget {
                       }),
                       // const Divider(color: Color(0xFF232830), thickness: 1),
                       Container(
-                        color: const Color(0xFF232830),
+                        color: Theme.of(context).colorScheme.outlineVariant,
                         height: 1,
                       ),
                     ],
@@ -101,7 +103,9 @@ class Channel extends StatelessWidget {
                   (context, index) {
                     return Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 6),
+                        horizontal: AnycastSpacing.pageH,
+                        vertical: AnycastSpacing.sm,
+                      ),
                       child: Obx(
                         () {
                           var feedsController =
@@ -210,17 +214,17 @@ class OrderChooser extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: onPressed,
       child: Column(
         children: [
           Text(
             text,
-            style: GoogleFonts.comfortaa(
-              color: choosed ? Colors.white : const Color(0xFF6B7280),
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2.4,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: choosed
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ),
           choosed
@@ -228,8 +232,8 @@ class OrderChooser extends StatelessWidget {
                   width: 48,
                   height: 4,
                   clipBehavior: Clip.antiAlias,
-                  decoration: const ShapeDecoration(
-                    color: Colors.white,
+                  decoration: ShapeDecoration(
+                    color: theme.colorScheme.onSurface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.only(
                         topLeft: Radius.circular(4),
@@ -266,28 +270,40 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
     var controller = Get.find<ChannelController>(tag: rssFeedUrl);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final initLeft = (Get.width - 48) / 2 - 60;
 
     return Stack(children: [
       Obx(
-        () => Container(
-          height: max(minExtent, maxExtent - shrinkOffset),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                controller.backgroundColor.value,
-                const Color(0xFF111316),
-              ],
+        () {
+          final headerColor = Color.alphaBlend(
+            controller.backgroundColor.value.withValues(
+              alpha: isDark ? .30 : .18,
             ),
-          ),
-        ),
+            theme.scaffoldBackgroundColor,
+          );
+          return Container(
+            height: max(minExtent, maxExtent - shrinkOffset),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  headerColor,
+                  theme.scaffoldBackgroundColor,
+                ],
+              ),
+            ),
+          );
+        },
       ),
       SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AnycastSpacing.pageHeader,
+          ),
           child: Stack(
             children: [
               _buildMain(context, shrinkOffset, overlapsContent),
@@ -322,6 +338,7 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
       BuildContext context, double shrinkOffset, bool overlapsContent) {
     var controller = Get.find<ChannelController>(tag: rssFeedUrl);
     var subscription = controller.channel.value;
+    final theme = Theme.of(context);
 
     return Column(
       children: [
@@ -341,15 +358,15 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                 height: 40,
                 padding: const EdgeInsets.all(8),
                 decoration: ShapeDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
+                  color: theme.colorScheme.surfaceContainerHigh,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-                child: const Iconify(
+                child: Iconify(
                   Ic.round_arrow_back,
                   size: 24,
-                  color: Colors.white,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
             ),
@@ -381,22 +398,22 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                     height: 40,
                     padding: const EdgeInsets.all(8),
                     decoration: ShapeDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: theme.colorScheme.surfaceContainerHigh,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                    child: const Iconify(
+                    child: Iconify(
                       Ic.round_ios_share,
                       size: 24,
-                      color: Colors.white,
+                      color: theme.colorScheme.onSurface,
                     )),
               ),
             ]),
           ],
         ),
         Column(children: [
-          const SizedBox(height: 16),
+          const SizedBox(height: AnycastSpacing.pageH),
           SizedBox(
             width: max(120 - shrinkOffset, 0),
             height: max(120 - shrinkOffset, 0),
@@ -411,11 +428,8 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontFamily: GoogleFonts.comfortaa().fontFamily,
-                fontWeight: FontWeight.bold,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: theme.colorScheme.onSurface,
                 decoration: TextDecoration.none,
               ),
             ),
@@ -426,19 +440,17 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                   opacity: max(1 - shrinkOffset / (maxExtent / 4), 0),
                   child: Column(
                     children: [
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AnycastSpacing.gap),
                       Text(
                         controller.channel.value.author ?? 'Unknown',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontFamily: 'PingFangSC-Regular,PingFang SC',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurface,
                           decoration: TextDecoration.none,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AnycastSpacing.gap),
                       GestureDetector(
                         onTap: () {
                           Clipboard.setData(ClipboardData(
@@ -448,36 +460,32 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                             'Copied RSS URL to clipboard',
                             snackPosition: SnackPosition.BOTTOM,
                             duration: const Duration(milliseconds: 1000),
-                            backgroundColor: Colors.black,
                           );
                         },
                         child: Text(
                           urlToDomain(controller.channel.value.rssFeedUrl!),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF6EE7B7),
-                            fontSize: 16,
-                            fontFamily: 'PingFangSC-Regular,PingFang SC',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.primary,
                             fontWeight: FontWeight.w600,
                             decoration: TextDecoration.none,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AnycastSpacing.gap),
                       ExpandableText(
                         (subscription.description ?? 'No description').trim(),
                         maxLines: 2,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontFamily: GoogleFonts.inter().fontFamily,
-                          fontWeight: FontWeight.w400,
-                          decoration: TextDecoration.none,
-                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              decoration: TextDecoration.none,
+                            ) ??
+                            TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AnycastSpacing.gap),
                       SizedBox(
                         width: 184,
                         height: 40,
@@ -485,7 +493,8 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                         child: TextButton(
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.all(8),
-                            backgroundColor: Colors.white,
+                            backgroundColor: theme.colorScheme.inverseSurface,
+                            foregroundColor: theme.colorScheme.onInverseSurface,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(36),
                             ),
@@ -513,16 +522,15 @@ class ChannelHeaderDelegate extends SliverPersistentHeaderDelegate {
                               return Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Iconify(Ic.round_play_arrow),
-                                  const SizedBox(width: 4),
+                                  Iconify(
+                                    Ic.round_play_arrow,
+                                    color: theme.colorScheme.onInverseSurface,
+                                  ),
+                                  const SizedBox(width: AnycastSpacing.xs),
                                   Text(
                                     'Latest Episode',
-                                    style: TextStyle(
-                                      color: const Color(0xFF111316),
-                                      fontSize: 16,
-                                      fontFamily:
-                                          GoogleFonts.comfortaa().fontFamily,
-                                      fontWeight: FontWeight.w700,
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color: theme.colorScheme.onInverseSurface,
                                     ),
                                   ),
                                 ],
@@ -548,6 +556,7 @@ class SubscriptionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      final theme = Theme.of(context);
       var controller = Get.find<ChannelController>(tag: rssFeedUrl);
       var subscribed = controller.subscribed.value;
       var loading = controller.isLoading.value;
@@ -555,21 +564,29 @@ class SubscriptionButton extends StatelessWidget {
         loading = true;
       }
 
-      Widget icon = const SizedBox(
-          width: 16, height: 16, child: CircularProgressIndicator());
+      var textColor = theme.colorScheme.onSurface;
+      var backgroundColor = theme.colorScheme.surfaceContainerHigh;
+      Widget icon = SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(color: textColor),
+      );
       String text = 'Loading...';
-      Color textColor = Colors.white;
-      Color backgroundColor = Colors.white.withValues(alpha: 0.1);
 
       if (!loading) {
         if (subscribed) {
           text = 'Unsubscribe';
-          textColor = Colors.black;
-          backgroundColor = Colors.white;
-          icon = const Iconify(Ic.round_clear, color: Colors.black, size: 24);
+          textColor = theme.colorScheme.onPrimaryContainer;
+          backgroundColor = theme.colorScheme.primaryContainer;
+          icon = Iconify(Ic.round_clear, color: textColor, size: 24);
         } else {
-          icon = const Iconify(Ic.round_add_circle_outline,
-              color: Colors.white, size: 24);
+          textColor = theme.colorScheme.onInverseSurface;
+          backgroundColor = theme.colorScheme.inverseSurface;
+          icon = Iconify(
+            Ic.round_add_circle_outline,
+            color: textColor,
+            size: 24,
+          );
           text = 'Subscribe';
         }
       }
@@ -587,15 +604,12 @@ class SubscriptionButton extends StatelessWidget {
         child: Row(
           children: [
             icon,
-            const SizedBox(width: 6),
+            const SizedBox(width: AnycastSpacing.sm),
             Text(
               text,
-              style: TextStyle(
+              style: theme.textTheme.labelLarge?.copyWith(
                 decoration: TextDecoration.none,
                 color: textColor,
-                fontSize: 16,
-                fontFamily: GoogleFonts.comfortaa().fontFamily,
-                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -633,6 +647,7 @@ class _SearchBarState extends State<SearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     var searchBar = Container(
       height: 56,
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -655,37 +670,29 @@ class _SearchBarState extends State<SearchBar> {
           );
         },
         controller: controller,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.w400,
-        ),
+        style: theme.textTheme.bodyLarge,
         decoration: InputDecoration(
           hintText: 'Search episodes',
-          hintStyle: TextStyle(
-            color: const Color(0xFF4B5563),
-            fontSize: 16,
-            fontFamily: GoogleFonts.comfortaa().fontFamily,
-            fontWeight: FontWeight.w400,
-            height: 0,
+          hintStyle: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.search,
-            color: Color(0xFF4B5563),
+            color: theme.colorScheme.onSurfaceVariant,
             size: 24,
           ),
           filled: true,
-          fillColor: const Color(0xFF232830),
+          fillColor: theme.colorScheme.surfaceContainer,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
-              color: Color(0xFF232830),
+            borderSide: BorderSide(
+              color: theme.colorScheme.outlineVariant,
             ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
-              color: Color(0xFF232830),
+            borderSide: BorderSide(
+              color: theme.colorScheme.primary,
             ),
           ),
         ),
@@ -696,9 +703,7 @@ class _SearchBarState extends State<SearchBar> {
     if (controller.text.isNotEmpty) {
       cancel = Row(
         children: [
-          const SizedBox(
-            width: 16,
-          ),
+          const SizedBox(width: AnycastSpacing.pageH),
           GestureDetector(
             onTap: () {
               controller.clear();
@@ -706,12 +711,8 @@ class _SearchBarState extends State<SearchBar> {
             },
             child: Text(
               'Clear',
-              style: TextStyle(
-                color: const Color(0xFF34D399),
-                fontSize: 16,
-                fontFamily: GoogleFonts.comfortaa().fontFamily,
-                fontWeight: FontWeight.w400,
-                height: 0,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
               ),
             ),
           ),
@@ -749,10 +750,12 @@ class ChannelSearch extends StatelessWidget {
           child: Column(
             children: [
               const Handler(),
-              const SizedBox(height: 12),
+              const SizedBox(height: AnycastSpacing.gap),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AnycastSpacing.pageH,
+                  ),
                   child: Obx(() {
                     var controller =
                         Get.find<ChannelController>(tag: rssFeedUrl);
@@ -766,21 +769,18 @@ class ChannelSearch extends StatelessWidget {
                       return Center(
                         child: Text(
                           'No results',
-                          style: GoogleFonts.comfortaa(
-                            fontSize: 20,
-                            color: Colors.white,
-                            decoration: TextDecoration.none,
-                            fontWeight: FontWeight.w400,
-                          ),
+                          style: Theme.of(context).textTheme.headlineMedium,
                         ),
                       );
                     }
 
                     return ListView.separated(
                       separatorBuilder: (context, index) {
-                        return const SizedBox(height: 12);
+                        return const SizedBox(height: AnycastSpacing.gap);
                       },
-                      padding: const EdgeInsets.only(bottom: 120),
+                      padding: const EdgeInsets.only(
+                        bottom: AnycastSpacing.pageBottomSafe,
+                      ),
                       itemCount: episodes.length,
                       itemBuilder: (context, index) {
                         return Obx(() {

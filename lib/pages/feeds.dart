@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:anycast/design_system/anycast_components.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:anycast/states/cardlist.dart';
@@ -12,7 +14,6 @@ import 'package:anycast/widgets/import_export.dart';
 import 'package:get/get.dart';
 import 'package:anycast/states/feed_episode.dart';
 import 'package:anycast/states/subscription.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +28,7 @@ class Feeds extends GetView<FeedEpisodeController> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 24, right: 24),
+      padding: const EdgeInsets.symmetric(horizontal: AnycastSpacing.pageH),
       child: EasyRefresh(
         onRefresh: () async {
           await fetchNewEpisodes();
@@ -41,16 +42,18 @@ class Feeds extends GetView<FeedEpisodeController> {
           triggerOffset: 1,
           spinInCenter: true,
           spinWidget: Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16),
+            padding:
+                const EdgeInsets.symmetric(horizontal: AnycastSpacing.pageH),
             child: Column(
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: AnycastSpacing.md),
                 Obx(() {
                   var percent = controller.progress.value;
                   return LinearProgressIndicator(
                     value: percent,
-                    color: Colors.green,
-                    backgroundColor: Colors.white.withValues(alpha: 0.4),
+                    color: Theme.of(context).colorScheme.primary,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(1),
                     minHeight: 1,
                   );
@@ -71,8 +74,12 @@ class Feeds extends GetView<FeedEpisodeController> {
           return ListView.separated(
             controller: controller.scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(top: 12, bottom: 64),
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            padding: const EdgeInsets.only(
+              top: AnycastSpacing.gap,
+              bottom: AnycastSpacing.pageBottomSafe,
+            ),
+            separatorBuilder: (context, index) =>
+                const SizedBox(height: AnycastSpacing.gap),
             itemCount: episodes.length,
             itemBuilder: (context, index) {
               var ep = episodes[index];
@@ -142,123 +149,46 @@ class ImportBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 400,
-      width: double.infinity,
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return AnycastEmptyState(
+      icon: Icons.inbox_rounded,
+      title: 'It’s empty here.',
+      message: 'Let\'s change that!',
+      action: Column(
         children: [
-          Container(
-            alignment: Alignment.center,
-            height: 240,
-            child: Text(
-              'It’s empty here.\n\nLet\'s change that!',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontFamily: GoogleFonts.comfortaa().fontFamily,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2.40,
-              ),
-            ),
+          FilledButton.icon(
+            onPressed: () {
+              Get.find<HomeTabController>().onItemTapped(2);
+            },
+            icon: const Icon(Icons.explore_rounded),
+            label: const Text('Explore'),
           ),
-          Expanded(
-            child: SizedBox(
-              width: 220,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextButton(
-                    style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: const Color(0xFF10B981),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 36,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        textStyle: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontFamily: GoogleFonts.comfortaa().fontFamily,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 2.40,
-                        )),
-                    onPressed: () {
-                      Get.find<HomeTabController>().onItemTapped(2);
-                    },
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Iconify(Ic.outline_explore,
-                            color: Colors.white, size: 24),
-                        SizedBox(width: 8),
-                        Text('Explore'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      SizedBox(
-                        height: 48,
-                        child: TextButton(
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            side:
-                                const BorderSide(color: Colors.white, width: 1),
-                            textStyle: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontFamily: GoogleFonts.comfortaa().fontFamily,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          onPressed: () {
-                            Get.dialog(const ImportExportBlock());
-                          },
-                          child: const Row(
-                            children: [
-                              Iconify(Ic.round_file_download,
-                                  color: Colors.white),
-                              SizedBox(width: 6),
-                              Text(
-                                'Import OPML',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      IconButton(
-                          onPressed: () {
-                            showModalBottomSheet(
-                              useSafeArea: true,
-                              isScrollControlled: true,
-                              context: context,
-                              builder: (context) {
-                                return const ImportInstructions();
-                              },
-                            );
-                          },
-                          icon:
-                              const Iconify(Ic.round_help, color: Colors.grey)),
-                    ],
-                  ),
-                ],
+          const SizedBox(height: AnycastSpacing.md),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  Get.dialog(const ImportExportBlock());
+                },
+                icon: const Icon(Icons.file_download_outlined),
+                label: const Text('Import OPML'),
               ),
-            ),
+              const SizedBox(width: AnycastSpacing.md),
+              IconButton(
+                tooltip: 'Import help',
+                onPressed: () {
+                  showModalBottomSheet(
+                    useSafeArea: true,
+                    isScrollControlled: true,
+                    context: context,
+                    builder: (context) {
+                      return const ImportInstructions();
+                    },
+                  );
+                },
+                icon: const Icon(Icons.help_outline_rounded),
+              ),
+            ],
           ),
         ],
       ),

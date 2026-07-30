@@ -1,8 +1,9 @@
+import 'package:anycast/design_system/anycast_components.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/widgets/card.dart';
 import 'package:flutter/material.dart';
 import 'package:anycast/states/subscription.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class Subscriptions extends StatelessWidget {
   static final controller = Get.put(SubscriptionController());
@@ -12,27 +13,43 @@ class Subscriptions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      if (controller.subscriptions.isEmpty) {
-        return Center(
-          child: SizedBox(
-            width: 300,
-            child: Text(
-              'Whoops! \n\nLooks like your podcast galaxy is still unexplored.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontFamily: GoogleFonts.comfortaa().fontFamily,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2.40,
-              ),
+      final state = anycastCollectionVisualState(
+        isLoading: controller.isLoading.value,
+        hasError: controller.loadError.value != null,
+        isEmpty: controller.subscriptions.isEmpty,
+      );
+      switch (state) {
+        case AnycastCollectionVisualState.loading:
+          return const AnycastLoadingState(
+            label: 'Loading subscriptions…',
+          );
+        case AnycastCollectionVisualState.error:
+          return AnycastEmptyState(
+            icon: Icons.cloud_off_rounded,
+            title: 'Couldn’t load subscriptions',
+            message: 'Check the local library and try again.',
+            action: TextButton.icon(
+              onPressed: controller.load,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
             ),
-          ),
-        );
+          );
+        case AnycastCollectionVisualState.empty:
+          return const AnycastEmptyState(
+            icon: Icons.library_music_rounded,
+            title: 'No subscriptions yet',
+            message: 'Follow a podcast to keep it close at hand.',
+          );
+        case AnycastCollectionVisualState.content:
+          break;
       }
       return ListView.separated(
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
+        separatorBuilder: (context, index) =>
+            const SizedBox(height: AnycastSpacing.gap),
+        padding: const EdgeInsets.only(
+          top: AnycastSpacing.gap,
+          bottom: AnycastSpacing.pageBottomSafe,
+        ),
         itemCount: controller.subscriptions.length,
         itemBuilder: (context, index) {
           return PodcastCard(subscription: controller.subscriptions[index]);

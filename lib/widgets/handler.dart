@@ -1,3 +1,4 @@
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:flutter/material.dart';
 
 class Handler extends StatefulWidget {
@@ -75,7 +76,7 @@ class HandlerState extends State<Handler> with SingleTickerProviderStateMixin {
         height: 6,
         clipBehavior: Clip.antiAlias,
         decoration: ShapeDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: AnycastColor.sandAlpha8(Theme.of(context).brightness),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),

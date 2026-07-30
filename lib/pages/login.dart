@@ -5,7 +5,6 @@ import 'package:anycast/widgets/privacy.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:iconify_flutter/icons/ri.dart';
@@ -19,8 +18,9 @@ class LoginPage extends GetView<AuthController> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      color: const Color(0xFF111316),
+      color: theme.scaffoldBackgroundColor,
       child: SafeArea(
         child: Column(
           children: [
@@ -45,19 +45,16 @@ class LoginPage extends GetView<AuthController> {
                         Text(
                           "Sign up now \n\n&\n\nGet 3 free audio transcriptions!",
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.comfortaa(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.none,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 50),
                         // Google Sign In Button
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
+                            backgroundColor: theme.colorScheme.inverseSurface,
+                            foregroundColor: theme.colorScheme.onInverseSurface,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
                             shape: RoundedRectangleBorder(
@@ -86,8 +83,9 @@ class LoginPage extends GetView<AuthController> {
                         // Apple Sign In Button
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHigh,
+                            foregroundColor: theme.colorScheme.onSurface,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
                             shape: RoundedRectangleBorder(
@@ -115,20 +113,16 @@ class LoginPage extends GetView<AuthController> {
                         const SizedBox(height: 10),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black12,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHigh,
+                            foregroundColor: theme.colorScheme.onSurface,
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Iconify(Ic.email, color: Colors.white, size: 16),
+                              Iconify(Ic.email, size: 16),
                               SizedBox(width: 10),
-                              Text(
-                                'Sign in with Email',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
+                              Text('Sign in with Email'),
                             ],
                           ),
                           onPressed: () async {
@@ -149,9 +143,9 @@ class LoginPage extends GetView<AuthController> {
                 child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
-                    _buildUserInfo(),
+                    _buildUserInfo(context),
                     const SizedBox(height: 20),
-                    _buildSubscriptionInfo(),
+                    _buildSubscriptionInfo(context),
                     const SizedBox(height: 20),
                     _buildPaywall(context),
                     const SizedBox(height: 30),
@@ -168,7 +162,7 @@ class LoginPage extends GetView<AuthController> {
     );
   }
 
-  Widget _buildUserInfo() {
+  Widget _buildUserInfo(BuildContext context) {
     var icon = Ic.round_apple;
     if (controller.user.value!.providerData[0].providerId == 'google.com') {
       icon = Ri.google_fill;
@@ -177,8 +171,8 @@ class LoginPage extends GetView<AuthController> {
       icon = Ic.email;
     }
 
+    final theme = Theme.of(context);
     return Card(
-      color: const Color(0xFF1E1E1E),
       child: Padding(
         padding: const EdgeInsets.all(15),
         child: Column(
@@ -186,36 +180,33 @@ class LoginPage extends GetView<AuthController> {
           children: [
             Text(
               "User Info",
-              style: GoogleFonts.comfortaa(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white70,
-              ),
+              style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 15),
             Row(
               children: [
                 CircleAvatar(
                   radius: 25,
-                  backgroundColor: Colors.grey[800],
-                  child: Iconify(icon, color: Colors.white70),
+                  backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                  child: Iconify(
+                    icon,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(width: 15),
                 Expanded(
                   child: Text(
                     controller.user.value!.email ?? 'No email',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      fontSize: 14,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                     maxLines: 2,
                   ),
                 ),
                 PopupMenuButton(
-                    color: Colors.black.withValues(alpha: 0.9),
-                    shadowColor: Colors.black87,
-                    iconColor: Colors.white70,
+                    color: theme.colorScheme.surface,
+                    shadowColor: theme.colorScheme.shadow,
+                    iconColor: theme.colorScheme.onSurfaceVariant,
                     itemBuilder: (context) {
                       return [
                         PopupMenuItem(
@@ -227,17 +218,14 @@ class LoginPage extends GetView<AuthController> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Iconify(
+                              Iconify(
                                 Ic.content_copy,
                                 size: 16,
-                                color: Colors.white,
+                                color: theme.colorScheme.onSurface,
                               ),
                               Text(
                                 'Copy email',
-                                style: GoogleFonts.roboto(
-                                  fontSize: 12,
-                                  color: Colors.white,
-                                ),
+                                style: theme.textTheme.labelMedium,
                               ),
                             ],
                           ),
@@ -249,23 +237,25 @@ class LoginPage extends GetView<AuthController> {
                               AlertDialog(
                                 title: Text(
                                   'Sign out',
-                                  style: GoogleFonts.roboto(
-                                    color: Colors.red,
+                                  style:
+                                      theme.textTheme.headlineSmall?.copyWith(
+                                    color: theme.colorScheme.error,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 content: Text(
                                   'Are you sure you want to sign out?',
-                                  style: GoogleFonts.roboto(
-                                    color: Colors.red,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 actions: [
                                   TextButton(
                                     child: Text(
                                       'Sign out',
-                                      style: GoogleFonts.roboto(
-                                        color: Colors.red,
+                                      style:
+                                          theme.textTheme.labelLarge?.copyWith(
+                                        color: theme.colorScheme.error,
                                       ),
                                     ),
                                     onPressed: () {
@@ -276,8 +266,9 @@ class LoginPage extends GetView<AuthController> {
                                   TextButton(
                                     child: Text(
                                       'Cancel',
-                                      style: GoogleFonts.roboto(
-                                        color: Colors.green,
+                                      style:
+                                          theme.textTheme.labelLarge?.copyWith(
+                                        color: theme.colorScheme.primary,
                                       ),
                                     ),
                                     onPressed: () {
@@ -294,13 +285,12 @@ class LoginPage extends GetView<AuthController> {
                               Icon(
                                 Icons.exit_to_app,
                                 size: 16,
-                                color: Colors.red.shade900,
+                                color: theme.colorScheme.error,
                               ),
                               Text(
                                 'Sign out',
-                                style: GoogleFonts.roboto(
-                                  fontSize: 12,
-                                  color: Colors.red.shade900,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.error,
                                 ),
                               ),
                             ],
@@ -316,7 +306,8 @@ class LoginPage extends GetView<AuthController> {
     );
   }
 
-  Widget _buildSubscriptionInfo() {
+  Widget _buildSubscriptionInfo(BuildContext context) {
+    final theme = Theme.of(context);
     return Obx(() {
       var rcController = Get.find<RevenueCatController>();
 
@@ -335,17 +326,13 @@ class LoginPage extends GetView<AuthController> {
           return Row(
             children: [
               Text('${user.remaining}',
-                  style: TextStyle(
-                    color: Colors.green.shade200,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.primary,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
                   )),
               Text(
                 right,
-                style: GoogleFonts.comfortaa(
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
+                style: theme.textTheme.bodyMedium,
               ),
             ],
           );
@@ -354,7 +341,6 @@ class LoginPage extends GetView<AuthController> {
 
       if (!rcController.isSubscribed) {
         return Card(
-          color: const Color(0xFF1E1E1E),
           child: Padding(
             padding: const EdgeInsets.all(15),
             child: Column(
@@ -362,8 +348,7 @@ class LoginPage extends GetView<AuthController> {
               children: [
                 Text(
                   'Basic Plan',
-                  style: GoogleFonts.comfortaa(
-                    color: Colors.white,
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -388,12 +373,8 @@ class LoginPage extends GetView<AuthController> {
               );
 
       return Card(
-        color: const Color(0xFF1E1E1E),
         child: DefaultTextStyle(
-          style: GoogleFonts.comfortaa(
-            color: Colors.white,
-            fontSize: 14,
-          ),
+          style: theme.textTheme.bodyMedium!,
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.all(15),
@@ -416,15 +397,13 @@ class LoginPage extends GetView<AuthController> {
 
   Widget _buildPaywall(BuildContext context) {
     var slideController = CarouselSliderController();
+    final theme = Theme.of(context);
 
     return Card(
-      color: const Color(0xFF1E1E1E),
       child: Padding(
         padding: const EdgeInsets.all(15),
         child: DefaultTextStyle(
-          style: GoogleFonts.comfortaa(
-            color: Colors.white,
-            fontSize: 14,
+          style: theme.textTheme.bodyMedium!.copyWith(
             fontWeight: FontWeight.bold,
           ),
           child: Column(
@@ -478,7 +457,7 @@ class LoginPage extends GetView<AuthController> {
                   List<Widget> planCards = [];
                   for (var plan in availablePlans) {
                     planCards.add(
-                      Expanded(child: _buildPlanCard(plan)),
+                      Expanded(child: _buildPlanCard(context, plan)),
                     );
                   }
 
@@ -492,7 +471,6 @@ class LoginPage extends GetView<AuthController> {
                       const SizedBox(height: 15),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.lightGreenAccent,
                           minimumSize: const Size(double.infinity, 50),
                         ),
                         onPressed: () async {
@@ -510,15 +488,13 @@ class LoginPage extends GetView<AuthController> {
                           if (plan == null) {
                             Get.dialog(
                               AlertDialog(
-                                title: Text('Error',
-                                    style: GoogleFonts.comfortaa(
-                                        color: Colors.black,
-                                        fontWeight: FontWeight.bold)),
+                                title: Text(
+                                  'Error',
+                                  style: theme.textTheme.headlineSmall,
+                                ),
                                 content: Text(
                                   'Invalid plan',
-                                  style: GoogleFonts.comfortaa(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold),
+                                  style: theme.textTheme.bodyMedium,
                                 ),
                               ),
                             );
@@ -532,10 +508,7 @@ class LoginPage extends GetView<AuthController> {
                           await rcController.purchasePackage(plan);
                           Get.back();
                         },
-                        child: Text('Confirm purchase',
-                            style: GoogleFonts.comfortaa(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold)),
+                        child: const Text('Confirm purchase'),
                       ),
                     ],
                   );
@@ -559,14 +532,13 @@ class LoginPage extends GetView<AuthController> {
                   if (!success) {
                     Get.dialog(
                       AlertDialog(
-                        title: Text('Error',
-                            style: GoogleFonts.comfortaa(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
+                        title: Text(
+                          'Error',
+                          style: theme.textTheme.headlineSmall,
+                        ),
                         content: Text(
                           'No active entitlements',
-                          style: GoogleFonts.comfortaa(
-                              color: Colors.white, fontWeight: FontWeight.bold),
+                          style: theme.textTheme.bodyMedium,
                         ),
                       ),
                     );
@@ -575,22 +547,23 @@ class LoginPage extends GetView<AuthController> {
 
                   Get.dialog(
                     AlertDialog(
-                      title: Text('Success',
-                          style: GoogleFonts.comfortaa(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
+                      title: Text(
+                        'Success',
+                        style: theme.textTheme.headlineSmall,
+                      ),
                       content: Text(
                         'Restored purchases',
-                        style: GoogleFonts.comfortaa(
-                            color: Colors.white, fontWeight: FontWeight.bold),
+                        style: theme.textTheme.bodyMedium,
                       ),
                     ),
                   );
                 },
-                child: const Center(
+                child: Center(
                   child: Text(
                     'restore purchases',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
@@ -601,7 +574,7 @@ class LoginPage extends GetView<AuthController> {
     );
   }
 
-  Widget _buildPlanCard(Package plan) {
+  Widget _buildPlanCard(BuildContext context, Package plan) {
     var title = 'Monthly';
     var per = 'Month';
 
@@ -612,13 +585,14 @@ class LoginPage extends GetView<AuthController> {
 
     return Obx(
       () {
+        final theme = Theme.of(context);
         var rcController = Get.find<RevenueCatController>();
         var choosenPlan = rcController.choosenPlan.value;
         final choosen = choosenPlan == plan.storeProduct.identifier;
-        var background = Colors.grey[800];
+        var background = theme.colorScheme.surfaceContainerHigh;
 
         if (choosen) {
-          background = const Color.fromARGB(255, 56, 121, 58);
+          background = theme.colorScheme.primaryContainer;
         }
 
         return Column(
@@ -633,17 +607,14 @@ class LoginPage extends GetView<AuthController> {
                   padding:
                       const EdgeInsets.symmetric(vertical: 12, horizontal: 28),
                   child: DefaultTextStyle(
-                    style: GoogleFonts.comfortaa(
-                      color: Colors.white,
-                      fontSize: 12,
+                    style: theme.textTheme.labelMedium!.copyWith(
+                      color: theme.colorScheme.onSurface,
                     ),
                     child: Column(
                       children: [
                         Text(
                           title,
-                          style: GoogleFonts.comfortaa(
-                            color: Colors.white,
-                            fontSize: 14,
+                          style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -660,9 +631,10 @@ class LoginPage extends GetView<AuthController> {
             const SizedBox(height: 5),
             Text(
               'Auto Renewal\n${plan.storeProduct.priceString}/${per.toLowerCase()}',
-              style: GoogleFonts.comfortaa(
-                color: choosen ? Colors.green : Colors.white70,
-                fontSize: 10,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: choosen
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
                 height: 1.2,
               ),
             ),
@@ -680,6 +652,7 @@ class PlusIntro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Obx(
       () {
         var rcController = Get.find<RevenueCatController>();
@@ -691,13 +664,11 @@ class PlusIntro extends StatelessWidget {
         return ExpansionTile(
           tilePadding: const EdgeInsets.all(0),
           initiallyExpanded: true,
-          collapsedIconColor: Colors.white,
-          iconColor: Colors.white,
+          collapsedIconColor: theme.colorScheme.onSurfaceVariant,
+          iconColor: theme.colorScheme.onSurface,
           title: Text(
             "Anycast Plus ($name)",
-            style: GoogleFonts.comfortaa(
-              color: Colors.white,
-              fontSize: 14,
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -707,9 +678,8 @@ class PlusIntro extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 DefaultTextStyle(
-                    style: GoogleFonts.comfortaa(
-                      color: Colors.white,
-                      fontSize: 12,
+                    style: theme.textTheme.bodySmall!.copyWith(
+                      color: theme.colorScheme.onSurface,
                       height: 1.4,
                     ),
                     child: const Column(
@@ -756,30 +726,24 @@ class RemoveAccount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: GestureDetector(
         onTap: () {
           Get.dialog(
             AlertDialog(
               title: Text("Permanently Delete Your Account?",
-                  style: GoogleFonts.comfortaa(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14)),
+                  style: theme.textTheme.headlineSmall),
               content: Text(
                 "Warning: This action will permanently delete your account and all associated data. Once deleted, your account cannot be recovered. Are you sure you want to proceed?",
-                style: GoogleFonts.comfortaa(color: Colors.white, fontSize: 14),
+                style: theme.textTheme.bodyMedium,
               ),
               actions: [
                 TextButton(
                   onPressed: () {
                     Get.back();
                   },
-                  child: Text("Cancel",
-                      style: GoogleFonts.comfortaa(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14)),
+                  child: const Text("Cancel"),
                 ),
                 TextButton(
                   onPressed: () async {
@@ -798,11 +762,12 @@ class RemoveAccount extends StatelessWidget {
                     Get.back();
                     Get.find<AuthController>().signOut();
                   },
-                  child: Text("Confirm",
-                      style: GoogleFonts.comfortaa(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14)),
+                  child: Text(
+                    "Confirm",
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -812,13 +777,12 @@ class RemoveAccount extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: Colors.white30,
+            color: theme.colorScheme.error.withValues(alpha: .10),
           ),
           child: Text(
             "Permanently Delete Account",
-            style: GoogleFonts.comfortaa(
-              color: Colors.red,
-              fontSize: 14,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.error,
               fontWeight: FontWeight.bold,
               decoration: TextDecoration.none,
             ),
@@ -830,17 +794,6 @@ class RemoveAccount extends StatelessWidget {
 }
 
 class EmailLogin extends StatefulWidget {
-  final inputDec = const InputDecoration(
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.all(Radius.circular(10)),
-      borderSide: BorderSide(color: Colors.white, width: 2),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.all(Radius.circular(10)),
-      borderSide: BorderSide(color: Colors.white, width: 2),
-    ),
-  );
-
   const EmailLogin({
     super.key,
   });
@@ -882,35 +835,24 @@ class _EmailLoginState extends State<EmailLogin> {
   }
 
   Widget loginWidget() {
+    final theme = Theme.of(context);
     return Column(
       children: [
         TextField(
-          style: const TextStyle(color: Colors.white),
+          style: theme.textTheme.bodyLarge,
           controller: emailController,
-          decoration: widget.inputDec.copyWith(
-            hintText: "Email",
-          ),
+          decoration: const InputDecoration(hintText: "Email"),
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 20),
         TextField(
-          style: const TextStyle(color: Colors.white),
+          style: theme.textTheme.bodyLarge,
           controller: passwordController,
-          decoration: widget.inputDec.copyWith(
-            hintText: "Password",
-          ),
+          decoration: const InputDecoration(hintText: "Password"),
           obscureText: true,
         ),
         const SizedBox(height: 20),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
-          ),
           onPressed: () {
             Get.find<AuthController>().loginWithEmail(
               emailController.text,
@@ -925,16 +867,14 @@ class _EmailLoginState extends State<EmailLogin> {
             // setLogin(false);
             Get.dialog(
               AlertDialog(
-                title: Text("Sorry!",
-                    style: GoogleFonts.comfortaa(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14)),
+                title: Text(
+                  "Sorry!",
+                  style: theme.textTheme.headlineSmall,
+                ),
                 content: Text(
                   "Please sign in with Apple or Google.\n\n"
                   "We don't support email registration yet.",
-                  style:
-                      GoogleFonts.comfortaa(color: Colors.white, fontSize: 14),
+                  style: theme.textTheme.bodyMedium,
                 ),
               ),
             );
@@ -946,44 +886,31 @@ class _EmailLoginState extends State<EmailLogin> {
   }
 
   Widget registerWidget() {
+    final theme = Theme.of(context);
     return Column(
       children: [
         TextField(
-          style: const TextStyle(color: Colors.white),
+          style: theme.textTheme.bodyLarge,
           controller: emailController,
-          decoration: widget.inputDec.copyWith(
-            hintText: "Email",
-          ),
+          decoration: const InputDecoration(hintText: "Email"),
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 20),
         TextField(
-          style: const TextStyle(color: Colors.white),
+          style: theme.textTheme.bodyLarge,
           controller: passwordController,
-          decoration: widget.inputDec.copyWith(
-            hintText: "Password",
-          ),
+          decoration: const InputDecoration(hintText: "Password"),
           obscureText: true,
         ),
         const SizedBox(height: 20),
         TextField(
-          style: const TextStyle(color: Colors.white),
+          style: theme.textTheme.bodyLarge,
           controller: passwordConfirmController,
-          decoration: widget.inputDec.copyWith(
-            hintText: "Confirm Password",
-          ),
+          decoration: const InputDecoration(hintText: "Confirm Password"),
           obscureText: true,
         ),
         const SizedBox(height: 20),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
-          ),
           onPressed: () {
             if (passwordController.text != passwordConfirmController.text) {
               Get.snackbar("Error", "Passwords don't match");

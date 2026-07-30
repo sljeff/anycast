@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/history_episode.dart';
 import 'package:anycast/models/playlist_episode.dart';
@@ -30,7 +31,7 @@ class PlayerController extends GetxController {
   var pageIndex = 1.obs;
   var playlistEpisode = PlaylistEpisodeModel.empty().obs;
   var backgroundColor =
-      const Color(0xFF111316).obs; // The color caculated by palette generator
+      AnycastColor.playerWarm.obs; // The color caculated by palette generator
   var channel = SubscriptionModel.empty().obs;
 
   var pageController = PageController(

@@ -1,3 +1,4 @@
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/episode.dart';
 import 'package:anycast/states/chat.dart' as state;
 import 'package:flutter/material.dart';
@@ -5,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class ChatPage extends GetView<state.ChatController> {
   final Episode episode;
@@ -22,9 +22,9 @@ class ChatPage extends GetView<state.ChatController> {
       },
       child: Scaffold(
         appBar: AppBar(
-          toolbarHeight: 64,
-          backgroundColor: Colors.deepPurpleAccent,
-          foregroundColor: Colors.white,
+          toolbarHeight: AnycastSpacing.sheetTitleH,
+          backgroundColor: AnycastColor.playerBackground,
+          foregroundColor: AnycastColor.playerText,
           leading: IconButton(
             onPressed: () {
               controller.clearMessages();
@@ -37,15 +37,13 @@ class ChatPage extends GetView<state.ChatController> {
             icon: const Icon(Icons.close_rounded, color: Colors.white),
           ),
           title: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding:
+                const EdgeInsets.symmetric(horizontal: AnycastSpacing.pageH),
             child: Text(
               episode.title ?? '',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.comfortaa(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
           actions: [

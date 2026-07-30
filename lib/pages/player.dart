@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:anycast/api/share.dart';
+import 'package:anycast/design_system/anycast_theme.dart';
 import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subscription.dart';
@@ -22,10 +24,10 @@ import 'package:anycast/widgets/play_icon.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter_lyric/flutter_lyric.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/ic.dart';
 import 'package:lottie/lottie.dart';
@@ -42,46 +44,104 @@ class PlayerPage extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
-          controller.pageIndex.value = 1;
-        }
-      },
-      child: Container(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: PopScope(
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) {
+            controller.pageIndex.value = 1;
+          }
+        },
+        child: Theme(
+          data: AnycastTheme.dark,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Obx(
+                () => _PlayerBackground(
+                  imageUrl: controller.playlistEpisode.value.imageUrl,
+                ),
+              ),
+              SafeArea(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Handler(),
+                    Expanded(
+                      child: PageView(
+                        controller: controller.pageController,
+                        children: const [
+                          PlayerSettings(),
+                          PlayerMain(),
+                          PlayerAI(),
+                        ],
+                        onPageChanged: (index) {
+                          controller.pageIndex.value = index;
+                        },
+                      ),
+                    ),
+                    const PageTab(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerBackground extends StatelessWidget {
+  const _PlayerBackground({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    const stops = [0.0, .25, .5, .745, 1.0];
+    if (imageUrl == null || imageUrl!.isEmpty) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: AnycastColor.playerGradientColors,
+            stops: stops,
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ImageFiltered(
+          imageFilter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+          child: Transform.scale(
+            scale: 1.15,
+            child: CachedNetworkImage(
+              imageUrl: imageUrl!,
+              fit: BoxFit.cover,
+              placeholder: (context, url) =>
+                  const ColoredBox(color: AnycastColor.playerWarm),
+              errorWidget: (context, url, error) =>
+                  const ColoredBox(color: AnycastColor.playerWarm),
+            ),
+          ),
+        ),
+        const ColoredBox(color: AnycastColor.playerArtworkScrim),
+        const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                controller.backgroundColor.value,
-                const Color(0xFF111316),
-                const Color(0xFF111316),
-              ],
+              colors: AnycastColor.playerGradientOverlayColors,
+              stops: stops,
             ),
           ),
-          child: SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Handler(),
-                Expanded(
-                  child: PageView(
-                    controller: controller.pageController,
-                    children: const [
-                      PlayerSettings(),
-                      PlayerMain(),
-                      PlayerAI(),
-                    ],
-                    onPageChanged: (index) {
-                      controller.pageIndex.value = index;
-                    },
-                  ),
-                ),
-                const PageTab(),
-              ],
-            ),
-          )),
+        ),
+      ],
     );
   }
 }
@@ -93,11 +153,14 @@ class PageTab extends GetView<PlayerController> {
   Widget build(BuildContext context) {
     return Container(
       height: 56,
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(AnycastSpacing.xs),
       decoration: ShapeDecoration(
-        color: const Color(0x19232830),
+        color: AnycastColor.sandAlpha3(Brightness.dark),
         shape: RoundedRectangleBorder(
-          side: const BorderSide(width: 1, color: Color(0xFF4B5563)),
+          side: BorderSide(
+            width: 1,
+            color: AnycastColor.sandAlpha4(Brightness.dark),
+          ),
           borderRadius: BorderRadius.circular(36),
         ),
       ),
@@ -121,9 +184,14 @@ class PlayerSettings extends GetView<PlayerController> {
   @override
   Widget build(BuildContext context) {
     return DefaultTextStyle(
-      style: const TextStyle(color: Colors.white),
+      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+            color: AnycastColor.playerText,
+          ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AnycastSpacing.pageHeader,
+          vertical: AnycastSpacing.pageH,
+        ),
         child: Column(children: [
           Expanded(
             child: Scrollbar(
@@ -135,7 +203,7 @@ class PlayerSettings extends GetView<PlayerController> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AnycastSpacing.pageH),
           const Settings(),
         ]),
       ),
@@ -148,11 +216,15 @@ class PlayerMain extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    var size = Get.width - 48;
+    var size = Get.width - AnycastSpacing.pageHeader * 2;
     return DefaultTextStyle(
-      style: const TextStyle(color: Colors.white),
+      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+            color: AnycastColor.playerText,
+          ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AnycastSpacing.pageHeader,
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -240,18 +312,24 @@ class PlayerAI extends GetView<PlayerController> {
   @override
   Widget build(BuildContext context) {
     return DefaultTextStyle(
-      style: const TextStyle(
-        color: Colors.white,
-        decoration: TextDecoration.none,
-      ),
+      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+            color: AnycastColor.playerText,
+            decoration: TextDecoration.none,
+          ),
       child: Container(
-        margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        margin: const EdgeInsets.all(AnycastSpacing.pageHeader),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AnycastSpacing.gap,
+        ),
         alignment: Alignment.center,
         decoration: ShapeDecoration(
+          color: AnycastColor.transcriptSurface,
           shape: RoundedRectangleBorder(
-            side: const BorderSide(width: 1, color: Color(0xFF232830)),
-            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+              width: 1,
+              color: AnycastColor.sandAlpha4(Brightness.dark),
+            ),
+            borderRadius: BorderRadius.circular(AnycastRadius.md),
           ),
         ),
         child: LayoutBuilder(builder: (context, constraints) {
@@ -260,34 +338,34 @@ class PlayerAI extends GetView<PlayerController> {
             children: [
               Container(
                 height: 60,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  vertical: AnycastSpacing.gap,
+                ),
                 alignment: Alignment.center,
                 child: Row(children: [
                   Obx(
-                    () => ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: controller.channel.value.imageUrl ??
-                            'https://placehold.co/400/000000/FFF.png?text=NoChannel',
-                      ),
+                    () => _TranscriptArtwork(
+                      imageUrl: controller.channel.value.imageUrl,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AnycastSpacing.gap),
                   Obx(
                     () => Expanded(
                       child: Text(controller.playlistEpisode.value.title ?? "",
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.comfortaa(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          )),
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AnycastColor.playerText,
+                                  )),
                     ),
                   ),
                 ]),
               ),
-              Divider(height: 1, color: Colors.grey[800]),
+              Divider(
+                height: 1,
+                color: AnycastColor.sandAlpha4(Brightness.dark),
+              ),
               Subtitles(height: height - 62),
             ],
           );
@@ -297,15 +375,132 @@ class PlayerAI extends GetView<PlayerController> {
   }
 }
 
+class _TranscriptArtwork extends StatelessWidget {
+  const _TranscriptArtwork({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AnycastRadius.sm),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: CachedNetworkImage(
+          imageUrl: imageUrl ?? '',
+          fit: BoxFit.cover,
+          placeholder: (context, url) => const ColoredBox(
+            color: AnycastColor.playerBackground,
+            child: Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AnycastColor.goldDark9,
+                ),
+              ),
+            ),
+          ),
+          errorWidget: (context, url, error) => const ColoredBox(
+            color: AnycastColor.playerBackground,
+            child: Icon(
+              Icons.podcasts_rounded,
+              size: 20,
+              color: AnycastColor.playerSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TranscriptStatusPanel extends StatelessWidget {
+  const _TranscriptStatusPanel({
+    required this.visual,
+    required this.title,
+    required this.message,
+    this.action,
+  });
+
+  final Widget visual;
+  final String title;
+  final String message;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AnycastSpacing.pageH),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            visual,
+            const SizedBox(height: AnycastSpacing.cardInner),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AnycastColor.playerText,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: AnycastSpacing.md),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AnycastColor.playerSecondary,
+                  ),
+            ),
+            if (action != null) ...[
+              const SizedBox(height: AnycastSpacing.pageHeader),
+              action!,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TranscriptStatusIcon extends StatelessWidget {
+  const _TranscriptStatusIcon({
+    required this.icon,
+    this.color = AnycastColor.playerText,
+  });
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: AnycastColor.sandAlpha3(Brightness.dark),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: color, size: 30),
+    );
+  }
+}
+
 class TitleBar extends GetView<PlayerController> {
   const TitleBar({super.key});
 
   @override
   Widget build(BuildContext context) {
-    var rightWidth = MediaQuery.of(context).size.width - 24 * 2 - 64 - 6;
+    var rightWidth = MediaQuery.of(context).size.width -
+        AnycastSpacing.pageHeader * 2 -
+        64 -
+        AnycastSpacing.sm;
     return Obx(() {
       var episode = controller.playlistEpisode.value;
-      var backgroundColor = controller.backgroundColor.value;
       var subscription = controller.channel.value;
       var imgUrl = subscription.imageUrl ?? '';
       var title = controller.playlistEpisode.value.title ?? '';
@@ -336,18 +531,15 @@ class TitleBar extends GetView<PlayerController> {
       }
 
       // marquee or text
-      var titleStyle = const TextStyle(
-        fontSize: 24,
-        color: Colors.white,
-        fontFamily: 'PingFang SC',
-        fontWeight: FontWeight.w600,
-      );
+      var titleStyle = Theme.of(context).textTheme.headlineMedium!.copyWith(
+            color: AnycastColor.playerText,
+          );
       Widget titleWidget = Text(
         title,
         style: titleStyle,
       );
       // if text width > rightWidth, use marquee
-      if (title.length * 24 > rightWidth) {
+      if (title.length * 22 > rightWidth) {
         titleWidget = Marquee(
           text: title,
           pauseAfterRound: const Duration(seconds: 1),
@@ -361,7 +553,7 @@ class TitleBar extends GetView<PlayerController> {
           borderRadius: BorderRadius.circular(12),
           child: img,
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: AnycastSpacing.sm),
         SizedBox(
           width: rightWidth,
           child: Column(
@@ -372,7 +564,7 @@ class TitleBar extends GetView<PlayerController> {
                 height: 34,
                 child: titleWidget,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AnycastSpacing.sm),
               GestureDetector(
                 onTap: () {
                   jumpToChannel(episode, context, subscription);
@@ -381,12 +573,10 @@ class TitleBar extends GetView<PlayerController> {
                   height: 24,
                   child: Text(
                     channelTitle,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: getTextSafeColor(backgroundColor),
-                      fontFamily: 'PingFang SC',
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AnycastColor.playerSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ),
               ),
@@ -427,32 +617,61 @@ class MyProgressBar extends GetView<PlayerController> {
             controller.positionData.value.duration == Duration.zero) {
           controller.initProgress();
         }
-        return ProgressBar(
-          progress: position,
-          buffered: bufferedPosition,
-          total: duration,
-          onSeek: (duration) {
-            controller.seek(duration);
-          },
-          timeLabelLocation: TimeLabelLocation.above,
-          timeLabelType: TimeLabelType.remainingTime,
-          timeLabelPadding: 4,
-          timeLabelTextStyle: TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontFamily: GoogleFonts.comfortaa().fontFamily,
-            fontWeight: FontWeight.w700,
-          ),
-          thumbColor: Colors.white,
-          thumbGlowColor: Colors.black.withValues(alpha: 0.2),
-          thumbCanPaintOutsideBar: false,
-          thumbRadius: 16,
-          thumbGlowRadius: 20,
-          barHeight: 40,
-          barCapShape: BarCapShape.round,
-          baseBarColor: const Color(0xFF232830),
-          bufferedBarColor: Colors.white.withValues(alpha: 0.05),
-          progressBarColor: Colors.white,
+        final state = playbackProgressVisualState(
+          hasEpisode:
+              controller.playlistEpisode.value.enclosureUrl?.isNotEmpty == true,
+          isLoading: controller.isLoading.value,
+          duration: duration,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (state.message != null) ...[
+              Text(
+                state.message!,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AnycastColor.playerSecondary,
+                    ),
+              ),
+              const SizedBox(height: AnycastSpacing.xs),
+            ],
+            IgnorePointer(
+              ignoring: !state.allowsSeek,
+              child: Opacity(
+                opacity: state.allowsSeek ? 1 : .48,
+                child: ProgressBar(
+                  progress: position,
+                  buffered: bufferedPosition,
+                  total: duration,
+                  onSeek: state.allowsSeek
+                      ? (duration) {
+                          controller.seek(duration);
+                        }
+                      : null,
+                  timeLabelLocation: state.allowsSeek
+                      ? TimeLabelLocation.above
+                      : TimeLabelLocation.none,
+                  timeLabelType: TimeLabelType.remainingTime,
+                  timeLabelPadding: AnycastSpacing.xs,
+                  timeLabelTextStyle:
+                      Theme.of(context).textTheme.labelMedium!.copyWith(
+                    color: AnycastColor.playerSecondary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                  thumbColor: AnycastColor.playerText,
+                  thumbGlowColor: Colors.black.withValues(alpha: 0.2),
+                  thumbCanPaintOutsideBar: false,
+                  thumbRadius: AnycastSpacing.md,
+                  thumbGlowRadius: AnycastSpacing.chip,
+                  barHeight: AnycastSpacing.playerProgress,
+                  barCapShape: BarCapShape.round,
+                  baseBarColor: AnycastColor.sandAlpha3(Brightness.dark),
+                  bufferedBarColor: AnycastColor.sandAlpha4(Brightness.dark),
+                  progressBarColor: AnycastColor.playerText,
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -471,145 +690,90 @@ class Subtitles extends GetView<SubtitleController> {
   Widget build(BuildContext context) {
     return Obx(() {
       var playerController = Get.find<PlayerController>();
-      if (playerController.playlistEpisode.value.enclosureUrl == null) {
-        return const SizedBox();
-      }
-      var url = playerController.playlistEpisode.value.enclosureUrl!;
+      final url =
+          playerController.playlistEpisode.value.enclosureUrl?.trim() ?? '';
+      final status = url.isEmpty ? null : controller.subtitleUrls[url];
+      final visualState = transcriptVisualState(
+        hasEpisode: url.isNotEmpty,
+        status: status,
+        hasTranscript: false,
+      );
 
-      var status = controller.subtitleUrls[url];
-      if (status == null) {
-        // a button to fetch subtitles
+      if (visualState == TranscriptVisualState.unavailable) {
+        return const Expanded(
+          child: _TranscriptStatusPanel(
+            visual: _TranscriptStatusIcon(
+              icon: Icons.description_outlined,
+            ),
+            title: 'Transcript unavailable',
+            message: 'Choose an episode to view or generate its transcript.',
+          ),
+        );
+      }
+
+      if (visualState == TranscriptVisualState.prompt) {
         return Expanded(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Generate transcript with AI (Beta)',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontFamily: GoogleFonts.comfortaa().fontFamily,
-                        fontWeight: FontWeight.w400,
-                        height: 0,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: const ShapeDecoration(
-                        color: Color(0xFF059669),
-                        shape: OvalBorder(),
-                      ),
-                      child: const Tooltip(
-                        showDuration: Duration(seconds: 10),
-                        message: 'AI transcript may take about 2 ~ 5 minutes',
-                        triggerMode: TooltipTriggerMode.tap,
-                        child: Icon(
-                          Icons.question_mark_rounded,
-                          size: 12,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                TextButton(
-                  onPressed: () {
-                    controller.add(url);
-                  },
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 48, vertical: 24),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Iconify(newDoc),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                )
-              ],
+          child: _TranscriptStatusPanel(
+            visual: const _TranscriptStatusIcon(
+              icon: Icons.auto_awesome_rounded,
+              color: AnycastColor.goldDark9,
+            ),
+            title: 'Generate transcript with AI',
+            message:
+                'Generation usually takes 2–5 minutes. You can leave this screen and come back later.',
+            action: FilledButton.icon(
+              onPressed: () {
+                controller.add(url);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: AnycastColor.goldDark9,
+                foregroundColor: AnycastColor.sand12,
+              ),
+              icon: const Icon(Icons.description_rounded),
+              label: const Text('Generate transcript'),
             ),
           ),
         );
       }
 
-      if (status == 'processing') {
-        // a progress indicator
-        var style = TextStyle(
-          color: Colors.white,
-          fontFamily: GoogleFonts.comfortaa().fontFamily,
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
-        );
+      if (visualState == TranscriptVisualState.processing) {
         return Expanded(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Lottie.asset('assets/lottie/robot_loading.json'),
-                const SizedBox(height: 24),
-                Text("Generating with AI ...", style: style),
-                const SizedBox(height: 8),
-                Text("It may take 2 ~ 5 minutes ...", style: style),
-                const SizedBox(height: 24),
-                Text(
-                  "Feel free to explore or come back later.",
-                  style: GoogleFonts.comfortaa().copyWith(
-                    color: Colors.white,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+          child: _TranscriptStatusPanel(
+            visual: SizedBox(
+              width: 112,
+              height: 112,
+              child: Lottie.asset('assets/lottie/robot_loading.json'),
             ),
+            title: 'Generating transcript…',
+            message:
+                'This usually takes 2–5 minutes. You can keep listening and return later.',
           ),
         );
       }
 
-      if (status == 'failed') {
-        // a button to retry
-        return Center(
-          child: TextButton(
-            onPressed: () {
-              controller.add(url);
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.blue,
+      if (visualState == TranscriptVisualState.failed) {
+        return Expanded(
+          child: _TranscriptStatusPanel(
+            visual: _TranscriptStatusIcon(
+              icon: Icons.error_outline_rounded,
+              color: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Retry'),
+            title: 'Transcript generation failed',
+            message:
+                'Nothing was changed. Try generating the transcript again.',
+            action: FilledButton.icon(
+              onPressed: () {
+                controller.add(url);
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+            ),
           ),
         );
       }
 
       var helper = DatabaseHelper();
-      return SingleChildScrollView(
+      return Expanded(
         child: FutureBuilder(
           future: helper.db.then((db) async {
             var subtitle = await SubtitleModel.get(db, url);
@@ -623,8 +787,34 @@ class Subtitles extends GetView<SubtitleController> {
             return subtitle;
           }),
           builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return _TranscriptStatusPanel(
+                visual: _TranscriptStatusIcon(
+                  icon: Icons.sync_problem_rounded,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                title: 'Couldn’t load transcript',
+                message: 'The saved transcript is temporarily unavailable.',
+                action: FilledButton.icon(
+                  onPressed: controller.subtitleUrls.refresh,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try again'),
+                ),
+              );
+            }
             if (!snapshot.hasData) {
-              return const SizedBox.shrink();
+              return const _TranscriptStatusPanel(
+                visual: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: AnycastColor.goldDark9,
+                  ),
+                ),
+                title: 'Loading transcript…',
+                message: 'Preparing the saved transcript for playback.',
+              );
             }
             var subtitle = snapshot.data!;
 
@@ -638,8 +828,32 @@ class Subtitles extends GetView<SubtitleController> {
                   return FutureBuilder(future: helper.db.then((db) {
                     return TranslationModel.get(db, url, language);
                   }), builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Column(
+                        children: [
+                          LyricsWithShare(
+                            mainLyric: subtitle.toLrc(),
+                            height: height - AnycastSpacing.xxl,
+                          ),
+                          const _TranscriptInlineStatus(
+                            message: 'Translation unavailable',
+                            showProgress: false,
+                          ),
+                        ],
+                      );
+                    }
                     if (!snapshot.hasData) {
-                      return const SizedBox.shrink();
+                      return Column(
+                        children: [
+                          LyricsWithShare(
+                            mainLyric: subtitle.toLrc(),
+                            height: height - AnycastSpacing.xxl,
+                          ),
+                          const _TranscriptInlineStatus(
+                            message: 'Loading translation…',
+                          ),
+                        ],
+                      );
                     }
 
                     var translation = snapshot.data!;
@@ -654,22 +868,10 @@ class Subtitles extends GetView<SubtitleController> {
                     children: [
                       LyricsWithShare(
                         mainLyric: subtitle.toLrc(),
-                        height: height - 48,
+                        height: height - AnycastSpacing.xxl,
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const RefreshProgressIndicator(),
-                          Text(
-                            "Translating subtitles...",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontFamily: GoogleFonts.comfortaa().fontFamily,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                      const _TranscriptInlineStatus(
+                        message: 'Translating transcript…',
                       ),
                     ],
                   );
@@ -685,6 +887,46 @@ class Subtitles extends GetView<SubtitleController> {
         ),
       );
     });
+  }
+}
+
+class _TranscriptInlineStatus extends StatelessWidget {
+  const _TranscriptInlineStatus({
+    required this.message,
+    this.showProgress = true,
+  });
+
+  final String message;
+  final bool showProgress;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: AnycastSpacing.xxl,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (showProgress) ...[
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AnycastColor.goldDark9,
+              ),
+            ),
+            const SizedBox(width: AnycastSpacing.md),
+          ],
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AnycastColor.playerSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -715,20 +957,27 @@ class _LyricsWithShareState extends State<LyricsWithShare>
 
   // 使用预设样式并自定义
   static final _lyricStyle = LyricStyles.default1.copyWith(
-    textStyle: GoogleFonts.mPlusRounded1c().copyWith(
-      color: Colors.grey[200],
+    textStyle: const TextStyle(
+      fontFamily: '.AppleSystemUIFont',
+      color: AnycastColor.playerSecondary,
       fontSize: 14,
+      height: 1.35,
     ),
-    activeStyle: GoogleFonts.mPlusRounded1c().copyWith(
-      color: Colors.greenAccent,
+    activeStyle: const TextStyle(
+      fontFamily: '.AppleSystemUIFont',
+      color: AnycastColor.playerText,
       fontSize: 16,
-      fontWeight: FontWeight.w200,
+      height: 1.35,
+      fontWeight: FontWeight.w700,
     ),
-    translationStyle: GoogleFonts.mPlusRounded1c().copyWith(
-      color: Colors.greenAccent,
+    translationStyle: const TextStyle(
+      fontFamily: '.AppleSystemUIFont',
+      color: AnycastColor.goldDark9,
       fontSize: 14,
+      height: 1.35,
+      fontWeight: FontWeight.w500,
     ),
-    translationActiveColor: Colors.grey[300],
+    translationActiveColor: AnycastColor.playerText,
     lineGap: 12, // 减小行间距
     translationLineGap: 6, // 减小翻译行间距
     textAlign: TextAlign.left,
@@ -748,8 +997,7 @@ class _LyricsWithShareState extends State<LyricsWithShare>
     _loadLyrics();
 
     // 立即同步当前播放进度
-    _lyricController
-        .setProgress(_playerController.positionData.value.position);
+    _lyricController.setProgress(_playerController.positionData.value.position);
 
     // 设置点击歌词行回调 - 用于切换播放/暂停
     _lyricController.setOnTapLineCallback((Duration position) {
@@ -815,8 +1063,8 @@ class _LyricsWithShareState extends State<LyricsWithShare>
           builder: (SelectionState state, Widget? child) {
             return Positioned(
               top: state.centerY,
-              left: 12,
-              right: 12,
+              left: AnycastSpacing.gap,
+              right: AnycastSpacing.gap,
               child: FractionalTranslation(
                 translation: const Offset(0, -0.5),
                 child: Row(
@@ -824,10 +1072,9 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                     // 左侧时间显示
                     Text(
                       "${state.duration.inMinutes.toString().padLeft(2, '0')}:${(state.duration.inSeconds % 60).toString().padLeft(2, '0')}",
-                      style: GoogleFonts.comfortaa(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: AnycastColor.playerText,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                         shadows: const [
                           Shadow(
                             color: Colors.black54,
@@ -843,7 +1090,7 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                       child: Container(
                         height: 2,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AnycastColor.playerText,
                           borderRadius: BorderRadius.circular(1),
                           boxShadow: const [
                             BoxShadow(
@@ -865,12 +1112,12 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: AnycastColor.sandAlpha8(Brightness.dark),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
                           Icons.play_arrow_rounded,
-                          color: Color(0xFF10B981),
+                          color: AnycastColor.goldDark9,
                           size: 24,
                         ),
                       ),
@@ -888,7 +1135,7 @@ class _LyricsWithShareState extends State<LyricsWithShare>
             padding: const EdgeInsets.only(right: 0),
             clipBehavior: Clip.antiAlias,
             decoration: const BoxDecoration(
-              color: Colors.black87,
+              color: AnycastColor.playerBackground,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(20),
                 bottomRight: Radius.circular(20),
@@ -898,7 +1145,11 @@ class _LyricsWithShareState extends State<LyricsWithShare>
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: GestureDetector(
-                  child: const Iconify(aiChat, color: Colors.green, size: 24),
+                  child: const Iconify(
+                    aiChat,
+                    color: AnycastColor.goldDark9,
+                    size: 24,
+                  ),
                   onTap: () {
                     showMaterialModalBottomSheet(
                       context: context,
@@ -911,7 +1162,7 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                 ),
               ),
               PopupMenuButton(
-                color: Colors.black87,
+                color: AnycastColor.playerBackground,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -922,13 +1173,18 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                       child: Row(children: [
                         const Iconify(
                           Ic.baseline_offline_share,
-                          color: Colors.white,
+                          color: AnycastColor.playerText,
                           size: 20,
                         ),
-                        const SizedBox(width: 8),
-                        Text("Export subtitles",
-                            style: GoogleFonts.comfortaa()
-                                .copyWith(color: Colors.white)),
+                        const SizedBox(width: AnycastSpacing.md),
+                        Text(
+                          'Export transcript',
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AnycastColor.playerText,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
                       ])),
                 ],
                 onSelected: (value) {
@@ -937,7 +1193,10 @@ class _LyricsWithShareState extends State<LyricsWithShare>
                     widget.translationLyric,
                   );
                 },
-                child: const Icon(Icons.more_vert_rounded, color: Colors.grey),
+                child: const Icon(
+                  Icons.more_vert_rounded,
+                  color: AnycastColor.playerSecondary,
+                ),
               ),
             ]),
           ),
@@ -990,7 +1249,7 @@ class PageTabButton extends GetView<PlayerController> {
         var isSelect = controller.pageIndex.value == index;
         var dec = isSelect
             ? ShapeDecoration(
-                color: Colors.white,
+                color: AnycastColor.sandAlpha4(Brightness.dark),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(36),
                 ),
@@ -1009,7 +1268,9 @@ class PageTabButton extends GetView<PlayerController> {
           child: GestureDetector(
             child: Iconify(
               icon,
-              color: isSelect ? Colors.black : Colors.white,
+              color: isSelect
+                  ? AnycastColor.playerText
+                  : AnycastColor.playerSecondary,
             ),
             onTap: () {
               controller.pageController.animateToPage(
@@ -1032,52 +1293,62 @@ class Controls extends GetView<PlayerController> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        IconButton(
-          onPressed: () {
-            myAudioHandler.seekByRelative(const Duration(seconds: -10));
-          },
-          icon: const Icon(
-            Icons.replay_10,
-            size: 48,
-            color: Colors.white,
-          ),
-        ),
-        Container(
-          height: 72,
-          width: 72,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color(0xFF10B981),
-          ),
-          child: IconButton(
-            onPressed: () {
-              if (controller.isPlaying.value) {
-                controller.pause();
-              } else {
-                controller.play();
-              }
-            },
-            icon: const PlayIcon(
+    return Obx(() {
+      final controlsEnabled = !controller.isLoading.value &&
+          controller.playlistEpisode.value.enclosureUrl?.isNotEmpty == true;
+      final buttonStyle = IconButton.styleFrom(
+        foregroundColor: AnycastColor.playerText,
+        disabledForegroundColor: AnycastColor.playerText.withValues(alpha: .38),
+        backgroundColor: Colors.transparent,
+        disabledBackgroundColor: Colors.transparent,
+      );
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          IconButton(
+            style: buttonStyle,
+            onPressed: controlsEnabled
+                ? () {
+                    myAudioHandler.seekByRelative(const Duration(seconds: -10));
+                  }
+                : null,
+            icon: const Icon(
+              Icons.replay_10,
               size: 48,
-              color: Colors.white,
             ),
           ),
-        ),
-        IconButton(
-          onPressed: () {
-            myAudioHandler.seekByRelative(const Duration(seconds: 30));
-          },
-          icon: const Icon(
-            Icons.forward_30,
-            color: Colors.white,
-            size: 48,
+          SizedBox(
+            height: 72,
+            width: 72,
+            child: IconButton(
+              style: buttonStyle,
+              onPressed: controlsEnabled
+                  ? () {
+                      if (controller.isPlaying.value) {
+                        controller.pause();
+                      } else {
+                        controller.play();
+                      }
+                    }
+                  : null,
+              icon: const PlayIcon(size: 48),
+            ),
           ),
-        ),
-      ],
-    );
+          IconButton(
+            style: buttonStyle,
+            onPressed: controlsEnabled
+                ? () {
+                    myAudioHandler.seekByRelative(const Duration(seconds: 30));
+                  }
+                : null,
+            icon: const Icon(
+              Icons.forward_30,
+              size: 48,
+            ),
+          ),
+        ],
+      );
+    });
   }
 }
 
@@ -1150,28 +1421,32 @@ class Settings extends GetView<SettingsController> {
 
   @override
   Widget build(BuildContext context) {
+    final sectionLabelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AnycastColor.playerSecondary,
+          fontWeight: FontWeight.w600,
+        );
     SliderThemeData sliderThemeData = SliderTheme.of(context).copyWith(
-      activeTrackColor: const Color(0xFF6B7280),
-      inactiveTrackColor: const Color(0xFF6B7280).withValues(alpha: 0.3),
-      trackHeight: 0,
+      activeTrackColor: AnycastColor.goldDark9,
+      inactiveTrackColor: AnycastColor.sandAlpha4(Brightness.dark),
+      trackHeight: AnycastSpacing.compactProgress,
       trackShape: const RoundedRectSliderTrackShape(),
-      thumbColor: Colors.white,
+      thumbColor: AnycastColor.playerText,
       thumbShape: const CustomSliderThumbCircle(thumbRadius: 20),
       overlayColor: Colors.transparent,
       overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
       showValueIndicator: ShowValueIndicator.never,
       tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 4),
-      activeTickMarkColor: Colors.white,
-      inactiveTickMarkColor: const Color(0xFF232830),
+      activeTickMarkColor: AnycastColor.playerBackground,
+      inactiveTickMarkColor: AnycastColor.playerSecondary,
       valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
-      valueIndicatorColor: const Color(0xFF111316),
-      valueIndicatorTextStyle: TextStyle(
-        color: const Color(0xFF111316),
-        fontSize: 14,
-        fontFamily: GoogleFonts.comfortaa().fontFamily,
-        fontWeight: FontWeight.w400,
+      valueIndicatorColor: AnycastColor.playerBackground,
+      valueIndicatorTextStyle:
+          Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: AnycastColor.playerBackground,
+        fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
+    final sliderSurface = AnycastColor.sandAlpha3(Brightness.dark);
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1182,29 +1457,20 @@ class Settings extends GetView<SettingsController> {
             children: [
               Text(
                 'SPEED',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontFamily: GoogleFonts.comfortaa().fontFamily,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: sectionLabelStyle,
               ),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AnycastSpacing.md),
             child: Obx(
               () => Material(
                 shape: const StadiumBorder(),
-                color: const Color(0xFF232830),
+                color: sliderSurface,
                 child: Padding(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(AnycastSpacing.xs),
                   child: SliderTheme(
-                    data: sliderThemeData.copyWith(
-                      activeTrackColor: Colors.grey,
-                      inactiveTrackColor: Colors.blue,
-                      inactiveTickMarkColor: Colors.white,
-                    ),
+                    data: sliderThemeData,
                     child: Slider(
                       value: controller.speed.value,
                       onChanged: (value) {
@@ -1221,30 +1487,25 @@ class Settings extends GetView<SettingsController> {
             ),
           ),
         ]),
-        const SizedBox(height: 16),
+        const SizedBox(height: AnycastSpacing.pageH),
         Column(children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Text(
                 'COUNTDOWN',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontFamily: GoogleFonts.comfortaa().fontFamily,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: sectionLabelStyle,
               ),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AnycastSpacing.md),
             child: Obx(
               () => Material(
-                color: const Color(0xFF232830),
+                color: sliderSurface,
                 shape: const StadiumBorder(),
                 child: Padding(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(AnycastSpacing.xs),
                   child: SliderTheme(
                     data: sliderThemeData,
                     child: Slider(
@@ -1273,7 +1534,7 @@ class Settings extends GetView<SettingsController> {
             ),
           )
         ]),
-        const SizedBox(height: 16),
+        const SizedBox(height: AnycastSpacing.pageH),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1284,12 +1545,7 @@ class Settings extends GetView<SettingsController> {
               children: [
                 Text(
                   'SKIP SILENCE',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontFamily: GoogleFonts.comfortaa().fontFamily,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: sectionLabelStyle,
                 ),
                 Material(
                   color: Colors.transparent,
@@ -1300,13 +1556,14 @@ class Settings extends GetView<SettingsController> {
                       fit: BoxFit.fill,
                       child: Obx(
                         () => Switch(
-                          activeThumbColor: Colors.white,
-                          inactiveThumbColor: Colors.grey,
+                          activeThumbColor: AnycastColor.playerBackground,
+                          inactiveThumbColor: AnycastColor.playerSecondary,
                           inactiveTrackColor:
-                              const Color(0xFF232830).withValues(alpha: 0.7),
+                              AnycastColor.sandAlpha5(Brightness.dark),
                           trackOutlineColor: WidgetStateColor.resolveWith(
-                              (states) => const Color(0xFF232830)
-                                  .withValues(alpha: 0.3)),
+                            (states) =>
+                                AnycastColor.sandAlpha3(Brightness.dark),
+                          ),
                           value: controller.skipSilence.value,
                           onChanged: (value) {
                             controller.setSkipSilence(value);
@@ -1324,12 +1581,7 @@ class Settings extends GetView<SettingsController> {
               children: [
                 Text(
                   'CONTINUOUS PLAY',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontFamily: GoogleFonts.comfortaa().fontFamily,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: sectionLabelStyle,
                 ),
                 Material(
                   color: Colors.transparent,
@@ -1340,13 +1592,14 @@ class Settings extends GetView<SettingsController> {
                       fit: BoxFit.fill,
                       child: Obx(
                         () => Switch(
-                          activeThumbColor: Colors.white,
-                          inactiveThumbColor: Colors.grey,
+                          activeThumbColor: AnycastColor.playerBackground,
+                          inactiveThumbColor: AnycastColor.playerSecondary,
                           inactiveTrackColor:
-                              const Color(0xFF232830).withValues(alpha: 0.7),
+                              AnycastColor.sandAlpha5(Brightness.dark),
                           trackOutlineColor: WidgetStateColor.resolveWith(
-                              (states) => const Color(0xFF232830)
-                                  .withValues(alpha: 0.3)),
+                            (states) =>
+                                AnycastColor.sandAlpha3(Brightness.dark),
+                          ),
                           value: controller.continuousPlaying.value,
                           onChanged: (value) {
                             controller.setContinuousPlaying(value);
@@ -1362,7 +1615,10 @@ class Settings extends GetView<SettingsController> {
               message: 'Auto play next episode after the current one ends.',
               showDuration: Duration(milliseconds: 2000),
               triggerMode: TooltipTriggerMode.tap,
-              child: Icon(Icons.info, color: Colors.grey),
+              child: Icon(
+                Icons.info,
+                color: AnycastColor.playerSecondary,
+              ),
             ),
           ],
         ),
