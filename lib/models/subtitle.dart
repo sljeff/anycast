@@ -66,11 +66,18 @@ class SubtitleModel {
   }
 
   static Future<void> insert(DatabaseExecutor db, SubtitleModel model) async {
-    // validation
-    if (model.subtitle == null ||
-        model.subtitle!.isEmpty ||
-        model.language == null ||
-        model.subtitle == 'null') {
+    if (model.enclosureUrl == null || model.status == null) {
+      return;
+    }
+
+    // A processing row intentionally has no language or transcript yet. Keep
+    // it so polling can resume after an application restart. Completed rows
+    // still require a usable payload.
+    if (model.status != 'processing' &&
+        (model.subtitle == null ||
+            model.subtitle!.isEmpty ||
+            model.language == null ||
+            model.subtitle == 'null')) {
       return;
     }
 

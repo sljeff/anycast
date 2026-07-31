@@ -29,6 +29,8 @@ const _currentPlaylistEpisodeUrl =
 const _currentHistoryEpisodeUrl = 'https://current.example/history-episode.mp3';
 const _currentSubscriptionUrl = 'https://current.example/feed.xml';
 const _currentSubtitleUrl = 'https://current.example/subtitle-episode.mp3';
+const _currentProcessingSubtitleUrl =
+    'https://current.example/processing-subtitle-episode.mp3';
 const _currentTranslationUrl =
     'https://current.example/translation-episode.mp3';
 const _requiredSeedIdentities = <String, List<int>>{
@@ -88,7 +90,7 @@ void main() {
   test('fresh creation builds the complete latest schema and required seeds',
       () async {
     final databasePath = path.join(testDirectory.path, 'fresh-under-test.db');
-    final db = await openAnycastDatabase(
+    var db = await openAnycastDatabase(
       databasePath,
       factory: databaseFactoryFfi,
     );
@@ -110,6 +112,18 @@ void main() {
       );
       expect(await readSchemaSnapshot(db), latestSchema);
       expect(await readRequiredSeedSnapshot(db), _expectedFreshRequiredSeeds);
+      await _writeProcessingSubtitle(db);
+      await _expectProcessingSubtitleReadable(db);
+    } finally {
+      await db.close();
+    }
+
+    db = await openAnycastDatabase(
+      databasePath,
+      factory: databaseFactoryFfi,
+    );
+    try {
+      await _expectProcessingSubtitleReadable(db);
     } finally {
       await db.close();
     }
@@ -520,6 +534,7 @@ Future<_CurrentModelState> _writeCurrentRowsThroughModels(Database db) async {
     ..status = 'completed'
     ..summary = 'Current summary updated';
   await SubtitleModel.insert(db, storedSubtitle);
+  await _writeProcessingSubtitle(db);
 
   final translation = TranslationModel.empty()
     ..enclosureUrl = _currentTranslationUrl
@@ -587,6 +602,7 @@ Future<void> _expectCurrentRowsReadableThroughModels(
   final subtitle = await SubtitleModel.get(db, _currentSubtitleUrl);
   expect(subtitle.status, 'completed');
   expect(subtitle.summary, 'Current summary updated');
+  await _expectProcessingSubtitleReadable(db);
 
   final translation = await TranslationModel.get(
     db,
@@ -595,6 +611,24 @@ Future<void> _expectCurrentRowsReadableThroughModels(
   );
   expect(translation, isNotNull);
   expect(translation!.status, 'completed');
+}
+
+Future<void> _writeProcessingSubtitle(Database db) {
+  return SubtitleModel.insert(
+    db,
+    SubtitleModel.empty()
+      ..enclosureUrl = _currentProcessingSubtitleUrl
+      ..status = 'processing'
+      ..subtitle = '',
+  );
+}
+
+Future<void> _expectProcessingSubtitleReadable(Database db) async {
+  final subtitle = await SubtitleModel.get(db, _currentProcessingSubtitleUrl);
+  expect(subtitle.enclosureUrl, _currentProcessingSubtitleUrl);
+  expect(subtitle.status, 'processing');
+  expect(subtitle.subtitle, isEmpty);
+  expect(subtitle.language, isNull);
 }
 
 Future<Map<String, List<Map<String, Object?>>>> _readFixtureData(

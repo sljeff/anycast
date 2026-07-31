@@ -19,7 +19,86 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
 
+typedef PlayerPeriodicTimerFactory = Timer Function(
+  Duration duration,
+  void Function(Timer timer) callback,
+);
+
+abstract interface class PlayerAudio {
+  bool get isPlaying;
+  bool get hasAudioSource;
+  Duration get playedDuration;
+  Stream<PlayerState> get playbackStateStream;
+  Stream<PositionData> get positionDataStream;
+
+  Future<void> playByEpisode(PlaylistEpisodeModel episode);
+  Future<void> setByEpisode(PlaylistEpisodeModel episode);
+  Future<void> pause();
+  Future<void> play();
+  Future<void> seekAndPlayByEpisode(
+    PlaylistEpisodeModel episode,
+    Duration position,
+  );
+}
+
+class _PlayerAudioAdapter implements PlayerAudio {
+  _PlayerAudioAdapter(this._audioHandler);
+
+  final MyAudioHandler _audioHandler;
+
+  @override
+  bool get hasAudioSource => _audioHandler.audioSource != null;
+
+  @override
+  bool get isPlaying => _audioHandler.isPlaying;
+
+  @override
+  Duration get playedDuration => _audioHandler.playedDuration;
+
+  @override
+  Stream<PlayerState> get playbackStateStream =>
+      _audioHandler.playbackStateStream;
+
+  @override
+  Stream<PositionData> get positionDataStream =>
+      _audioHandler.positionDataStream;
+
+  @override
+  Future<void> pause() => _audioHandler.pause();
+
+  @override
+  Future<void> play() => _audioHandler.play();
+
+  @override
+  Future<void> playByEpisode(PlaylistEpisodeModel episode) =>
+      _audioHandler.playByEpisode(episode);
+
+  @override
+  Future<void> seekAndPlayByEpisode(
+    PlaylistEpisodeModel episode,
+    Duration position,
+  ) =>
+      _audioHandler.seekAndPlayByEpisode(episode, position);
+
+  @override
+  Future<void> setByEpisode(PlaylistEpisodeModel episode) =>
+      _audioHandler.setByEpisode(episode);
+}
+
 class PlayerController extends GetxController {
+  PlayerController({
+    PlayerAudio? audio,
+    PlaylistEpisodeController Function(int playlistId)?
+        playlistEpisodeControllerForId,
+    bool Function()? continuousPlaying,
+    Future<void> Function(Duration duration)? delay,
+    PlayerPeriodicTimerFactory? periodicTimer,
+  })  : myAudioHandler = audio ?? _PlayerAudioAdapter(MyAudioHandler()),
+        _playlistEpisodeControllerForId = playlistEpisodeControllerForId,
+        _continuousPlaying = continuousPlaying,
+        _delay = delay ?? Future<void>.delayed,
+        _periodicTimer = periodicTimer ?? Timer.periodic;
+
   var player = PlayerModel.empty().obs;
   var isPlaying = false.obs;
   var isLoading = false.obs;
@@ -39,14 +118,24 @@ class PlayerController extends GetxController {
     initialPage: 1,
   );
   final DatabaseHelper helper = DatabaseHelper();
-  final MyAudioHandler myAudioHandler = MyAudioHandler();
+  final PlayerAudio myAudioHandler;
+  final PlaylistEpisodeController Function(int playlistId)?
+      _playlistEpisodeControllerForId;
+  final bool Function()? _continuousPlaying;
+  final Future<void> Function(Duration duration) _delay;
+  final PlayerPeriodicTimerFactory _periodicTimer;
+  Timer? _progressTimer;
+  StreamSubscription<PlayerState>? _playbackStateSubscription;
+  StreamSubscription<PositionData>? _positionDataSubscription;
 
   PlaylistEpisodeController? get playlistEpisodeController {
     if (player.value.currentPlaylistId == null) {
       return null;
     }
-    var peController = Get.find<PlaylistController>()
-        .getEpisodeControllerByPlaylistId(player.value.currentPlaylistId!);
+    final playlistId = player.value.currentPlaylistId!;
+    var peController = _playlistEpisodeControllerForId?.call(playlistId) ??
+        Get.find<PlaylistController>()
+            .getEpisodeControllerByPlaylistId(playlistId);
 
     if (peController.episodes.isNotEmpty &&
         playlistEpisode.value.enclosureUrl == null) {
@@ -62,7 +151,7 @@ class PlayerController extends GetxController {
     load();
 
     // interval 2 seconds to save playedDuration
-    Timer.periodic(const Duration(seconds: 2), (timer) {
+    _progressTimer = _periodicTimer(const Duration(seconds: 2), (timer) {
       if (!myAudioHandler.isPlaying) return;
       var peController = playlistEpisodeController;
       if (peController == null) {
@@ -74,46 +163,62 @@ class PlayerController extends GetxController {
       peController.updatePlayedDuration(myAudioHandler.playedDuration);
     });
 
-    myAudioHandler.playbackStateStream.listen((state) async {
-      isPlaying.value = state.playing;
-      // loading or buffering
-      isLoading.value = [
-        ProcessingState.loading,
-        ProcessingState.buffering,
-      ].contains(state.processingState);
-      if (state.processingState == ProcessingState.completed) {
-        var peController = playlistEpisodeController;
-        if (peController == null) {
-          return;
-        }
-        peController.removeTop();
-        if (peController.episodes.isEmpty) {
-          pause();
-          clear();
-        } else {
-          playByEpisode(peController.episodes[0]).then((_) {
-            if (!Get.find<SettingsController>().continuousPlaying.value) {
-              pause();
-              Future.delayed(const Duration(milliseconds: 100), () {
-                initProgress();
-              });
-            }
-          });
-        }
-      }
-    });
+    _playbackStateSubscription =
+        myAudioHandler.playbackStateStream.listen(handlePlaybackState);
+    _positionDataSubscription =
+        myAudioHandler.positionDataStream.listen(handlePositionData);
+  }
 
-    myAudioHandler.positionDataStream.listen((event) {
-      if (!myAudioHandler.isPlaying ||
-          isLoading.value ||
-          [
-            event.bufferedPosition,
-            event.position,
-          ].contains(Duration.zero)) {
-        return;
-      }
-      positionData.value = event;
-    });
+  @override
+  void onClose() {
+    _progressTimer?.cancel();
+    _playbackStateSubscription?.cancel();
+    _positionDataSubscription?.cancel();
+    super.onClose();
+  }
+
+  Future<void> handlePlaybackState(PlayerState state) async {
+    isPlaying.value = state.playing;
+    // loading or buffering
+    isLoading.value = [
+      ProcessingState.loading,
+      ProcessingState.buffering,
+    ].contains(state.processingState);
+    if (state.processingState != ProcessingState.completed) {
+      return;
+    }
+
+    var peController = playlistEpisodeController;
+    if (peController == null) {
+      return;
+    }
+    peController.removeTop();
+    if (peController.episodes.isEmpty) {
+      pause();
+      clear();
+      return;
+    }
+
+    await playByEpisode(peController.episodes[0]);
+    final continuousPlaying = _continuousPlaying?.call() ??
+        Get.find<SettingsController>().continuousPlaying.value;
+    if (!continuousPlaying) {
+      pause();
+      await _delay(const Duration(milliseconds: 100));
+      initProgress();
+    }
+  }
+
+  void handlePositionData(PositionData event) {
+    if (!myAudioHandler.isPlaying ||
+        isLoading.value ||
+        [
+          event.bufferedPosition,
+          event.position,
+        ].contains(Duration.zero)) {
+      return;
+    }
+    positionData.value = event;
   }
 
   void load() {
@@ -164,7 +269,7 @@ class PlayerController extends GetxController {
   }
 
   Future<void> play() async {
-    if (myAudioHandler.audioSource == null) {
+    if (!myAudioHandler.hasAudioSource) {
       if (playlistEpisode.value.enclosureUrl == null) {
         return;
       }
