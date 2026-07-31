@@ -12,6 +12,8 @@ import 'table_creator.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
+const int databaseSchemaVersion = 4;
+
 List<TableCreator> tableCreators = [
   feedEpisodeTableCreator,
   playlistEpisodeTableCreator,
@@ -24,12 +26,47 @@ List<TableCreator> tableCreators = [
   translationCreateTable,
 ];
 
-var migrations = {
+const Map<int, List<String>> migrations = {
   // 3 -> 4
-  4: [
+  4: <String>[
     'ALTER TABLE settings ADD COLUMN continuousPlaying INTEGER DEFAULT 1',
   ],
 };
+
+Future<void> createLatestDatabaseSchema(DatabaseExecutor db) async {
+  for (final tableCreator in tableCreators) {
+    await tableCreator(db);
+  }
+}
+
+Future<void> migrateDatabase(
+  DatabaseExecutor db,
+  int oldVersion,
+  int newVersion, {
+  Map<int, List<String>> migrationSteps = migrations,
+}) async {
+  final targetVersions = migrationSteps.keys.toList()..sort();
+
+  for (final targetVersion in targetVersions) {
+    if (oldVersion < targetVersion && targetVersion <= newVersion) {
+      for (final sql in migrationSteps[targetVersion]!) {
+        await db.execute(sql);
+      }
+    }
+  }
+}
+
+Future<Database> openAnycastDatabase(
+  String path, {
+  DatabaseFactory? factory,
+}) {
+  final options = OpenDatabaseOptions(
+    version: databaseSchemaVersion,
+    onCreate: (db, _) => createLatestDatabaseSchema(db),
+    onUpgrade: migrateDatabase,
+  );
+  return (factory ?? databaseFactory).openDatabase(path, options: options);
+}
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper.internal();
@@ -52,32 +89,12 @@ class DatabaseHelper {
     // await deleteDatabase(path);
 
     // create new
-    Database db = await openDatabase(
-      path,
-      version: 4,
-      onCreate: (Database db, version) async {
-        for (TableCreator tableCreator in tableCreators) {
-          await tableCreator(db);
-        }
-      },
-      onUpgrade: (db, oldVersion, newVersion) {
-        var sorted = migrations.keys.toList()..sort();
-
-        for (int version in sorted) {
-          if (oldVersion < version) {
-            for (String sql in migrations[version]!) {
-              db.execute(sql);
-              print('executed $sql');
-            }
-          }
-        }
-      },
-    );
-    return db;
+    return openAnycastDatabase(path);
   }
 
-  Future close() async {
-    var dbClient = await db;
-    return dbClient.close();
+  Future<void> close() async {
+    final dbClient = _db;
+    _db = null;
+    await dbClient?.close();
   }
 }

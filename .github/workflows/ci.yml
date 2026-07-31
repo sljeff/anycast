@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      - '**'
   workflow_dispatch:
 
 permissions:
@@ -45,11 +45,19 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
-      - name: Test
-        run: flutter test
+      - name: Run functional unit tests
+        run: flutter test --exclude-tags compatibility
+
+      - name: Run backward-compatibility regression tests
+        run: flutter test --tags compatibility
 
   android:
     name: Build Android
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: test
     runs-on: ubuntu-24.04
     timeout-minutes: 40
 
@@ -157,6 +165,11 @@ jobs:
 
   ios:
     name: Build iOS
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: test
     runs-on: macos-15
     timeout-minutes: 50
 
