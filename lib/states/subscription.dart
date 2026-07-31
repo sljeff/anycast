@@ -2,11 +2,50 @@ import 'package:anycast/models/helper.dart';
 import 'package:anycast/models/subscription.dart';
 import 'package:get/get.dart';
 
+abstract interface class SubscriptionStore {
+  Future<List<SubscriptionModel>> listAll();
+
+  Future<void> addMany(List<SubscriptionModel> subscriptions);
+
+  Future<void> remove(SubscriptionModel subscription);
+}
+
+class _DatabaseSubscriptionStore implements SubscriptionStore {
+  _DatabaseSubscriptionStore(this._helper);
+
+  final DatabaseHelper _helper;
+
+  @override
+  Future<List<SubscriptionModel>> listAll() async {
+    final db = await _helper.db;
+    return SubscriptionModel.listAll(db);
+  }
+
+  @override
+  Future<void> addMany(List<SubscriptionModel> subscriptions) async {
+    final db = await _helper.db;
+    await SubscriptionModel.addMany(db, subscriptions);
+  }
+
+  @override
+  Future<void> remove(SubscriptionModel subscription) async {
+    final db = await _helper.db;
+    await SubscriptionModel.remove(db, subscription);
+  }
+}
+
 class SubscriptionController extends GetxController {
+  SubscriptionController({SubscriptionStore? store})
+      : _store = store ?? _DatabaseSubscriptionStore(DatabaseHelper());
+
   final subscriptions = <SubscriptionModel>[].obs;
   final isLoading = true.obs;
   final loadError = RxnString();
 
+  final SubscriptionStore _store;
+
+  // Kept public for compatibility with existing callers. The default store
+  // uses the same singleton DatabaseHelper instance.
   final DatabaseHelper helper = DatabaseHelper();
 
   @override
@@ -19,8 +58,7 @@ class SubscriptionController extends GetxController {
     isLoading.value = true;
     loadError.value = null;
     try {
-      final db = await helper.db;
-      subscriptions.value = await SubscriptionModel.listAll(db);
+      subscriptions.value = await _store.listAll();
     } catch (_) {
       loadError.value = 'Unable to load subscriptions.';
     } finally {
@@ -28,27 +66,26 @@ class SubscriptionController extends GetxController {
     }
   }
 
-  void addMany(List<SubscriptionModel> subscriptions) {
-    helper.db.then((db) => {
-          SubscriptionModel.addMany(db, subscriptions).then((_) {
-            load();
-          })
-        });
+  Future<void> addMany(List<SubscriptionModel> subscriptions) async {
+    await _store.addMany(subscriptions);
+    await load();
   }
 
-  void remove(SubscriptionModel subscription) {
-    var index = subscriptions
+  Future<void> remove(SubscriptionModel subscription) async {
+    final index = subscriptions
         .indexWhere((element) => element.title == subscription.title);
-    subscriptions.removeAt(index);
-    helper.db.then((db) {
-      SubscriptionModel.remove(db, subscription);
-    });
+    if (index != -1) {
+      subscriptions.removeAt(index);
+    }
+    await _store.remove(subscription);
   }
 
   bool exists(SubscriptionModel m) {
     // rssFeedUrl or title or id exists
     for (var s in subscriptions) {
-      if (s.rssFeedUrl == m.rssFeedUrl || s.title == m.title || s.id == m.id) {
+      if ((m.rssFeedUrl != null && s.rssFeedUrl == m.rssFeedUrl) ||
+          (m.title != null && s.title == m.title) ||
+          (m.id != null && s.id == m.id)) {
         return true;
       }
     }

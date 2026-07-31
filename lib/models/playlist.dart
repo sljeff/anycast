@@ -1,20 +1,20 @@
 import 'package:sqflite/sqflite.dart';
 
 var tableName = 'playlist';
-Future<void> playlistTableCreator(DatabaseExecutor db) {
-  return db.execute("""
+Future<void> playlistTableCreator(DatabaseExecutor db) async {
+  await db.execute("""
     CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY,
       title TEXT,
       position INTEGER
     )
-  """).then((v) {
-    // create default 1 if not exists
-    db.rawInsert("""
-      INSERT OR IGNORE INTO $tableName (id, title, position)
-      VALUES (1, 'Default', 1)
-    """);
-  });
+  """);
+
+  // create default 1 if not exists
+  await db.rawInsert("""
+    INSERT OR IGNORE INTO $tableName (id, title, position)
+    VALUES (1, 'Default', 1)
+  """);
 }
 
 class PlaylistModel {

@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 
 var tableName = 'settings';
-Future<void> settingsTableCreator(DatabaseExecutor db) {
-  return db.execute("""
+Future<void> settingsTableCreator(DatabaseExecutor db) async {
+  await db.execute("""
     CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY,
       darkMode INTEGER,
@@ -19,22 +19,22 @@ Future<void> settingsTableCreator(DatabaseExecutor db) {
       maxHistoryEpisodes INTEGER,
       continuousPlaying INTEGER DEFAULT 1
     )
-  """).then((v) {
-    var code = Platform.localeName;
-    // en_US / zh_Hans_CN / zh_CN
-    var languageAndCountry = code.split('_');
-    var language = 'en';
-    var country = 'US';
-    if (languageAndCountry.length > 1) {
-      language = code.split('_')[0];
-      country = code.split('_')[languageAndCountry.length - 1];
-    }
+  """);
 
-    db.rawInsert("""
-      INSERT OR IGNORE INTO $tableName (id, darkMode, speed, skipSilence, autoSleepTimer, maxCacheCount, countryCode, targetLanguage, autoRefreshInterval, maxFeedEpisodes, maxHistoryEpisodes)
-      VALUES (1, 0, 1.0, 0, '0,0,0', 10, '$country', '$language', 300, 100, 100)
-    """);
-  });
+  var code = Platform.localeName;
+  // en_US / zh_Hans_CN / zh_CN
+  var languageAndCountry = code.split('_');
+  var language = 'en';
+  var country = 'US';
+  if (languageAndCountry.length > 1) {
+    language = code.split('_')[0];
+    country = code.split('_')[languageAndCountry.length - 1];
+  }
+
+  await db.rawInsert("""
+    INSERT OR IGNORE INTO $tableName (id, darkMode, speed, skipSilence, autoSleepTimer, maxCacheCount, countryCode, targetLanguage, autoRefreshInterval, maxFeedEpisodes, maxHistoryEpisodes)
+    VALUES (1, 0, 1.0, 0, '0,0,0', 10, '$country', '$language', 300, 100, 100)
+  """);
 }
 
 class SettingsModel {
