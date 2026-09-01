@@ -17,13 +17,24 @@ import 'package:opml/opml.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
-class ImportExportBlock extends StatelessWidget {
+class ImportExportBlock extends StatefulWidget {
   const ImportExportBlock({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    var textController = TextEditingController();
+  State<ImportExportBlock> createState() => _ImportExportBlockState();
+}
 
+class _ImportExportBlockState extends State<ImportExportBlock> {
+  final textController = TextEditingController();
+
+  @override
+  void dispose() {
+    textController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AlertDialog(
       titleTextStyle: Theme.of(context).textTheme.headlineMedium,
       contentTextStyle: Theme.of(context).textTheme.bodyLarge,
@@ -173,11 +184,7 @@ class ImportExportBlock extends StatelessWidget {
                     ),
                     controller: textController,
                     style: Theme.of(context).textTheme.bodyMedium,
-                    onChanged: (value) {
-                      textController.text = value;
-                    },
                     onSubmitted: (url) {
-                      textController.text = url;
                       if (url.isEmpty) {
                         return;
                       }
