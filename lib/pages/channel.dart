@@ -644,6 +644,30 @@ class SearchBar extends StatefulWidget {
 
 class _SearchBarState extends State<SearchBar> {
   final controller = TextEditingController();
+  var _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    controller.addListener(_syncHasText);
+  }
+
+  void _syncHasText() {
+    final hasText = controller.text.isNotEmpty;
+    if (hasText == _hasText) {
+      return;
+    }
+    setState(() {
+      _hasText = hasText;
+    });
+  }
+
+  @override
+  void dispose() {
+    controller.removeListener(_syncHasText);
+    controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -654,11 +678,6 @@ class _SearchBarState extends State<SearchBar> {
       child: TextField(
         onTapOutside: (event) {
           FocusScope.of(context).unfocus();
-        },
-        onChanged: (value) {
-          setState(() {
-            controller.text = value;
-          });
         },
         onSubmitted: (value) {
           showMaterialModalBottomSheet(
@@ -700,7 +719,7 @@ class _SearchBarState extends State<SearchBar> {
     );
 
     Widget cancel = const SizedBox.shrink();
-    if (controller.text.isNotEmpty) {
+    if (_hasText) {
       cancel = Row(
         children: [
           const SizedBox(width: AnycastSpacing.pageH),
