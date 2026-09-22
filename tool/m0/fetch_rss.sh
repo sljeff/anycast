@@ -292,6 +292,11 @@ if os.path.exists(p):
 merged = {'captured_at': m['standard'][0]['captured_at'] if m['standard'] else None,
           'live': {k: m[k] for k in ('standard', 'http_plain', 'redirect')},
           'ua_sensitive': ua}
+# preserve the author-subscription bucket if it was collected separately
+# (fetch_user_subs.sh); it is not re-fetched by this script
+us_path = f'{out}/user_subs/manifest.json'
+if os.path.exists(us_path):
+    merged['live']['user_subs'] = json.load(open(us_path))
 json.dump(merged, open(f'{out}/manifest.json', 'w'), ensure_ascii=False, indent=1)
 print('   manifest written')
 PYEOF

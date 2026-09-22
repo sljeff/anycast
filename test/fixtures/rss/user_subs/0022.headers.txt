@@ -1,0 +1,24 @@
+HTTP/2 200 
+date: Tue, 22 Sep 2026 08:56:46 GMT
+content-type: application/rss+xml; charset=UTF-8
+server: cloudflare
+vary: Accept-Encoding
+last-modified: Tue, 22 Sep 2026 04:41:42 GMT
+etag: W/"f38f692dbca2ab3f109d52f74a9a1ebc"
+link: <https://www.thetype.com/wp-json/>; rel="https://api.w.org/"
+expires: Tue, 22 Sep 2026 09:56:46 GMT
+cache-control: max-age=3600
+x-cache-status: HIT
+x-rocket-nginx-serving-static: MISS
+strict-transport-security: max-age=31536000;
+x-xss-protection: 1; mode=block
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+referrer-policy: no-referrer-when-downgrade
+content-security-policy: default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=6Ux2Kyhkz7oj4p%2B9BS6EA9S4PyvGhbW3Tpd8rus9eJliHVgYGwpj0Z8twvKtDRhrUUEQ8Miv3sTiZmj4rhxX2%2Bcydc%2FkoPXCXQrkRpw%2BSpUBsdMbso1gndMGLaeD0%2FyucAA%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+cf-cache-status: DYNAMIC
+cf-ray: a3f0192c5ca9b5f2-SJC
+alt-svc: h3=":443"; ma=86400
+

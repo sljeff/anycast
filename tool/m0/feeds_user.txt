@@ -1,0 +1,27 @@
+# author's real subscription set (anycast OPML export, 2026-09)
+# consumed by fetch_user_subs.sh -> rss/user_subs bucket + db_user fixture
+https://www.ximalaya.com/album/41563226.xml
+https://feeds.fireside.fm/teahour/rss
+https://yitianshijie.net/episodes/feed.xml
+https://feed.xyzfm.space/wqgumr8kx8h8
+https://www.ximalaya.com/album/4867505.xml
+https://pan.icu/feed
+https://bowuzhi.fm/episodes/feed.xml
+https://feed.xyzfm.space/h4tfwertttht
+https://feed.xyzfm.space/mjvd3fknfr4v
+https://www.etw.fm/rss
+https://feed.xyzfm.space/x734thm8c63f
+https://taiyilaile.com/episodes/feed.xml
+https://www.thetype.com/typechat/feed/
+https://feed.xyzfm.space/mkkxu98dm89e
+https://anchor.fm/s/f2cbc0a8/podcast/rss
+https://sspai.typlog.io/episodes/feed.xml
+https://feed.xyzfm.space/dk4yh3pkpjp3
+https://feed.xyzfm.space/9bmupxfae9qd
+https://pretro.xyz/feed
+https://storyfm.cn/feed/episodes
+https://miechakucha.com/episodes/feed.xml
+https://crazy.capital/feed
+https://feed.xyzfm.space/j8yp8gxkmgqr
+https://hardimage.pro/episodes/feed.xml
+https://feed.xyzfm.space/wmnkvmrpwuww

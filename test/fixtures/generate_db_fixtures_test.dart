@@ -50,8 +50,16 @@ void main() {
   });
 
   test('generate all db fixture buckets', () async {
-    if (dbRoot.existsSync()) {
-      dbRoot.deleteSync(recursive: true);
+    // Wipe only generator-owned buckets; db_device is a pulled iOS container
+    // (integration_test/m0_seed_test.dart), not regenerable here.
+    const generated = [
+      'db_light', 'db_heavy', 'db_user', 'db_dirty', 'db_v3',
+      'db_edge_subs', 'db_crashed', 'db_corrupt_truncated',
+      'db_corrupt_notadb', 'db_corrupt_partial',
+    ];
+    for (final b in generated) {
+      final d = Directory('${dbRoot.path}/$b');
+      if (d.existsSync()) d.deleteSync(recursive: true);
     }
     dbRoot.createSync(recursive: true);
 
@@ -59,6 +67,7 @@ void main() {
 
     await buildLight(sources);
     await buildHeavy(sources);
+    await buildUser(sources);
     await buildDirty(sources);
     await buildV3();
     await buildCrashed();
@@ -77,8 +86,10 @@ class FixtureSources {
   final List<Map<String, dynamic>> channelsIndex;
   // rssFeedUrl -> parsed import data (real mapping code over archived XML)
   final List<PodcastImportData> parsedFeeds;
+  // the author's real subscription export (rss/user_subs bucket)
+  final List<PodcastImportData> userFeeds;
 
-  FixtureSources(this.channelsIndex, this.parsedFeeds);
+  FixtureSources(this.channelsIndex, this.parsedFeeds, this.userFeeds);
 
   static Future<FixtureSources> load() async {
     final indexFile = File('test/fixtures/channels_index.json');
@@ -100,7 +111,34 @@ class FixtureSources {
         }
       }
     }
-    return FixtureSources(channelsIndex, parsed);
+
+    final userFeeds = <PodcastImportData>[];
+    final userManifestFile =
+        File('test/fixtures/rss/user_subs/manifest.json');
+    if (userManifestFile.existsSync()) {
+      final userManifest =
+          (jsonDecode(userManifestFile.readAsStringSync()) as List)
+              .cast<Map<String, dynamic>>();
+      final urlByFile = {
+        for (final item in userManifest)
+          item['file'] as String: item['url'] as String,
+      };
+      final dir = Directory('test/fixtures/rss/user_subs');
+      for (final f in dir.listSync()) {
+        if (!f.path.endsWith('.xml')) continue;
+        final file = f.path.split(Platform.pathSeparator).last;
+        final url = urlByFile[file];
+        if (url == null) continue;
+        final bytes = File(f.path).readAsBytesSync();
+        final data = parseFeedResponse(
+            url, http.Response.bytes(bytes, 200),
+            onlyFistEpisode: false);
+        if (data != null && data.subscription?.title != null) {
+          userFeeds.add(data);
+        }
+      }
+    }
+    return FixtureSources(channelsIndex, parsed, userFeeds);
   }
 
   static String _urlForCorpusFile(String path) {
@@ -163,6 +201,24 @@ class FixtureSources {
     }
     all.sort((a, b) => (b.pubDate ?? 0).compareTo(a.pubDate ?? 0));
     // dedupe by enclosureUrl (UNIQUE constraint)
+    final seen = <String>{};
+    final out = <FeedEpisodeModel>[];
+    for (final e in all) {
+      if (e.enclosureUrl == null || seen.contains(e.enclosureUrl)) continue;
+      seen.add(e.enclosureUrl!);
+      out.add(e);
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
+
+  /// Feed episodes from the author's subscription set, newest first.
+  List<FeedEpisodeModel> userFeedEpisodes({int limit = 500}) {
+    final all = <FeedEpisodeModel>[];
+    for (final d in userFeeds) {
+      all.addAll(d.feedEpisodes!);
+    }
+    all.sort((a, b) => (b.pubDate ?? 0).compareTo(a.pubDate ?? 0));
     final seen = <String>{};
     final out = <FeedEpisodeModel>[];
     for (final e in all) {
@@ -422,6 +478,36 @@ Future<void> buildHeavy(FixtureSources sources) async {
       maxHistoryEpisodes: 300,
       skipSilence: 1,
       continuousPlaying: 0);
+  await db.close();
+
+  await writeCacheMetaDb(dir, eps.take(3).map((e) => e.enclosureUrl!).toList());
+}
+
+/// db_user: the author's real subscription set (rss/user_subs corpus) written
+/// through the app's real model insert paths. Stands in for a real-device
+/// pull until container extraction is done (05 §1.1 fallback path c).
+Future<void> buildUser(FixtureSources sources) async {
+  final dir = '${dbRoot.path}/db_user';
+  await Directory(dir).create(recursive: true);
+  final db = await createDb('$dir/anycast.db');
+
+  final subs = [for (final d in sources.userFeeds) d.subscription!];
+  await SubscriptionModel.addMany(db, subs);
+
+  final eps = sources.userFeedEpisodes(limit: 500);
+  await FeedEpisodeModel.insertMany(db, eps);
+
+  // history: played oldest->newest so id DESC == most-recently-played first
+  final oldestFirst = eps.reversed.toList();
+  for (var i = 0; i < 40 && i < oldestFirst.length; i++) {
+    await HistoryEpisodeModel.insert(
+        db, HistoryEpisodeModel.fromMap(oldestFirst[i].toMap()));
+  }
+
+  await fillPlaylist(db, eps.sublist(0, eps.length < 15 ? eps.length : 15));
+  await fillSubtitlesAndTranslations(
+      db, eps.take(15).map((e) => e.enclosureUrl!).toList(), 6);
+  await normalizeSettings(db, country: 'CN', language: 'zh');
   await db.close();
 
   await writeCacheMetaDb(dir, eps.take(3).map((e) => e.enclosureUrl!).toList());

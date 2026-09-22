@@ -324,8 +324,8 @@ void main() {
         }
       }
 
-      for (final b in ['standard', 'http_plain']) {
-        for (final item in (manifest['live'][b] as List)) {
+      for (final b in ['standard', 'http_plain', 'user_subs']) {
+        for (final item in (manifest['live'][b] as List? ?? [])) {
           await mapFixture(b, item['file'], item['url'],
               summaryOnly: (item['items'] ?? 0) > 200);
         }
@@ -767,6 +767,8 @@ void main() {
       final buckets = [
         'db_light',
         'db_heavy',
+        'db_user',
+        'db_device',
         'db_dirty',
         'db_v3',
         'db_edge_subs',

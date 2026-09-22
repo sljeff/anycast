@@ -1,0 +1,33 @@
+HTTP/1.1 302 Moved Temporarily
+Content-Type: text/html
+Content-Length: 221
+Connection: keep-alive
+Server: Tengine/3.1.0
+Location: https://feeds.storyfm.cn/storyfm.xml
+Date: Tue, 22 Sep 2026 08:56:34 GMT
+Accept-Ranges: bytes
+Strict-Transport-Security: max-age=31536000
+x-link-via: jnun011:443;huzmp04:443;
+x-b2f-cs-cache: no-cache
+X-Cache-Status: MISS from KS-CLOUD-HUZ-MP-04-14
+X-Cache-Status: MISS from KS-CLOUD-JN-UN-011-06
+x-b2f-cc: no-cache
+X-Cdn-Request-ID: dca77a18591fbe4e1edf946fb92b0b30
+
+HTTP/2 200 
+server: Tengine/3.1.0
+date: Tue, 22 Sep 2026 08:56:35 GMT
+content-type: text/xml; charset=utf-8
+content-length: 2635988
+access-control-allow-headers: If-None-Match, If-Modified-Since, Accept, Accept-Encoding
+access-control-allow-methods: GET, HEAD, OPTIONS
+access-control-allow-origin: *
+access-control-expose-headers: ETag, Last-Modified, Content-Length, Content-Encoding, Location, Retry-After
+access-control-max-age: 86400
+cache-control: public, max-age=1800
+etag: "2fdbf7024281cde5a7fa181a8d1825f1"
+last-modified: Fri, 18 Sep 2026 08:35:20 GMT
+vary: Accept-Encoding
+wavpub-one-feed: true
+strict-transport-security: max-age=31536000
+

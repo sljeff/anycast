@@ -1,5 +1,5 @@
 {
-  "source": "getTextSafeColor (utils/formatters.dart:139-153)",
+  "source": "getTextSafeColor (utils/formatters.dart:139-153 @ 1.2.1+38; function removed by post-baseline visual refresh on the Flutter line — native still implements this released behavior)",
   "fallback": "0xFF10B981",
   "cases": {
     "0xFF000000": {

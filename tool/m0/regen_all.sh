@@ -26,6 +26,7 @@ if [[ "${1:-}" == "--live" ]]; then
   export UA_DART="Dart/3.10 (dart:io)"
   bash tool/m0/fetch_rss.sh
   python3 tool/m0/construct_rss_buckets.py
+  bash tool/m0/fetch_user_subs.sh
   bash tool/m0/fetch_api.sh
   bash tool/m0/fetch_media.sh
 else
@@ -34,6 +35,16 @@ else
     echo "fixture payloads missing (git carries only provenance records)" >&2
     echo "bootstrap once with: tool/m0/regen_all.sh --live" >&2
     exit 1
+  fi
+  # db_user depends on the author's-subscription corpus
+  if [[ -z "$(ls test/fixtures/rss/user_subs/*.xml 2>/dev/null)" ]]; then
+    echo "user_subs payloads missing; collect once with: bash tool/m0/fetch_user_subs.sh" >&2
+    exit 1
+  fi
+  # constructed buckets are deterministic (template = first standard entry);
+  # cheap and idempotent, always rebuild if absent
+  if [[ -z "$(ls test/fixtures/rss/missing_fields/*.xml 2>/dev/null)" ]]; then
+    python3 tool/m0/construct_rss_buckets.py
   fi
   # deterministic audio/opml depend only on the corpus; bootstrap if absent
   if [[ ! -f test/fixtures/audio/very_short_8s.mp3 ]]; then

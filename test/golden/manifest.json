@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-22T02:47:18.677884Z",
+  "generated_at": "2026-09-22T10:02:23.740211Z",
   "app_version": "1.2.1+38",
   "generator": "test/golden/export_golden_test.dart",
   "files": [
@@ -21,7 +21,7 @@
     },
     {
       "file": "G14_text_safe_color.json",
-      "bytes": 2061
+      "bytes": 2193
     },
     {
       "file": "G15_db_dump/db_corrupt_notadb.json",
@@ -40,6 +40,10 @@
       "bytes": 1071396
     },
     {
+      "file": "G15_db_dump/db_device.json",
+      "bytes": 158943
+    },
+    {
       "file": "G15_db_dump/db_dirty.json",
       "bytes": 184366
     },
@@ -54,6 +58,10 @@
     {
       "file": "G15_db_dump/db_light.json",
       "bytes": 37691
+    },
+    {
+      "file": "G15_db_dump/db_user.json",
+      "bytes": 2895127
     },
     {
       "file": "G15_db_dump/db_v3.json",
@@ -89,7 +97,7 @@
     },
     {
       "file": "G7_rss_mapping.json",
-      "bytes": 74031
+      "bytes": 174108
     },
     {
       "file": "G8_save_new_episodes.json",
