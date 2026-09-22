@@ -1,0 +1,84 @@
+{
+  "source": "getTextSafeColor (utils/formatters.dart:139-153)",
+  "fallback": "0xFF10B981",
+  "cases": {
+    "0xFF000000": {
+      "luminance": 0.0,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    },
+    "0xFF0A0A0A": {
+      "luminance": 0.003035269835488375,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    },
+    "0xFF111111": {
+      "luminance": 0.005605391624202723,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    },
+    "0xFF1A1A1A": {
+      "luminance": 0.010329823029626936,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    },
+    "0xFF222222": {
+      "luminance": 0.01599629336550963,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    },
+    "0xFF2A2A2A": {
+      "luminance": 0.02315336617811041,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    },
+    "0xFF333333": {
+      "luminance": 0.033104766570885055,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    },
+    "0xFF555555": {
+      "luminance": 0.09084171118340768,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    },
+    "0xFF808080": {
+      "luminance": 0.21586050011389923,
+      "threshold": 0.2,
+      "returns_fallback": false,
+      "result": "0xFF808080"
+    },
+    "0xFFAAAAAA": {
+      "luminance": 0.4019777798321958,
+      "threshold": 0.2,
+      "returns_fallback": false,
+      "result": "0xFFAAAAAA"
+    },
+    "0xFFFFFFFF": {
+      "luminance": 1.0,
+      "threshold": 0.2,
+      "returns_fallback": false,
+      "result": "0xFFFFFFFF"
+    },
+    "0xFF10B981": {
+      "luminance": 0.3639306191994719,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    },
+    "0xFF113316": {
+      "luminance": 0.025447509844347283,
+      "threshold": 0.2,
+      "returns_fallback": true,
+      "result": "0xFF10B981"
+    }
+  }
+}

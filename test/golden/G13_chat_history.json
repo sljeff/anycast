@@ -1,0 +1,78 @@
+{
+  "source": "buildChatHistory (states/chat.dart, original sendMessage lines 26-35): first 10 in list order, single-key maps, reversed",
+  "cases": {
+    "two_messages": [
+      {
+        "ai": "hi"
+      },
+      {
+        "human": "hello"
+      }
+    ],
+    "ten_messages": [
+      {
+        "ai": "msg 9"
+      },
+      {
+        "human": "msg 8"
+      },
+      {
+        "ai": "msg 7"
+      },
+      {
+        "human": "msg 6"
+      },
+      {
+        "ai": "msg 5"
+      },
+      {
+        "human": "msg 4"
+      },
+      {
+        "ai": "msg 3"
+      },
+      {
+        "human": "msg 2"
+      },
+      {
+        "ai": "msg 1"
+      },
+      {
+        "human": "msg 0"
+      }
+    ],
+    "twelve_messages_cutoff": [
+      {
+        "ai": "msg 9"
+      },
+      {
+        "human": "msg 8"
+      },
+      {
+        "ai": "msg 7"
+      },
+      {
+        "human": "msg 6"
+      },
+      {
+        "ai": "msg 5"
+      },
+      {
+        "human": "msg 4"
+      },
+      {
+        "ai": "msg 3"
+      },
+      {
+        "human": "msg 2"
+      },
+      {
+        "ai": "msg 1"
+      },
+      {
+        "human": "msg 0"
+      }
+    ]
+  },
+  "contract_note": "history末元素即当前 user_input(≤10条时); >10条时发送的是最旧10条(旧版实际行为,不得\"修复\")"
+}

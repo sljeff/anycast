@@ -37,6 +37,31 @@ secret output. Do not change `config/infisical-config.sha256` merely to make
 validation pass; a digest change must correspond to an intentional, reviewed
 Infisical configuration change.
 
+## Git write operations require explicit user consent
+
+Do not perform the following git write operations (including but not limited
+to) without the user's **explicit consent in the current conversation**:
+
+- `git commit`, `git push`
+- creating / deleting / switching branches (including force operations)
+- `git reset` / `revert` / `rebase` / `merge` / `cherry-pick`
+- adding or deleting `git tag`s; changing `git remote`s
+- any `git push --force`; deleting remote refs
+
+Every such operation must be requested separately each time; consent given
+once does not carry over to the next operation. Editing files, running tests,
+and reading the repository are not restricted. When the user explicitly
+instructs a commit or push in the current exchange, follow that instruction
+for that instance.
+
+## Language of committed artifacts
+
+Write in English anything that is committed and consumed by others: code, code
+comments, logic reference documentation, commit messages, and pull request
+descriptions. Personal or limited-scope material — plan documents, user
+conversations, temporary scripts — is not restricted and may use whatever
+language suits its audience. Keep this file itself in English.
+
 ## Git and release flow
 
 Use a short-lived branch and pull request for every change to `main`. Do not

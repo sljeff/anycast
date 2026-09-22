@@ -1,0 +1,598 @@
+{
+  "source": "models/settings.dart + states/player.dart:290-311 + pages/settings.dart lists + player.dart sliders",
+  "autoSleepTimer_csv": [
+    {
+      "encode_input": [
+        0,
+        0,
+        0
+      ],
+      "csv": "0,0,0",
+      "decoded": [
+        0,
+        0,
+        0
+      ],
+      "mins_value": null
+    },
+    {
+      "encode_input": [
+        1,
+        2,
+        3
+      ],
+      "csv": "1,2,3",
+      "decoded": [
+        1,
+        2,
+        3
+      ],
+      "mins_value": 30
+    },
+    {
+      "encode_input": [
+        23,
+        23,
+        6
+      ],
+      "csv": "23,23,6",
+      "decoded": [
+        23,
+        23,
+        6
+      ],
+      "mins_value": 60
+    },
+    {
+      "encode_input": [
+        7,
+        19,
+        4
+      ],
+      "csv": "7,19,4",
+      "decoded": [
+        7,
+        19,
+        4
+      ],
+      "mins_value": 40
+    }
+  ],
+  "speed_steps": [
+    0.5,
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    1.75,
+    2.0
+  ],
+  "countdown_minutes": [
+    0,
+    10,
+    20,
+    30,
+    40,
+    50,
+    60
+  ],
+  "countdown_labels": [
+    "OFF",
+    "10 min",
+    "20 min",
+    "30 min",
+    "40 min",
+    "50 min",
+    "1 hour"
+  ],
+  "target_languages": [
+    {
+      "name": "English",
+      "code": "en"
+    },
+    {
+      "name": "Français",
+      "code": "fr"
+    },
+    {
+      "name": "Deutsch",
+      "code": "de"
+    },
+    {
+      "name": "Español",
+      "code": "es"
+    },
+    {
+      "name": "Italiano",
+      "code": "it"
+    },
+    {
+      "name": "日本語",
+      "code": "ja"
+    },
+    {
+      "name": "中文",
+      "code": "zh"
+    },
+    {
+      "name": "Portugues",
+      "code": "pt"
+    },
+    {
+      "name": "Nederlands",
+      "code": "nl"
+    },
+    {
+      "name": "українська",
+      "code": "uk"
+    },
+    {
+      "name": "Pусский",
+      "code": "ru"
+    }
+  ],
+  "target_language_codes": [
+    "en",
+    "fr",
+    "de",
+    "es",
+    "it",
+    "ja",
+    "zh",
+    "pt",
+    "nl",
+    "uk",
+    "ru"
+  ],
+  "countries_raw": [
+    {
+      "name": "Argentina",
+      "code": "AR"
+    },
+    {
+      "name": "Australia",
+      "code": "AU"
+    },
+    {
+      "name": "Österreich",
+      "code": "AT"
+    },
+    {
+      "name": "Bangladesh",
+      "code": "BD"
+    },
+    {
+      "name": "België / Belgique",
+      "code": "BE"
+    },
+    {
+      "name": "Brasil",
+      "code": "BR"
+    },
+    {
+      "name": "Canada",
+      "code": "CA"
+    },
+    {
+      "name": "Schweiz",
+      "code": "CH"
+    },
+    {
+      "name": "Chile",
+      "code": "CL"
+    },
+    {
+      "name": "中国",
+      "code": "CN"
+    },
+    {
+      "name": "Colombia",
+      "code": "CO"
+    },
+    {
+      "name": "Česká republika",
+      "code": "CZ"
+    },
+    {
+      "name": "Deutschland",
+      "code": "DE"
+    },
+    {
+      "name": "Danmark",
+      "code": "DK"
+    },
+    {
+      "name": "مصر",
+      "code": "EG"
+    },
+    {
+      "name": "España",
+      "code": "ES"
+    },
+    {
+      "name": "Suomi",
+      "code": "FI"
+    },
+    {
+      "name": "France",
+      "code": "FR"
+    },
+    {
+      "name": "United Kingdom",
+      "code": "GB"
+    },
+    {
+      "name": "Ελλάδα",
+      "code": "GR"
+    },
+    {
+      "name": "Magyarország",
+      "code": "HU"
+    },
+    {
+      "name": "Indonesia",
+      "code": "ID"
+    },
+    {
+      "name": "Ireland",
+      "code": "IE"
+    },
+    {
+      "name": "Israel",
+      "code": "IL"
+    },
+    {
+      "name": "India",
+      "code": "IN"
+    },
+    {
+      "name": "Italia",
+      "code": "IT"
+    },
+    {
+      "name": "日本",
+      "code": "JP"
+    },
+    {
+      "name": "대한민국",
+      "code": "KR"
+    },
+    {
+      "name": "México",
+      "code": "MX"
+    },
+    {
+      "name": "Malaysia",
+      "code": "MY"
+    },
+    {
+      "name": "Nigeria",
+      "code": "NG"
+    },
+    {
+      "name": "Nederland",
+      "code": "NL"
+    },
+    {
+      "name": "Norge",
+      "code": "NO"
+    },
+    {
+      "name": "New Zealand",
+      "code": "NZ"
+    },
+    {
+      "name": "Pakistan",
+      "code": "PK"
+    },
+    {
+      "name": "Polska",
+      "code": "PL"
+    },
+    {
+      "name": "Philippines",
+      "code": "PH"
+    },
+    {
+      "name": "Portugal",
+      "code": "PT"
+    },
+    {
+      "name": "România",
+      "code": "RO"
+    },
+    {
+      "name": "Россия",
+      "code": "RU"
+    },
+    {
+      "name": "Saudi Arabia",
+      "code": "SA"
+    },
+    {
+      "name": "Sverige",
+      "code": "SE"
+    },
+    {
+      "name": "Singapore",
+      "code": "SG"
+    },
+    {
+      "name": "ประเทศไทย",
+      "code": "TH"
+    },
+    {
+      "name": "Türkiye",
+      "code": "TR"
+    },
+    {
+      "name": "Україна",
+      "code": "UA"
+    },
+    {
+      "name": "United States",
+      "code": "US"
+    },
+    {
+      "name": "Việt Nam",
+      "code": "VN"
+    },
+    {
+      "name": "South Africa",
+      "code": "ZA"
+    }
+  ],
+  "countries_sorted_by_name": [
+    {
+      "name": "Argentina",
+      "code": "AR"
+    },
+    {
+      "name": "Australia",
+      "code": "AU"
+    },
+    {
+      "name": "Bangladesh",
+      "code": "BD"
+    },
+    {
+      "name": "België / Belgique",
+      "code": "BE"
+    },
+    {
+      "name": "Brasil",
+      "code": "BR"
+    },
+    {
+      "name": "Canada",
+      "code": "CA"
+    },
+    {
+      "name": "Chile",
+      "code": "CL"
+    },
+    {
+      "name": "Colombia",
+      "code": "CO"
+    },
+    {
+      "name": "Danmark",
+      "code": "DK"
+    },
+    {
+      "name": "Deutschland",
+      "code": "DE"
+    },
+    {
+      "name": "España",
+      "code": "ES"
+    },
+    {
+      "name": "France",
+      "code": "FR"
+    },
+    {
+      "name": "India",
+      "code": "IN"
+    },
+    {
+      "name": "Indonesia",
+      "code": "ID"
+    },
+    {
+      "name": "Ireland",
+      "code": "IE"
+    },
+    {
+      "name": "Israel",
+      "code": "IL"
+    },
+    {
+      "name": "Italia",
+      "code": "IT"
+    },
+    {
+      "name": "Magyarország",
+      "code": "HU"
+    },
+    {
+      "name": "Malaysia",
+      "code": "MY"
+    },
+    {
+      "name": "México",
+      "code": "MX"
+    },
+    {
+      "name": "Nederland",
+      "code": "NL"
+    },
+    {
+      "name": "New Zealand",
+      "code": "NZ"
+    },
+    {
+      "name": "Nigeria",
+      "code": "NG"
+    },
+    {
+      "name": "Norge",
+      "code": "NO"
+    },
+    {
+      "name": "Pakistan",
+      "code": "PK"
+    },
+    {
+      "name": "Philippines",
+      "code": "PH"
+    },
+    {
+      "name": "Polska",
+      "code": "PL"
+    },
+    {
+      "name": "Portugal",
+      "code": "PT"
+    },
+    {
+      "name": "România",
+      "code": "RO"
+    },
+    {
+      "name": "Saudi Arabia",
+      "code": "SA"
+    },
+    {
+      "name": "Schweiz",
+      "code": "CH"
+    },
+    {
+      "name": "Singapore",
+      "code": "SG"
+    },
+    {
+      "name": "South Africa",
+      "code": "ZA"
+    },
+    {
+      "name": "Suomi",
+      "code": "FI"
+    },
+    {
+      "name": "Sverige",
+      "code": "SE"
+    },
+    {
+      "name": "Türkiye",
+      "code": "TR"
+    },
+    {
+      "name": "United Kingdom",
+      "code": "GB"
+    },
+    {
+      "name": "United States",
+      "code": "US"
+    },
+    {
+      "name": "Việt Nam",
+      "code": "VN"
+    },
+    {
+      "name": "Österreich",
+      "code": "AT"
+    },
+    {
+      "name": "Česká republika",
+      "code": "CZ"
+    },
+    {
+      "name": "Ελλάδα",
+      "code": "GR"
+    },
+    {
+      "name": "Россия",
+      "code": "RU"
+    },
+    {
+      "name": "Україна",
+      "code": "UA"
+    },
+    {
+      "name": "مصر",
+      "code": "EG"
+    },
+    {
+      "name": "ประเทศไทย",
+      "code": "TH"
+    },
+    {
+      "name": "中国",
+      "code": "CN"
+    },
+    {
+      "name": "日本",
+      "code": "JP"
+    },
+    {
+      "name": "대한민국",
+      "code": "KR"
+    }
+  ],
+  "locale_derivation": {
+    "en_US": {
+      "language": "en",
+      "country": "US"
+    },
+    "zh_Hans_CN": {
+      "language": "zh",
+      "country": "CN"
+    },
+    "zh_CN": {
+      "language": "zh",
+      "country": "CN"
+    },
+    "fr_FR": {
+      "language": "fr",
+      "country": "FR"
+    },
+    "zh-Hans-CN": {
+      "language": "en",
+      "country": "US"
+    },
+    "ja-JP": {
+      "language": "en",
+      "country": "US"
+    },
+    "de": {
+      "language": "en",
+      "country": "US"
+    }
+  },
+  "default_row": {
+    "note": "settings.dart:33-36 INSERT OR IGNORE defaults; autoRefreshInterval=300 (口径裁定, 01 §2)",
+    "darkMode": 0,
+    "speed": 1.0,
+    "skipSilence": 0,
+    "autoSleepTimer": "0,0,0",
+    "maxCacheCount": 10,
+    "autoRefreshInterval": 300,
+    "maxFeedEpisodes": 100,
+    "maxHistoryEpisodes": 100,
+    "continuousPlaying": 1
+  },
+  "autoRefresh_choices_seconds": [
+    60,
+    180,
+    300,
+    600,
+    1800
+  ],
+  "max_episodes_choices": [
+    50,
+    100,
+    200,
+    300
+  ]
+}

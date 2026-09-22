@@ -1,0 +1,36 @@
+{
+  "source": "models/playlist_episode.dart:90-125 (insertion only, K26)",
+  "cases": {
+    "empty_index0": {
+      "prefill": null,
+      "index": 0,
+      "positions": [
+        0.0
+      ],
+      "threw": false
+    },
+    "append_at_length": {
+      "prefill": 3,
+      "index": 3,
+      "positions": [
+        -0.003,
+        -0.0015,
+        0.0,
+        0.0015
+      ],
+      "threw": false
+    },
+    "index_length_plus_1": {
+      "prefill": 3,
+      "index": 4,
+      "threw": true,
+      "error": "RangeError (length): Invalid value: Not in inclusive range 0..2: 3"
+    },
+    "index_way_out_of_range": {
+      "prefill": 3,
+      "index": 10,
+      "threw": true,
+      "error": "RangeError (length): Invalid value: Not in inclusive range 0..2: 9"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "source": "utils/formatters.dart + getPlayedAndTotalTime (models/playlist_episode.dart:160-164)",
+  "reference_now_ms": 1790045237370,
+  "formatDatetime": {
+    "past_2020": "2020-5-15",
+    "future_2030": "just now",
+    "this_year_jan": "1-5",
+    "last_year": "2025-6-15",
+    "just_now_is_special_cased": true
+  },
+  "formatDate": {
+    "past_2020": "2020-5-15",
+    "this_year": "1-5"
+  },
+  "formatDuration": {
+    "zero": "",
+    "59s": "0m",
+    "1m": "1m",
+    "99m": "99m",
+    "100m": "1h 40m",
+    "134m": "2h 14m"
+  },
+  "formatRemainingTime": {
+    "zero_duration": "",
+    "unplayed_73m": "73m",
+    "played_1h13m": "73m remaining",
+    "played_past_end": "0m remaining"
+  },
+  "getPlayedAndTotalTime": {
+    "normal": "21:32 / 31:56",
+    "null_duration_convention": "0:05 / 0:00",
+    "hour_rollover": "61:01 / 122:02"
+  },
+  "formatCountdown": {
+    "zero": "OFF",
+    "negative": "OFF",
+    "59s": "00:59",
+    "60m": "1h",
+    "59m59s": "59:59"
+  },
+  "formatTime": {
+    "zero": "00:00:00",
+    "1h2m3s": "01:02:03"
+  },
+  "urlToDomain": {
+    "https": "www.ximalaya.com",
+    "no_scheme": ""
+  },
+  "note": "timeago relative branches are computed against reference_now_ms; native side must inject the same instant"
+}

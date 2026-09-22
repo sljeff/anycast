@@ -1,0 +1,47 @@
+{
+  "source": "PaletteGenerator.fromImageProvider (utils/formatters.dart:167-177)",
+  "fallback": "0xFF111316",
+  "assertion_note": "native CoreImage comparison uses CIEDE2000 < 10, not exact equality (05 §3)",
+  "cases": [
+    {
+      "file": "cover_00.jpg",
+      "dominantColor": "0xFFE8E8E9",
+      "dominantColor_int": 4293454057
+    },
+    {
+      "file": "cover_01.jpg",
+      "dominantColor": "0xFF3A1300",
+      "dominantColor_int": 4281996032
+    },
+    {
+      "file": "cover_02.jpg",
+      "dominantColor": "0xFF441770",
+      "dominantColor_int": 4282652528
+    },
+    {
+      "file": "cover_03.jpg",
+      "dominantColor": "0xFFA79369",
+      "dominantColor_int": 4289172329
+    },
+    {
+      "file": "cover_04.jpg",
+      "dominantColor": "0xFF005DE8",
+      "dominantColor_int": 4278214120
+    },
+    {
+      "file": "cover_05.jpg",
+      "dominantColor": "0xFFF4BB2D",
+      "dominantColor_int": 4294228781
+    },
+    {
+      "file": "cover_06.jpg",
+      "dominantColor": "0xFF008987",
+      "dominantColor_int": 4278225287
+    },
+    {
+      "file": "cover_07.jpg",
+      "dominantColor": "0xFFD8D0B0",
+      "dominantColor_int": 4292399280
+    }
+  ]
+}

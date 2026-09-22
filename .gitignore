@@ -142,7 +142,19 @@ app.*.symbols
 !**/ios/**/default.mode1v3
 !**/ios/**/default.mode2v3
 !**/ios/**/default.pbxuser
-!**/ios/**/default.perspectivev3
+!**/ios/**/default.perspective3v3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 !/dev/ci/**/Gemfile.lock
 !.vscode/settings.json
+
+# M0 test fixtures: payloads are regenerated from their recorded sources
+# (capture manifests, response headers, collectors in tool/m0/); only the
+# provenance records and the test/golden/ expectations are tracked.
+# See test/fixtures/README.md for the regeneration workflow.
+/test/fixtures/audio/
+/test/fixtures/db/
+/test/fixtures/images/
+/test/fixtures/opml/
+/test/fixtures/api/
+/test/fixtures/channels_index.json
+/test/fixtures/rss/**/*.xml

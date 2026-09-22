@@ -1,0 +1,319 @@
+{
+ "captured_at": "2026-09-22T02:17:32+00:00",
+ "live": {
+  "standard": [
+   {
+    "file": "0421.xml",
+    "url": "https://www.ximalaya.com/album/68171496.xml",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "application/xml;charset=UTF-8",
+    "sha256": "508eb0fccf332296070a4751f457b721532ec03f4a50d2d91bfc232fff5bebb1",
+    "bytes": 2588433,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "最新幽默段子笑话大全｜每日更新",
+    "items": 2000,
+    "itunes_duration_count": 2000
+   },
+   {
+    "file": "0415.xml",
+    "url": "https://www.ximalaya.com/album/25143377.xml",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "application/xml;charset=UTF-8",
+    "sha256": "e044744b24b9f0c624f0f42ce95e33e28154b9d2baad0f4e84f4cd030f212815",
+    "bytes": 3463745,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "依首良音（流行二）",
+    "items": 1857,
+    "itunes_duration_count": 1857
+   },
+   {
+    "file": "0414.xml",
+    "url": "https://www.ximalaya.com/album/21583059.xml",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "application/xml;charset=UTF-8",
+    "sha256": "ee1e3185389132567781530174493e452dd09845c056fd1617185012a2533df6",
+    "bytes": 3314535,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "依首良音（流行一）",
+    "items": 1802,
+    "itunes_duration_count": 1802
+   },
+   {
+    "file": "0432.xml",
+    "url": "https://www.ximalaya.com/album/81417000.xml",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "application/xml;charset=UTF-8",
+    "sha256": "21179466acfee51dabc32db8a0dbea276c89aa4f41aba3b4c61937b46636a14a",
+    "bytes": 2189262,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "富爸爸穷爸爸-思维分享",
+    "items": 1660,
+    "itunes_duration_count": 1660
+   },
+   {
+    "file": "0430.xml",
+    "url": "https://www.ximalaya.com/album/78469192.xml",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "application/xml;charset=UTF-8",
+    "sha256": "b1bcba6cf4c9a431c3e28d0498f8cff41d3ff967c02adc0148069413168bd2d9",
+    "bytes": 2181864,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "财富自由之路-穷爸爸富爸爸",
+    "items": 1654,
+    "itunes_duration_count": 1654
+   },
+   {
+    "file": "0359.xml",
+    "url": "https://rss.libsyn.com/shows/67940/destinations/278377.xml",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "application/rss+xml; charset=utf-8",
+    "sha256": "392e59a9522aeab11effc209831c140af46fc24cd8d44f6116bf9dc0256679e9",
+    "bytes": 2652863,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "REAL AF with Andy Frisella",
+    "items": 1384,
+    "itunes_duration_count": 1384
+   },
+   {
+    "file": "0212.xml",
+    "url": "https://feeds.megaphone.fm/VKRX3013755423",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "application/xml; charset=utf-8",
+    "sha256": "dded544cb87231ef4a54d9143c6756f580a3e86dc3850c0d345ae0992f82ef54",
+    "bytes": 1645549,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "CBS Radio Mystery Theater | Old Time Radio",
+    "items": 1348,
+    "itunes_duration_count": 1348
+   },
+   {
+    "file": "0217.xml",
+    "url": "https://feeds.megaphone.fm/WWO6655869236",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "application/xml; charset=utf-8",
+    "sha256": "21e2dc89361ca1559c01a79851452816bc7be0574babcf0b6522c9c6581fb682",
+    "bytes": 3446617,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "The Prof G Pod with Scott Galloway",
+    "items": 1210,
+    "itunes_duration_count": 1210
+   },
+   {
+    "file": "0076.xml",
+    "url": "https://audioboom.com/channels/5166624.rss",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "text/xml; charset=utf-8",
+    "sha256": "3c955caef96e9d7cafc9bfa705c7d74ec494f64350143e2d1d0dc83a25b98f26",
+    "bytes": 2033858,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "Pod Save America",
+    "items": 1200,
+    "itunes_duration_count": 1200
+   },
+   {
+    "file": "0241.xml",
+    "url": "https://feeds.npr.org/510338/podcast.xml",
+    "bucket": "standard",
+    "status": 200,
+    "content_type": "application/xml; charset=utf-8",
+    "sha256": "a917e90cc36be94582aab5d2a55374f10e99477572d3ef7ea9c80b06ba896f82",
+    "bytes": 3324800,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "Life Kit",
+    "items": 1172,
+    "itunes_duration_count": 1172
+   }
+  ],
+  "http_plain": [
+   {
+    "file": "0002.xml",
+    "url": "http://feeds.harvardbusiness.org/harvardbusiness/ideacast",
+    "bucket": "http_plain",
+    "status": 200,
+    "content_type": "text/xml; charset=utf-8",
+    "sha256": "8176289c4caebd85966eee50ce8c6ab13ef3fac603e6c0468539a4e2b5327dad",
+    "bytes": 632984,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "HBR IdeaCast",
+    "items": 250,
+    "itunes_duration_count": 250
+   },
+   {
+    "file": "0003.xml",
+    "url": "http://feeds.harvardbusiness.org/harvardbusiness/women-at-work",
+    "bucket": "http_plain",
+    "status": 200,
+    "content_type": "text/xml; charset=utf-8",
+    "sha256": "156c4f3580c88b07f094179f07efd7b24254ded0ac27d27996fae7fd08773f5c",
+    "bytes": 565399,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "Women at Work",
+    "items": 163,
+    "itunes_duration_count": 163
+   },
+   {
+    "file": "0005.xml",
+    "url": "http://kikudorabungak.main.jp/feed/podcast",
+    "bucket": "http_plain",
+    "status": 200,
+    "content_type": "application/rss+xml; charset=UTF-8",
+    "sha256": "b19ad5a4f4b5d8a14d70f914ff094cd46a0bedd0492047574c5b94ce310dbf2e",
+    "bytes": 313451,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "きくドラ",
+    "items": 300,
+    "itunes_duration_count": 300
+   },
+   {
+    "file": "0007.xml",
+    "url": "http://rss.castbox.fm/everest/78e14307d01a4bef9665c62f22e26ca4.xml",
+    "bucket": "http_plain",
+    "status": 200,
+    "content_type": "application/xml; charset=utf-8",
+    "sha256": "650bff204165644324334e072b76985d57f336a90590134156e493b846170ac1",
+    "bytes": 3008932,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "پلی لیست | PlayList",
+    "items": 382,
+    "itunes_duration_count": 382
+   },
+   {
+    "file": "0008.xml",
+    "url": "http://rss.lizhi.fm/rss/14275.xml",
+    "bucket": "http_plain",
+    "status": 200,
+    "content_type": "text/xml; charset=utf-8",
+    "sha256": "50f17eda3188bdb7cea7df171495c15b5732ac5fafd3cc10b1ad20c2b8475edc",
+    "bytes": 3378419,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "大内密谈",
+    "items": 1352,
+    "itunes_duration_count": 1352
+   },
+   {
+    "file": "0009.xml",
+    "url": "http://rss.lizhi.fm/rss/171692631.xml",
+    "bucket": "http_plain",
+    "status": 200,
+    "content_type": "text/xml; charset=utf-8",
+    "sha256": "72be9a11fe741ac61f9287619d0ad538ed0c428dc7e0df8680d011412c8276d6",
+    "bytes": 337513,
+    "fetched_ua": "browser",
+    "captured_at": "2026-09-22T02:17:32+00:00",
+    "title": "Woo话可说",
+    "items": 174,
+    "itunes_duration_count": 174
+   }
+  ],
+  "redirect": [
+   {
+    "file": "0004.headers.txt",
+    "url": "http://feeds.wnyc.org/snapjudgment-wnyc",
+    "bucket": "redirect",
+    "status": 301,
+    "location": "http://feeds.feedburner.com/snapjudgment-wnyc",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "captured_at": "2026-09-22T02:17:36+00:00"
+   },
+   {
+    "file": "0006.headers.txt",
+    "url": "http://rss.castbox.fm/everest/414dd9dd51cc4dd498b57c4d5cf08950.xml",
+    "bucket": "redirect",
+    "status": 302,
+    "location": "https://feeds.acast.com/public/shows/67ca6c9effae9c0f4e3e7637",
+    "sha256": "30fed5e5538fca1188d93beef10975d20c6c065a51e5f5693abc8bb0a0784cd8",
+    "captured_at": "2026-09-22T02:17:38+00:00",
+    "final_file": "0006.final.xml"
+   },
+   {
+    "file": "0106.headers.txt",
+    "url": "https://feed.syntax.fm/rss",
+    "bucket": "redirect",
+    "status": 302,
+    "location": "https://feeds.megaphone.fm/FSI1483080183",
+    "sha256": "12755429beb15d5eb57eafa45b8dba326343dd099bf0552038694c3856e8860e",
+    "captured_at": "2026-09-22T02:17:42+00:00"
+   },
+   {
+    "file": "0135.headers.txt",
+    "url": "https://feeds.99percentinvisible.org/99percentinvisible",
+    "bucket": "redirect",
+    "status": 301,
+    "location": "https://feeds.simplecast.com/BqbsxVfO",
+    "sha256": "446a6087825fa73eadb045e5a2e9e2adf7df241b571228187728191d961dda1f",
+    "captured_at": "2026-09-22T02:17:45+00:00"
+   },
+   {
+    "file": "0167.headers.txt",
+    "url": "https://feeds.libsyn.com/629010/rss",
+    "bucket": "redirect",
+    "status": 302,
+    "location": "https://rss.libsyn.com/shows/629010/destinations/5546055.xml",
+    "sha256": "83e1a0a0d3846e3151225a0ca379979220576ba587a1af5540a351639dda7f13",
+    "captured_at": "2026-09-22T02:17:47+00:00",
+    "final_file": "0167.final.xml"
+   },
+   {
+    "file": "0249.headers.txt",
+    "url": "https://feeds.redcircle.com/67860829-4ab4-480a-8940-7b1856299886",
+    "bucket": "redirect",
+    "status": 301,
+    "location": "https://feeds.simplecast.com/FRhlISgU",
+    "sha256": "2cce72f2b87c44e732519952585d0cd73076e5baecd6f931c8ea749fd6311eff",
+    "captured_at": "2026-09-22T02:17:50+00:00"
+   }
+  ]
+ },
+ "ua_sensitive": [
+  {
+   "url": "http://rss.lizhi.fm/rss/14275.xml",
+   "bucket": "ua_sensitive",
+   "status_by_ua": {
+    "browser": "200",
+    "dart": "200",
+    "none": "567"
+   },
+   "captured_at": "2026-09-22T02:19:23+00:00",
+   "browser_sha256": "72be9a11fe741ac61f9287619d0ad538ed0c428dc7e0df8680d011412c8276d6",
+   "dart_sha256": "72be9a11fe741ac61f9287619d0ad538ed0c428dc7e0df8680d011412c8276d6",
+   "none_sha256": "a52ffbb482455952a1f95ebc9e7d454dca0d4f3a0b4ac40427baa787404b9e76"
+  },
+  {
+   "url": "http://rss.lizhi.fm/rss/171692631.xml",
+   "bucket": "ua_sensitive",
+   "status_by_ua": {
+    "browser": "200",
+    "dart": "200",
+    "none": "567"
+   },
+   "captured_at": "2026-09-22T02:19:25+00:00",
+   "browser_sha256": "72be9a11fe741ac61f9287619d0ad538ed0c428dc7e0df8680d011412c8276d6",
+   "dart_sha256": "72be9a11fe741ac61f9287619d0ad538ed0c428dc7e0df8680d011412c8276d6",
+   "none_sha256": "2f6c7940d6a0780fecfd28d6e098fdb283aaa0e22bccc28eaafe705f917d0c69"
+  }
+ ]
+}

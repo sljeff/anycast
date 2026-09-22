@@ -1,0 +1,16 @@
+{
+  "source": "SubtitleModel.toLrc / TranslationModel.toLrc / formatLrcTime (models/subtitle.dart:101-116, formatters.dart:180-185)",
+  "subtitle_json": "[{\"start\":0.0,\"end\":3.9,\"text\":\"First line\"},{\"start\":61.234567,\"end\":125.999,\"text\":\"fractional seconds 中文\"},{\"start\":3599.9999,\"end\":3600.5,\"text\":\"near the hour mark\"},{\"start\":5.0,\"end\":9.5,\"text\":\"emoji 🎧 & “quotes” عربى\"},{\"start\":600.001,\"end\":660.0,\"text\":\"ten minutes in\"}]",
+  "subtitle_toLrc": "[00:00.000]First line\n[00:03.900]\n[01:01.234]fractional seconds 中文\n[02:05.999]\n[59:59.999]near the hour mark\n[60:00.500]\n[00:05.000]emoji 🎧 & “quotes” عربى\n[00:09.500]\n[10:00.001]ten minutes in\n[11:00.000]\n",
+  "translation_toLrc": "[00:00.000]【译】First line\n[00:03.900]\n[01:01.234]【译】fractional seconds 中文\n[02:05.999]\n[59:59.999]【译】near the hour mark\n[60:00.500]\n[00:05.000]【译】emoji 🎧 & “quotes” عربى\n[00:09.500]\n[10:00.001]【译】ten minutes in\n[11:00.000]\n",
+  "formatLrcTime": {
+    "0.0": "00:00.000",
+    "4.999": "00:04.999",
+    "59.9999": "00:59.999",
+    "61.234567": "01:01.234",
+    "599.999": "09:59.999",
+    "3599.9999": "59:59.999",
+    "3600.5": "60:00.500"
+  },
+  "note": "byte-exact LRC text: [mm:ss.mmm] two lines per segment"
+}

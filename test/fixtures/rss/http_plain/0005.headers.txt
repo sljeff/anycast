@@ -1,0 +1,14 @@
+HTTP/1.1 200 OK
+Date: Tue, 22 Sep 2026 02:14:55 GMT
+Content-Type: application/rss+xml; charset=UTF-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+Server: Apache
+X-Powered-By: PHP/7.4.33
+Link: <http://kikudorabungak.main.jp/wp-json/>; rel="https://api.w.org/"
+Access-Control-Allow-Origin: *
+Last-Modified: Tue, 15 Sep 2026 15:01:35 GMT
+ETag: "fd3f4a9f924cd85b26e27bf72bad3d70"
+Vary: Range,Accept-Encoding
+X-Cache: HIT
+

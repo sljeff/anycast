@@ -23,18 +23,7 @@ class ChatController extends GetxController {
     );
     chatController.insertMessage(userMsg);
 
-    List<Map<String, String>> history = [];
-    final messages = chatController.messages;
-    // 获取最近 10 条历史消息
-    for (int i = 0; i < messages.length && i < 10; i++) {
-      final msg = messages[i];
-      if (msg is TextMessage) {
-        history.add({msg.authorId: msg.text});
-      }
-    }
-    history = history.reversed.toList();
-
-    send2AI(enclosureUrl, text, history);
+    send2AI(enclosureUrl, text, buildChatHistory(chatController.messages));
   }
 
   void send2AI(
@@ -83,4 +72,19 @@ class ChatController extends GetxController {
     chatController.dispose();
     super.onClose();
   }
+}
+
+/// Pure history-array construction for /api/subtitles/chat (original inline
+/// logic of sendMessage, extracted for testability): first 10 messages in list
+/// order, single-key maps {human|ai: text}, reversed back to chronological.
+List<Map<String, String>> buildChatHistory(List<Message> messages) {
+  List<Map<String, String>> history = [];
+  // 获取最近 10 条历史消息
+  for (int i = 0; i < messages.length && i < 10; i++) {
+    final msg = messages[i];
+    if (msg is TextMessage) {
+      history.add({msg.authorId: msg.text});
+    }
+  }
+  return history.reversed.toList();
 }

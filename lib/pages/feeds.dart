@@ -248,8 +248,17 @@ Future<void> fetchNewEpisodes() async {
   );
 }
 
-void saveNewEpisodes(
-    List<PodcastImportData?> episodes, List<SubscriptionModel> subscriptions) {
+class SaveNewEpisodesResult {
+  final List<SubscriptionModel> subscriptions;
+  final List<FeedEpisodeModel> episodes;
+
+  SaveNewEpisodesResult(this.subscriptions, this.episodes);
+}
+
+/// Pure merge decision of saveNewEpisodes (original inline logic, extracted
+/// for testability): local lastUpdated vs fetched latest pubDate, 3 branches.
+SaveNewEpisodesResult computeNewEpisodes(List<PodcastImportData?> episodes,
+    List<SubscriptionModel> subscriptions) {
   var fetchedMap = <String, PodcastImportData>{};
   for (var episode in episodes) {
     if (episode == null) continue;
@@ -278,11 +287,18 @@ void saveNewEpisodes(
     }));
   }
 
-  if (updatedSubscriptions.isNotEmpty) {
-    Get.find<SubscriptionController>().addMany(updatedSubscriptions);
+  return SaveNewEpisodesResult(updatedSubscriptions, updatedEpisodes);
+}
+
+void saveNewEpisodes(
+    List<PodcastImportData?> episodes, List<SubscriptionModel> subscriptions) {
+  var result = computeNewEpisodes(episodes, subscriptions);
+
+  if (result.subscriptions.isNotEmpty) {
+    Get.find<SubscriptionController>().addMany(result.subscriptions);
   }
-  if (updatedEpisodes.isNotEmpty) {
-    Get.find<FeedEpisodeController>().addMany(updatedEpisodes);
+  if (result.episodes.isNotEmpty) {
+    Get.find<FeedEpisodeController>().addMany(result.episodes);
   }
 }
 

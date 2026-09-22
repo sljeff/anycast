@@ -1,0 +1,32 @@
+{
+  "source": "api/share.dart:12-57",
+  "timeout_seconds": 3,
+  "retry_max_attempts": 3,
+  "retry_only": [
+    "SocketException",
+    "TimeoutException"
+  ],
+  "cases": [
+    {
+      "url": "https://anycast.website/player?rssfeedurl=https%3A%2F%2Fexample.com%2Ffeed.xml&enclosureurl=https%3A%2F%2Fexample.com%2Fep1.mp3",
+      "md5": "c8441b6c1eaabe3e183f5ff28c5e2ae7",
+      "md5_len": 32,
+      "body_json": "{\"cmd\":\"add\",\"url\":\"https://anycast.website/player?rssfeedurl=https%3A%2F%2Fexample.com%2Ffeed.xml&enclosureurl=https%3A%2F%2Fexample.com%2Fep1.mp3\",\"password\":\"cjp2PGN3zuf5cfh\",\"key\":\"c8441b6c1eaabe3e183f5ff28c5e2ae7\"}",
+      "result_url_when_ok": "https://s.kindjeff.com/c8441b6c1eaabe3e183f5ff28c5e2ae7"
+    },
+    {
+      "url": "https://anycast.website/channel?rssfeedurl=https%3A%2F%2Fexample.com%2Ffeed.xml",
+      "md5": "81e85e1936401a0a245dfee15ff05b22",
+      "md5_len": 32,
+      "body_json": "{\"cmd\":\"add\",\"url\":\"https://anycast.website/channel?rssfeedurl=https%3A%2F%2Fexample.com%2Ffeed.xml\",\"password\":\"cjp2PGN3zuf5cfh\",\"key\":\"81e85e1936401a0a245dfee15ff05b22\"}",
+      "result_url_when_ok": "https://s.kindjeff.com/81e85e1936401a0a245dfee15ff05b22"
+    },
+    {
+      "url": "https://anycast.website/player?rssfeedurl=&enclosureurl=",
+      "md5": "86e5527b96c8d43585605ea47ed488b1",
+      "md5_len": 32,
+      "body_json": "{\"cmd\":\"add\",\"url\":\"https://anycast.website/player?rssfeedurl=&enclosureurl=\",\"password\":\"cjp2PGN3zuf5cfh\",\"key\":\"86e5527b96c8d43585605ea47ed488b1\"}",
+      "result_url_when_ok": "https://s.kindjeff.com/86e5527b96c8d43585605ea47ed488b1"
+    }
+  ]
+}

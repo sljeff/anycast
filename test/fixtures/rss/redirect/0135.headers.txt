@@ -1,0 +1,10 @@
+HTTP/2 301 
+date: Tue, 22 Sep 2026 02:15:27 GMT
+content-type: text/html; charset=UTF-8
+location: https://feeds.simplecast.com/BqbsxVfO
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=FIFw2SHzlnebCFLUNbPt97yNRHPL5cDncsUnNZJBRUsWcW%2B9vKHPcMErj2EGgboCSGCZZ0j%2B8qddn0DW%2BSn6%2F6Lm27txsoeFhwQE6dFsPSadTBfPe4nlC645FHwHPsBzurvkj%2BaKHMjO9ZLVjAPq"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a3edcd4edfec6ad1-SJC
+alt-svc: h3=":443"; ma=86400
+

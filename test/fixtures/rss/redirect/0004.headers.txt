@@ -1,0 +1,8 @@
+HTTP/1.1 301 Moved Permanently
+x-amz-id-2: TzCK08akNSIgpLr+6GpXWrEp6NXgtVNLyQRJDT4oa6gnEUBtRCFenrxJepEcAhh+HxkiuYVAt60=
+x-amz-request-id: K11Q1A0CGK7YZ4GB
+Date: Tue, 22 Sep 2026 02:14:56 GMT
+Location: http://feeds.feedburner.com/snapjudgment-wnyc
+Content-Length: 0
+Server: AmazonS3
+

@@ -1,0 +1,73 @@
+{
+  "bucket": "db_edge_subs",
+  "user_version": 4,
+  "playlist": [
+    {
+      "id": 1,
+      "title": "Default",
+      "position": 1
+    },
+    {
+      "id": 2,
+      "title": "Second",
+      "position": 2
+    }
+  ],
+  "player": [
+    {
+      "id": 1,
+      "currentPlaylistId": null
+    }
+  ],
+  "settings": [
+    {
+      "id": 1,
+      "darkMode": 0,
+      "speed": 1.0,
+      "skipSilence": 0,
+      "autoSleepTimer": "0,0,0",
+      "maxCacheCount": 10,
+      "countryCode": "US",
+      "targetLanguage": "en",
+      "autoRefreshInterval": 300,
+      "maxFeedEpisodes": 100,
+      "maxHistoryEpisodes": 100,
+      "continuousPlaying": 1
+    }
+  ],
+  "subscription": [
+    {
+      "id": 1,
+      "rssFeedUrl": "https://edge.example.com/feed-a.xml",
+      "title": "Collision Channel",
+      "description": "the resident subscription (title owner)",
+      "imageUrl": null,
+      "link": "https://edge-a.example.com/",
+      "categories": null,
+      "author": null,
+      "email": null,
+      "lastUpdated": 1780272000000
+    }
+  ],
+  "feedEpisode": [],
+  "playlistEpisode": [
+    {
+      "id": 1,
+      "title": "Cross-list episode",
+      "description": "moved between playlists",
+      "duration": 2400000,
+      "enclosureUrl": "https://edge.example.com/ep-cross.mp3",
+      "pubDate": 1780272000000,
+      "imageUrl": null,
+      "channelTitle": "Collision Channel",
+      "rssFeedUrl": "https://edge.example.com/feed-a.xml",
+      "playlistId": 1,
+      "position": 0.0,
+      "playedDuration": null
+    }
+  ],
+  "historyEpisode": [],
+  "subtitle": [],
+  "translation": [],
+  "sqlite_sequence": []
+}

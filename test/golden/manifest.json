@@ -1,0 +1,107 @@
+{
+  "generated_at": "2026-09-22T02:47:18.677884Z",
+  "app_version": "1.2.1+38",
+  "generator": "test/golden/export_golden_test.dart",
+  "files": [
+    {
+      "file": "G10_time_formats.json",
+      "bytes": 1242
+    },
+    {
+      "file": "G11_user_from_json.json",
+      "bytes": 1006
+    },
+    {
+      "file": "G12_shortlink_params.json",
+      "bytes": 1650
+    },
+    {
+      "file": "G13_chat_history.json",
+      "bytes": 1280
+    },
+    {
+      "file": "G14_text_safe_color.json",
+      "bytes": 2061
+    },
+    {
+      "file": "G15_db_dump/db_corrupt_notadb.json",
+      "bytes": 204
+    },
+    {
+      "file": "G15_db_dump/db_corrupt_partial.json",
+      "bytes": 225
+    },
+    {
+      "file": "G15_db_dump/db_corrupt_truncated.json",
+      "bytes": 227
+    },
+    {
+      "file": "G15_db_dump/db_crashed.json",
+      "bytes": 1071396
+    },
+    {
+      "file": "G15_db_dump/db_dirty.json",
+      "bytes": 184366
+    },
+    {
+      "file": "G15_db_dump/db_edge_subs.json",
+      "bytes": 1608
+    },
+    {
+      "file": "G15_db_dump/db_heavy.json",
+      "bytes": 1071303
+    },
+    {
+      "file": "G15_db_dump/db_light.json",
+      "bytes": 37691
+    },
+    {
+      "file": "G15_db_dump/db_v3.json",
+      "bytes": 35133
+    },
+    {
+      "file": "G16_search_trim.json",
+      "bytes": 738
+    },
+    {
+      "file": "G1_playlist_position.json",
+      "bytes": 2689605
+    },
+    {
+      "file": "G2_insert_or_update_by_index.json",
+      "bytes": 770
+    },
+    {
+      "file": "G3_to_lrc.json",
+      "bytes": 1338
+    },
+    {
+      "file": "G4_export_text.json",
+      "bytes": 992
+    },
+    {
+      "file": "G5_html_to_text.json",
+      "bytes": 4602
+    },
+    {
+      "file": "G6_opml_parse.json",
+      "bytes": 68222
+    },
+    {
+      "file": "G7_rss_mapping.json",
+      "bytes": 74031
+    },
+    {
+      "file": "G8_save_new_episodes.json",
+      "bytes": 244857
+    },
+    {
+      "file": "G9_settings_codec.json",
+      "bytes": 8915
+    },
+    {
+      "file": "G_palette_dominant.json",
+      "bytes": 1173
+    }
+  ]
+}

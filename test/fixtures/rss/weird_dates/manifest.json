@@ -1,0 +1,22 @@
+[
+ {
+  "file": "weird_pubdates.xml",
+  "items": 12,
+  "dates": [
+   "Mon, 01 Jan 1990 00:00:00 GMT",
+   "Tue, 15 Mar 1994 12:30:45 +0000",
+   "Wed, 02 Feb 2022 09:15:00 EST",
+   "Thu, 03 Mar 2022 09:15:00 CST",
+   "Fri, 01 Apr 2022 09:15:00 +0800",
+   "Sat, 31 Dec 2033 23:59:59 GMT",
+   "Sun, 22 Sep 2030 10:00:00 Z",
+   "22 Sep 2026 10:00:00 GMT",
+   "Mon, 22 Sep 2026 10:00:00 UT",
+   "not a date at all",
+   "",
+   "Mon, 29 Feb 2027 10:00:00 GMT"
+  ],
+  "url": "constructed:https://www.ximalaya.com/album/68171496.xml",
+  "bucket": "weird_dates"
+ }
+]

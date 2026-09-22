@@ -1,0 +1,12 @@
+HTTP/1.1 302 Found
+Date: Tue, 22 Sep 2026 02:14:55 GMT
+Content-Type: text/html; charset=utf-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+Server: cloudflare
+Location: https://feeds.acast.com/public/shows/67ca6c9effae9c0f4e3e7637
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+cf-cache-status: DYNAMIC
+CF-RAY: a3edcc816d75944d-SJC
+
