@@ -78,7 +78,7 @@ dependencies:
   firebase_core: ^4.2.1
   firebase_auth: ^6.1.2
   google_sign_in: ^7.2.0
-  purchases_flutter: ^9.9.9
+  purchases_flutter: ^10.13.1
   jiffy: ^6.3.1
   sentry_flutter: ^9.8.0
   modal_bottom_sheet: ^3.0.0
