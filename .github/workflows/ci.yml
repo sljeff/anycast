@@ -236,7 +236,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' &&
         (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/native'))
-    runs-on: macos-27
+    runs-on: xcode-27
     timeout-minutes: 40
 
     steps:
@@ -245,12 +245,14 @@ jobs:
         with:
           persist-credentials: false
 
-      # macos-27 is in public preview and its default toolchain is Xcode 27,
-      # the only toolchain the native project is verified against; pin an
-      # exact version once the image is GA. The L0–L2 Swift Testing suites
-      # do not run here: their M0 fixture payloads are deliberately not in
-      # git (provenance model, test/fixtures/README.md) — run them locally
-      # per native/README.md. XCUITest smoke joins this job in M3 (05 §6.2).
+    # The Xcode 27 image is preview-only and only reachable via the
+    # `xcode-27` label (there is no macos-27 label; GA macOS images top
+    # out at Xcode 26) — Xcode 27 is the only toolchain the native
+    # project is verified against. Revisit once a GA image ships it.
+    # The L0–L2 Swift Testing suites do not run here: their M0 fixture
+    # payloads are deliberately not in git (provenance model,
+    # test/fixtures/README.md) — run them locally per native/README.md.
+    # XCUITest smoke joins this job in M3 (05 §6.2).
       - name: Generate and build native targets for testing
         shell: bash
         run: |
