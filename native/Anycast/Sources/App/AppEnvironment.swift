@@ -15,6 +15,15 @@ final class AppEnvironment {
     let purchases: RevenueCatController
     let startup: StartupSequence
 
+    /// K18: the session category is set HERE, at process start — category
+    /// only, never an activation (cold start must not interrupt another
+    /// app's audio; the first PLAY is what activates).
+    let audioSession: AudioSessionController
+
+    /// Installed by the startup DAG once local state is restored; the M2
+    /// audio stack and every timer live inside it.
+    private(set) var playback: PlaybackStack?
+
     init(paths: ApplicationPaths,
          sentry: SentryService,
          auth: AuthController,
@@ -23,7 +32,29 @@ final class AppEnvironment {
         self.sentry = sentry
         self.auth = auth
         self.purchases = purchases
+
+        let session = AudioSessionController()
+        session.configureAtStartup()
+        self.audioSession = session
+
         self.startup = StartupSequence(sentry: sentry, auth: auth, purchases: purchases, paths: paths)
+        startup.onReady = { [weak self] database, settings, pointer in
+            guard let self else { return }
+            Task {
+                self.playback = await PlaybackStack.build(
+                    database: database,
+                    settings: settings,
+                    pointer: pointer,
+                    paths: self.paths,
+                    session: self.audioSession,
+                    auth: self.auth,
+                    sentry: self.sentry
+                )
+                #if DEBUG
+                self.playback?.runSmokeTestIfRequested(arguments: ProcessInfo.processInfo.arguments)
+                #endif
+            }
+        }
     }
 
     /// The production graph. Tests (L0–L2) never go through here — they

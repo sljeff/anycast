@@ -40,6 +40,12 @@ enum AppConfiguration {
     static func episodeCacheMetaDatabaseURL(appSupport: URL) -> URL {
         appSupport.appendingPathComponent("anycast_episode.db")
     }
+
+    /// `Library/Application Support/libCachedImageData.db` — cover cache
+    /// index (docs/migration/01 §1.2); read by the K19 artwork fallback.
+    static func coverCacheMetaDatabaseURL(appSupport: URL) -> URL {
+        appSupport.appendingPathComponent("libCachedImageData.db")
+    }
 }
 
 /// Runtime secrets. The bundle contains an optional `Secrets.plist`

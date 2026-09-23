@@ -84,21 +84,28 @@ struct L0DatabaseTests {
         #expect(settings.continuousPlaying)
     }
 
-    @Test("tmp audio variants: missing tmp tolerated, missing meta DB tolerated, orphan rows ignored")
+    @Test("cache audio variants: emptied cache dir tolerated, missing meta DB tolerated, orphan rows ignored")
     func tmpAndMetaVariants() async throws {
         let fileManager = FileManager.default
 
-        // (a) full bucket: meta DB opens and maps URLs.
+        // (a) full bucket: meta DB opens and maps URLs (real-device layout:
+        // Library/Caches/anycast_episode/, 01 §4.1 2026-09-23 correction).
         let full = try sandboxURL("db_light")
         let fullMeta = await CacheMetaDatabase.open(
             at: full.appendingPathComponent("Library/Application Support/anycast_episode.db")
         )
         #expect(fullMeta.isAvailable, "meta DB opens")
+        let rows = await fullMeta.allRows()
+        #expect(!rows.isEmpty)
+        if let url = rows.first?.url {
+            let mapped = await fullMeta.entry(forURL: url)
+            #expect(mapped != nil, "url-keyed lookup resolves (key column = the URL itself)")
+        }
 
-        // (b) tmp emptied, meta DB kept → open tolerates; mapping still
+        // (b) cache dir emptied, meta DB kept → open tolerates; mapping still
         // readable (missing FILES are playback-time misses, never errors).
         let emptied = try sandboxURL("db_light")
-        let tmpDir = emptied.appendingPathComponent("tmp/anycast_episode")
+        let tmpDir = emptied.appendingPathComponent("Library/Caches/anycast_episode")
         if fileManager.fileExists(atPath: tmpDir.path) {
             for file in try fileManager.contentsOfDirectory(atPath: tmpDir.path) {
                 try fileManager.removeItem(at: tmpDir.appendingPathComponent(file))

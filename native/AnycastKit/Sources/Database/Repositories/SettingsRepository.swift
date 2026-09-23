@@ -29,13 +29,9 @@ public struct SettingsRepository: Sendable {
         try await update("speed = ?", [value])
     }
 
-    /// `settings.skipSilence` is retained for schema compatibility and is
-    /// never written by the UI (decision K2: the switch is removed); the
-    /// setter exists only for schema-complete tooling.
-    @concurrent
-    public func setSkipSilence(_ value: Bool) async throws {
-        try await set("skipSilence", numeric: value ? 1 : 0)
-    }
+    /// K2: `settings.skipSilence` is read for schema compatibility and
+    /// deliberately has NO setter — the switch is gone and nothing may write
+    /// the column (a released row's value must survive round trips).
 
     @concurrent
     public func setAutoSleepTimer(startHour: Int, endHour: Int, minsIndex: Int) async throws {

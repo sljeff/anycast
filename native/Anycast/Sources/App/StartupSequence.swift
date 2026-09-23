@@ -32,6 +32,11 @@ final class StartupSequence {
     private(set) var settings: AppSettings?
     private(set) var playerPointer: PlayerPointer?
 
+    /// Fired once local state is restored (database + settings + pointer).
+    /// The composition root installs the playback stack here — timers of
+    /// any kind exist only after this point (the DAG's hard rule).
+    var onReady: (@MainActor (_ database: AppDatabase, _ settings: AppSettings, _ pointer: PlayerPointer?) -> Void)?
+
     private let sentry: SentryService
     private let auth: AuthController
     private let purchases: RevenueCatController
@@ -96,6 +101,11 @@ final class StartupSequence {
             self.playerPointer = pointer
 
             phase = .ready
+
+            // 6. Local state restored: install the playback stack and only
+            //    now schedule the pollers (15 s/10 s) — nothing
+            //    timer-shaped existed before settings loaded.
+            onReady?(database, settings, pointer)
         } catch {
             // K25 already handled corrupt files inside openAt; landing here
             // means even a rebuilt database will not open — degrade visibly
@@ -130,10 +140,15 @@ struct ApplicationPaths {
     let documents: URL
     let applicationSupport: URL
     let temporary: URL
+    let caches: URL
 
     var mainDatabaseURL: URL { AppConfiguration.mainDatabaseURL(documents: documents) }
     var episodeCacheMetaDatabaseURL: URL { AppConfiguration.episodeCacheMetaDatabaseURL(appSupport: applicationSupport) }
-    var episodeCacheDirectory: URL { temporary.appendingPathComponent("anycast_episode", isDirectory: true) }
+    /// Real-device layout (db_device evidence, 01 §4.1 2026-09-23
+    /// correction): audio files live under Library/Caches, not tmp/.
+    var episodeCacheDirectory: URL { caches.appendingPathComponent("anycast_episode", isDirectory: true) }
+    var coverCacheMetaDatabaseURL: URL { AppConfiguration.coverCacheMetaDatabaseURL(appSupport: applicationSupport) }
+    var coverCacheDirectory: URL { caches.appendingPathComponent("libCachedImageData", isDirectory: true) }
 
     static func standard() -> ApplicationPaths {
         let fileManager = FileManager.default
@@ -141,7 +156,8 @@ struct ApplicationPaths {
         return ApplicationPaths(
             documents: base,
             applicationSupport: fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0],
-            temporary: URL(fileURLWithPath: NSTemporaryDirectory())
+            temporary: URL(fileURLWithPath: NSTemporaryDirectory()),
+            caches: fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         )
     }
 }

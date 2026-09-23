@@ -20,6 +20,7 @@ import 'dart:io';
 import 'package:anycast/models/feed_episode.dart';
 import 'package:anycast/models/helper.dart' show tableCreators;
 import 'package:anycast/models/history_episode.dart';
+import 'package:anycast/models/player.dart';
 import 'package:anycast/models/playlist_episode.dart';
 import 'package:anycast/models/subtitle.dart';
 import 'package:anycast/models/subscription.dart';
@@ -55,7 +56,7 @@ void main() {
     const generated = [
       'db_light', 'db_heavy', 'db_user', 'db_dirty', 'db_v3',
       'db_edge_subs', 'db_crashed', 'db_corrupt_truncated',
-      'db_corrupt_notadb', 'db_corrupt_partial',
+      'db_corrupt_notadb', 'db_corrupt_partial', 'db_smoke',
     ];
     for (final b in generated) {
       final d = Directory('${dbRoot.path}/$b');
@@ -73,6 +74,7 @@ void main() {
     await buildCrashed();
     await buildCorrupt();
     await buildEdgeSubs(sources);
+    await buildSmoke(sources);
     await writeOpmlFixture(sources);
 
     print('all db fixture buckets written under ${dbRoot.path}');
@@ -294,11 +296,12 @@ List<Map<String, dynamic>> subtitleSegments(int count, {bool special = false}) {
   });
 }
 
-Future<void> writeCacheMetaDb(String dir, List<String> enclosureUrls) async {
+Future<void> writeCacheMetaDb(String dir, List<String> enclosureUrls,
+    {bool farFutureValidTill = false}) async {
   final supportDir = Directory('$dir/Library/Application Support');
   supportDir.createSync(recursive: true);
-  final tmpDir = Directory('$dir/tmp/anycast_episode');
-  tmpDir.createSync(recursive: true);
+  final cacheDir = Directory('$dir/Library/Caches/anycast_episode');
+  cacheDir.createSync(recursive: true);
   final audioBytes =
       File('test/fixtures/audio/very_short_8s.mp3').readAsBytesSync();
 
@@ -318,22 +321,25 @@ Future<void> writeCacheMetaDb(String dir, List<String> enclosureUrls) async {
         touched integer,
         length integer
         );
-        create unique index cacheObjectkey
-        ON cacheObject (key);
       ''');
           }));
 
   final batch = db.batch();
   for (var i = 0; i < enclosureUrls.length && i < 3; i++) {
     final name = fakeUuidV1(baseEpoch + i * 1000);
-    File('${tmpDir.path}/$name.mp3').writeAsBytesSync(audioBytes);
+    File('${cacheDir.path}/$name.mp3').writeAsBytesSync(audioBytes);
     final touched = baseEpoch + 86400000 * i;
     batch.insert('cacheObject', {
       'url': enclosureUrls[i],
       'key': enclosureUrls[i],
       'relativePath': '$name.mp3',
       'eTag': '"etag-$i"',
-      'validTill': touched + 30 * 86400000,
+      // The smoke bucket must survive the native stale cleanup
+      // (validTill < now ⇒ row + file deleted), so its rows carry a
+      // deterministic far-future expiry instead of the corpus dates.
+      'validTill': farFutureValidTill
+          ? baseEpoch + 10 * 365 * 86400000
+          : touched + 30 * 86400000,
       'touched': touched,
       'length': audioBytes.length,
     });
@@ -358,8 +364,6 @@ Future<void> writeCacheMetaDb(String dir, List<String> enclosureUrls) async {
         touched integer,
         length integer
         );
-        create unique index cacheObjectkey
-        ON cacheObject (key);
       ''');
           }));
   final b2 = db2.batch();
@@ -446,6 +450,47 @@ Future<void> buildLight(FixtureSources sources) async {
   await db.close();
 
   await writeCacheMetaDb(dir, eps.take(2).map((e) => e.enclosureUrl!).toList());
+}
+
+/// db_smoke: the REPRODUCIBLE `-m2-smoke-play` container (2026-09-23
+/// correction — the recorded M2 smoke numbers cannot be replayed from the
+/// committed db_light: its player pointer is NULL, so restore returns early
+/// and the smoke guard never fires, and its queue head is an uncached
+/// podtrac URL). Unlike db_light: ① `player.currentPlaylistId` is set;
+/// ② the queue head is a CACHED episode; ③ the head's playedDuration sits
+/// INSIDE the 8s fixture audio (db_light's 30%-of-RSS-duration values seek
+/// past the end of the file); ④ cache rows carry a far-future validTill so
+/// the native stale cleanup keeps them.
+Future<void> buildSmoke(FixtureSources sources) async {
+  final dir = '${dbRoot.path}/db_smoke';
+  await Directory(dir).create(recursive: true);
+  final db = await createDb('$dir/anycast.db');
+
+  final subs = sources.subscriptions(minCount: 4);
+  await SubscriptionModel.addMany(db, subs);
+
+  final eps = sources.feedEpisodes(limit: 20);
+  await FeedEpisodeModel.insertMany(db, eps);
+
+  // Deterministic queue (fillPlaylist scatters for realism): insert
+  // bottom-up so eps[1] — a cached ximalaya episode — is the head, and the
+  // uncached podtrac episode sits last for a manual miss-path run.
+  for (final e in [eps[2], eps[0], eps[1]]) {
+    final ep = PlaylistEpisodeModel.fromMap(e.toMap());
+    ep.playlistId = 1;
+    await PlaylistEpisodeModel.insertOrUpdateByIndex(db, 1, 0, ep);
+  }
+  await PlayerModel.update(
+      db, PlayerModel.fromMap({'currentPlaylistId': 1}));
+  await db.update(
+      'playlistEpisode', {'playedDuration': 3000},
+      where: 'enclosureUrl = ?', whereArgs: [eps[1].enclosureUrl]);
+  await normalizeSettings(db);
+  await db.close();
+
+  await writeCacheMetaDb(dir,
+      eps.take(2).map((e) => e.enclosureUrl!).toList(),
+      farFutureValidTill: true);
 }
 
 Future<void> buildHeavy(FixtureSources sources) async {
@@ -609,9 +654,9 @@ Future<void> buildCrashed() async {
     js.renameSync('$dir/anycast.db-journal');
   }
 
-  // carry the cache meta db + tmp files from db_heavy
+  // carry the cache meta db + audio files from db_heavy (real-device layout:
+  // Library/Caches/anycast_episode/, db_device evidence, 01 §4.1 correction)
   await _copyDir('${dbRoot.path}/db_heavy/Library', '$dir/Library');
-  await _copyDir('${dbRoot.path}/db_heavy/tmp', '$dir/tmp');
 }
 
 Future<void> buildCorrupt() async {

@@ -222,7 +222,8 @@ CREATE TABLE IF NOT EXISTS translation (
 - **`<Container>/Library/Application Support/anycast_episode.db`** — 音频缓存索引（cacheKey=`anycast_episode`，states/cache.dart:11）
 - **`<Container>/Library/Application Support/libCachedImageData.db`** — 封面图片缓存索引（cached_network_image 使用 `DefaultCacheManager`，其 `key = 'libCachedImageData'`）
 
-表结构（fork 的 cache_object_provider.dart，version 3）：表 `cacheObject`，列 `_id INTEGER PRIMARY KEY / url TEXT / key TEXT / relativePath TEXT / eTag TEXT / validTill INTEGER / touched INTEGER / length INTEGER`，外加 `CREATE UNIQUE INDEX cacheObjectkey ON cacheObject (key)`（2026-09-22 核验更正：id 列名实为 `_id`、路径列名实为 `relativePath`，非早期转述的 id/path；`relativePath` 只存**文件名** `<uuidv1>.<ext>`，由 `<tmp>/<cacheKey>/` 前缀解析——cache_object.dart:9-16、file_system_io.dart:28-35）。onUpgrade：v1→v2 加 `key` 列（`set key = url where key is null`）；v2→v3 加 `length` 列。库版本 3。
+表结构（fork 的 cache_object_provider.dart，version 3）：表 `cacheObject`，列 `_id INTEGER PRIMARY KEY / url TEXT / key TEXT / relativePath TEXT / eTag TEXT / validTill INTEGER / touched INTEGER / length INTEGER`，外加 `CREATE UNIQUE INDEX cacheObjectkey ON cacheObject (key)`（2026-09-22 核验更正：id 列名实为 `_id`、路径列名实为 `relativePath`，非早期转述的 id/path；`relativePath` 只存**文件名** `<uuidv1>.<ext>`，由 `<Library/Caches>/<cacheKey>/` 前缀解析——cache_object.dart:9-16、file_system_io.dart:28-35）。onUpgrade：v1→v2 加 `key` 列（`set key = url where key is null`）；v2→v3 加 `length` 列。库版本 3。
+**2026-09-23 实机勘误（M2，依据 `db_device` 真实容器，simctl 提取）**：① **`key` 列的行内值就是该资源的 URL 本身**（`url` 与 `key` 两列逐行相同），不是 Config 的 cacheKey 字面量——`Config(cacheKey)` 只决定库文件名与文件目录；原生按 `WHERE url = ?`（或 `key = url`）查行，按字面 cacheKey 查会永远 miss。② 实机库 `sqlite_master` 中**没有** `cacheObjectkey` 唯一索引（只有建表语句；fork 源里的 CREATE UNIQUE INDEX 在实机上未出现）——原生建库时不建该索引、与实机一致。③ `validTill` 非固定 30 天：实机行 `validTill − touched ≈ 604,796,775 ms ≈ 7 天`，与响应 `Cache-Control: max-age=604800` 吻合 → **validTill 按 HTTP 缓存头（Date + max-age）计算，无头时才落默认 stalePeriod 30 天**。④ `touched`/`validTill` 均为毫秒（实机值 1.79e12 量级）。⑤ 扩展名取自响应 Content-Type（实机 `.m4a` URL 存为 `.mp4`，即 audio/mp4 → .mp4）。
 **旧版路径迁移**：该 fork 会检查 `getDatabasesPath()/<key>.db`（即 Documents/）下的旧库文件并 rename 到新位置（V2 之前的老安装用户）。
 
 ---
@@ -276,8 +277,8 @@ var cacheManager = CacheManager(
 );
 ```
 - **cacheKey**：`anycast_episode`；**maxNrOfCacheObjects = maxCacheCount（默认 10，按对象个数，非字节）**；**stalePeriod 未传 → fork 默认 30 天**（_config_io.dart：`stalePeriod ?? const Duration(days: 30)`）。
-- **文件位置**（fork file_system_io.dart）：`getTemporaryDirectory()/<cacheKey>/<文件名>` → iOS 上 `getTemporaryDirectory()` = `NSTemporaryDirectory()` = **`<Container>/tmp/`**（注意：**不是 Library/Caches**；tmp 与 Caches 都可能被系统清理，但路径不同，原生侧别找错）。
-  → 音频文件绝对路径：`<Container>/tmp/anycast_episode/<uuid_v1>.<ext>`。
+- **文件位置（2026-09-23 实机勘误，M2）**：`<Container>/Library/Caches/anycast_episode/<uuid_v1>.<ext>`——**不是早期从 fork 源推得的 `tmp/`**。依据：`db_device`（模拟器实机容器，simctl 提取，见《00》M0 修订注记与 test/fixtures/README.md）中音频文件实际位于 `Library/Caches/anycast_episode/`（`1a92d670-….mp4` 等），目录下无 tmp 残留。封面缓存同一套 IOFileSystem 代码路径，同在 `Library/Caches/libCachedImageData/`。**原生写入必须落在同一路径**，否则回滚 Flutter 后索引指不到文件（05 §2.4 写回兼容）。
+  → 音频文件绝对路径：`<Container>/Library/Caches/anycast_episode/<uuid_v1>.<ext>`。
 - **文件命名规则**（fork cache_manager.dart:209-214 与 web_helper.dart `_setDataFromHeaders`）：首次 `relativePath = '${Uuid().v1()}$fileExtension'`，扩展名由 HTTP 响应 `Content-Type` 映射（mime_converter.dart，如 `audio/mpeg → .mp3`，未知类型 `.$subType`，`application/octet-stream → .bin`）；服务器返回新文件且扩展名变化时会换新 UUID 文件名并删旧文件。**文件名与 URL 无哈希关系，唯一映射靠 `anycast_episode.db` 的 `url/key/relativePath` 列** —— 原生迁移若想保留已下载音频，必须先读该元数据库再找文件。
 - **下载触发**：播放页下载按钮（widgets/card.dart:244 → `CacheController.download` → `getFileStream(url, withProgress: true)`，states/cache.dart:51-56）；起播时也会顺带 `getFileStream`（audio_handler.dart:215-219）。
 - **清理逻辑**（fork cache_store.dart）：定时器（最短间隔 10s）在每次 DB 读后调度：① 超容量对象（`getObjectsOverCapacity`：touched 最旧优先、且超过 1 天未触碰的才删，限 100 行/次）；② 超过 stalePeriod 30 天的对象。删除即删文件+DB 行。
@@ -286,7 +287,7 @@ var cacheManager = CacheManager(
 
 ### 4.2 封面图片缓存
 `cached_network_image`（3.4.1）→ `DefaultCacheManager`（key `libCachedImageData`，默认 maxNrOfCacheObjects=200、stalePeriod=30 天）：
-- 文件：`<Container>/tmp/libCachedImageData/<uuid_v1>.<ext>`
+- 文件：`<Container>/Library/Caches/libCachedImageData/<uuid_v1>.<ext>`（2026-09-23 勘误，同 §4.1）
 - 元数据：`<Container>/Library/Application Support/libCachedImageData.db`
 
 ### 4.3 字幕/LRC 文件
@@ -298,9 +299,9 @@ var cacheManager = CacheManager(
 |---|---|
 | 主 DB | `<Container>/Documents/anycast.db`（+ 事务期 `-journal`） |
 | OPML 导出产物 | `<Container>/Documents/anycast_subscriptions.xml` |
-| 音频缓存文件 | `<Container>/tmp/anycast_episode/` |
+| 音频缓存文件 | `<Container>/Library/Caches/anycast_episode/`（2026-09-23 实机勘误，原记 tmp/） |
 | 音频缓存元 DB | `<Container>/Library/Application Support/anycast_episode.db` |
-| 图片缓存文件 | `<Container>/tmp/libCachedImageData/` |
+| 图片缓存文件 | `<Container>/Library/Caches/libCachedImageData/` |
 | 图片缓存元 DB | `<Container>/Library/Application Support/libCachedImageData.db` |
 | 字幕导出临时文件 | `<Container>/tmp/*.txt` |
 
@@ -390,9 +391,9 @@ var cacheManager = CacheManager(
 |---|---|---|---|
 | 1 | `Documents/anycast.db` | SQLite，user_version=4，9 张表（§1） | 直接 SQLite 打开。**坑**：① 所有布尔为 INTEGER 0/1；② 所有时间为 Unix **毫秒** INTEGER（pubDate/lastUpdated/duration/playedDuration），无 ISO 字符串、无时区问题；③ `playlistEpisode.position` 是 REAL 浮点排序键；④ `subtitle.subtitle`、`translation.translation` 是 JSON 数组字符串 `[{start:秒(double),end:秒(double),text}]`；⑤ `settings.autoSleepTimer` 是 `"a,b,c"` CSV；⑥ `translation` 是 AUTOINCREMENT（存在 `sqlite_sequence` 行）；⑦ 大量列可空（description/pubDate/duration 等）；⑧ `subtitle.summary` 恒 NULL；⑨ TEXT 无长度约束；⑩ 历史表"最新"按 id DESC 而非时间排序 |
 | 2 | `Documents/anycast.db-journal` | 事务残留 | 仅在异常退出时存在；迁移时先正常打开让 SQLite 恢复/回滚，不要只拷贝主文件 |
-| 3 | `tmp/anycast_episode/` | 已下载音频，文件名 `UUIDv1.<mime扩展名>` | **必须**配合 #4 的 `path` 列定位；tmp 目录可能已被系统清空，需容忍空目录；同 enclosureUrl 的 URL→文件映射只在 DB 里 |
+| 3 | `Library/Caches/anycast_episode/`（2026-09-23 实机勘误，原记 tmp/） | 已下载音频，文件名 `UUIDv1.<mime扩展名>` | **必须**配合 #4 的 `relativePath` 列定位；系统可能清理该目录，需容忍空目录；同 enclosureUrl 的 URL→文件映射只在 DB 里（`url` 与 `key` 列均为资源 URL，见 §1.2 勘误） |
 | 4 | `Library/Application Support/anycast_episode.db` | SQLite v3，表 cacheObject（_id/url/key/relativePath/eTag/validTill/touched/length） | 保留即可继承“已下载”状态；不迁移则下载进度/离线音频全部丢失（但可重新流播） |
-| 5 | `tmp/libCachedImageData/` + `Library/Application Support/libCachedImageData.db` | 封面缓存 | 纯缓存，可放弃，重下即可 |
+| 5 | `Library/Caches/libCachedImageData/` + `Library/Application Support/libCachedImageData.db` | 封面缓存 | 纯缓存，可放弃，重下即可 |
 | 6 | `Documents/anycast_subscriptions.xml` | 上次 OPML 导出文件（UTF-8） | 遗留产物，原生可无视或提示用户 |
 | 7 | `tmp/*.txt` | 字幕导出的 LRC 临时文件 | 短命，可无视 |
 | 8 | App Group `group.com.kindjeff.ShareExtention/` 容器 | 分享进来的 OPML/文件副本（原名）、`TempImage.png`、`<base64>.jpg` | 若保留同 group id 的 Extension 需继续兼容；旧残留文件可清理 |

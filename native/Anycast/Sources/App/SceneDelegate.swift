@@ -39,4 +39,19 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             rootController?.handleOpenURL(context.url)
         }
     }
+
+    // MARK: - Foreground / background (08 §4.1, K24)
+
+    /// Background: suspend the pollers, save the playback progress once
+    /// more. Timers die here; iOS would suspend them anyway, but explicit
+    /// cancellation also stops the 15 s/10 s rounds racing app termination.
+    func sceneDidEnterBackground(_ scene: UIScene) {
+        (UIApplication.shared.delegate as? AppDelegate)?.environment.playback?.setSceneActive(false)
+    }
+
+    /// Foreground: resume the pollers with one immediate round — covering
+    /// whatever the background window skipped (08 §4.1).
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        (UIApplication.shared.delegate as? AppDelegate)?.environment.playback?.setSceneActive(true)
+    }
 }

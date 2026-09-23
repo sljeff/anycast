@@ -319,11 +319,13 @@ struct L2ContractTests {
 
     @Test("Shortlink: body bytes, 3 attempts, degradation to nil")
     func shortlink() async throws {
-        // Body byte-equality against the golden construction.
+        // Real recording (replayed by name — the L2 replay invariant covers
+        // every api fixture): 200 + the recorded key.
         let url = "https://anycast.website/player?rssfeedurl=https%3A%2F%2Fexample.com%2Ffeed.xml&enclosureurl=https%3A%2F%2Fexample.com%2Fep1.mp3"
-        ReplayProtocol.reset { _ in .response(status: 200, body: #"{"status":200,"key":"ab12cd"}"#) }
+        let recordedOK = try fixtureResponse("shortlink_post", "ok")
+        ReplayProtocol.reset { _ in recordedOK }
         let short = await makeClient().getShortURL(for: URL(string: url)!)
-        #expect(short?.absoluteString == "https://s.kindjeff.com/ab12cd")
+        #expect(short?.absoluteString == "https://s.kindjeff.com/c8441b6c1eaabe3e183f5ff28c5e2ae7")
 
         let sent = ReplayProtocol.requests()[0]
         let sentBody = String(decoding: ReplayProtocol.body(of: sent), as: UTF8.self)

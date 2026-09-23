@@ -51,6 +51,38 @@ processes have shown to get jetsammed on the simulator when run concurrently.
 The test suites require the M0 payloads (gitignored by design): run
 `tool/m0/regen_all.sh` from the repository root once on this machine.
 
+## M2 audio smoke (DEBUG only)
+
+Seeds nothing itself — it plays the restored queue head through the real
+stack (engine, session, Now Playing, 2 s persistence, cache). Removed when
+the M3 player UI lands.
+
+The reproducible container is the generator's `db_smoke` bucket (player
+pointer set, queue head cached with in-file progress, far-future `validTill`
+so the stale cleanup keeps the rows — `buildSmoke` in
+`test/fixtures/generate_db_fixtures_test.dart`). An earlier smoke record
+referenced a hand-modified `db_light` container whose steps were never
+recorded and cannot be replayed from the generator output; `db_smoke` exists
+so this cannot recur.
+
+```sh
+# App installed and terminated, then:
+container=$(xcrun simctl get_app_container <udid> com.kindjeff.anycast data)
+mkdir -p "$container/Documents" "$container/Library/Application Support" \
+         "$container/Library/Caches"
+cp test/fixtures/db/db_smoke/anycast.db "$container/Documents/"
+cp -R test/fixtures/db/db_smoke/Library/. "$container/Library/"
+xcrun simctl launch --console-pty <udid> com.kindjeff.anycast -m2-smoke-play local
+# stdout: "[m2-smoke] isPlaying=… position=…ms error=…" — verified run
+# (iPhone 16 Pro simulator, 2026-09-24): "isPlaying=true position=7500ms
+# error=none" — cache hit resuming at 3000 ms, paused row persisted
+# 7812 ms (K24); the hit also refreshes the row's `touched` in the meta DB.
+# If isPlaying=false with "The operation could not be completed", the
+# simulator's audio HAL is wedged — `simctl shutdown` + `boot` and re-seed.
+# The uncached podtrac episode sits LAST in the queue for a manual
+# miss-path run (stream + full-file download) after removing the head rows.
+```
+
 ## Conventions
 
 - Architecture rules from migration docs 06 §4 / 08 §1-§3 are lint-grade:

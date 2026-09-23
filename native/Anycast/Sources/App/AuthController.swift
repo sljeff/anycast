@@ -41,7 +41,28 @@ final class AuthController {
             FirebaseApp.configure()
         }
         isFirebaseConfigured = true
+        Self.markConfiguredForTokenRequests()
         currentUID = Auth.auth().currentUser?.uid
+    }
+
+    // Thread-safe mirror of `isFirebaseConfigured` for @Sendable call
+    // sites (the APIClient tokenProvider): the Firebase Auth APIs are
+    // themselves thread-safe; `Auth.auth()` raises if unconfigured, so the
+    // flag gates first. Written once at startup, read from any task.
+    nonisolated(unsafe) private static var configuredForTokenRequests = false
+    nonisolated static func markConfiguredForTokenRequests() {
+        configuredForTokenRequests = true
+    }
+
+    /// Token for @Sendable contexts — captures nothing, hops nothing: safe
+    /// to reference directly from any closure.
+    nonisolated static func currentToken() async throws -> String? {
+        // Bool set-once at startup; the only possible race reads `false`
+        // early, which degrades to the signed-out synthetic 401 — never a
+        // crash, never a wrong token.
+        guard configuredForTokenRequests else { return nil }
+        guard let user = Auth.auth().currentUser else { return nil }
+        return try await user.getIDToken()
     }
 
     /// The Flutter line's `authStateChanges` equivalent (lib/states/user.dart):
@@ -66,10 +87,9 @@ final class AuthController {
     }
 
     func token() async throws -> String? {
-        guard isFirebaseConfigured, let user = Auth.auth().currentUser else { return nil }
         // Firebase SDK caches + silently refreshes; no client-side refresh
         // retry on 401 (contract red line #2, docs/migration/02 §6).
-        return try await user.getIDToken()
+        try await Self.currentToken()
     }
 
     // MARK: - Sign in

@@ -118,16 +118,31 @@
 
 **目标**：播放行为等价（含怪癖复刻）。**DoD**：§5.1 状态机单测 + 真机 smoke 通过。
 
-- [ ] `PlaybackService`（@MainActor）：单 AVPlayer + 应用层队列，复刻"episodes[0] 即当前曲、播完 removeTop 连拍、队列空 pause+clear"（K3，《04》§1.2）
-- [ ] AVAudioSession 会话策略（K18，**冷启动不得打断他 App 音频**——旧版激活只随起播发生）：启动早期只 `setCategory(.playback)`（**必做项**，原生不设置则后台播放断；setCategory 本身不抢音频焦点）；**首次起播前**才 `setActive(true)`（AVPlayer 会隐式激活，显式调用便于捕错）；暂停**保持激活**（锁屏 Now Playing 卡片不消失）；队列播空/stop 时 `setActive(false, options: .notifyOthersOnDeactivation)`（让他 App 恢复播放，平台礼仪增强）并吞 error 560030880；打断/路由监听不劣于旧版（08 §5.2 + 2026-09-22 修订：原文"启动早期 setActive(true)"会让冷启动打断他 App，已纠正）
-- [ ] 锁屏：MPRemoteCommandCenter——skipBackward/skipForward = ±10s（K1 复刻）、toggle、changePlaybackPosition；NowPlayingInfo（title/album/duration/rate/artwork + 本地兜底 K19）
-- [ ] 进度：2s 落盘 + pause/退后台补存（K24）；进度事件四条件过滤或等价视觉（K11）
-- [ ] 倍速 7 档 + `.timeDomain` 保音调 + 持久化恢复；睡眠定时（仅播放中递减）；skip silence 开关不实现（K2 移除）
-- [ ] 下载缓存：URLSession downloadTask + 读旧元数据库映射（`anycast_episode.db` 的 url/key/path）+ LRU 语义（个数 10 / 30 天 / 1 天未触碰）+ 删除联动 + 播放即缓存
-- [ ] 播放错误提示 + 手动重试（K6）
-- [ ] §5.1 状态机单测全绿；§5.5/5.6 缓存与设置项测试全绿
-- [ ] 真机 smoke：起播/后台 30min/来电/拔耳机/锁屏 ±10s（§5.2–5.4 先粗过一轮，细测留 M4）
-- [ ] 【验证项】iOS 27 竖屏"偏好"语义实测（07 §4 风险项）
+**目标**：播放行为等价（含怪癖复刻）。**DoD**：§5.1 状态机单测 + 真机 smoke 通过。
+
+> **2026-09-23 进度**：**自动化 DoD 达成——54 → 102 个 Swift Testing 测试全绿**（新增 48：§5.1 状态机 15、缓存 §5.5 10、会话/锁屏/睡眠+K19 5、轮询节奏+K27/K9 7、L2 fixtures 全量补回放+红线 11 11、加上 M1 五套件回归；模拟器 iPhone 16 Pro/iOS 27 SDK 全量通过；Flutter 侧 `flutter test` 82 通过/19 跳过亦全绿）。**模拟器 smoke 通过**（DEBUG 启动参数 `-m2-smoke-play`，等 M3 UI 后移除）——**2026-09-23 三次复核勘误：下述数字不可从生成器产物复现，仅作历史记录**：生成器产出的 db_light `player.currentPlaylistId` 为 NULL（restore 提前返回、smoke guard 不触发）、队首是未缓存的 podtrac URL（首播必走 miss）、"validTill=2025"系笔误（实为 2026-07-01/02，同样过期），27900→30233 实为队列第二位 id=2 的行——当时容器显然被手工改过（设指针/重排）而步骤未记录。已补 **db_smoke** 桶（指针已设+队首已缓存+playedDuration=3000 落在 8s 音频内+validTill 远期免遭 stale 清理；生成器 `buildSmoke`），灌入步骤见 native/README「M2 audio smoke」，**已实测复现**（2026-09-24 模拟器：指针 restore→缓存命中 touched 更新→3000ms 起播 isPlaying=true→暂停落盘 7812ms（K24）→历史行插入（K30）），M4 真机 smoke 按此执行。当时观察到的行为本身有效：① 缓存命中本地文件按 playedDuration 起播、暂停落盘（K24）；② LRU 清理把过期行连文件删除（stale 30 天语义）；③ 未命中路径=URL 流播 + CDN 真实整文件下载（UUIDv1+`audio/mp4`→`.mp4` 命名、validTill=now+30d、索引落库）；④ 历史行携带 playlist 行 id（K30）。**待人工**：真机 smoke（§5.2–5.4 粗过）、iOS 27 竖屏偏好实测（07 §4）。
+>
+> - **基线勘误（先改文档再改实现，《01》§1.2/§4.1/§4.4/§9，依据 `db_device` 实机容器）**：① 音频缓存文件在 **`Library/Caches/anycast_episode/`**（非 fork 源推得的 `tmp/`）；② 元 DB `key` 列行内存的是**资源 URL 本身**（非 cacheKey 字面量——M1 的按字面量查询会永远 miss，已修正为 `WHERE url = ?`）；③ 实机库**无** `cacheObjectkey` 唯一索引（原生建库同构）；④ `validTill` 非固定 30 天——按 HTTP 头（Date+max-age）计算，无头才落 30 天（实机行 ≈ touched+7 天，与 CloudFront `max-age=604800` 吻合）。生成器 `generate_db_fixtures_test.dart` 与全部合成桶已按实机布局重生成（flutter test 全绿）。
+> - **架构落位**（全部进 AnycastKit，测试可达）：`Playback/`（PlaybackEngine 协议 + AVPlayerEngine 单 AVPlayer 实现 + PlaybackService=@Observable 队列状态机 + AudioSessionController + NowPlayingController + SleepTimerController）、`Cache/`（EpisodeCacheStore actor=下载/索引/LRU）、`Subtitles/`（15s/10s 轮询双控制器 + PollTimer 抽象）。App 侧 `PlaybackStack`（组合根在启动 DAG onReady 后装配——**settings 加载完成前零定时器**；AudioSession 的 setCategory 在 AppEnvironment 构造期即完成）+ SceneDelegate 前后台挂接（后台停轮询+补存进度，回前台补一轮轮询，08 §4.1）。
+> - **K 决策落实**：K1（锁屏 ±10s `preferredIntervals=[10s]`、显式禁用切曲命令——契约测试断言）、K3（播完 removeTop 连删 playlistEpisode+subtitle+translation 行（事务）+缓存文件+双轮询映射，播空 pause+clear+deactivate、K31 重开容错）、K4（`seekByRelative` duration 未知不再崩、不设上限 clamp）、K6（failed 事件→`playbackError`、`retry()` 按最后位置重载）、K9（翻译 30s 超时（M1）+ 连续 5 次失败置 failed 离开轮询循环——不再 forever 重发）、K11（四条件过滤逐条测试钉住，且**修复了实现首版 persist 路径绕过过滤的漏洞**）、K17（autoSleepTimer 字段保留不激活）、K18（启动仅 setCategory（幂等）、首播前 setActive(true)、暂停保持、播空 `setActive(false,.notifyOthers)`+吞 560030880、打断/拔耳机显式暂停、来电结束**不**自动恢复——调用顺序由 FakeBackend 测试钉死）、K19（封面本地兜底：先读旧 libCachedImageData 元库文件、再网络、内存缓存）、K24（2s 节流并入 periodic observer、pause/退后台补存）、K27（后台轮询 5xx/超时保持 processing 静默继续、401 仍走登录信号（暂上报 Sentry，M3 接登录 sheet）、用户主动 add() 返回错误信号供弹窗）、K30（resume 重插历史 id 不变——服务层+仓储双侧测试）、K38（滑到 0=OFF 不触发 pause，仅自然递减到 0 才 pause）。
+> - **M1 遗留清账**：转写 15s/翻译 10s 轮询节奏断言（PollTimerFactory 记录 interval+手动驱动 tick，逐 tick 计请求数——"恰好 15s/10s、空转零请求"）、红线 11 断言（`ShareURL.player/channel`：全小写 query key+Dart 编码，逐字节钉死——它同时是短链 md5 的输入）、**API fixtures 全部 51 个文件按名回放**（传输失败类 network_timeout/network_failure/slow_response 为 status-0 无 body 元数据，回放即映射为合成传输错误；categories/empty_country_probe 为实采分类树真载荷——含 429 原始 body 是带引号 JSON 串、chat"401"实为真实 404、短链超时 3 次后降级长链、top-channels 传输失败抛错等实采怪癖）。
+> - **终局复核又抓到一个算法级缺陷（已修+回归）**：容量淘汰在 touched-ASC 列表上先误用 `dropFirst(capacity)`（选中**最新**行）、二改 `suffix`（仍是最新端）——正确语义是 `prefix(count−capacity)`（最旧端）；"86 全绿"的首轮其实跑的是缺 CacheStoreTests 的陈旧二进制，教训是**新增测试文件后必须确认套件数变化**（10 套件/102 测试为基准）。
+>
+> - **2026-09-23 深度 review 修复（二次复核采纳，100→102 全绿）**：① API fixtures 按名回放补到全量 51 文件——原注记"全部补齐"实缺 10 个（8 个传输失败元数据、categories/empty_country_probe 实采真载荷、translate/slow_response），现全部按名回放，并补上 top-channels 传输失败、短链超时 3 次降级长链两条此前无断言的分支；② K19 封面兜底顺序补单测（本地 libCachedImageData 元库→网络→内存缓存，本地命中零网络钉死）；③ 缓存清理调度面对齐 fork"每次 DB 读后调度"（cachedFile 命中/未命中、cachedURLs 均调度；原实现仅命中时调度）；④ 删除无调用者的 `SettingsRepository.setSkipSilence`（K2"不写入"口径，防 M3 误接 UI）；⑤ 冷启动恢复的持久化倍速到达引擎补断言（restore→setDesiredSpeed）；⑥ 注记分解数字修正（缓存 §5.5 8→10、L2 8→11，与实际套件一致）。
+> - **冒烟发现的三个运行时缺陷（均已修+测试回归）**：CMTime NaN→Int64 转换崩溃（起播前 timeline 未建立）、`Int64.min` 差值溢出（LRU 调度间隔）、`MPMediaItemArtwork` 请求闭包继承 MainActor 隔离被 MediaPlayer 私有队列调用触发 dispatch_assert_queue 崩溃（闭包需 nonisolated+Sendable 装箱）——此类"真机/模拟器才显形"的坑记入 M4 真机 smoke 重点复验项。
+> - **2026-09-23 三次复核（外部 review 五条全采纳，102→103 全绿）**：① **真实缺陷**——`handleCompleted` 非连播分支的 `pause()` 会把新队首 seek 未落地时读到的 ~0 落盘进其 playedDuration（典型场景：ep2 听到一半转去 ep1，ep1 播完自动进 ep2 时进度被清零；Dart 的 pause 不落盘、2s timer 以 isPlaying 为门，无此问题；FakeEngine 的 load 同步置位掩盖了竞态）——该转移改为只停引擎不落盘（`pauseEngineOnly`），FakeEngine 增加"延迟就绪"模式钉住回归；② seek 异集分支从 service 级 `playByEpisode`（插历史+写指针）收窄为 Dart handler 级等价（仅 load+play，不插历史不写指针），冷启动后直接拖进度条不再多插历史行；③ shortlink 200 路径改为真回放 `ok.json`（原为合成 body `ab12cd`——那是 54 个 api fixture 中唯一未按名加载的文件，L2ContractReplayTests 的"全部按名回放"不变量现在严格成立，计数自 51 增至 54）；④ smoke 注记勘误 + `db_smoke` 可复现桶（见上条进度注记）；⑤ validTill=2025 笔误更正（实为 2026-07-01/02）。
+> - **待 M3 顺带**：K6 错误 toast 与重试按钮的 UI、K27 登录 sheet 接线、NowPlaying 封面走 Kingfisher 统一缓存、`-m2-smoke-play` 移除、缓存进度环 UI（`cacheStates` 已发布）。
+
+- [x] `PlaybackService`（@MainActor）：单 AVPlayer + 应用层队列，复刻"episodes[0] 即当前曲、播完 removeTop 连拍、队列空 pause+clear"（K3，《04》§1.2）
+- [x] AVAudioSession 会话策略（K18，**冷启动不得打断他 App 音频**——旧版激活只随起播发生）：启动早期只 `setCategory(.playback)`（**必做项**，原生不设置则后台播放断；setCategory 本身不抢音频焦点）；**首次起播前**才 `setActive(true)`（AVPlayer 会隐式激活，显式调用便于捕错）；暂停**保持激活**（锁屏 Now Playing 卡片不消失）；队列播空/stop 时 `setActive(false, options: .notifyOthersOnDeactivation)`（让他 App 恢复播放，平台礼仪增强）并吞 error 560030880；打断/路由监听不劣于旧版（08 §5.2 + 2026-09-22 修订：原文"启动早期 setActive(true)"会让冷启动打断他 App，已纠正）
+- [x] 锁屏：MPRemoteCommandCenter——skipBackward/skipForward = ±10s（K1 复刻）、toggle、changePlaybackPosition；NowPlayingInfo（title/album/duration/rate/artwork + 本地兜底 K19）
+- [x] 进度：2s 落盘 + pause/退后台补存（K24）；进度事件四条件过滤或等价视觉（K11）
+- [x] 倍速 7 档 + `.timeDomain` 保音调 + 持久化恢复；睡眠定时（仅播放中递减，K38 滑到 0=OFF 不误暂停）；skip silence 开关不实现（K2 移除）
+- [x] 下载缓存：URLSession downloadTask + 读旧元数据库映射（`anycast_episode.db`，key 列实为 URL——见 2026-09-23 基线勘误）+ LRU 语义（个数 10 / 30 天 / 1 天未触碰）+ 删除联动 + 播放即缓存
+- [x] 播放错误提示 + 手动重试（K6）（服务层 `playbackError`/`retry()` 就绪；toast 的 UI 呈现随 M3 播放页）
+- [x] §5.1 状态机单测全绿；§5.5/5.6 缓存与设置项测试全绿
+- [ ] 真机 smoke：起播/后台 30min/来电/拔耳机/锁屏 ±10s（§5.2–5.4 先粗过一轮，细测留 M4）【待人工：模拟器 smoke 已过（见进度注记），真机项需设备】
+- [ ] 【验证项】iOS 27 竖屏"偏好"语义实测（07 §4 风险项）【待人工：需 iOS 27 真机/模拟器实拍确认，M4 一并】
 
 ## M3 · UI 期（07 映射逐屏实施，顺序可调）
 
