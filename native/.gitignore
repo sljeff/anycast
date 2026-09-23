@@ -1,0 +1,25 @@
+# Generated project — the source of truth is project.yml (xcodegen).
+# Keep the shared SPM lockfile so dependency versions (e.g. GRDB 7.11.1)
+# stay reproducible after `xcodegen generate`; exclude the rest. Git cannot
+# re-include a file under an ignored directory, so each parent level is
+# re-included down to the lockfile.
+*.xcodeproj/*
+!*.xcodeproj/project.xcworkspace
+*.xcodeproj/project.xcworkspace/*
+!*.xcodeproj/project.xcworkspace/xcshareddata
+*.xcodeproj/project.xcworkspace/xcshareddata/*
+!*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/*
+!*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+# Secrets and SDK configuration, materialized like the Flutter line's .env:
+#   cp ../ios/Runner/GoogleService-Info.plist Anycast/Resources/
+#   (Secrets.plist is written from the repo-root .env — see README)
+Anycast/Resources/Secrets.plist
+Anycast/Resources/GoogleService-Info.plist
+
+# Build artifacts
+build/
+DerivedData/
+xcuserdata/
+*.xcscmblueprint

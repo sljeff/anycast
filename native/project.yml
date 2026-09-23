@@ -1,0 +1,252 @@
+name: Anycast
+options:
+  bundleIdPrefix: com.kindjeff
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    CODE_SIGN_STYLE: Automatic
+    CUSTOM_GROUP_ID: group.com.kindjeff.ShareExtention
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+    # The Flutter line's pubspec.yaml stays the version source of truth; these
+    # mirror it and are only bumped as an intentional release step (AGENTS.md).
+    MARKETING_VERSION: "1.2.1"
+    CURRENT_PROJECT_VERSION: "38"
+
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.0.0
+  firebase-ios-sdk:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 11.0.0
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: 8.0.0
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios
+    from: 5.30.0
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: 8.13.0
+  Kingfisher:
+    url: https://github.com/onevcat/Kingfisher
+    from: 8.0.0
+  SwiftSoup:
+    url: https://github.com/scinfu/SwiftSoup
+    from: 2.7.0
+  lottie-ios:
+    url: https://github.com/airbnb/lottie-ios
+    from: 4.4.0
+  ChatLayout:
+    url: https://github.com/ekazaev/ChatLayout
+    from: 2.0.0
+  MarqueeLabel:
+    url: https://github.com/cbpowell/MarqueeLabel
+    from: 4.5.0
+
+targets:
+  # Core (data + networking + ported logic). Deliberately NOT MainActor-by-
+  # default: repository work runs off the main actor (docs/migration/06 §4,
+  # 08 §1.1). The app target is the MainActor-by-default one.
+  AnycastKit:
+    type: framework
+    platform: iOS
+    sources:
+      - path: AnycastKit/Sources
+    dependencies:
+      - package: GRDB
+      - package: SwiftSoup
+    settings:
+      base:
+        SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: Nonisolated
+        PRODUCT_NAME: AnycastKit
+        GENERATE_INFOPLIST_FILE: "YES"
+        DEFINES_MODULE: "YES"
+
+  Anycast:
+    type: application
+    platform: iOS
+    sources:
+      - path: Anycast/Sources
+      - path: Anycast/Resources
+        buildPhase: resources
+    dependencies:
+      - target: AnycastKit
+      - target: ShareExtension
+      - package: firebase-ios-sdk
+        products:
+          - FirebaseAuth
+          - FirebaseCore
+      - package: GoogleSignIn
+      - package: RevenueCat
+      - package: Sentry
+      - package: Kingfisher
+      - package: lottie-ios
+        products:
+          - Lottie
+      - package: ChatLayout
+      - package: MarqueeLabel
+    # Post-build (after linking): the dSYM only exists once binaries are
+    # linked. NOTE: xcodegen's target key is `postBuildScripts` — a plain
+    # `buildScripts` key is silently dropped and the phase never appears.
+    postBuildScripts:
+      - name: Sentry dSYM Upload
+        # Runs only for Release builds with a token present; local Debug
+        # builds and CI without credentials skip silently (M1 checklist:
+        # without dSYM upload, M5 crash triage would read unsymbolicated
+        # stacks).
+        runOnlyWhenInstalling: false
+        basedOnDependencyAnalysis: false
+        shell: /bin/sh
+        script: |
+          if [ "$CONFIGURATION" != "Release" ]; then
+            exit 0
+          fi
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "SENTRY_AUTH_TOKEN not set — skipping dSYM upload"
+            exit 0
+          fi
+          SENTRY_DIR="${BUILD_DIR%/Build/Products}/SourcePackages/checkouts/sentry-cocoa"
+          if [ ! -d "$SENTRY_DIR" ]; then
+            SENTRY_DIR="${BUILD_DIR}/../../SourcePackages/checkouts/sentry-cocoa"
+          fi
+          if [ ! -d "$SENTRY_DIR" ]; then
+            echo "sentry-cocoa checkout not found — skipping dSYM upload"
+            exit 0
+          fi
+          export SENTRY_CLI_PRODUCTION=1
+          "$SENTRY_DIR/scripts/upload-symbols.sh" \
+            --dsym "$DWARF_DSYM_FOLDER_PATH" \
+            --org sentinel \
+            --project anycast \
+            "$SENTRY_AUTH_TOKEN"
+    info:
+      path: Anycast/Info.plist
+      properties:
+        CFBundleDisplayName: Anycast
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        LSRequiresIPhoneOS: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+        UIBackgroundModes:
+          - audio
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - com.googleusercontent.apps.1092551717876-ugib9p1irmilcqr6hcshcmnj9sg6edfm
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - ShareMedia-$(PRODUCT_BUNDLE_IDENTIFIER)
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UILaunchScreen: {}
+        AppGroupId: $(CUSTOM_GROUP_ID)
+    entitlements:
+      path: Anycast/Anycast.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.kindjeff.ShareExtention
+        com.apple.developer.applesignin:
+          - Default
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kindjeff.anycast
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        INFOPLIST_KEY_CFBundleDisplayName: Anycast
+
+  ShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension/Sources
+      - path: ShareExtension/Resources
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Share Extension
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        # Explicit value: the Flutter line's $(FLUTTER_BUILD_NUMBER) resolved
+        # empty here and shipped that way; do not resurrect the dangling
+        # reference (docs/migration/08 §12.3).
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        AppGroupId: $(CUSTOM_GROUP_ID)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionMainStoryboard: MainInterface
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsFileWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+    entitlements:
+      path: ShareExtension/ShareExtension.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.kindjeff.ShareExtention
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kindjeff.anycast.Share-Extension
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: "YES"
+        # Vendored sources are kept byte-compatible with the shipped
+        # extension ("保留原样", 05 §11); compiling them under Swift 6
+        # strict concurrency would require editing them. Swift 5 mode.
+        SWIFT_VERSION: "5.0"
+        SWIFT_APPROACHABLE_CONCURRENCY: "NO"
+
+  AnycastTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AnycastTests
+    dependencies:
+      - target: AnycastKit
+    settings:
+      base:
+        SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: Nonisolated
+        GENERATE_INFOPLIST_FILE: "YES"
+
+schemes:
+  Anycast:
+    build:
+      targets:
+        Anycast: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - AnycastTests
+  AnycastTests:
+    build:
+      targets:
+        AnycastTests: [test]
+    test:
+      config: Debug
+      # The G10/G11 goldens were exported on a UTC+8 host and the ports
+      # deliberately interpret wall-clock times in the runner's local zone
+      # (device-local semantics, 05 §1.5). Pin the zone so the suite is not
+      # machine-dependent (CI in UTC would otherwise fail).
+      environmentVariables:
+        - variable: TZ
+          value: Asia/Shanghai
+          isEnabled: true
+      targets:
+        - AnycastTests

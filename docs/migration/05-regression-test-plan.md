@@ -177,7 +177,7 @@ tool/golden_export.dart
 - [ ] `subtitle.summary` 恒 NULL，读取不得当错误
 - [ ] 各表大量列可 NULL（description/pubDate/duration/author/email/lastUpdated…）
 - [ ] 历史表"最新"语义 = `ORDER BY id DESC`（**不是** pubDate）
-- [ ] `playlistEpisode.enclosureUrl` 全表 UNIQUE：同一集不能加入第二个列表（UI 行为一致：从别处添加时是替换还是拒绝，与旧版一致——旧版为 INSERT OR REPLACE，即**移动到新列表**）
+- [ ] `playlistEpisode.enclosureUrl` 全表 UNIQUE：同一集不能加入第二个列表（现网实际行为：`getByEnclosureUrl` 全表查到后 `update` **不改 playlistId**——行留在旧列表、position 却按目标列表序被污染；2026-09-23 勘误，原生按 K14 新裁定 = 移动到新列表）
 - [ ] `subscription` title UNIQUE：导入同名频道会**整行替换旧订阅（id 改变）**
 - [ ] 翻译语言切换覆盖旧翻译（UNIQUE enclosureUrl）
 
@@ -187,7 +187,7 @@ tool/golden_export.dart
 - [ ] 播完一首：队首行 + 其 subtitle/translation 行 + 缓存文件/元 DB 行**全部删除**（连带删除语义）
 - [ ] 收件箱/历史 60s 裁剪到 max 值；裁剪后行数精确，且**保留侧行正确**：feed 留 pubDate 最新的 N 条、history 留 id 最新的 N 条（`removeOld` 按列表序保留前 N、删除其余 enclosureUrl，states/feed_episode.dart:134-148、states/history.dart:54-68——2026-09-22 增补保留侧断言）
 - [ ] 新写入的行 id 分配不与旧数据冲突（非 AUTOINCREMENT 表 insert 顺序 max(id)+1）
-- [ ] 暂停→继续（resume）→ 历史中该集行移到最新、**id 改变**（`play()` 对已有 audioSource 也执行 HistoryController.insert，states/player.dart:169-173，K30 复刻）
+- [ ] 暂停→继续（resume）→ 历史行重插但 **id 不变、排序位置不变**（`HistoryEpisodeModel.fromMap(playlistEpisode.toMap())` 带入 playlist 行 id，delete+INSERT(显式 id, REPLACE) 原样保留；原表述"移顶、id 改变"系勘误，2026-09-23 sqflite 实测确认，states/player.dart:243/280 + models/history_episode.dart:70-77，K30）
 - [ ] 队列播空（`clear()` 删 player 行）后重启 → 缺行视为"无播放状态"，不抛错（旧版 `PlayerModel.get` 对空结果 `maps[0]` 抛错导致恢复链断裂，models/player.dart:49-55，K31 修复）
 
 ### 2.4 写回兼容（回滚安全网，已定稿：首版只读兼容 + 相同 schema 写入，见 §11 战略决策）
@@ -565,7 +565,7 @@ tool/golden_export.dart
 | K11 | 进度事件四条件过滤（!isPlaying/isLoading/position==0/buffered==0，player.dart:105-115） | 起播/暂停/加载中 UI | 复刻或等价视觉 |
 | K12 | 历史按 id DESC 而非时间排序（history_episode.dart:55） | 数据语义 | **复刻**（排序语义改变会导致"最新历史"内容不同） |
 | K13 | 同名订阅互相顶掉（subscription.title UNIQUE） | 数据语义 | **复刻**（改会改变数据行为） |
-| K14 | 同一集跨列表 = 移动到新列表（playlistEpisode UNIQUE） | 数据语义 | **复刻** |
+| K14 | 同一集跨列表加入（playlistEpisode 表级 UNIQUE(enclosureUrl)）。现网实际行为：`getByEnclosureUrl` 全表查到后 `update` **不改 playlistId**——行留在旧列表、position 却按目标列表序计算（视觉上等于没加进新列表、旧列表序被污染，models/playlist_episode.dart:90-125；原表"移动到新列表"的表述与代码不符，2026-09-23 勘误） | 数据语义 | **行为变更（2026-09-23 拍板）**：跨列表加入 = 移动到新列表（playlistId 更新），不复刻现网怪癖；L0 补跨列表断言 |
 | K15 | 换目标语言覆盖旧翻译（translation UNIQUE） | 数据语义 | **复刻**（同上） |
 | K16 | maxCacheCount 无 UI（锁死 10）（states/player.dart:436-443） | 隐藏功能 | 复刻缺省；增强（加设置项）可放后续版本 |
 | K17 | autoSleepTimer 可配置但不生效（死代码，audio_handler.dart:121） | 死功能 | 复刻（不激活）；后续版本决定删除或实现 |
@@ -581,7 +581,7 @@ tool/golden_export.dart
 | K27 | 后台轮询（15s 转写/10s 翻译）非 2xx 每次都 `ErrorHandler.handle` 弹模态错误框（token 过期时登录页随机弹、429 弹 Error 429）；任何一次瞬时 5xx 会删本地 processing 记录、UI 回退 Generate（api/subtitles.dart:44-47、subtitle timer failed 分支） | 稳定性 | **修复（行为变更）**：用户主动触发的 add() 保持弹窗；后台轮询错误静默——5xx/超时保持 processing 继续轮询（服务端按 enclosure_url 幂等不重复计费，《02》§7）；401 仍走登录页（08 §11.5-4） |
 | K28 | 转写"自愈"重触发：本地 succeeded 但存储文本为空/'null' 时删记录置回 processing 重新 POST（pages/player.dart:610-624） | 契约 | **复刻**；L2 回放须覆盖该分支（§1.3 已补） |
 | K29 | 导出字幕文件名 `$title - $channel.txt` 未 sanitize，标题含 `/` 等非法路径字符即写文件抛异常、导出必崩（pages/player.dart:968） | 崩溃类 | **修复**：sanitize 文件名（K4/K5 族） |
-| K30 | 每次恢复播放（resume）也会把该集顶到历史最新、id 改变（states/player.dart:169-173） | 数据语义 | **复刻** + §2.3 补断言（pause→resume → history 行移顶、id 变化） |
+| K30 | 每次恢复播放（resume）也会重插历史行——但 `fromMap(playlistEpisode.toMap())` 带入 playlist 行 id，delete+INSERT(显式 id, REPLACE) 后 **id 不变、历史排序位置不变**（原表述"移顶、id 改变"系勘误，2026-09-23 sqflite 实测确认，states/player.dart:243/280 + models/history_episode.dart:70-77；仅"已播完重新入列再播"才因 playlist 新行 id 而置顶） | 数据语义 | **复刻（勘误后口径）** + §2.3 断言：resume 重插后 id 不变、排序位置不变 |
 | K31 | 队列播空 `clear()` 删 player 行（默认行只在建库时插入），重启后 `PlayerModel.get` 对空结果 `maps[0]` 抛错 → 未捕获 async 不崩但 load 链断，当前曲/进度恢复静默失败（models/player.dart:49-55） | 数据恢复 | **修复（泛化口径，2026-09-22 升级）**：**DB open 时幂等 `INSERT OR IGNORE` 补齐三行默认行**（playlist `(1,'Default',1)`、player `(1,NULL)`、settings 全默认）——同族的 `SettingsModel.get` 的 `maps[0]`（settings.dart:94）一并消掉，且 K25 坏库重建天然复用同一逻辑；读侧仍防御缺行（视为默认值）。§2.3 补断言 |
 | K32 | MyProgressBar 在 duration==0 时 build 内反复调 `initProgress()`（条件恒真 + PositionData 未实现 ==，每次新实例触发重建）→ 热循环直到真实播放事件（pages/player.dart:426-429） | 渲染 | **修复**：进度展示移出渲染路径（崩溃族，08 §12.1-2） |
 | K33 | 跑马灯触发按 `title.length × 24` 字符数估宽，CJK/拉丁混排必然误判（《03》§2.10） | 视觉 | **微增强**：播放器标题改 `boundingRect` 实测宽度触发；**历史列表的 always-scroll 行为保持**（不测宽、短标题也滚，playlists.dart:342-355）——两处不互相污染（08 §7.3/§11.6） |
@@ -590,6 +590,8 @@ tool/golden_export.dart
 | K36 | autoRefreshInterval 改动即时重启定时器；CupertinoPicker 滚动过程每 tick 都取消重建一次（周期从零重计）（states/player.dart:459-466） | 定时器语义 | **复刻**：改动即时生效 + 接受滚动期重置（08 §11.5-3，§12.4 已更正原表述） |
 | K37 | 反馈邮箱 UI 显示 `kindjeff.com@gmail.com` 与 mailto 实发 `kindjeffcom@gmail.com` 不一致（pages/settings.dart:460-471） | 笔误 | **统一为 `kindjeff.com@gmail.com`（2026-09-22 拍板）**：显示与实发同址。注：Gmail 忽略点号、两者本是同一邮箱，投递行为不变，仅显示一致性修复 |
 | K38 | 睡眠倒计时滑条拖到 0（= OFF）时，`onChanged` 即置 zero，若 1s timer 先触发会 `pause()`——"关闭倒计时"可能顺带暂停播放（player.dart:1252-1254 + states/player.dart:324-327，时序相关；《04》§1.7） | 竞态 | **修复（2026-09-22 定）**：滑到 0 = OFF 不触发 pause，仅倒计时**自然递减到 0** 才 pause |
+| K39 | `htmlToText` 的 Dart `body.text` **包含** `<script>`/`<style>` 文本内容（html 包把其内容存为 TextNode；实测 `a<script>var x=1;</script><style>.y{}</style>b` → `avar x=1;.y{}b`，utils/rss_fetcher.dart:165-185；原生初版误裁且 parity 注释写反，2026-09-23 发现） | 数据字节 | **复刻（2026-09-23 拍板）**：原生把 script/style 内容收进文本（SwiftSoup DataNode），订阅 description 写回字节同构；专项测试钉住该 case（一致性优先于观感——描述里混 JS 属垃圾文本，但分歧成本更高） |
+| K40 | Dart `String.trim()` 裁 Unicode White_Space ∪ **U+FEFF**；Swift `.whitespacesAndNewlines` = White_Space ∪ **U+200B**——差异两个字符且方向相反（Dart 多裁 FEFF、Swift 多裁零宽空格 200B；NBSP/U+0085/U+3000/U+2000–200A 等两者同裁，2026-09-23 双侧实测）。`subscription.title` 是 UNIQUE 键，尾部差一字符即成两行 | 数据字节 | **复刻（2026-09-23 拍板）**：`dartTrimmed()`（whitespacesAndNewlines − 200B + FEFF）应用于全部 Dart `.trim()` 对应点（RSS 字段、订阅 title/description、G16 搜索映射、renderHtml 路由），探针测试钉住两个差集字符 |
 
 **首版纳入的增强项汇总**（K6/K7/K8/K9/K18/K19/K24/K25 + 2026-09-22 并入的 K26/K27/K29/K31/K32/K33/K35/K38）：播放错误提示+手动重试、show notes 链接可点、聊天错误不再伪装成 AI 回复（401/403 绝不当回复显示）、翻译请求 30s 超时+异常捕获+重试上限+失败态、音频打断/拔耳机显式处理（不劣于旧版）、锁屏封面本地缓存兜底、进度退后台时补一次保存、损坏数据库隔离重建不 crash loop、拖拽下移 off-by-one 修复、后台轮询错误静默、导出文件名 sanitize、clear 后重启恢复修复（open 幂等补默认行）、duration==0 渲染循环修复、跑马灯实测宽度触发、换集背景渐变即时更新、倒计时滑到 0（OFF）不误触 pause。
 

@@ -59,7 +59,7 @@
 
 **目标**：把"真实世界"固化成可重复的测试资产。**DoD**：golden 与来源记录（manifest/headers）进 git，payload 不进 git、由来源一键重新生成（2026-09-22 修订：原为"fixtures+golden 进 git"，为控制仓库体积改为 provenance 模式，见 test/fixtures/README.md）；TF 基线 build 可装。
 
-> **2026-09-22 进度**：自动化资产全部建成（`native` 分支）——RSS 语料 8 桶（真实源 22 个 + 构造桶）、API fixtures 10 端点、DB 7 桶由真实建表/模型代码生成、音频 8 类、OPML 4 份、封面 8 张、G1–G16 golden 全量导出、一键脚本 `tool/m0/regen_all.sh`、目录说明 `test/fixtures/README.md`。**待人工**：真机容器采集验证（降级至 M4 顺带做）、真机数据样本替换（已由 `db_user`+`db_device` 实质满足）、~~golden 人工抽查 ≥3 组~~（已抽查 G4/G9/G13 + 现网只读复核）、~~TF 基线 build~~（锚定现网商店版）、招募用户（放宽为尽力而为）。生成细节见 test/fixtures/README.md；基线文档已按实测修正三处（01 §1.2 缓存列名、05 §1.5 G1/G13）。
+> **2026-09-22 进度**：自动化资产全部建成（`native` 分支）——RSS 语料 9 桶（真实源 22 个 + 作者真实订阅 25 源 + 构造桶）、API fixtures 10 端点、DB 9 桶（7 桶真实语料合成、`db_user`/`db_device` 见下方修订）、音频 8 类、OPML 4 份、封面 8 张、G1–G16 golden 全量导出、一键脚本 `tool/m0/regen_all.sh`、目录说明 `test/fixtures/README.md`。**待人工**：真机容器采集验证（降级至 M4 顺带做）、真机数据样本替换（已由 `db_user`+`db_device` 实质满足）、~~golden 人工抽查 ≥3 组~~（已抽查 G4/G9/G13 + 现网只读复核）、~~TF 基线 build~~（锚定现网商店版）、招募用户（放宽为尽力而为）。生成细节见 test/fixtures/README.md；基线文档已按实测修正三处（01 §1.2 缓存列名、05 §1.5 G1/G13）。
 >
 > **2026-09-22 修订（真机数据路径：模拟器实机产出）**：新增 `rss/user_subs` 语料桶（作者真实订阅导出 25 源，24 可解析，bowuzhi.fm 死源如实保留）与两个 DB 桶——**`db_user`**（同一语料经真实模型写入路径生成的确定性 fixture）和 **`db_device`**（iOS 模拟器实机产出：`integration_test/m0_seed_test.dart` 启动真实 App、走分享导入真实代码路径导入全部订阅、入队并真实播放一集，容器在测试保活窗口内由 `simctl get_app_container` 提取）。实机数据确认：真实音频缓存位于 `Library/Caches/anycast_episode/`（非 `tmp/`），fixture 按实机布局收编。
 >
@@ -69,8 +69,8 @@
 
 - [x] 分支策略落地：`main` 冻结为 Flutter 维护线（保持可构建可提审，回滚保险，05 §10.1）；**原生代码定稿落位（2026-09-22 拍板）：同仓库新目录 `native/` 放 Xcode 工程**——M0 采集的 `test/fixtures` 与 `test/golden` 由 Swift Testing 按相对路径直接读，零共享成本；CI 在同仓加原生 job（XCUITest 冒烟宿主，05 §6.2）→ **`native` 长期分支已建（自 main），全部迁移工作落此分支**
 - [ ] 验证容器采集可行性：真机确认 Xcode Download/Replace Container 对 dev 签名可用、对现网 App Store 版不可用（05 §1.1 修正规程）【降级至 M4 覆盖安装准备时顺带做；db_device 已由模拟器实机产出兜底】
-- [x] 按 05 §1.1 三级路径采集/构造 DB 样本：`db_light / db_heavy / db_dirty / db_v3 / db_crashed / db_corrupt（truncated/notadb/partial 三型）/ db_edge_subs` + 两个缓存元数据库 + tmp 音频样本（每桶 ≤3 文件）——**当前为合成路径（真实 RSS 语料喂真实建表/插入代码），真机 `db_heavy` 灌入后可直接替换同名文件**；生成器 `test/fixtures/generate_db_fixtures_test.dart`
-- [x] RSS 语料 8 桶（05 §1.2）：standard(10)/http_plain(6)/redirect(6)/ua_sensitive(2×3UA) 为真实采集（后端发现接口 441 候选 + 精选清单，385 源元数据入 `channels_index.json`）；missing_fields(5)/giant(1200 items+1MB 描述)/malformed(3)/weird_dates(12 种日期) 以真实源为模板构造；采集脚本 `tool/m0/fetch_rss.sh` + `construct_rss_buckets.py`
+- [x] 按 05 §1.1 三级路径采集/构造 DB 样本：`db_light / db_heavy / db_user / db_device / db_dirty / db_v3 / db_crashed / db_corrupt（truncated/notadb/partial 三型）/ db_edge_subs` + 两个缓存元数据库 + tmp 音频样本（每桶 ≤3 文件）——`db_user`/`db_device` 之外的 7 桶（light/heavy/dirty/v3/crashed/corrupt/edge_subs）为合成路径（真实 RSS 语料喂真实建表/插入代码，真机 `db_heavy` 灌入后可直接替换同名文件）；`db_user`（真实订阅经真实模型写入）与 `db_device`（模拟器实机产出）见 2026-09-22 修订；生成器 `test/fixtures/generate_db_fixtures_test.dart`（`db_device` 另由 `integration_test/m0_seed_test.dart` 实机产出）
+- [x] RSS 语料 9 桶（05 §1.2）：standard(10)/http_plain(6)/redirect(6 源 3xx 交换，仅 2 源留有 .final.xml)/ua_sensitive(2×3UA) 为真实采集（后端发现接口 441 候选 + 精选清单，385 源元数据入 `channels_index.json`）；user_subs(25) 为作者真实订阅导出（24 可解析，bowuzhi.fm 死源如实保留，采集脚本 `tool/m0/fetch_user_subs.sh`）；missing_fields(5)/giant(1200 items+1MB 描述)/malformed(3)/weird_dates(12 种日期) 以真实源为模板构造；采集脚本 `tool/m0/fetch_rss.sh` + `construct_rss_buckets.py`
 - [x] API fixtures（05 §1.3）：10 端点 × 成功+全部错误分支（401、403 code=2、403 其他、429、5xx、超时、`data:null`、转写 processing 多帧、K28 自愈分支、翻译 translation:null 等）；无认证端点与 401 路径**实采**（含真实 404 `{"message":"No Transcription Found"}`），需认证成功态按《02》规格构造；脚本 `tool/m0/fetch_api.sh`
 - [x] 音频样本 8 类（05 §1.4，ffmpeg 确定性合成：8s/30min/2h05m/含静音/VBR/AAC/128k/伪 mp3 + 404/500/错误 Content-Type/无 Range 本地服务器 `tool/m0/serve_local.py`）+ OPML（App 导出=真实 generateOPML 产出 + Overcast/小宇宙风格构造 + 500 源巨型）+ 封面图样本 8 张（真实封面 800px，取色对拍 golden 已导出）
 - [x] 写 `test/golden/export_golden_test.dart`（flutter test 环境 + sqflite_common_ffi，05 §1.5 运行环境说明），导出 **G1–G16 全量 golden**——G1/G2 **仅插入场景**逐字节导出（含头部 200 连插与中点饱和重排两序列），移动场景按 K26 修复语义单测断言（05 §1.5）；G13 含当前 user_input 重复逐字节复刻；另导出 G_palette（palette_generator dominantColor）；**G4/G7/G8/G13 为单一事实来源做了 4 处纯函数提取**（buildExportText / parseFeedResponse / computeNewEpisodes / buildChatHistory，行为不变，flutter analyze 通过）
@@ -82,20 +82,37 @@
 
 **目标**：证明"读旧数据 + 说同一套 API 协议"成立。**DoD**：05 §2（数据迁移矩阵）、§3（G1–G16 对拍）、§4（契约回放）自动化测试全绿。
 
-- [ ] 新建 Xcode 工程：min iOS 18、Swift 6.2 Approachable Concurrency、UIKit 为主、UIScene 生命周期（iOS 27 强制，06 §3/§4）
-- [ ] 引入依赖 10 个（06 §1）：GRDB、Firebase/GoogleSignIn、RevenueCat、Sentry、Kingfisher、SwiftSoup、FeedKit（可选）、lottie-ios、ChatLayout、MarqueeLabel
-- [ ] 架构铁律入骨架（08 §1.1/§2.2/§3.1，当 lint 用）：**组合根**（AppEnvironment 启动时显式构造全部长生命周期对象、构造注入；`Get.put` 风暴 / build() 内注册 / lazyPut / 延时删除一律不移植，页面状态随 VC deinit 生灭）；**DB 访问与解码/解析不得出现在 @MainActor 调用栈**（GRDB `read/write` 同步阻塞、Swift 6 对此不报警，属静默性能陷阱；repository 层 `@concurrent`/actor + 值类型 `Codable & Sendable` 跨界 + 单 `DatabaseQueue` 不启用 WAL）
-- [ ] 启动 DAG（08 §2.3/§12.1-5）：Sentry → Firebase/RC 配置 → DB open/迁移/K25 兜底 → settings 加载完成 → 恢复播放器指针 → **settings 加载完成前不起任何定时器**（根除 180/300 竞态）→ 首帧；RC `configure` 完成后才 `logIn(uid)`、失败重试（勿复刻旧版竞态：authStateChanges 先到时 logIn 抛错被 print 吞掉、整会话 RC 匿名）
-- [ ] Share Extension 编译依赖供给（08 §12.1-4，"保留原样"的前提）：`receive_sharing_intent` 是 git 依赖（pubspec 经 KasemJaffer 仓库）且本机 pub-cache 副本已不存在，而 ShareViewController.swift:10 `import receive_sharing_intent` 靠 Runner pods 的 `inherit! :search_paths` 供给——二选一：继续以 pod/SPM 拉该 git 仓库，或把插件 Swift 源（Constants/SharedMediaFile/SharedMediaType，量很小）vendor 进扩展 target
-- [ ] Privacy manifest：app 级 `PrivacyInfo.xcprivacy` 申报 required-reason APIs——至少 **UserDefaults（CA92.1，App Group suite 读取）与文件时间戳（C617.1，缓存 LRU 的 touched 语义）**两类（2026-09-22 细化）+ 各 SDK 自带 manifest 核对 + App Store 隐私标签与现网一致；漏申报会被提审拒绝
-- [ ] GRDB 打开 `Documents/anycast.db`：schema 只读校验（user_version=4、9 张表）+ migrator 从 v4 续写 + **写回兼容**（相同 schema 写入，05 §2.4）+ 坏库兜底（K25：隔离 `.corrupt` + 重建 + 上报，不 crash loop；仅确定性损坏信号触发，见 K25 触发条件）
-- [ ] 语义层实现：毫秒时间 / bool 0-1 / position REAL / JSON 列 / autoSleepTimer CSV / 历史 id DESC 等全部按《01》§9 坑位清单
-- [ ] L0 测试跑绿：05 §2.1 矩阵全行（含 `db_corrupt`、空目录默认行断言——autoRefreshInterval=300 口径、locale 推导按 G9 fixture）
-- [ ] 网络层：URLSession 实现 02 §6 十四红线逐条（认证头格式、超时 10s/3s、重试仅网络异常、429/5xx 不重试、转写 15s/翻译 10s 轮询节奏、RSS 8 并发、RSS 浏览器 UA、短链硬编码契约）
-- [ ] L1 golden 对拍跑绿（G1–G16，Swift Testing）
-- [ ] L2 契约回放跑绿（URLProtocol/Replay 回放 §1.3 fixtures，05 §4.1–4.2）
-- [ ] Sentry 接入（DSN/采样配置平移，02 §5.1）+ **dSYM 符号上传配置**（sentry-cocoa 的上传脚本/构建阶段，本地与 CI 构建都要传——不配则 M5 灰度期崩溃比对全是未符号化堆栈，2026-09-22 增补）
-- [ ] Firebase Auth 三登录 + RevenueCat（logIn(Firebase uid)、entitlement `plus`、产品 `anycast_monthly`）——可先只做 SDK 层联调，UI 留 M3
+> **2026-09-23 进度**：**DoD 达成——L0（14）+ L1（26，含 G_palette 2 项 CIEDE2000<10）+ L2（12）+ 资产可用性（2）= 54 个 Swift Testing 测试全绿**（iOS 18.6 模拟器，测试 TZ 钉 Asia/Shanghai；建议 `-parallel-testing-enabled NO`，见 native/README）。工程与实现要点：
+>
+> - **工程**：`native/` xcodegen 工程（`project.yml` 为唯一事实，勿手改 pbxproj）。AnycastKit（动态 framework，`SWIFT_DEFAULT_ACTOR_ISOLATION=Nonisolated` + `@concurrent` repository——SQL 永不落在 MainActor 栈）+ Anycast app（MainActor 默认）+ ShareExtension（vendored 源码迁入）+ AnycastTests。min iOS 18、Swift Approachable Concurrency（6.2 引入的特性集；language mode 6.0）、UIScene 生命周期、Privacy manifest（UserDefaults CA92.1 + 文件时间戳 C617.1，app 与扩展各一份）。
+> - **依赖**：GRDB 7.11.1 / Firebase(Auth+Core) / GoogleSignIn / RevenueCat / Sentry / Kingfisher / SwiftSoup / lottie / ChatLayout / MarqueeLabel。**FeedKit 砍掉**：其仓库 tag 的 Package.swift 是 Swift tools 3.1，Xcode 27 SPM 直接拒绝解析（08 §8 本就预判"XMLParser 一个就够可砍"）；RSS 解析改为自写 XMLParser 逐语义对齐 webfeed_plus，G7 对拍通过（52 fixtures；redirect/ua_sensitive 为传输层语料，不进 RSS 映射对拍）。
+> - **架构铁律落地**：组合根 `AppEnvironment` + 启动 DAG `StartupSequence`（Sentry → Firebase/RC configure → DB open（K25 在内）→ settings → player 指针 → RC `logIn(uid)`（configure 完成后、失败重试 3 次、上报）——settings 加载前无任何定时器）；DB 用 `DatabaseQueue`（rollback journal，不启 WAL，写回兼容）。
+> - **G7/G8 字节级对拍的两个硬前提**（后续改动勿破坏）：① Dart `List.sort` 是不稳定双轴快排，等值 pubDate 的次序被 golden 锁定 → 移植了 SDK 的 `DartSort`（32 阈值插入排序——`right - left <= 32` 即 33 元素内走插入排序，SDK sort.dart 实义；2026-09-23 曾按 `<` 误植，33 元素等值区间偏离 Dart 次序，已修正并有专项边界测试）；② Dart-intl 宽松解析（如 Feb 29 2027 滚动到 Mar 1、未知时区缩写按 0）与 webfeed 时区表全部按源码移植（`DartDate`/`RSSDate`）。
+> - **G11 裁定（Jiffy 时区怪癖，按 golden 复刻）**：`User.fromJson` 的 `expired_at` 经 Jiffy `yyyy-MM-ddTHH:mm:ssZ` 解析后是**墙钟时间按设备本地时区**取值、串内偏移被丢弃（golden 在 UTC+8 主机导出：`09:30:00+00:00` → 01:30Z）。原生按同语义实现（剥偏移后按本地时区解析）。
+> - **subtitle processing 行不落库（按 1.2.1+38 基线）**：`a0b7f66`（2026-07-31，未随任何发布出去的 Flutter 线改动）允许 processing 行落库——**不属于现网基线，不移植**；原生按 01 §1.1 口径（只有完整 succeeded 行落库）。若后续确认现网 1.2.1+38 实际包含该改动，再修订 01 与两边断言。
+> - **K 决策落实**：K2（skipSilence 只读不写）、K5（RSS 缺字段容忍——golden 中 `parse_error_null` 的 missing_fields 条目按"容忍解析成功"断言，malformed/空文件仍失败；user_subs 0 字节死源如实按失败处理）、K8（chat 非 2xx 不再当 AI 回复）、K9（翻译 30s 超时）、K10（429 无退避复刻）、K13/K14/K15（UNIQUE 替换语义，L0 专项断言）、K25（坏库 `.corrupt` 隔离+重建+上报、再开不重复隔离）、K26（repository 移动按移动后邻居；G1 场景按旧算法逐字节重放）、K28/K29/K31（L0/L1 断言）。
+> - **十四红线**：L2 逐条断言（Bearer 仅 4 认证端点、Content-Type 仅随 body、10s/3s/30s/无超时、传输层失败才重试（2/3 次总计）、429/5xx 不重试、翻译无 Authorization、短链 body 逐字节对 G12、未登录合成 401 零请求、RSS 8 并发+浏览器 UA+失败源跳过（URLProtocol 实测 max-in-flight==8））。
+> - **`test/compatibility/` 合流评估（M0 遗留）**：**不合流**。它是 Flutter 维护线自身的模型守卫（跑 Dart 模型、`flutter test`），与原生 L0（读真实语料桶+golden）职责不同、各自保留。约束记录：未来 schema 变更需同步三处——`native/AnycastKit/.../Schema.swift`、`test/compatibility/fixtures/*.sql`、`test/fixtures/generate_db_fixtures_test.dart`（M0 生成器）。
+> - **待 M2/M3 顺带**：Firebase/RC 为 SDK 层联调（代码就绪、随 App target 编译），真机级登录/entitlement 验证并入 M3 登录屏与 M4 付费矩阵；模拟器上 `Auth` 的真登录流程未跑。Sentry dSYM 上传脚本已挂 Release 构建阶段（build phase；无 `SENTRY_AUTH_TOKEN` 时静默跳过，CI 注入 token 后生效）。
+>
+> **2026-09-23 深度 review 修订**（代码级对照 Dart 源逐项复核后修复，测试 44→47 全绿）：① RSS 解析容忍未定义 XML 实体（Dart xml 按字面保留 `&nbsp;`；Foundation XMLParser 原本整文档失败，野生源会被静默跳过——P0）；② DartSort 阈值修正 `right - left <= 32`（见上）；③ K14 跨列表加入改为全表查重并移动到新列表（原先只查目标列表、跨列表加入会撞表级 UNIQUE 抛错），补跨列表断言；④ K26 修复语义补专项测试（下移/上移 + 重开验证；此前生产 `movePosition` 零覆盖，G1 golden 锁的是旧算法）；⑤ RC 绑定补 Firebase auth 状态监听（晚到/后登录的 uid 不再整会话匿名）且不再随 DB 降级整体跳过；⑥ 查询编码按 Dart `Uri.encodeQueryComponent`（`+`→`%2B`、空格→`+`；原 URLComponents 会把字面 `+` 让服务端解成空格）；⑦ L2 断言修复（no-Auth 改为全端点累积断言——原先 per-endpoint reset 把证据抹掉了；Bearer 补齐 4/4 端点）；⑧ `deleteUser` 返回 ErrorSignal（原先吞掉全部错误信号）；⑨ 测试 scheme TZ 钉 Asia/Shanghai（G10/G11 golden 为 UTC+8 主机导出，原先换时区机器必挂）；⑩ 缓存元 DB 的 `validTill`/`touched` 注释 seconds→milliseconds（fork 实存毫秒，防 M2 LRU 差 1000 倍）；⑪ 冷启动 URL 经 connectionOptions 接线、缺 `GoogleService-Info.plist` 优雅降级、Apple 登录协调器用后即清；⑫ pbxproj 重生成并修正 Sentry dSYM 脚本键名（xcodegen 只认 `postBuildScripts`，原 `buildScripts` 键被静默丢弃、脚本阶段从未生成过）。**遗留待办**：转写 15s/翻译 10s 轮询节奏与红线 11 断言（M2）、search_episodes 等未回放 fixtures（M2 补）、Sentry `--org sentinel` slug 人工对证（仓库内无从验证）、sentry-cocoa 8.x vs 06 研究文档 9.29+ 取舍、RSS 野生输入差异集（zh_CN 日期回退、时区 token trim、嵌套 image 等）。
+>
+> **2026-09-23 二次复核修订（外部深度 review 逐条对照 Dart 源与 pub-cache 实测后采纳）**：① K25 上报接线补齐——`StartupSequence` 传 `onQuarantine` → Sentry（此前 hook 只在 L0 测试接线，生产路径静默，与上文"上报"声明不符）；② `parseFeedResponse` lastUpdated 恢复 Dart 语义——非空时取 `feedEpisodes[0].pubDate`（可为 NULL；原 `?? now` 吞 NULL 后 `local >= fetched` 会把该订阅后续集数永久冻结），`computeNewEpisodes` 同步对齐 local==NULL 的首集分支；③ 播放列表 position 邻居数组改 `[Double?]` 对齐全量下标（NULL position 行在 Dart 里=该侧无邻居，原 `compactMap` 挤掉 NULL 行导致邻居查找整体偏移，补脏行断言）；④ K39/K40 新裁定入《05》§11：htmlToText 对齐 Dart 收 script/style 文本、`dartTrimmed()` 对齐 trim 字符集（实测差异两个字符且方向相反：Dart 多裁 FEFF、Swift 多裁零宽空格 200B）；⑤ K14/K30 基线勘误（见《05》§11）：K14 现网实为"留旧列表+position 污染"（原生按行为变更=移动到新列表）；K30 现网实为"resume 重插但 id 不变不移顶"（sqflite 实测；原生 history 行保留 playlist 行 id）；⑥ 小项：`Uri.encodeQueryComponent` 字符集对齐（`!'()*` 应编码，实测）、`itunes:duration` 数字容忍空白（`int.tryParse(' 3600')`=3600）、`<enclosure>` 无 `url` 属性时保留该集（Dart 行为，enclosureUrl=NULL 落库）、RFC822 年份宽度 `\d{1,6}`（intl `yyyy` 贪婪，实测 `20241` 年可解析）、`authorizedSend` 死代码清理、RC `logLevel` 门控 `#if DEBUG`、Google credential 注释改准确（iOS API 强制 accessToken 参数，随 verifyAssertion 上行、idToken 优先，无害）。**未采纳**：外部 review 的"RSS `findElements` 后代搜索"指控（xml 6.6.1 源码 `findElements` 为直接子元素，原生行为一致）；其 trim 论据修正为"仅差 FEFF"（NBSP 例不成立）。**记录在案不修**：重试面宽于 Dart（TLS/重定向等也重试一次，终态相同仅多 ~200ms；M2 轮询节奏断言时再评估）、`URLSession.timeoutInterval` 字节间隔语义 vs Dart 整请求上限（慢速滴流响应可超名义 10s/3s）、Apple 登录 sha256 nonce（M3 登录屏落地）、JSON `\b`/`\f` 简写与 ≥1e15 整值的字节差、`expired_at` 纯日期宽容差异（服务端固定发完整 ISO）、M3 移植 `importPodcastsByUrls` 时保留 `s = {}` 死过滤器原样（修好会让重导触发 title UNIQUE REPLACE 换 id）。
+
+- [x] 新建 Xcode 工程：min iOS 18、Swift 6.2 Approachable Concurrency、UIKit 为主、UIScene 生命周期（iOS 27 强制，06 §3/§4）
+- [x] 引入依赖（06 §1）：GRDB、Firebase/GoogleSignIn、RevenueCat、Sentry、Kingfisher、SwiftSoup、lottie-ios、ChatLayout、MarqueeLabel（FeedKit 经评估砍掉，见上）
+- [x] 架构铁律入骨架（08 §1.1/§2.2/§3.1，当 lint 用）：组合根 + DB/解码不出 MainActor 栈（AnycastKit Nonisolated 默认 + `@concurrent` + 值类型跨界 + 单 `DatabaseQueue` 不启 WAL）
+- [x] 启动 DAG（08 §2.3/§12.1-5）：Sentry → Firebase/RC 配置 → DB open/迁移/K25 兜底 → settings 加载完成 → 恢复播放器指针 → settings 加载完成前不起任何定时器 → 首帧；RC configure 完成后才 logIn(uid)、失败重试
+- [x] Share Extension 编译依赖供给（08 §12.1-4）：源码（含 vendored SharedMediaTypes.swift）迁入 native/ShareExtension，bundle id `com.kindjeff.anycast.Share-Extension`、App Group 与 `ShareMedia-` scheme 保持
+- [x] Privacy manifest：app 级 `PrivacyInfo.xcprivacy`（UserDefaults CA92.1 + 文件时间戳 C617.1；扩展同报）+ 各 SDK 自带 manifest 随包；App Store 隐私标签核对留 M5
+- [x] GRDB 打开 `Documents/anycast.db`：schema 只读校验（user_version=4、9 张表）+ migrator 从 v4 续写（migration map 与 Dart 同构）+ 写回兼容（相同 schema、rollback journal）+ 坏库兜底（K25）
+- [x] 语义层实现：毫秒时间 / bool 0-1 / position REAL / JSON 列（Dart 风格 double 编码写回）/ autoSleepTimer CSV / 历史 id DESC 等全部按《01》§9
+- [x] L0 测试跑绿：05 §2.1 矩阵全行（G15 七桶逐行对拍；db_corrupt×3 → K25 断言；空目录默认行含 zh-Hans-CN→zh/CN 推导；autoRefreshInterval=300）
+- [x] 网络层：URLSession 实现 02 §6 十四红线逐条（L2 全绿背书）
+- [x] L1 golden 对拍跑绿（G1–G16 + G_palette，Swift Testing）
+- [x] L2 契约回放跑绿（URLProtocol 回放 §1.3 fixtures，05 §4.1–4.2）
+- [x] Sentry 接入（DSN/全量采样平移）+ dSYM 符号上传配置（Release + token 门控构建脚本）
+- [x] Firebase Auth 三登录 + RevenueCat（logIn(Firebase uid)、entitlement `plus`、产品 `anycast_monthly`）——SDK 层完成；UI 与真机联调留 M3/M4
 
 ## M2 · 音频期（05 §5 自动部分全绿）
 
