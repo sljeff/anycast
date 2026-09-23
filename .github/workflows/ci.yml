@@ -228,3 +228,46 @@ jobs:
             android/app/google-services.json \
             ios/Runner/GoogleService-Info.plist \
             lib/firebase_options.dart
+
+  native-ios:
+    name: Build native iOS
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/native'))
+    runs-on: macos-27
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # macos-27 is in public preview and its default toolchain is Xcode 27,
+      # the only toolchain the native project is verified against; pin an
+      # exact version once the image is GA. The L0–L2 Swift Testing suites
+      # do not run here: their M0 fixture payloads are deliberately not in
+      # git (provenance model, test/fixtures/README.md) — run them locally
+      # per native/README.md. XCUITest smoke joins this job in M3 (05 §6.2).
+      - name: Generate and build native targets for testing
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Flutter maintenance refs without native/ skip cleanly.
+          if [ ! -f native/project.yml ]; then
+            echo "native/project.yml not present on this ref — nothing to build."
+            exit 0
+          fi
+          brew install xcodegen
+          (
+            cd native
+            xcodegen generate
+          )
+          xcodebuild \
+            -project native/Anycast.xcodeproj \
+            -scheme Anycast \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build-for-testing
