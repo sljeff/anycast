@@ -76,7 +76,8 @@ class ChatController extends GetxController {
 
 /// Pure history-array construction for /api/subtitles/chat (original inline
 /// logic of sendMessage, extracted for testability): first 10 messages in list
-/// order, single-key maps {human|ai: text}, reversed back to chronological.
+/// order (the list is oldest-first — insertMessage appends), single-key maps
+/// {human|ai: text}, reversed into newest-first order.
 List<Map<String, String>> buildChatHistory(List<Message> messages) {
   List<Map<String, String>> history = [];
   // 获取最近 10 条历史消息

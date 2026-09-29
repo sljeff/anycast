@@ -700,8 +700,9 @@ void main() {
         'source': 'buildChatHistory (states/chat.dart, original sendMessage '
             'lines 26-35): first 10 in list order, single-key maps, reversed',
         'cases': cases,
-        'contract_note': 'history末元素即当前 user_input(≤10条时); >10条时发送的是'
-            '最旧10条(旧版实际行为,不得"修复")',
+        'contract_note': 'With <=10 messages the current user_input is the '
+            'FIRST history element (newest-first payload); with >10 messages '
+            'the OLDEST ten are sent instead (shipped behavior, do not "fix")',
       });
     });
 
