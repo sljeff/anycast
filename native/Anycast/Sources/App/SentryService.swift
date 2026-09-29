@@ -21,7 +21,8 @@ final class SentryService {
 
     /// K25 quarantine reporting and any other non-fatal startup failure land
     /// here. The old app had zero manual captures; the migration only adds
-    /// what its own decisions require (K25 兜底上报, migration counters).
+    /// what its own decisions require (K25 fallback reporting, migration
+/// counters).
     func capture(_ error: Error, context: String) {
         SentrySDK.capture(error: error) { scope in
             scope.setTag(value: context, key: "migration.context")

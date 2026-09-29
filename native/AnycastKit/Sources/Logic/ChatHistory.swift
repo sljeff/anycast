@@ -4,11 +4,11 @@ import Foundation
 ///
 /// The shipped quirk is pinned byte-for-byte: the controller APPENDS the new
 /// message first, then takes the FIRST 10 messages of the list (oldest
-/// first) and reverses them into chronological order. Consequences the
+/// first) and reverses them into newest-first order. Consequences the
 /// golden locks in: with ≤10 total the newest message (the current
-/// user_input) appears AGAIN as the last history element; with >10 the
-/// current input is NOT part of the payload at all. Do not "fix" this
-/// (docs/migration/05 §1.5 G13 / 08 §11.5-2).
+/// user_input) appears AGAIN as the FIRST history element; with >10 the
+/// current input is NOT part of the payload at all (the oldest ten go
+/// instead). Do not "fix" this (docs/migration/05 §1.5 G13 / 08 §11.5-2).
 public enum ChatHistory {
 
     public struct Message: Equatable, Sendable {

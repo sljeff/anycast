@@ -24,6 +24,21 @@ final class AppEnvironment {
     /// audio stack and every timer live inside it.
     private(set) var playback: PlaybackStack?
 
+    /// Built once the playback stack exists — the one object screens
+    /// receive. Held here so a late `onShellReady` observer (set after the
+    /// DAG finished) still gets it exactly once.
+    private(set) var uiContext: UIContext?
+
+    /// The shell installs through this callback (SceneDelegate wires it to
+    /// RootViewController.install). Called once, with the UIContext.
+    var onShellReady: (@MainActor (UIContext) -> Void)? {
+        didSet {
+            if let uiContext, onShellReady != nil {
+                onShellReady?(uiContext)
+            }
+        }
+    }
+
     init(paths: ApplicationPaths,
          sentry: SentryService,
          auth: AuthController,
@@ -41,7 +56,7 @@ final class AppEnvironment {
         startup.onReady = { [weak self] database, settings, pointer in
             guard let self else { return }
             Task {
-                self.playback = await PlaybackStack.build(
+                let stack = await PlaybackStack.build(
                     database: database,
                     settings: settings,
                     pointer: pointer,
@@ -50,11 +65,35 @@ final class AppEnvironment {
                     auth: self.auth,
                     sentry: self.sentry
                 )
-                #if DEBUG
-                self.playback?.runSmokeTestIfRequested(arguments: ProcessInfo.processInfo.arguments)
-                #endif
+                self.playback = stack
+                self.installUIContext(database: database, stack: stack)
             }
         }
+    }
+
+    /// The `UIContext` is constructed ONLY here, after the DAG restored
+    /// local state and the playback stack exists (constructor injection
+    /// from here down; screens never see a half-built context).
+    private func installUIContext(database: AppDatabase, stack: PlaybackStack) {
+        let context = UIContext(
+            database: database,
+            api: APIClient(client: HTTPClient(), tokenProvider: {
+                try await AuthController.currentToken()
+            }),
+            paths: paths,
+            playback: stack.playback,
+            cacheStore: stack.cacheStore,
+            sleepTimer: stack.sleepTimer,
+            subtitles: stack.subtitles,
+            translations: stack.translations,
+            settingsBox: stack.settingsBox,
+            auth: auth,
+            purchases: purchases
+        )
+        context.loginPrompt.context = context
+        ShareHandoffCoordinator.register(on: context)
+        uiContext = context
+        onShellReady?(context)
     }
 
     /// The production graph. Tests (L0–L2) never go through here — they

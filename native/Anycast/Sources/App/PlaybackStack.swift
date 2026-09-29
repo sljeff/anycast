@@ -1,5 +1,6 @@
 import AnycastKit
 import Foundation
+import Kingfisher
 
 /// The M2 audio stack, assembled once the startup DAG has restored local
 /// state (database + settings + pointer). Everything timer-shaped — the
@@ -67,7 +68,14 @@ final class PlaybackStack {
         let nowPlaying = NowPlayingController(
             artworkProvider: NowPlayingArtworkProvider(
                 coverMeta: coverMeta,
-                coverDirectory: paths.coverCacheDirectory
+                coverDirectory: paths.coverCacheDirectory,
+                // M3 unification: the network leg runs through Kingfisher's
+                // shared cache so Now Playing and in-app covers share bytes
+                // (K19 order unchanged — the local cover meta DB is checked
+                // first inside the provider).
+                fetchImage: { url in
+                    try? await KingfisherManager.shared.retrieveImage(with: .network(url)).image
+                }
             )
         )
         let playback = PlaybackService(
@@ -91,6 +99,14 @@ final class PlaybackStack {
             session: session,
             sentry: sentry
         )
+
+        // K27: a background-poll 401 still reaches the login flow (M3: the
+        // login sheet via AuthController.onAuthRequired) and remains
+        // visible in Sentry.
+        subtitles.onLoginRequired = { [weak auth] in
+            sentry.captureMessage("401 during subtitle polling", context: "subtitle.poll")
+            auth?.notifyAuthRequired()
+        }
 
         await playback.restore(pointer: pointer, settings: settings)
         await subtitles.start()
@@ -136,12 +152,6 @@ final class PlaybackStack {
             Task { await subtitles?.remove(url: url) }
             Task { await translations?.remove(url: url) }
         }
-
-        // K27: a background-poll 401 still reaches the login flow. Until
-        // the M3 login sheet exists, it reports to Sentry.
-        subtitles.onLoginRequired = {
-            sentry.captureMessage("401 during subtitle polling", context: "subtitle.poll")
-        }
     }
 
     /// 08 §4.1: background suspends the pollers; foreground resumes them
@@ -155,29 +165,6 @@ final class PlaybackStack {
             playback.applicationDidEnterBackground()
         }
     }
-
-    #if DEBUG
-    /// M2 simulator smoke hook (`-m2-smoke-play <audio-file-or-url>`): with
-    /// no UI until M3, this drives the real stack end-to-end — engine,
-    /// session activation, Now Playing, progress persistence. Debug builds
-    /// only; removed when the M3 player page lands.
-    func runSmokeTestIfRequested(arguments: [String]) {
-        guard let index = arguments.firstIndex(of: "-m2-smoke-play"),
-              arguments.count > index + 1,
-              let queueHead = playback.queue.first
-        else { return }
-        let target = arguments[index + 1]
-        print("[m2-smoke] playing \(target) for queue head \(queueHead.enclosureUrl ?? "?")")
-        Task {
-            await playback.playByEpisode(queueHead)
-            try? await Task.sleep(for: .seconds(5))
-            print("[m2-smoke] isPlaying=\(playback.isPlaying) position=\(playback.positionData.positionMilliseconds)ms error=\(playback.playbackError ?? "none")")
-            playback.pause()
-            await playback.flushStoreWrites()
-            print("[m2-smoke] paused; playedDuration row saved")
-        }
-    }
-    #endif
 }
 
 /// Small shared box so settings changes (M3) propagate to the pollers and

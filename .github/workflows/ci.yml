@@ -237,7 +237,7 @@ jobs:
       (github.event_name == 'push' &&
         (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/native'))
     runs-on: xcode-27
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     steps:
       - name: Check out source
@@ -252,7 +252,9 @@ jobs:
     # The L0–L2 Swift Testing suites do not run here: their M0 fixture
     # payloads are deliberately not in git (provenance model,
     # test/fixtures/README.md) — run them locally per native/README.md.
-    # XCUITest smoke joins this job in M3 (05 §6.2).
+    # The XCUITest smoke below does run here: every data-dependent step
+    # skips when the simulator has no seeded container, so the structural
+    # flows (tabs, sheets, settings persistence, login) still gate the PR.
       - name: Generate and build native targets for testing
         shell: bash
         run: |
@@ -262,7 +264,11 @@ jobs:
             echo "native/project.yml not present on this ref — nothing to build."
             exit 0
           fi
+          # Homebrew ships no versioned xcodegen formula, so the pin is a
+          # post-install assertion: an unexpected toolchain bump fails the
+          # job loudly instead of silently regenerating the project.
           brew install xcodegen
+          test "$(xcodegen --version)" = "Version: 2.46.0"
           (
             cd native
             xcodegen generate
@@ -271,5 +277,58 @@ jobs:
             -project native/Anycast.xcodeproj \
             -scheme Anycast \
             -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath native/build/dd \
             CODE_SIGNING_ALLOWED=NO \
             build-for-testing
+
+      - name: Run native UI smoke (XCUITest, 05 §6.2)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f native/project.yml ]; then
+            echo "native/project.yml not present on this ref — nothing to run."
+            exit 0
+          fi
+          # Pick whichever iPhone the image ships; the smoke suite is
+          # device-agnostic. The trailing `|| true` keeps a grep miss inside
+          # the command substitution from tripping set -e with grep's exit
+          # code before the friendly error branch below can report it.
+          UDID=$(xcrun simctl list devices available \
+            | grep -E "iPhone [0-9]+( Pro| Plus|e)? \(" \
+            | head -1 | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/' || true)
+          if [ -z "$UDID" ]; then
+            echo "no available iPhone simulator on this image" >&2
+            exit 1
+          fi
+          echo "using simulator $UDID"
+          # Deterministic runner selection out of the shared derived data:
+          # build-for-testing writes exactly one product xctestrun; exclude
+          # patched copies (qa-gated / reference / *-patched) local crawl
+          # runs leave behind, then sort so a second genuine product can
+          # never flip the pick silently.
+          XCTESTRUN=$(ls native/build/dd/Build/Products/*.xctestrun 2>/dev/null \
+            | grep -v -e 'qa-gated.xctestrun' -e 'reference.xctestrun' -e '\-patched\.' \
+            | sort | head -1 || true)
+          if [ -z "$XCTESTRUN" ]; then
+            echo "no .xctestrun under native/build/dd/Build/Products — did build-for-testing run?" >&2
+            exit 1
+          fi
+          echo "using xctestrun $XCTESTRUN"
+          # xcodebuild refuses to overwrite an existing result bundle.
+          mkdir -p native/build/runs/ci
+          rm -rf native/build/runs/ci/ui-smoke.xcresult
+          xcodebuild \
+            -xctestrun "$XCTESTRUN" \
+            -destination "id=$UDID" \
+            -derivedDataPath native/build/dd \
+            -resultBundlePath native/build/runs/ci/ui-smoke.xcresult \
+            -only-testing:AnycastUITests \
+            test-without-building
+
+      - name: Upload UI smoke result bundle
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-ui-smoke-xcresult
+          path: native/build/runs/ci/ui-smoke.xcresult
+          if-no-files-found: ignore

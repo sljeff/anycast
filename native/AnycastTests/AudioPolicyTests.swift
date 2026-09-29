@@ -34,15 +34,15 @@ struct AudioPolicyTests {
             lock.lock(); _calls.append(.setCategory); lock.unlock()
         }
 
-        func activate() throws {
-            lock.lock(); _calls.append(.activate); lock.unlock()
+        func activate() async throws {
+            lock.withLock { _calls.append(.activate) }
         }
 
-        func deactivate(notifyOthers: Bool) throws {
-            lock.lock()
-            _calls.append(.deactivate(notifyOthers: notifyOthers))
-            let shouldThrow = _failDeactivate
-            lock.unlock()
+        func deactivate(notifyOthers: Bool) async throws {
+            let shouldThrow = lock.withLock {
+                _calls.append(.deactivate(notifyOthers: notifyOthers))
+                return _failDeactivate
+            }
             if shouldThrow {
                 // 560030880 ('!act') — another app holds the audio focus.
                 throw NSError(domain: NSOSStatusErrorDomain, code: 560030880)
@@ -54,7 +54,7 @@ struct AudioPolicyTests {
     }
 
     @Test("K18: startup sets category ONLY; first play activates; pause stays active; drained queue deactivates with notifyOthers and swallows 560030880")
-    func sessionPolicy() {
+    func sessionPolicy() async {
         let backend = FakeSessionBackend()
         let controller = AudioSessionController(backend: backend)
 
@@ -68,18 +68,18 @@ struct AudioPolicyTests {
         #expect(backend.calls == [.setCategory])
 
         // First play activates; repeated plays do not re-activate.
-        controller.activateForPlayback()
-        controller.activateForPlayback()
+        await controller.activateForPlayback()
+        await controller.activateForPlayback()
         #expect(backend.calls == [.setCategory, .activate])
 
         // Pause keeps the session (lock-screen card survives).
-        controller.activateForPlayback()
+        await controller.activateForPlayback()
         #expect(backend.calls == [.setCategory, .activate])
 
         // Queue drained: deactivate with notifyOthers, swallowing the
         // focus-held error instead of surfacing it.
         backend.failNextDeactivate()
-        controller.deactivate()
+        await controller.deactivate()
         #expect(backend.calls == [.setCategory, .activate, .deactivate(notifyOthers: true)])
     }
 
@@ -89,8 +89,8 @@ struct AudioPolicyTests {
             var interruption: (@Sendable (AudioSessionController.Interruption) -> Void)?
             var route: (@Sendable (AudioSessionController.RouteChange) -> Void)?
             func setCategoryPlayback() throws {}
-            func activate() throws {}
-            func deactivate(notifyOthers: Bool) throws {}
+            func activate() async throws {}
+            func deactivate(notifyOthers: Bool) async throws {}
             func setInterruptionHandler(_ handler: @escaping @Sendable (AudioSessionController.Interruption) -> Void) {
                 interruption = handler
             }
@@ -210,6 +210,7 @@ struct AudioPolicyTests {
         try FileManager.default.createDirectory(at: covers, withIntermediateDirectories: true)
         let meta = try await CacheMetaDatabase.openWritable(
             at: directory.appendingPathComponent("libCachedImageData.db"))
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
 
         func makeImage(_ color: UIColor) -> UIImage {
             UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { context in

@@ -100,6 +100,7 @@ struct CacheStoreTests {
     @Test("download stores a UUIDv1-named file with the mime extension and indexes it (key = url)")
     func downloadStoresRow() async throws {
         let (store, directory, meta, clock) = await makeStore()
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
         let url = "https://cdn.example.com/episode.m4a"
         ServingProtocol.reset([url: stubAudio(contentType: "audio/mpeg", cacheControl: "max-age=604800")])
 
@@ -136,7 +137,8 @@ struct CacheStoreTests {
 
     @Test("validTill falls back to the 30-day stale period without cache headers")
     func validTillDefault() async throws {
-        let (store, _, meta, clock) = await makeStore()
+        let (store, directory, meta, clock) = await makeStore()
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
         let url = "https://cdn.example.com/noheaders.mp3"
         ServingProtocol.reset([url: stubAudio(contentType: "audio/mpeg")])
 
@@ -149,7 +151,8 @@ struct CacheStoreTests {
 
     @Test("cache hit refreshes touched and returns the file; missing file is a plain miss")
     func cacheHitTouches() async throws {
-        let (store, _, meta, clock) = await makeStore()
+        let (store, directory, meta, clock) = await makeStore()
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
         let url = "https://cdn.example.com/ep.mp3"
         ServingProtocol.reset([url: stubAudio(contentType: "audio/mpeg")])
         _ = try await(await store.startDownload(url: url)).value
@@ -170,6 +173,7 @@ struct CacheStoreTests {
     @Test("304 revalidation keeps the file and extends its life")
     func revalidation304() async throws {
         let (store, directory, meta, clock) = await makeStore()
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
         let url = "https://cdn.example.com/ep.mp3"
         ServingProtocol.reset([url: stubAudio(contentType: "audio/mpeg", etag: "\"v1\"")])
         let first = try await(await store.startDownload(url: url)).value
@@ -190,7 +194,6 @@ struct CacheStoreTests {
         // The If-None-Match carried the stored ETag.
         let request = ServingProtocol.requests().last
         #expect(request?.value(forHTTPHeaderField: "If-None-Match") == "\"v1\"")
-        _ = directory
     }
 
     // MARK: - LRU (fork cache_store semantics)
@@ -198,7 +201,8 @@ struct CacheStoreTests {
     @Test("over capacity: oldest-touched beyond the limit die, but only after a full untouched day")
     func lruOverCapacity() async throws {
         let clock = FakeClock()
-        let (store, _, meta, _) = await makeStore(capacity: 3, clock: clock)
+        let (store, directory, meta, _) = await makeStore(capacity: 3, clock: clock)
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
 
         // Five downloads, one "day" apart: capacities 3 → rows 1,2 are
         // beyond the limit and untouched >1 day.
@@ -227,7 +231,8 @@ struct CacheStoreTests {
     @Test("over capacity but recently touched: kept until the grace day passes")
     func lruGrace() async throws {
         let clock = FakeClock()
-        let (store, _, meta, _) = await makeStore(capacity: 2, clock: clock)
+        let (store, directory, meta, _) = await makeStore(capacity: 2, clock: clock)
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
 
         // Three downloads minutes apart: g0 is beyond capacity but only
         // minutes untouched → survives this round (the 1-day grace).
@@ -251,7 +256,8 @@ struct CacheStoreTests {
     @Test("stale rows (past validTill) are removed regardless of capacity")
     func staleCleanup() async throws {
         let clock = FakeClock()
-        let (store, _, meta, _) = await makeStore(capacity: 10, clock: clock)
+        let (store, directory, meta, _) = await makeStore(capacity: 10, clock: clock)
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
         let url = "https://cdn.example.com/stale.mp3"
         ServingProtocol.reset([url: stubAudio(contentType: "audio/mpeg")])
         _ = try await(await store.startDownload(url: url)).value
@@ -264,7 +270,8 @@ struct CacheStoreTests {
 
     @Test("remove deletes file + row (the K3 cascade's cache half)")
     func removeCascade() async throws {
-        let (store, _, meta, _) = await makeStore()
+        let (store, directory, meta, _) = await makeStore()
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
         let url = "https://cdn.example.com/gone.mp3"
         ServingProtocol.reset([url: stubAudio(contentType: "audio/mpeg")])
         let file = try await(await store.startDownload(url: url)).value
@@ -282,6 +289,7 @@ struct CacheStoreTests {
         let fixture = try RepoAssets.sandboxedCopy(ofFixtureDirectory: "db/db_device")
         let metaURL = fixture.appendingPathComponent("Library/Application Support/anycast_episode.db")
         let meta = await CacheMetaDatabase.open(at: metaURL)
+        defer { SandboxCleanup.remove(fixture, closing: [meta.queue]) }
         #expect(meta.isAvailable)
 
         let rows = await meta.allRows()

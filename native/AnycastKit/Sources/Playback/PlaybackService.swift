@@ -147,7 +147,7 @@ public final class PlaybackService {
         trackStoreWrite { try await self.store.savePointer(playlistId: playlistId) }
 
         await setByEpisodeInner(episode)
-        session.activateForPlayback()
+        await session.activateForPlayback()
         playbackError = nil
         engine.playImmediately()
     }
@@ -188,8 +188,14 @@ public final class PlaybackService {
             playing: false
         )
 
-        if let file = await cache.cachedFile(for: urlString) {
-            guard loadedEnclosureURL == urlString else { return }
+        let cachedFile = await cache.cachedFile(for: urlString)
+        // The lookup suspended — a concurrent play of another episode may
+        // have taken over by now. Never load a stale source over the newer
+        // selection: the engine item and `loadedEnclosureURL` diverging
+        // makes the next same-episode seek and the progress persistence
+        // act on the wrong episode.
+        guard loadedEnclosureURL == urlString else { return }
+        if let file = cachedFile {
             engine.load(url: file, initialPositionMilliseconds: initialPosition)
         } else if let remote = URL(string: urlString) {
             engine.load(url: remote, initialPositionMilliseconds: initialPosition)
@@ -211,11 +217,21 @@ public final class PlaybackService {
                     self.cacheStates[urlString] = progress
                 }
             }
-            _ = try? await task.value
+            // The explicit completion set matters when this observer JOINED
+            // an in-flight download (the store reuses the existing task, so
+            // this onProgress never fires). A FAILED download must not read
+            // as complete: drop the entry so the card reverts to its
+            // not-downloaded display — same rule as the manual-download
+            // path in the playlist binder.
+            let downloadResult = try? await task.value
             await MainActor.run { [weak self] in
                 guard let self else { return }
-                if self.cacheStates[urlString] != nil {
-                    self.cacheStates[urlString] = 1
+                if downloadResult != nil {
+                    if self.cacheStates[urlString] != nil {
+                        self.cacheStates[urlString] = 1
+                    }
+                } else {
+                    self.cacheStates.removeValue(forKey: urlString)
                 }
             }
         }
@@ -233,7 +249,7 @@ public final class PlaybackService {
             // delete+INSERT(REPLACE) preserves it).
             try? await store.insertHistory(episode: episode)
         }
-        session.activateForPlayback()
+        await session.activateForPlayback()
         playbackError = nil
         engine.playImmediately()
     }
@@ -272,7 +288,7 @@ public final class PlaybackService {
         engine.pause()
         if engine.hasItem && loadedEnclosureURL == episode.enclosureUrl {
             engine.seek(toMilliseconds: positionMilliseconds)
-            session.activateForPlayback()
+            await session.activateForPlayback()
             playbackError = nil
             engine.playImmediately()
             return
@@ -281,7 +297,7 @@ public final class PlaybackService {
         updated.playedDuration = positionMilliseconds
         currentEpisode = updated
         await setByEpisodeInner(updated)
-        session.activateForPlayback()
+        await session.activateForPlayback()
         playbackError = nil
         engine.playImmediately()
     }
@@ -305,7 +321,7 @@ public final class PlaybackService {
         var updated = episode
         updated.playedDuration = position
         await setByEpisode(updated)
-        session.activateForPlayback()
+        await session.activateForPlayback()
         playbackError = nil
         engine.playImmediately()
     }
@@ -358,7 +374,17 @@ public final class PlaybackService {
         case .completed:
             Task { await handleCompleted() }
         case let .failed(message):
+            // K6: a failure ends the loading attempt — clear the transport
+            // flags so the loading lottie stops and the controls re-enable.
+            // (The engine may never follow up with loadingChanged(false).)
+            isLoading = false
+            isPlaying = false
             playbackError = message
+            nowPlaying.updatePlaybackState(
+                positionMilliseconds: engine.positionMilliseconds,
+                speed: speed,
+                playing: false
+            )
         }
     }
 
@@ -418,7 +444,7 @@ public final class PlaybackService {
         positionData = .zero
         currentPlaylistId = nil
         try? await store.clearPointer()
-        session.deactivate()
+        await session.deactivate()
     }
 
     // MARK: - Progress persistence (K24)

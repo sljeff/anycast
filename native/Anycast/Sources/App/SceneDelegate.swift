@@ -26,9 +26,16 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.makeKeyAndVisible()
         self.window = window
 
+        // The tab shell installs as soon as the startup DAG is ready
+        // (dark base before that); URL routing works from the first turn.
+        if let environment = (UIApplication.shared.delegate as? AppDelegate)?.environment {
+            environment.onShellReady = { [weak root] context in
+                root?.install(context)
+            }
+        }
+
         // Both URL arrival paths (docs/migration/08 §12.2): cold start via
-        // connectionOptions, warm via scene(_:openURLContexts:). The handler
-        // is an M3 placeholder, but the drains must both exist from day one.
+        // connectionOptions, warm via scene(_:openURLContexts:).
         for context in connectionOptions.urlContexts {
             root.handleOpenURL(context.url)
         }

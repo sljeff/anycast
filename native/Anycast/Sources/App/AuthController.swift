@@ -26,6 +26,16 @@ final class AuthController {
     /// `StartupSequence`); the Firebase listener below invokes it.
     private var uidObserver: (@MainActor (String?) -> Void)?
 
+    /// M3 global 401 signal (docs/migration/03 §10.1): any API consumer
+    /// that receives `.loginRequired` (401, or 403 with code==2) calls
+    /// `notifyAuthRequired()`; the composition root routes it to the login
+    /// prompt coordinator. Background pollers use the same funnel.
+    var onAuthRequired: (@MainActor () -> Void)?
+
+    func notifyAuthRequired() {
+        onAuthRequired?()
+    }
+
     /// True once Firebase is configured. `Auth.auth()` raises an
     /// NSException when called unconfigured, so every access is gated — a
     /// bare clone without the gitignored `GoogleService-Info.plist` degrades

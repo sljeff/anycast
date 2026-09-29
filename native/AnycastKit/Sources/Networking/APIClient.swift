@@ -213,6 +213,15 @@ public struct APIClient: Sendable {
         public var id: String
         public var imageURL: String
         public var nightImageURL: String
+
+        /// The implicit memberwise initializer is internal; app/test targets
+        /// build categories directly (list UI, fixtures).
+        public init(name: String, id: String, imageURL: String, nightImageURL: String) {
+            self.name = name
+            self.id = id
+            self.imageURL = imageURL
+            self.nightImageURL = nightImageURL
+        }
     }
 
     /// GET /api/categories — bare GET: no timeout override, no retry; errors

@@ -158,3 +158,11 @@ app.*.symbols
 /test/fixtures/api/
 /test/fixtures/channels_index.json
 /test/fixtures/rss/**/*.xml
+
+# Native iOS scratch build outputs (xcodebuild -derivedDataPath build/…).
+# Already covered by the generic `build/` above; kept explicit for clarity.
+/native/build/
+
+# swift-snapshot-testing mismatch artifacts (SnapshotBaseline writes them
+# next to the committed baselines on a failed verify).
+*.actual.png

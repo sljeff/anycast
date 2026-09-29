@@ -50,6 +50,17 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Comfortaa-Regular.ttf</string>
+		<string>Comfortaa-Bold.ttf</string>
+		<string>NotoSans-Regular.ttf</string>
+		<string>NotoSans-Bold.ttf</string>
+		<string>Inter-Regular.ttf</string>
+		<string>MPLUSRounded1c-Regular.ttf</string>
+		<string>Roboto-Regular.ttf</string>
+		<string>RobotoMono-Regular.ttf</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -65,11 +65,12 @@ struct PollingRhythmTests {
 
     // MARK: - Helpers
 
-    private func makeDatabase() async throws -> AppDatabase {
+    private func makeDatabase() async throws -> (AppDatabase, URL) {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("poll-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        let database = try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        return (database, directory)
     }
 
     private func makeAPI() -> APIClient {
@@ -83,7 +84,8 @@ struct PollingRhythmTests {
 
     @Test("subtitle poller: exactly 15s cadence; one round per tick; idle rounds emit nothing")
     func subtitleCadence() async throws {
-        let database = try await makeDatabase()
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
         let factory = ManualPollTimerFactory()
         let controller = SubtitlePollController(
             api: makeAPI(),
@@ -116,7 +118,8 @@ struct PollingRhythmTests {
 
     @Test("subtitle poller K27: background 5xx keeps processing silently; 401 routes to login")
     func subtitleBackgroundSilence() async throws {
-        let database = try await makeDatabase()
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
         let factory = ManualPollTimerFactory()
         let controller = SubtitlePollController(
             api: makeAPI(),
@@ -143,7 +146,8 @@ struct PollingRhythmTests {
 
     @Test("subtitle add(): succeeded persists the row; failed deletes it; user-visible error signals surface")
     func subtitleAddBranches() async throws {
-        let database = try await makeDatabase()
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
         let controller = SubtitlePollController(
             api: makeAPI(),
             subtitles: database.subtitleRepository(),
@@ -194,7 +198,8 @@ struct PollingRhythmTests {
 
     @Test("translation poller: exactly 10s cadence; requires a target language and a succeeded subtitle")
     func translationCadence() async throws {
-        let database = try await makeDatabase()
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
         let factory = ManualPollTimerFactory()
         let url = "https://x.example/ep1.mp3"
         try await seedSubtitle(database: database, url: url, language: "en")
@@ -236,7 +241,8 @@ struct PollingRhythmTests {
 
     @Test("translation: detected == target skips the request; cached row short-circuits")
     func translationSkips() async throws {
-        let database = try await makeDatabase()
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
         let url = "https://x.example/ep1.mp3"
 
         // Same language → no request, ever.
@@ -277,7 +283,8 @@ struct PollingRhythmTests {
 
     @Test("translation K9: five consecutive failures stop the loop for that URL")
     func translationRetryCap() async throws {
-        let database = try await makeDatabase()
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
         let url = "https://x.example/ep1.mp3"
         try await seedSubtitle(database: database, url: url, language: "en")
 
@@ -313,7 +320,8 @@ struct PollingRhythmTests {
 
     @Test("translation success persists the row with the encoded payload")
     func translationPersists() async throws {
-        let database = try await makeDatabase()
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
         let url = "https://x.example/ep1.mp3"
         try await seedSubtitle(database: database, url: url, language: "en")
 

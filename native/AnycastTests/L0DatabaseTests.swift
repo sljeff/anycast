@@ -25,6 +25,7 @@ struct L0DatabaseTests {
         let buckets = ["db_light", "db_heavy", "db_dirty", "db_user", "db_device", "db_edge_subs", "db_crashed"]
         for bucket in buckets {
             let (database, sandbox) = try await openSandbox(bucket)
+            defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
 
             let version = try await database.queue.read { db in
                 try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
@@ -41,7 +42,8 @@ struct L0DatabaseTests {
 
     @Test("Read orderings: playlist position ASC, feed pubDate DESC, history id DESC, subscription title ASC (BINARY)")
     func readOrderings() async throws {
-        let (database, _) = try await openSandbox("db_heavy")
+        let (database, sandbox) = try await openSandbox("db_heavy")
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
 
         let playlists = try await database.playlistRepository().listPlaylists()
         let playlistPositions = playlists.compactMap(\.position)
@@ -71,7 +73,8 @@ struct L0DatabaseTests {
 
     @Test("Settings decode: CSV/enums/units per G9 caliber (db defaults)")
     func settingsDecode() async throws {
-        let (database, _) = try await openSandbox("db_light")
+        let (database, sandbox) = try await openSandbox("db_light")
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
         let settings = try await database.settingsRepository().load()
         #expect(settings.autoRefreshInterval == 300)
         #expect(settings.speed == 1.0)
@@ -94,6 +97,7 @@ struct L0DatabaseTests {
         let fullMeta = await CacheMetaDatabase.open(
             at: full.appendingPathComponent("Library/Application Support/anycast_episode.db")
         )
+        defer { SandboxCleanup.remove(full, closing: [fullMeta.queue]) }
         #expect(fullMeta.isAvailable, "meta DB opens")
         let rows = await fullMeta.allRows()
         #expect(!rows.isEmpty)
@@ -116,6 +120,7 @@ struct L0DatabaseTests {
         let emptiedMeta = await CacheMetaDatabase.open(
             at: emptied.appendingPathComponent("Library/Application Support/anycast_episode.db")
         )
+        defer { SandboxCleanup.remove(emptied, closing: [emptiedDB.queue, emptiedMeta.queue]) }
         #expect(emptiedMeta.isAvailable, "meta DB still readable with empty tmp")
 
         // (c) meta DB removed, tmp files kept → tolerant open, no mapping.
@@ -125,6 +130,7 @@ struct L0DatabaseTests {
             try fileManager.removeItem(at: metaURL)
         }
         let metalessDB = try await AppDatabase.openAt(metaless.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(metaless, closing: [metalessDB.queue]) }
         _ = try await metalessDB.settingsRepository().load()
         let missingMeta = await CacheMetaDatabase.open(at: metaURL)
         #expect(!missingMeta.isAvailable, "missing meta DB → unavailable, not an error")
@@ -134,6 +140,7 @@ struct L0DatabaseTests {
     func v3Upgrade() async throws {
         let sandbox = try sandboxURL("db_v3")
         let database = try await AppDatabase.openAt(sandbox.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
 
         let version = try await database.queue.read { db in
             try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
@@ -155,6 +162,7 @@ struct L0DatabaseTests {
     @Test("db_crashed: hot journal recovers cleanly, data matches golden")
     func crashedRecovery() async throws {
         let (database, sandbox) = try await openSandbox("db_crashed")
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
         let comparison = try await G15.compare(database: database, goldenBucket: "db_crashed", sandbox: sandbox)
         #expect(comparison.mismatches.isEmpty)
     }
@@ -167,6 +175,7 @@ struct L0DatabaseTests {
 
             let quarantines = QuarantineRecorder()
             let database = try await AppDatabase.openAt(url, onQuarantine: quarantines.handler)
+            defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
 
             #expect(quarantines.events.count == 1, "\(bucket): quarantined exactly once")
             #expect(FileManager.default.fileExists(atPath: url.path + ".corrupt"),
@@ -191,17 +200,19 @@ struct L0DatabaseTests {
 
     @Test("Fresh install: creators + default rows + locale-derived country/language")
     func freshInstallDefaults() async throws {
-        func freshDatabase(locale: String) async throws -> AppDatabase {
+        func freshDatabase(locale: String) async throws -> (AppDatabase, URL) {
             let directory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("anycast-fresh-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            return try await AppDatabase.openAt(
+            let database = try await AppDatabase.openAt(
                 directory.appendingPathComponent("anycast.db"),
                 localeIdentifier: locale
             )
+            return (database, directory)
         }
 
-        let database = try await freshDatabase(locale: "zh-Hans-CN")
+        let (database, freshDirectory) = try await freshDatabase(locale: "zh-Hans-CN")
+        defer { SandboxCleanup.remove(freshDirectory, closing: [database.queue]) }
 
         let playlists = try await database.playlistRepository().listPlaylists()
         #expect(playlists == [PlaylistRow(id: 1, title: "Default", position: 1)])
@@ -221,12 +232,14 @@ struct L0DatabaseTests {
         #expect(settings.continuousPlaying)
 
         // Dart-style underscore identifiers go through the same rule (G9).
-        let underscored = try await freshDatabase(locale: "zh_Hans_CN")
+        let (underscored, underscoredDirectory) = try await freshDatabase(locale: "zh_Hans_CN")
+        defer { SandboxCleanup.remove(underscoredDirectory, closing: [underscored.queue]) }
         let settings2 = try await underscored.settingsRepository().load()
         #expect(settings2.countryCode == "CN" && settings2.targetLanguage == "zh")
 
         // No-separator fallback: en/US.
-        let bare = try await freshDatabase(locale: "en")
+        let (bare, bareDirectory) = try await freshDatabase(locale: "en")
+        defer { SandboxCleanup.remove(bareDirectory, closing: [bare.queue]) }
         let settings3 = try await bare.settingsRepository().load()
         #expect(settings3.countryCode == "US" && settings3.targetLanguage == "en")
     }
@@ -235,7 +248,8 @@ struct L0DatabaseTests {
 
     @Test("JSON columns decode to double-second segments; summary NULL reads clean; sqlite_sequence readable")
     func semanticTraps() async throws {
-        let (database, _) = try await openSandbox("db_heavy")
+        let (database, sandbox) = try await openSandbox("db_heavy")
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
 
         let subtitleURL = try await database.queue.read { db in
             try String.fetchOne(db, sql: "SELECT enclosureUrl FROM subtitle LIMIT 1")
@@ -259,8 +273,9 @@ struct L0DatabaseTests {
         }
         #expect(sequenceNames.contains("translation"))
 
-        let dirty = try await openSandbox("db_dirty")
-        let episodes = try await dirty.0.feedRepository().listAll()
+        let (dirty, dirtySandbox) = try await openSandbox("db_dirty")
+        defer { SandboxCleanup.remove(dirtySandbox, closing: [dirty.queue]) }
+        let episodes = try await dirty.feedRepository().listAll()
         #expect(episodes.contains { $0.duration == nil || $0.pubDate == nil || $0.description == nil })
     }
 
@@ -270,6 +285,7 @@ struct L0DatabaseTests {
             .appendingPathComponent("anycast-unique-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let database = try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
 
         // Same enclosureUrl re-inserted → one row (K14 move semantics).
         let episode = PlaylistEpisodeRow(
@@ -364,6 +380,7 @@ struct L0DatabaseTests {
             .appendingPathComponent("anycast-nullpos-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let database = try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
 
         // ORDER BY position ASC puts the NULL row first: [A(NULL), B(2.0)].
         try await database.queue.write { db in
@@ -413,6 +430,7 @@ struct L0DatabaseTests {
         try await repository.insertOrUpdateByIndex(episode("A"), playlistId: 1, index: 3)
 
         var reopened = try await AppDatabase.openAt(url)
+        defer { SandboxCleanup.remove(directory, closing: [database.queue, reopened.queue]) }
         let afterDownMove = try await reopened.playlistRepository().listEpisodes(playlistId: 1)
         #expect(afterDownMove.compactMap(\.title) == ["B", "C", "A"],
                 "downward move survives reopen")
@@ -432,6 +450,7 @@ struct L0DatabaseTests {
         let sandbox = try sandboxURL("db_light")
         let url = sandbox.appendingPathComponent("anycast.db")
         let database = try await AppDatabase.openAt(url)
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
 
         // Progress lands on the queue HEAD row by enclosureUrl.
         let queue = try await database.playlistRepository().listEpisodes(playlistId: 1)
@@ -540,6 +559,7 @@ struct L0DatabaseTests {
             .appendingPathComponent("anycast-gate-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let database = try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
 
         // No language → dropped.
         try await database.subtitleRepository().insert(

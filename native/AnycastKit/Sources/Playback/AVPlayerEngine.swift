@@ -121,6 +121,12 @@ public final class AVPlayerEngine: PlaybackEngine {
                 case .readyToPlay:
                     self.events?(.loadingChanged(false))
                 case .failed:
+                    // A failed item can leave timeControlStatus parked at
+                    // .waitingToPlayAtSpecifiedRate, so the loading flag
+                    // must be cleared explicitly — otherwise the UI spins
+                    // forever on a track that will never play (just_audio
+                    // lands in ProcessingState.idle on error).
+                    self.events?(.loadingChanged(false))
                     self.events?(.failed(item.error?.localizedDescription ?? "load failed"))
                 @unknown default:
                     break

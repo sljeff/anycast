@@ -22,13 +22,16 @@ import Foundation
 public final class AudioSessionController {
 
     /// Abstracted for the policy unit tests (call order and gating, without
-    /// a real audio session).
+    /// a real audio session). Activation/deactivation are async: the real
+    /// AVAudioSession calls are the hang-risk synchronous variants, which
+    /// iOS flags as a main-thread fault ("AVAudioSession Hang Risk") — the
+    /// async overloads are the sanctioned replacement.
     public protocol Backend: AnyObject, Sendable {
         func setCategoryPlayback() throws
-        func activate() throws
+        func activate() async throws
         /// Errors of `!act` (560030880) and friends are decided by the
         /// backend; the controller's contract is "deactivate never throws".
-        func deactivate(notifyOthers: Bool) throws
+        func deactivate(notifyOthers: Bool) async throws
         func setInterruptionHandler(_ handler: @escaping @Sendable (Interruption) -> Void)
         func setRouteChangeHandler(_ handler: @escaping @Sendable (RouteChange) -> Void)
     }
@@ -101,11 +104,12 @@ public final class AudioSessionController {
 
     /// Before the first play of a session. AVPlayer would implicitly
     /// activate under `.playback`; doing it explicitly makes activation
-    /// failures observable.
-    public func activateForPlayback() {
+    /// failures observable. Awaited — the session API is asynchronous off
+    /// the main thread, and the state flip must not precede the result.
+    public func activateForPlayback() async {
         guard state != .active else { return }
         do {
-            try backend.activate()
+            try await backend.activate()
             state = .active
         } catch {
             onActivateFailure?("activate: \(error.localizedDescription)")
@@ -113,11 +117,11 @@ public final class AudioSessionController {
     }
 
     /// Queue drained / stopped: give the audio focus back, politely.
-    public func deactivate() {
+    public func deactivate() async {
         guard state == .active else { return }
         // 560030880 and other deactivation quirks are expected on this
         // path — swallow, never surface.
-        try? backend.deactivate(notifyOthers: true)
+        try? await backend.deactivate(notifyOthers: true)
         state = .inactive
     }
 }
@@ -133,13 +137,13 @@ public final class AVAudioSessionBackend: AudioSessionController.Backend, @unche
         try session.setCategory(.playback, mode: .default, options: [])
     }
 
-    public func activate() throws {
-        try session.setActive(true, options: [])
+    public func activate() async throws {
+        try await session.setActive(true, options: [])
     }
 
-    public func deactivate(notifyOthers: Bool) throws {
-        try session.setActive(false,
-                              options: notifyOthers ? .notifyOthersOnDeactivation : [])
+    public func deactivate(notifyOthers: Bool) async throws {
+        try await session.setActive(false,
+                                    options: notifyOthers ? .notifyOthersOnDeactivation : [])
     }
 
     public func setInterruptionHandler(_ handler: @escaping @Sendable (AudioSessionController.Interruption) -> Void) {

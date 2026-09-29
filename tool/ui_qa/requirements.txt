@@ -1,0 +1,3 @@
+# Python dependencies for the local QA tooling under tool/ui_qa/.
+# scan_frames.py needs Pillow (image decoding, thumbnails, contact sheets).
+Pillow

@@ -49,6 +49,9 @@ packages:
   MarqueeLabel:
     url: https://github.com/cbpowell/MarqueeLabel
     from: 4.5.0
+  swift-snapshot-testing:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    from: 1.12.0
 
 targets:
   # Core (data + networking + ported logic). Deliberately NOT MainActor-by-
@@ -156,6 +159,15 @@ targets:
           - UIInterfaceOrientationPortrait
         UILaunchScreen: {}
         AppGroupId: $(CUSTOM_GROUP_ID)
+        UIAppFonts:
+          - Comfortaa-Regular.ttf
+          - Comfortaa-Bold.ttf
+          - NotoSans-Regular.ttf
+          - NotoSans-Bold.ttf
+          - Inter-Regular.ttf
+          - MPLUSRounded1c-Regular.ttf
+          - Roboto-Regular.ttf
+          - RobotoMono-Regular.ttf
     entitlements:
       path: Anycast/Anycast.entitlements
       properties:
@@ -223,6 +235,68 @@ targets:
         SWIFT_DEFAULT_ACTOR_ISOLATION: Nonisolated
         GENERATE_INFOPLIST_FILE: "YES"
 
+  # App-layer unit tests, hosted in the app process (they exercise UIKit
+  # components: cells, HTML rendering, fonts). MainActor-by-default like the
+  # app target itself. NOTE: hosted tests launch the real app and its startup
+  # DAG on the simulator — AppEnvironment degrades gracefully when Firebase
+  # config/DB are absent (DEBUG, M1 behavior).
+  AnycastAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AnycastAppTests
+    dependencies:
+      - target: Anycast
+      - target: AnycastKit
+    settings:
+      base:
+        SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Anycast.app/Anycast
+        BUNDLE_LOADER: $(TEST_HOST)
+
+  # L4 screen-snapshot baselines (05 §6.1), same host shape as the app tests.
+  # Baselines are stored per iOS major version under
+  # AnycastSnapshotTests/__Snapshots__/<SourceFile>/iOS-<major>/ — the
+  # SnapshotBaseline helper wraps the library naming to add that prefix.
+  AnycastSnapshotTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AnycastSnapshotTests
+        # Baselines are read/written via #filePath-relative filesystem paths,
+        # not bundle resources. Bundling them also collides: iOS-18 and
+        # iOS-27 store same-named PNGs (duplicate copy outputs).
+        excludes:
+          - "__Snapshots__/**"
+    dependencies:
+      - target: Anycast
+      - target: AnycastKit
+      - package: swift-snapshot-testing
+        products:
+          - SnapshotTesting
+    settings:
+      base:
+        SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Anycast.app/Anycast
+        BUNDLE_LOADER: $(TEST_HOST)
+
+  # XCUITest smoke (05 §6.2); grows into the scripted smoke pass in M3.
+  AnycastUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: AnycastUITests
+    dependencies:
+      - target: Anycast
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: Anycast
+
 schemes:
   Anycast:
     build:
@@ -234,6 +308,9 @@ schemes:
       config: Debug
       targets:
         - AnycastTests
+        - AnycastAppTests
+        - AnycastSnapshotTests
+        - AnycastUITests
   AnycastTests:
     build:
       targets:

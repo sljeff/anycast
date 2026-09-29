@@ -35,6 +35,28 @@ public struct PlaylistRepository: Sendable {
         }
     }
 
+    /// Batched membership check: the subset of `urls` present in ANY
+    /// playlist (a table-wide look-up — membership is not playlist-scoped).
+    /// One read per parameter ceiling, chunked like
+    /// `deleteByEnclosureUrls` (RepositoryHelpers).
+    @concurrent
+    public func playlistContainsURLs(_ urls: [String]) async throws -> Set<String> {
+        guard !urls.isEmpty else { return [] }
+        return try await database.queue.read { db in
+            var members = Set<String>()
+            for chunk in urls.chunked(maxLength: 500) {
+                let placeholders = Array(repeating: "?", count: chunk.count).joined(separator: ",")
+                let found = try String.fetchAll(
+                    db,
+                    sql: "SELECT enclosureUrl FROM playlistEpisode WHERE enclosureUrl IN (\(placeholders))",
+                    arguments: StatementArguments(chunk)
+                )
+                members.formUnion(found)
+            }
+            return members
+        }
+    }
+
     /// Add-or-move at `index` (the data-layer half of
     /// `insertOrUpdateByIndex`, states/playlist_episode.dart `add`/`move`).
     ///
@@ -78,7 +100,7 @@ public struct PlaylistRepository: Sendable {
             } else {
                 // K14: the UNIQUE(enclosureUrl) constraint is table-global,
                 // so dedup must be too — the same episode added from another
-                // playlist MOVES here (K14 ruling: 跨列表 = 移动到新列表).
+                // playlist MOVES here (K14 ruling: cross-list add = move to the new list).
                 // The shipped Dart looked the row up table-wide via
                 // getByEnclosureUrl and updated it (keeping the old
                 // playlistId); a plain INSERT here would throw on the

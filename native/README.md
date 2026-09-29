@@ -51,37 +51,45 @@ processes have shown to get jetsammed on the simulator when run concurrently.
 The test suites require the M0 payloads (gitignored by design): run
 `tool/m0/regen_all.sh` from the repository root once on this machine.
 
-## M2 audio smoke (DEBUG only)
+### Test bundles
 
-Seeds nothing itself — it plays the restored queue head through the real
-stack (engine, session, Now Playing, 2 s persistence, cache). Removed when
-the M3 player UI lands.
+| Bundle | Covers | Needs M0 fixtures? |
+|---|---|---|
+| `AnycastTests` | L0–L2 parity: DB matrix, G1–G16 goldens, API contract replay | yes (TZ pinned to Asia/Shanghai) |
+| `AnycastAppTests` | App-layer units (design system, screen logic, layout sanity sweep) | only the live-shell specs |
+| `AnycastSnapshotTests` | Reference captures of the M3 screen states (05 §6.1) — gated behind `SNAPSHOT_CAPTURE=1` | content-bearing screens |
+| `AnycastUITests` | XCUITest smoke (05 §6.2); data-dependent steps skip when unseeded. `QACrawlUITests` is additionally gated behind `QA_CRAWL=1` (set by `tool/ui_qa/crawl.sh`) | no (skips) |
 
-The reproducible container is the generator's `db_smoke` bucket (player
-pointer set, queue head cached with in-file progress, far-future `validTill`
-so the stale cleanup keeps the rows — `buildSmoke` in
-`test/fixtures/generate_db_fixtures_test.dart`). An earlier smoke record
-referenced a hand-modified `db_light` container whose steps were never
-recorded and cannot be replayed from the generator output; `db_smoke` exists
-so this cannot recur.
+Screen reference baselines live in
+`AnycastSnapshotTests/__Snapshots__/ScreenBaselineCaptureTests/iOS-<major>/`
+and are re-recorded against the seeded container below with
+`TEST_RUNNER_SNAPSHOT_CAPTURE=1 xcodebuild … test` (a plain `test` run skips
+the suite — the captures overwrite the committed references); M4 compares
+them with the Flutter build per OS — structural comparison, not pixel diffs.
+
+### Manual runs in the simulator
+
+Seed the database with the generator's `db_smoke` bucket (player pointer set,
+queue head cached with in-file progress, far-future `validTill` so the stale
+cleanup keeps the rows — `buildSmoke` in
+`test/fixtures/generate_db_fixtures_test.dart`). The same container drives the
+reference captures, the hosted screen searches and the data-dependent UI
+smoke flows:
 
 ```sh
-# App installed and terminated, then:
+xcodebuild -project Anycast.xcodeproj -scheme Anycast \
+  -destination 'id=<simulator-udid>' -derivedDataPath build/dd build
+xcrun simctl install <udid> build/dd/Build/Products/Debug-iphonesimulator/Anycast.app
+xcrun simctl launch <udid> com.kindjeff.anycast   # creates the data container
 container=$(xcrun simctl get_app_container <udid> com.kindjeff.anycast data)
-mkdir -p "$container/Documents" "$container/Library/Application Support" \
-         "$container/Library/Caches"
-cp test/fixtures/db/db_smoke/anycast.db "$container/Documents/"
-cp -R test/fixtures/db/db_smoke/Library/. "$container/Library/"
-xcrun simctl launch --console-pty <udid> com.kindjeff.anycast -m2-smoke-play local
-# stdout: "[m2-smoke] isPlaying=… position=…ms error=…" — verified run
-# (iPhone 16 Pro simulator, 2026-09-24): "isPlaying=true position=7500ms
-# error=none" — cache hit resuming at 3000 ms, paused row persisted
-# 7812 ms (K24); the hit also refreshes the row's `touched` in the meta DB.
-# If isPlaying=false with "The operation could not be completed", the
-# simulator's audio HAL is wedged — `simctl shutdown` + `boot` and re-seed.
-# The uncached podtrac episode sits LAST in the queue for a manual
-# miss-path run (stream + full-file download) after removing the head rows.
+mkdir -p "$container/Documents" "$container/Library/Application Support" "$container/Library/Caches"
+cp ../test/fixtures/db/db_smoke/anycast.db "$container/Documents/"
+cp -R ../test/fixtures/db/db_smoke/Library/. "$container/Library/"
 ```
+
+Query the live shell from tests with `UIContext`
+(`(UIApplication.shared.delegate as? AppDelegate)?.environment.uiContext`) —
+that is how the snapshot, layout and smoke suites reach the real screens.
 
 ## Conventions
 
