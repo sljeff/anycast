@@ -2,7 +2,7 @@
 
 > 本文是 MV 里程碑的**规格事实源与任务清单**（V0 审计产出，2026-10-01）。
 > 执行主线仍在《00》：MV 位于 M3 与 M4 之间——**M4 的发布门验收对象是 v2**。
-> 设计源：Figma 文件 `anycast-v2.0`——完整链接存本地 `native/.env` 的 `FIGMA_ANYCAST_V2_URL`（gitignored，不入库；不是仓库根 `.env`），主画板 `4:1749`。
+> 设计源：Figma 文件 `anycast-v2.0`——完整链接存 Infisical `/app-config` 的 `FIGMA_ANYCAST_V2_URL`，由 `scripts/bootstrap.sh` 物化到本地 `native/.env`（gitignored，不入库；不是仓库根 `.env`），主画板 `4:1749`。
 > Token 语义源：`lib/design_system/anycast_theme.dart`（Flutter 侧已合并、未发布，自称 "ported from the UIKit source of truth"）。
 
 ## 0. 已拍板决策（2026-10-01）
@@ -365,4 +365,4 @@ share clips（`387:3797`）、saved clip（`377:3785`）、AI summary 块（`965
 
 沿用《00》：行为与基线不符先改基线文档；新决策写入本文对应小节；cream/sand 逐屏改判、探索性功能解禁均需产品拍板后登记。
 
-**私有信息纪律（2026-10-01 增补）**：Figma 链接与 file key 属私有设计源，只存本地 `native/.env` 的 `FIGMA_ANYCAST_V2_URL`（`.gitignore` 的 `*.env` 规则覆盖，永不入库；注意仓库根 `.env` 是另一文件，不含该变量）；禁止写入任何入库内容（代码、注释、文档、提交信息、PR 描述）。后续实施会话需要设计数据时从 `.env` 读取。文档内的 node-id 无访问凭据、离开 file key 无法定位文件，保留作为实施映射索引。
+**私有信息纪律（2026-10-01 增补；2026-10-08 改为 Infisical 物化）**：Figma 链接与 file key 属私有设计源，只存 Infisical `/app-config` 的 `FIGMA_ANYCAST_V2_URL`，由 `scripts/bootstrap.sh` 物化到本地 `native/.env`（`.gitignore` 的 `*.env` 规则覆盖，永不入库；注意仓库根 `.env` 是另一文件，不含该变量）；禁止写入任何入库内容（代码、注释、文档、提交信息、PR 描述）。后续实施会话需要设计数据时从 `native/.env` 读取。文档内的 node-id 无访问凭据、离开 file key 无法定位文件，保留作为实施映射索引。
