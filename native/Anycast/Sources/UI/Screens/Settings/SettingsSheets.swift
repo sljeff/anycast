@@ -62,6 +62,11 @@ final class SettingsOptionSheetViewController: UIViewController {
             config.textProperties.font = Typography.mainText.font()
             cell.contentConfiguration = config
             cell.accessories = option.code == selectedCode ? [.checkmark()] : []
+            // v2 surface token instead of the system insetGrouped gray
+            // (09 audit — same treatment as the settings main list).
+            var background = UIBackgroundConfiguration.clear()
+            background.backgroundColor = Theme.surfaceContainer
+            cell.backgroundConfiguration = background
         }
 
         let dataSource = UICollectionViewDiffableDataSource<Int, Int>(collectionView: collectionView) {

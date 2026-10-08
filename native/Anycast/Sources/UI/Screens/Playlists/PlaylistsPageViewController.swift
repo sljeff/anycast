@@ -1,11 +1,13 @@
 import UIKit
 import AnycastKit
 
-/// Tab 1 (lib/pages/playlists.dart:24-59): one page per playlist, switched
-/// by horizontal swipe ONLY — the Dart Scaffold has a TabBarView but NO
-/// TabBar (03 §10.1: usually the single default list; a visible tab strip
-/// must not be invented here). Hosts the shared MyAppBar treatment
-/// (gradient PLAYLIST title, gear, embedded search, 03 §2.2).
+/// The queue tab (lib/pages/playlists.dart:24-59, IA per 09 §3.4): one
+/// page per playlist, switched by horizontal swipe ONLY — the Dart Scaffold
+/// has a TabBarView but NO TabBar (03 §10.1: usually the single default
+/// list; a visible tab strip must not be invented here). The v2 header
+/// (09 §3.8) replaces the v1 AppBar; the embedded search field retired
+/// with the search circle in the pill bar. The full QueueView v2 reskin
+/// (archive cover strip + queue cards, 1020:7525) is V3 batch-2 scope.
 @MainActor
 final class PlaylistsPageViewController: UIViewController {
 
@@ -16,8 +18,7 @@ final class PlaylistsPageViewController: UIViewController {
     private var pageController: UIPageViewController!
     private var pages: [Int64: PlaylistEpisodeListViewController] = [:]
 
-    private let searchField = UITextField()
-    private let cancelButton = UIButton(type: .system)
+    private let header = HeaderView()
 
     init(context: UIContext) {
         self.context = context
@@ -37,133 +38,21 @@ final class PlaylistsPageViewController: UIViewController {
         Task { await reloadPlaylists() }
     }
 
-    // MARK: - AppBar (03 §2.2 — the same structure every tab page hosts)
+    // MARK: - v2 header (09 §3.8)
 
     private func buildHeader() {
-        let title = GradientTextLabel()
-        title.text = "PLAYLIST"
-
-        let gear = UIButton(type: .custom)
-        gear.setImage(AppIcons.settings, for: .normal)
-        gear.tintColor = Theme.secondaryText
-        gear.backgroundColor = Theme.cardBackground
-        gear.layer.cornerRadius = 18
-        gear.layer.cornerCurve = .continuous
-        gear.isAccessibilityElement = true
-        gear.accessibilityLabel = "Settings"
-        gear.addAction(
-            UIAction { [weak self] _ in self?.openSettings() },
-            for: .touchUpInside
-        )
-        gear.widthAnchor.constraint(equalToConstant: 36).isActive = true
-        gear.heightAnchor.constraint(equalToConstant: 36).isActive = true
-
-        let titleRow = UIStackView(arrangedSubviews: [title, gear])
-        titleRow.axis = .horizontal
-        titleRow.alignment = .center
-        titleRow.spacing = 12
-
-        buildSearchRow()
-
-        // The green Cancel sits BESIDE the field and collapses until text
-        // exists (appbar.dart:120-143).
-        cancelButton.isHidden = true
-        let searchRow = UIStackView(arrangedSubviews: [searchField, cancelButton])
-        searchRow.axis = .horizontal
-        searchRow.alignment = .center
-        searchRow.spacing = 12
-
-        let header = UIStackView(arrangedSubviews: [titleRow, searchRow])
-        header.axis = .vertical
-        header.spacing = 12
+        header.configure(HeaderView.Configuration(title: "queue"))
+        header.onSettings = { [weak self] in
+            guard let self else { return }
+            AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
+        }
         header.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(header)
-
         NSLayoutConstraint.activate([
-            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
         ])
-    }
-
-    private func buildSearchRow() {
-        let icon = UIImageView(image: AppIcons.search)
-        icon.tintColor = Theme.secondaryText
-        icon.contentMode = .center
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        let iconBox = UIView()
-        iconBox.translatesAutoresizingMaskIntoConstraints = false
-        iconBox.addSubview(icon)
-        NSLayoutConstraint.activate([
-            iconBox.widthAnchor.constraint(equalToConstant: 44),
-            iconBox.heightAnchor.constraint(equalToConstant: 24),
-
-            icon.leadingAnchor.constraint(equalTo: iconBox.leadingAnchor, constant: 14),
-            icon.centerYAnchor.constraint(equalTo: iconBox.centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 24),
-            icon.heightAnchor.constraint(equalToConstant: 24),
-        ])
-
-        searchField.leftView = iconBox
-        searchField.leftViewMode = .always
-        searchField.placeholder = "Shows, episodes, and more"
-        searchField.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 16)
-        )
-        searchField.adjustsFontForContentSizeCategory = true
-        searchField.textColor = Theme.primaryLightMax
-        searchField.attributedPlaceholder = NSAttributedString(
-            string: searchField.placeholder ?? "",
-            attributes: [.foregroundColor: Theme.hintGray]
-        )
-        searchField.backgroundColor = Theme.cardBackground
-        searchField.layer.cornerRadius = 12
-        searchField.layer.cornerCurve = .continuous
-        searchField.returnKeyType = .search
-        searchField.autocorrectionType = .no
-        searchField.autocapitalizationType = .none
-        searchField.clearButtonMode = .whileEditing
-        searchField.translatesAutoresizingMaskIntoConstraints = false
-        // Floor, not a fixed height: the body font scales with Dynamic Type
-        // and a required == 56 clips the text at accessibility sizes.
-        searchField.heightAnchor.constraint(greaterThanOrEqualToConstant: 56).isActive = true
-        searchField.addTarget(self, action: #selector(searchEditingChanged), for: .editingChanged)
-        searchField.addTarget(self, action: #selector(searchSubmitted), for: .primaryActionTriggered)
-
-        cancelButton.setTitle("Cancel", for: .normal)
-        cancelButton.setTitleColor(Theme.primary, for: .normal)
-        cancelButton.titleLabel?.font = Typography.mainText.font()
-        cancelButton.addAction(
-            UIAction { [weak self] _ in self?.cancelSearch() },
-            for: .touchUpInside
-        )
-        cancelButton.translatesAutoresizingMaskIntoConstraints = false
-        cancelButton.heightAnchor.constraint(equalToConstant: 24).isActive = true
-    }
-
-    @objc private func searchEditingChanged() {
-        cancelButton.isHidden = (searchField.text ?? "").isEmpty
-    }
-
-    /// Non-empty submit opens the SearchPage sheet (appbar.dart:97-107).
-    @objc private func searchSubmitted() {
-        let text = (searchField.text ?? "").trimmingCharacters(in: .whitespaces)
-        guard !text.isEmpty else { return }
-        searchField.resignFirstResponder()
-        AppSheets.presentExpand(
-            SearchPageViewController(context: context, searchText: text),
-            from: topMostPresented()
-        )
-    }
-
-    private func cancelSearch() {
-        searchField.text = nil
-        searchEditingChanged()
-        searchField.resignFirstResponder()
-    }
-
-    private func openSettings() {
-        AppSheets.presentExpand(SettingsViewController(context: context), from: topMostPresented())
     }
 
     // MARK: - Swipe-only playlist paging (03 §10.1)
@@ -184,7 +73,7 @@ final class PlaylistsPageViewController: UIViewController {
             pageController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             pageController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             pageController.view.topAnchor.constraint(
-                equalTo: searchField.bottomAnchor, constant: 12
+                equalTo: header.bottomAnchor, constant: Spacing.xs
             ),
             pageController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])

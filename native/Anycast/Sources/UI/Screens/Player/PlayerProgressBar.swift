@@ -103,9 +103,13 @@ final class PlayerProgressBarView: UIControl {
     init() {
         super.init(frame: CGRect(x: 0, y: 0, width: 320, height: Self.barHeight + 20))
 
-        trackLayer.fillColor = Theme.cardBackground.cgColor
+        // Static player-page tokens (trait-independent): the player stays
+        // warm-dark in both appearances (09 §2.1), and CAShapeLayer fill
+        // colors snapshot `.cgColor` at config time — a dynamic color here
+        // would freeze whatever trait was ambient.
+        trackLayer.fillColor = Theme.playerBackground.cgColor
         bufferedLayer.fillColor = UIColor.white.withAlphaComponent(0.05).cgColor
-        playedLayer.fillColor = UIColor.white.cgColor
+        playedLayer.fillColor = Theme.playerText.cgColor
         barContainer.clipsToBounds = true
         barContainer.layer.cornerRadius = Self.barHeight / 2
         // The control tracks touches itself; the container is pure chrome.

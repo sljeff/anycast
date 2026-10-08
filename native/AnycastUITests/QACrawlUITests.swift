@@ -57,7 +57,7 @@ final class QACrawlUITests: XCTestCase {
     private var skippedStates = Set<String>()
     private var audit = true            // asserts + findings→failures
     private var probesEnabled = true
-    private var currentTab = "Podcast"  // for probe recovery
+    private var currentTab = "tab-0"    // pill chip id, for probe recovery
     private var probeBudget = 0
 
     // MARK: - XCTest plumbing
@@ -538,7 +538,7 @@ final class QACrawlUITests: XCTestCase {
                 _ = settle(timeout: 0.8)
                 app.swipeDown()
             case 3:
-                let tab = app.tabBars.buttons[currentTab]
+                let tab = app.buttons[currentTab]
                 if tab.exists { tapElement(tab) }
             default:
                 _ = reenter?()
@@ -553,7 +553,7 @@ final class QACrawlUITests: XCTestCase {
     private func relaunchToShell() {
         app.terminate()
         app.launch()
-        _ = app.tabBars.firstMatch.waitForExistence(timeout: 15)
+        _ = app.buttons["tab-0"].waitForExistence(timeout: 15)
         _ = settle(timeout: 2)
     }
 
@@ -682,8 +682,8 @@ final class QACrawlUITests: XCTestCase {
 
     private func ensureSettingsOpen() -> Bool {
         if settingsRowsVisible() { return true }
-        currentTab = "Discover"
-        _ = tap(app.tabBars.buttons["Discover"], "Discover tab")
+        currentTab = "tab-0"
+        _ = tap(app.buttons["tab-0"], "Inbox chip")
         guard tap(app.buttons["Settings"].firstMatch, "settings gear") else { return false }
         return waitUntil(timeout: 8) { self.settingsRowsVisible() }
     }
@@ -700,22 +700,23 @@ final class QACrawlUITests: XCTestCase {
     private func ensureDetailOpen() -> Bool {
         if app.buttons["Share episode"].exists { return true }
         closeSheet()
-        let cover = app.buttons.matching(
-            NSPredicate(format: "label == 'Episode details'")).firstMatch
-        guard cover.waitForExistence(timeout: 4) else { return false }
-        tapElement(cover)
+        // v2 inbox cards are located by their `more` menu button; the whole
+        // card opens Detail (09 §10 批次1).
+        let card = app.collectionViews.cells
+            .containing(.button, identifier: "inbox-card-more")
+            .firstMatch
+        guard card.waitForExistence(timeout: 4) else { return false }
+        tapElement(card)
         return app.buttons["Share episode"].waitForExistence(timeout: 6)
     }
 
-    /// Inbox rows carry 'Episode details' cover buttons; the subscriptions
-    /// grid does not — that is the discriminator for which page we are on.
+    /// Subscriptions live on the library tab since the v2 IA flip
+    /// (09 §3.3) — tap the chip, then the subscriptions collection must
+    /// show rows.
     private func ensureSubscriptionsPage() -> Bool {
         closeSheet()
-        if app.buttons.matching(NSPredicate(format: "label == 'Episode details'")).count > 0 {
-            let strip = app.staticTexts["Subscriptions"]
-            guard strip.exists else { return false }
-            tapElement(strip)
-        }
+        currentTab = "tab-2"
+        _ = tap(app.buttons["tab-2"], "library chip")
         return app.collectionViews.firstMatch.waitForExistence(timeout: 4)
             && app.collectionViews.firstMatch.cells.count > 0
     }
@@ -776,9 +777,9 @@ final class QACrawlUITests: XCTestCase {
     // swiftlint:disable:next function_body_length
     private func runCrawl() {
         app.launch()
-        guard app.tabBars.firstMatch.waitForExistence(timeout: 20) else {
+        guard app.buttons["tab-0"].waitForExistence(timeout: 20) else {
             addFinding("nav", "nav-fail", "P0", "tab bar", "shell never installed")
-            if audit { XCTFail("tab bar did not install — app did not reach the shell") }
+            if audit { XCTFail("pill tab bar did not install — app did not reach the shell") }
             _ = captureState("no-shell", settleTimeout: 1)
             flushFindings()
             return
@@ -787,20 +788,24 @@ final class QACrawlUITests: XCTestCase {
         let steps: [Checkpoint] = [
             Checkpoint(state: "inbox",
                        action: { _ in true },
-                       required: ["Settings", "Inbox", "Subscriptions"],
+                       // v2 IA: the inner Subscriptions strip is gone; the
+                       // pill chips + search circle are the shell markers.
+                       required: ["Settings", "Inbox", "library", "search"],
                        probe: true, settle: 5),
 
             Checkpoint(state: "inbox-expanded",
                        action: { s in
-                           let cover = s.app.descendants(matching: .any)
-                               .matching(NSPredicate(format: "label == 'Episode details'"))
+                           // The v2 card surfaces its actions through the
+                           // long-press context menu (09 §7a-C1) — the v1
+                           // strip and its offset-tap target are retired.
+                           let card = s.app.collectionViews.cells
+                               .containing(.button, identifier: "inbox-card-more")
                                .firstMatch
-                           guard cover.waitForExistence(timeout: 5) else {
+                           guard card.waitForExistence(timeout: 5) else {
                                s.markSkipped("inbox-expanded", "inbox cards", "needs db_smoke")
                                return false
                            }
-                           cover.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                               .withOffset(CGVector(dx: 220, dy: 30)).tap()
+                           card.press(forDuration: 1.2)
                            return s.app.buttons["Add to playlist"].waitForExistence(timeout: 4)
                        },
                        required: ["Add to playlist", "Remove from inbox"],
@@ -810,19 +815,20 @@ final class QACrawlUITests: XCTestCase {
                        action: { s in
                            // Cell subtrees merge into the cell's accessibility
                            // element, so the description identifier is not
-                           // queryable — instead try covers until a Detail
-                           // sheet renders a real show-notes body (up to 3
-                           // visible cards). The sheet grabber tap closes.
-                           let covers = s.app.buttons.matching(
-                               NSPredicate(format: "label == 'Episode details'"))
-                           guard covers.count > 0 else {
+                           // queryable — instead try cards (located by the
+                           // `more` button) until a Detail sheet renders a
+                           // real show-notes body (up to 3 visible cards).
+                           // The sheet grabber tap closes.
+                           let cards = s.app.collectionViews.cells
+                               .containing(.button, identifier: "inbox-card-more")
+                           guard cards.count > 0 else {
                                s.markSkipped("detail", "inbox cards", "needs db_smoke")
                                return false
                            }
-                           let tries = min(3, covers.count)
+                           let tries = min(3, cards.count)
                            for index in 0..<tries {
-                               let cover = covers.element(boundBy: index)
-                               s.tapElement(cover)
+                               let card = cards.element(boundBy: index)
+                               s.tapElement(card)
                                guard s.app.buttons["Share episode"]
                                        .waitForExistence(timeout: 6) else { continue }
                                if s.detailBodyPopulated() { return true }
@@ -857,9 +863,8 @@ final class QACrawlUITests: XCTestCase {
             Checkpoint(state: "subscriptions",
                        action: { s in
                            s.closeSheet(times: 2)  // channel, then detail
-                           let strip = s.app.staticTexts["Subscriptions"]
-                           guard strip.waitForExistence(timeout: 5) else { return false }
-                           s.tapElement(strip)
+                           guard s.tap(s.app.buttons["tab-2"], "library chip") else { return false }
+                           s.currentTab = "tab-2"
                            return s.app.collectionViews.firstMatch.waitForExistence(timeout: 4)
                        },
                        required: [],
@@ -884,8 +889,9 @@ final class QACrawlUITests: XCTestCase {
             Checkpoint(state: "search",
                        action: { s in
                            s.closeSheet()
-                           s.currentTab = "Podcast"
-                           let field = s.app.textFields.firstMatch
+                           s.currentTab = "tab-0"
+                           guard s.tap(s.app.buttons["tab-search"], "search circle") else { return false }
+                           let field = s.app.textFields["search-entry-field"]
                            guard field.waitForExistence(timeout: 5) else { return false }
                            s.tapElement(field)
                            // Flutter's engine field does not expose keyboard
@@ -926,8 +932,8 @@ final class QACrawlUITests: XCTestCase {
             Checkpoint(state: "playlists",
                        action: { s in
                            s.closeSheet()
-                           s.currentTab = "Playlist"
-                           return s.tap(s.app.tabBars.buttons["Playlist"], "Playlist tab")
+                           s.currentTab = "tab-1"
+                           return s.tap(s.app.buttons["tab-1"], "queue chip")
                        },
                        required: ["Settings"],
                        probe: true, settle: 3),
@@ -992,18 +998,18 @@ final class QACrawlUITests: XCTestCase {
                        required: ["Continuous play"],
                        probe: true, settle: 3),
 
-            Checkpoint(state: "discover",
+            Checkpoint(state: "library",
                        action: { s in
                            s.closeSheet()
-                           s.currentTab = "Discover"
-                           return s.tap(s.app.tabBars.buttons["Discover"], "Discover tab")
+                           s.currentTab = "tab-2"
+                           return s.tap(s.app.buttons["tab-2"], "library chip")
                        },
                        required: ["Settings"],
                        probe: true, settle: 3),
 
             Checkpoint(state: "settings",
                        action: { s in
-                           s.currentTab = "Discover"
+                           s.currentTab = "tab-0"
                            guard s.tap(s.app.buttons["Settings"].firstMatch, "settings gear") else {
                                return false
                            }

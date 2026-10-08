@@ -174,14 +174,23 @@ final class SettingsViewController: UIViewController {
         let dataSource = UICollectionViewDiffableDataSource<Int, SettingsPageModel.Row>(
             collectionView: collectionView
         ) { collectionView, indexPath, row in
+            let cell: UICollectionViewListCell
             if row == .enableTranslation {
-                return collectionView.dequeueConfiguredReusableCell(
+                cell = collectionView.dequeueConfiguredReusableCell(
                     using: switchRegistration, for: indexPath, item: row
                 )
+            } else {
+                cell = collectionView.dequeueConfiguredReusableCell(
+                    using: rowRegistration, for: indexPath, item: row
+                )
             }
-            return collectionView.dequeueConfiguredReusableCell(
-                using: rowRegistration, for: indexPath, item: row
-            )
+            // v2 surface token instead of the system insetGrouped gray —
+            // the default material is not part of the palette and halved
+            // the card/background contrast step (09 audit).
+            var background = UIBackgroundConfiguration.clear()
+            background.backgroundColor = Theme.surfaceContainer
+            cell.backgroundConfiguration = background
+            return cell
         }
         dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
             collectionView.dequeueConfiguredReusableSupplementary(

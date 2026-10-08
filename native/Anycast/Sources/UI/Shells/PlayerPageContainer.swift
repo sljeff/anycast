@@ -203,10 +203,11 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         super.viewDidLoad()
         Theme.installDarkBase(on: view)
 
+        let gradientTraits = UITraitCollection(userInterfaceStyle: .dark)
         gradientLayer.colors = [
             Theme.paletteFallback.cgColor,
-            Theme.primaryBackgroundDark.cgColor,
-            Theme.primaryBackgroundDark.cgColor,
+            Theme.primaryBackgroundDark.resolvedColor(with: gradientTraits).cgColor,
+            Theme.primaryBackgroundDark.resolvedColor(with: gradientTraits).cgColor,
         ]
         gradientLayer.locations = [0, 0.5, 1]
         view.layer.insertSublayer(gradientLayer, at: 0)
@@ -349,10 +350,17 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
     }
 
     private func applyGradient(_ dominant: UIColor) {
+        // The trailing stops use a DYNAMIC semantic token: resolving with
+        // explicit dark traits avoids the CGColor freeze where the Task
+        // context resolves the Light variant (#F9F9F8) and washes the
+        // player's dark text out (09 §9a; the player stack is pinned
+        // warm-dark by design, 09 §2.1). PlayerProgressBar follows the
+        // same pattern.
+        let dark = UITraitCollection(userInterfaceStyle: .dark)
         gradientLayer.colors = [
             dominant.cgColor,
-            Theme.primaryBackgroundDark.cgColor,
-            Theme.primaryBackgroundDark.cgColor,
+            Theme.primaryBackgroundDark.resolvedColor(with: dark).cgColor,
+            Theme.primaryBackgroundDark.resolvedColor(with: dark).cgColor,
         ]
     }
 }

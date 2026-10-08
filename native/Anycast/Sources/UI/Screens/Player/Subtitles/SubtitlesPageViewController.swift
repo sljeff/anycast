@@ -151,7 +151,7 @@ final class SubtitlesPageViewController: UIViewController {
     // MARK: - Chrome construction
 
     private func buildChrome() {
-        container.backgroundColor = UIColor.black.withAlphaComponent(0.32)
+        container.backgroundColor = Theme.transcriptSurface
         container.layer.borderColor = Theme.primaryLightMax.withAlphaComponent(0.12).cgColor
         container.layer.borderWidth = 1
         container.layer.cornerRadius = 8

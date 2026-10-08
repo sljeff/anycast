@@ -94,11 +94,19 @@ struct ChannelFoldGeometry: Equatable {
     }
 
     /// UIColor form of the same blend, over the app's page background.
-    static func blendOverBackground(_ dominant: UIColor) -> UIColor {
+    /// Both colors resolve against explicit dark traits: the channel page
+    /// is pinned dark, and `getRed` on a dynamic token otherwise resolves
+    /// whatever traits the caller carries — a light-context resolve washed
+    /// the pinned header into a pale band with unreadable text (09 §9a).
+    static func blendOverBackground(
+        _ dominant: UIColor,
+        traits: UITraitCollection = UITraitCollection(userInterfaceStyle: .dark)
+    ) -> UIColor {
         var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-        dominant.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        dominant.resolvedColor(with: traits).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
         var bgRed: CGFloat = 0, bgGreen: CGFloat = 0, bgBlue: CGFloat = 0, bgAlpha: CGFloat = 0
-        Theme.primaryBackgroundDark.getRed(&bgRed, green: &bgGreen, blue: &bgBlue, alpha: &bgAlpha)
+        Theme.primaryBackgroundDark.resolvedColor(with: traits)
+            .getRed(&bgRed, green: &bgGreen, blue: &bgBlue, alpha: &bgAlpha)
         return UIColor(
             red: red * 0.3 + bgRed * 0.7,
             green: green * 0.3 + bgGreen * 0.7,

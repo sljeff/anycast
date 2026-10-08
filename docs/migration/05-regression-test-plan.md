@@ -336,11 +336,11 @@ tool/golden_export.dart
 
 | # | 屏幕 | 必备状态 |
 |---|---|---|
-| S1 | Inbox 有数据 / 空态（ImportBlock） | 两种 |
-| S2 | Inbox 卡片展开态（3 按钮） | |
+| S1 | Inbox 有数据 / 空态（ImportBlock）——**v2 批次1 起卡为 v2 形态（09 §10 批次1 Inbox 半场注记，03 §2.3 v2 裁定）：滚动流 chrome + 文字主导卡 + swipe/more，V4 重录按新形态** | 两种 |
+| S2 | Inbox 卡片展开态（3 按钮）——**v2 起退役（09 §7a-C1：Inbox 无展开态，改长按菜单；V4 重录时删除本基线）** | |
 | S3 | Subscriptions 列表 / 空态 | |
 | S4 | Channel 展开头 / 折叠头（滚动后）/ 订阅按钮三态 | 三种 |
-| S5 | Detail sheet（0.7 高） | |
+| S5 | Detail sheet（0.7 高）——**v2 批次1 起整屏 v2 形态（09 §10 Detail modal v2 注记，03 §1.3 v2 裁定）：hero artwork + 磨砂面板 + 两钮播放条，V4 重录按新形态** | |
 | S6 | 播放列表（含进度背景条卡、下载三态） | |
 | S7 | 历史弹窗 / 空 | |
 | S8 | Discover 分类 Tab / Network Error / loading | |
@@ -383,11 +383,12 @@ tool/golden_export.dart
 - [ ] 竖屏锁定（iPad 上也允许竖屏两个方向）
 
 **卡片与列表（P0）**
-- [ ] 整卡点按展开按钮条（200ms，高 60），同列表互斥，再点收起
-- [ ] 封面点按开 Detail（0.7 高 sheet，内滚联动缩放 0.7→0.6）
+- [ ] 整卡点按展开按钮条（200ms，高 60），同列表互斥，再点收起（**v2 起 Inbox 不适用**——09 §7a-C1：Inbox 整卡点按开 Detail + 长按 context menu；Channel/Search/播放列表/历史卡照旧）
+- [ ] **v2 Inbox 增补（09 §7a-C1 批次1 补齐）**：卡面 more(…) 按钮 = UIMenu 下拉三动作（Play / Add to playlist / Remove from inbox）；trailing swipe 左滑露出 Remove（destructive 红），执行后卡离场；header/分类条/提示卡随列表滚动（滚动流 chrome），Tab0 回顶逻辑不变
+- [ ] 封面点按开 Detail（0.7 高 sheet，内滚联动缩放 0.7→0.6）；v2 起 Inbox 整卡点按同开 Detail（09 §7a-C1）
 - [ ] Detail 内点频道名：关当前开 Channel
-- [ ] Inbox 三按钮：播放（加顶+移出收件箱+开播）、加列表（**飞入动画 600ms** 后加入+移出）、移除
-- [ ] 加列表飞入动画的起点/终点/缩小/淡出节奏（4 个触发点：Inbox/Channel/ChannelSearch/Search）
+- [ ] Inbox 三按钮：播放（加顶+移出收件箱+开播）、加列表（**飞入动画 600ms** 后加入+移出）、移除（**v2 起经长按 context menu 触发**，动作语义不变，09 §7a-C1）
+- [ ] 加列表飞入动画的起点/终点/缩小/淡出节奏（4 个触发点：Inbox/Channel/ChannelSearch/Search；v2 起 Inbox 触发点为长按菜单项，起点=卡片中心）
 
 **播放列表拖拽（P0，最高风险手势）**
 - [ ] 长按 ~150ms 后整卡可拖（无把手提示）

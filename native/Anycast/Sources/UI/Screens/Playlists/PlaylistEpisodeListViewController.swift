@@ -202,7 +202,9 @@ final class PlaylistEpisodeListViewController: UIViewController {
     }
 
     @objc private func exploreTapped() {
-        context.tabs.select(2)
+        // v2 09 §3.5: Discover retired — discovery lives behind the search
+        // circle (was Get.find<HomeTabController>().onItemTapped(2)).
+        AppSheets.presentForm(SearchEntryViewController(context: context), from: topMostPresented())
     }
 
     // MARK: - Layout (ReorderableListView padding: top 12 / bottom 64)

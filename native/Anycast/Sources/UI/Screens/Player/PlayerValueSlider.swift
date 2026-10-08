@@ -228,9 +228,15 @@ final class PlayerValueSlider: UIControl {
             case .allWhite:
                 dot.fillColor = UIColor.white.cgColor
             case .whiteUpToActive:
+                // `cardBackground` is a dynamic token; the slider lives on
+                // the pinned-dark player settings page, so resolve with
+                // explicit dark traits — a bare `.cgColor` froze the Light
+                // variant and lit the "invisible" inactive dots up as
+                // pale specks (09 §9a).
+                let dark = UITraitCollection(userInterfaceStyle: .dark)
                 dot.fillColor = index <= selectedIndex
                     ? UIColor.white.cgColor
-                    : Theme.cardBackground.cgColor
+                    : Theme.cardBackground.resolvedColor(with: dark).cgColor
             }
         }
     }

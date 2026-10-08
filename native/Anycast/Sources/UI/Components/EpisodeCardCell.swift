@@ -63,16 +63,21 @@ struct EpisodeCardContent {
     var descriptionPlainText: String?
 }
 
-/// The generic episode card (lib/widgets/card.dart:30-297, 03 §2.11): a
-/// rounded-20 bordered 100pt row with an 80×80 rounded-16 cover (tap →
-/// Detail), single-line title, channel name (max 114pt) + duration/relative
-/// time, and a 2-line htmlToText description. Whole-card tap toggles the
-/// 0↔60 action strip (200 ms easeInOut); playlist cards add the progress
-/// backdrop and the download indicator.
+/// The generic episode card (lib/widgets/card.dart:30-297, 03 §2.11; v2
+/// geometry per 09 §5: surface card, radius16, 16pt padding/gap): an
+/// 112pt row with an 80×80 rounded-18 cover (tap → Detail), single-line
+/// title, channel name (max 114pt) + duration/relative time, and a 2-line
+/// htmlToText description. Whole-card tap toggles the 0↔60 action strip
+/// (200 ms easeInOut); playlist cards add the progress backdrop and the
+/// download indicator. Lists that took the native-first path (09 §7a-C1,
+/// Inbox) render no strip and surface the same actions through the list's
+/// context menu, passing them here as `menuActions` for VoiceOver.
 ///
 /// VoiceOver: the container's children carry the labels, so the card itself
-/// is not an element — the title acts as the strip-toggle button
-/// (accessibilityActivate), otherwise the action strip would be unreachable.
+/// is not an element — the title acts as the card action button
+/// (accessibilityActivate → onCardTap) and carries the menu actions as
+/// accessibility custom actions, so every card action stays reachable
+/// without sight on strip and strip-less lists alike.
 private final class TitleActivatableLabel: UILabel {
     var onActivate: (() -> Void)?
     override func accessibilityActivate() -> Bool {
@@ -84,17 +89,24 @@ private final class TitleActivatableLabel: UILabel {
 final class EpisodeCardCell: UICollectionViewCell {
 
     static let reuseIdentifier = "EpisodeCardCell"
-    static let cardRowHeight: CGFloat = 104   // 80pt cover + 12pt padding ×2
+    static let cardRowHeight: CGFloat = 112   // 80pt cover + 16pt padding ×2 (09 §5)
     static let stripHeight: CGFloat = 60
-    static let spacing: CGFloat = 12          // list row gap (ListView.separated)
+    static let spacing: CGFloat = Spacing.pageH // list row gap (09 §5 gap16)
 
     /// Card cover tap → open the Detail sheet.
     var onCoverTap: (() -> Void)?
     /// Whole-card tap → toggle the action strip (route through the list's
-    /// CardExpandCoordinator).
+    /// CardExpandCoordinator); strip-less lists point this at the card's
+    /// primary action instead (Inbox: open the Detail sheet, 09 §7a-C1).
     var onCardTap: (() -> Void)?
     /// Tap on the not-downloaded indicator → start download.
     var onDownloadTap: (() -> Void)?
+    /// The actions a strip-less list surfaces through its context menu
+    /// (native-first, 09 §7a-C1). Rendering stays with the list — the cell
+    /// only mirrors them as VoiceOver custom actions on the title.
+    var menuActions: [EpisodeCardAction] = [] {
+        didSet { applyMenuActions() }
+    }
 
     private let cardContainer = UIView()
     private let coverView = UIImageView()
@@ -134,6 +146,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         onCoverTap = nil
         onCardTap = nil
         onDownloadTap = nil
+        menuActions = []
     }
 
     // MARK: - Configure
@@ -224,11 +237,12 @@ final class EpisodeCardCell: UICollectionViewCell {
         stack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stack)
 
-        // Card row (rounded 20, bordered, 12pt inner padding).
+        // Card row (v2: surface card, radius16, hairline outline; 16pt inner
+        // padding — 09 §5 inbox card spec).
         cardContainer.backgroundColor = Theme.cardBackground
         cardContainer.layer.borderColor = Theme.cardOutline.cgColor
         cardContainer.layer.borderWidth = 1
-        cardContainer.layer.cornerRadius = 20
+        cardContainer.layer.cornerRadius = Radius.md
         cardContainer.layer.cornerCurve = .continuous
         // The 4pt progress backdrop spans the card's full width with
         // square corners; without clipping it runs straight through the
@@ -247,7 +261,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         coverView.isUserInteractionEnabled = true
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = 16
+        coverView.layer.cornerRadius = Radius.artwork
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = Theme.primaryBackground
         coverView.translatesAutoresizingMaskIntoConstraints = false
@@ -263,7 +277,8 @@ final class EpisodeCardCell: UICollectionViewCell {
         titleLabel.textColor = Theme.primaryLightMax
         titleLabel.numberOfLines = 1
         titleLabel.adjustsFontForContentSizeCategory = true
-        // The strip toggle for VoiceOver (sighted users tap the whole card).
+        // The card action for VoiceOver (sighted users tap the whole card);
+        // strip-less lists also hang the menu actions off it below.
         titleLabel.isAccessibilityElement = true
         titleLabel.accessibilityTraits = [.button]
         titleLabel.onActivate = { [weak self] in self?.onCardTap?() }
@@ -368,7 +383,7 @@ final class EpisodeCardCell: UICollectionViewCell {
             stack.topAnchor.constraint(equalTo: contentView.topAnchor),
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-            // 104 pt is the minimum (80pt cover + 12pt padding ×2); the card
+            // 112 pt is the minimum (80pt cover + 16pt padding ×2); the card
             // self-sizes taller when the scaled fonts demand it (hosts use
             // .estimated heights). The cover pins to the top only, so the
             // extra space at accessibility sizes goes to the text column.
@@ -377,15 +392,15 @@ final class EpisodeCardCell: UICollectionViewCell {
             cardContainer.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
             cardContainer.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
 
-            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: 12),
-            coverView.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: 12),
+            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.pageH),
+            coverView.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.pageH),
             coverView.widthAnchor.constraint(equalToConstant: 80),
             coverView.heightAnchor.constraint(equalToConstant: 80),
 
-            textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: 12),
-            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -12),
-            textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: 12),
-            textColumn.bottomAnchor.constraint(lessThanOrEqualTo: cardContainer.bottomAnchor, constant: -12),
+            textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.pageH),
+            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.pageH),
+            textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.pageH),
+            textColumn.bottomAnchor.constraint(lessThanOrEqualTo: cardContainer.bottomAnchor, constant: -Spacing.pageH),
             // == the cover height at the default size (identical layout);
             // grows with Dynamic Type where the required equality used to
             // clip the description at accessibility sizes.
@@ -433,6 +448,18 @@ final class EpisodeCardCell: UICollectionViewCell {
     }
 
     // MARK: - Actions
+
+    /// Mirrors `menuActions` onto the title as accessibility custom actions
+    /// — the VoiceOver equivalent of the context menu (strip-less lists,
+    /// 09 §7a-C1). Strip lists pass nothing and keep their strip buttons.
+    private func applyMenuActions() {
+        titleLabel.accessibilityCustomActions = menuActions.map { action in
+            UIAccessibilityCustomAction(name: action.accessibilityLabel) { _ in
+                action.handler()
+                return true
+            }
+        }
+    }
 
     @objc private func cardTapped() {
         onCardTap?()

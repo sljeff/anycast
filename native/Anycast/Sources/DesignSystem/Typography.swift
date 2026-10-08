@@ -179,3 +179,84 @@ extension Typography.Style {
     static let htmlError = Typography.htmlError
     static let htmlBody = Typography.htmlBody
 }
+
+/// Anycast 2.0 text styles (docs/migration/09 §2.4) — the system face (the
+/// Figma file's Inter is a stand-in for the platform font; the Flutter port
+/// likewise uses `.AppleSystemUIFont`) with the v2 size/weight/line-height
+/// scale. New v2 screens consume these; the v1 `Style` statics above retire
+/// per-screen during the V3 migration.
+nonisolated enum TypographyV2 {
+
+    struct Style {
+        let size: CGFloat
+        /// Design line height; applied via the paragraph-style attribute so
+        /// multiline labels honor it (single-line labels can ignore it).
+        let lineHeight: CGFloat
+        let weight: UIFont.Weight
+        let color: UIColor
+        let scalingTextStyle: UIFont.TextStyle
+
+        func font(traits: UITraitCollection? = nil) -> UIFont {
+            let base = UIFont.systemFont(ofSize: size, weight: weight)
+            let metrics = UIFontMetrics(forTextStyle: scalingTextStyle)
+            if let traits {
+                return metrics.scaledFont(for: base, compatibleWith: traits)
+            }
+            return metrics.scaledFont(for: base)
+        }
+
+        /// Attributed-string attributes covering font, line height and color.
+        func attributes(traits: UITraitCollection? = nil) -> [NSAttributedString.Key: Any] {
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.minimumLineHeight = lineHeight
+            paragraph.maximumLineHeight = lineHeight
+            return [
+                .font: font(traits: traits),
+                .paragraphStyle: paragraph.copy(),
+                .foregroundColor: color,
+            ]
+        }
+    }
+
+    static let displayLarge = Style(size: 48, lineHeight: 48, weight: .black, color: Theme.onSurface, scalingTextStyle: .largeTitle)
+    static let displayMedium = Style(size: 34, lineHeight: 41, weight: .regular, color: Theme.onSurface, scalingTextStyle: .largeTitle)
+    static let displaySmall = Style(size: 28, lineHeight: 34, weight: .regular, color: Theme.onSurface, scalingTextStyle: .title1)
+    static let headlineLarge = Style(size: 28, lineHeight: 34, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .title1)
+    static let headlineMedium = Style(size: 22, lineHeight: 28, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .title2)
+    static let headlineSmall = Style(size: 17, lineHeight: 22, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .headline)
+    static let titleLarge = Style(size: 20, lineHeight: 25, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .title2)
+    static let titleMedium = Style(size: 16, lineHeight: 21, weight: .medium, color: Theme.onSurface, scalingTextStyle: .body)
+    static let titleSmall = Style(size: 15, lineHeight: 20, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .subheadline)
+    static let bodyLarge = Style(size: 17, lineHeight: 22, weight: .regular, color: Theme.onSurface, scalingTextStyle: .body)
+    static let bodyMedium = Style(size: 15, lineHeight: 20, weight: .regular, color: Theme.onSurface, scalingTextStyle: .subheadline)
+    static let bodySmall = Style(size: 13, lineHeight: 18, weight: .regular, color: Theme.onSurface, scalingTextStyle: .footnote)
+    static let labelLarge = Style(size: 17, lineHeight: 22, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .body)
+    static let labelMedium = Style(size: 12, lineHeight: 16, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .caption1)
+    static let labelSmall = Style(size: 11, lineHeight: 13, weight: .medium, color: Theme.onSurface, scalingTextStyle: .caption2)
+
+    /// All v2 styles, for tests and enumerations.
+    static let allStyles: [Style] = [
+        displayLarge, displayMedium, displaySmall, headlineLarge, headlineMedium,
+        headlineSmall, titleLarge, titleMedium, titleSmall, bodyLarge, bodyMedium,
+        bodySmall, labelLarge, labelMedium, labelSmall,
+    ]
+}
+
+extension TypographyV2.Style {
+    // Member-style access (`style: TypographyV2.Style = .headlineSmall`).
+    static let displayLarge = TypographyV2.displayLarge
+    static let displayMedium = TypographyV2.displayMedium
+    static let displaySmall = TypographyV2.displaySmall
+    static let headlineLarge = TypographyV2.headlineLarge
+    static let headlineMedium = TypographyV2.headlineMedium
+    static let headlineSmall = TypographyV2.headlineSmall
+    static let titleLarge = TypographyV2.titleLarge
+    static let titleMedium = TypographyV2.titleMedium
+    static let titleSmall = TypographyV2.titleSmall
+    static let bodyLarge = TypographyV2.bodyLarge
+    static let bodyMedium = TypographyV2.bodyMedium
+    static let bodySmall = TypographyV2.bodySmall
+    static let labelLarge = TypographyV2.labelLarge
+    static let labelMedium = TypographyV2.labelMedium
+    static let labelSmall = TypographyV2.labelSmall
+}

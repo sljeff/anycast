@@ -90,7 +90,10 @@ final class ChannelViewController: UIViewController {
         }
         collectionView.translatesAutoresizingMaskIntoConstraints = false
 
-        let playerBar = context.makePlayerBar()
+        // The v2 capsule mini player (surface 80% pill, round cover, no
+        // time row) — the page previously kept the v1 `.standalone`
+        // full-bleed bar, clashing with the shell's capsule language.
+        let playerBar = context.makePlayerBar(style: .capsule)
         playerBar.translatesAutoresizingMaskIntoConstraints = false
         let height = playerBar.heightAnchor.constraint(equalToConstant: 58)
 
@@ -184,9 +187,13 @@ final class ChannelViewController: UIViewController {
             collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: playerBar.topAnchor),
 
-            playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            playerBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            // Floating capsule: page-grid side margins, 16 pt clear of the
+            // safe-area bottom (the standalone bar used to run full-bleed).
+            playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+            playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            playerBar.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.pageH
+            ),
             playerBarHeight,
 
             episodeListSpinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -573,6 +580,9 @@ final class ChannelHeaderView: UICollectionReusableView {
     var actions: Actions?
 
     private let gradientLayer = CAGradientLayer()
+    /// Dominant color last applied to the header gradient (re-applied on
+    /// trait flips).
+    private var headerDominant: UIColor = ChannelViewModel.playerWarmColor
     private let grabber = SheetGrabberView()
     private let backButton = UIButton(type: .custom)
     private let shareButton = UIButton(type: .custom)
@@ -617,10 +627,7 @@ final class ChannelHeaderView: UICollectionReusableView {
     private func build() {
         layoutMargins = UIEdgeInsets(top: 0, left: 24, bottom: 0, right: 24)
 
-        gradientLayer.colors = [
-            ChannelFoldGeometry.blendOverBackground(ChannelViewModel.playerWarmColor).cgColor,
-            Theme.primaryBackgroundDark.cgColor,
-        ]
+        applyHeaderGradient(dominant: ChannelViewModel.playerWarmColor)
         gradientLayer.startPoint = CGPoint(x: 0.5, y: 0)
         gradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
         layer.insertSublayer(gradientLayer, at: 0)
@@ -814,10 +821,29 @@ final class ChannelHeaderView: UICollectionReusableView {
         subscriptionButton.configure(display: display)
         latestButton.configuration = latestConfiguration(loading: latestEpisodeLoading)
 
+        applyHeaderGradient(dominant: dominant)
+    }
+
+    /// The pinned-header gradient. The bottom stop is a DYNAMIC semantic
+    /// token: `.cgColor` would freeze whatever traits the caller carries —
+    /// built off-window it resolved Light and washed the header into a
+    /// pale band with unreadable text (09 §9a). Resolving with explicit
+    /// dark traits matches the page's pinned style; the layer is refreshed
+    /// on trait flips for the V4 dual-theme flip-over.
+    func applyHeaderGradient(dominant: UIColor) {
+        headerDominant = dominant
+        let dark = UITraitCollection(userInterfaceStyle: .dark)
         gradientLayer.colors = [
             ChannelFoldGeometry.blendOverBackground(dominant).cgColor,
-            Theme.primaryBackgroundDark.cgColor,
+            Theme.primaryBackgroundDark.resolvedColor(with: dark).cgColor,
         ]
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if previousTraitCollection?.hasDifferentColorAppearance(comparedTo: traitCollection) ?? false {
+            applyHeaderGradient(dominant: headerDominant)
+        }
     }
 
     // MARK: Fold (transform/opacity only — 08 §11.2)

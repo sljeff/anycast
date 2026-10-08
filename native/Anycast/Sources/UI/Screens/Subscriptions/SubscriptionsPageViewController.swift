@@ -32,11 +32,19 @@ final class SubscriptionsPageViewController: UIViewController {
                     heightDimension: .estimated(PodcastCardCell.cardHeight)
                 )
             )
-            item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 24)
+            // v2 page margin (16) — same correction as the Inbox list: the
+            // v1 24 pt inset clashed with the 16 pt grid the header and
+            // membership card use above this embedded list.
+            item.contentInsets = NSDirectionalEdgeInsets(
+                top: 0, leading: Spacing.pageH, bottom: 0, trailing: Spacing.pageH
+            )
             let group = NSCollectionLayoutGroup.horizontal(layoutSize: item.layoutSize, subitems: [item])
             let section = NSCollectionLayoutSection(group: group)
             section.interGroupSpacing = PodcastCardCell.spacing
-            section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 64, trailing: 0)
+            // Zero bottom inset (09 §10 决策⑥): same double-counted v1
+            // clearance as the Inbox list — the shell's
+            // additionalSafeAreaInsets owns the chrome avoidance now.
+            section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 0, trailing: 0)
             return section
         }
         self.collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)

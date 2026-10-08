@@ -29,19 +29,27 @@ final class SmokeFlowsUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 20), "tab bar did not install")
-        XCTAssertEqual(tabBar.buttons.count, 3)
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
+        XCTAssertTrue(app.buttons["tab-1"].exists, "queue chip missing")
+        XCTAssertTrue(app.buttons["tab-2"].exists, "library chip missing")
 
-        for tab in ["Playlist", "Discover", "Podcast"] {
-            tabBar.buttons[tab].tap()
-            XCTAssertTrue(tabBar.buttons[tab].isSelected, "\(tab) tab did not become selected")
+        for tab in ["tab-1", "tab-2", "tab-0"] {
+            app.buttons[tab].tap()
+            XCTAssertTrue(app.buttons[tab].isSelected, "\(tab) chip did not become selected")
             // Scroll the tab's first list when it has content (seeded runs);
             // on a bare simulator the empty state has nothing to scroll.
             let list = app.collectionViews.firstMatch
             if list.exists, list.cells.count > 0 {
-                list.swipeUp()
-                list.swipeDown()
+                // Upper-half coordinate drags only: element swipes compute
+                // their press point from the element frame, and with the v2
+                // floating mini player capsule (~y 654-712) the press can
+                // land ON it — its any-direction pan-open quirk (03 §2.9)
+                // then presents the player sheet over the whole shell.
+                let mid = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+                let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
+                let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+                mid.press(forDuration: 0.05, thenDragTo: upper)
+                upper.press(forDuration: 0.05, thenDragTo: lower)
             }
         }
     }
@@ -51,10 +59,11 @@ final class SmokeFlowsUITests: XCTestCase {
     func testSearchSheetOpens() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        let field = app.textFields.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 5), "search field missing on the Podcast tab")
+        app.buttons["tab-search"].tap()
+        let field = app.textFields["search-entry-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "search entry sheet missing")
         field.tap()
         guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
             // A connected hardware keyboard suppresses the software one; the
@@ -70,8 +79,8 @@ final class SmokeFlowsUITests: XCTestCase {
 
         // The sheet's own copy is the stable marker (03 §2.6) — do not
         // weaken with an any-collectionView fallback: one always exists
-        // behind the sheet on the Podcast tab, so the disjunct passed even
-        // when the sheet never opened.
+        // behind the entry sheet on the Inbox tab, so the disjunct passed
+        // even when the sheet never opened.
         let marker = app.staticTexts["You are searching for"]
         XCTAssertTrue(
             marker.waitForExistence(timeout: 8),
@@ -84,7 +93,7 @@ final class SmokeFlowsUITests: XCTestCase {
     func testSettingsChangePersistsAcrossRelaunch() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         app.buttons["Settings"].tap()
         let intervalRow = app.cells["settings-row-autoRefreshInterval"]
@@ -101,7 +110,7 @@ final class SmokeFlowsUITests: XCTestCase {
             guard let original = before, !original.isEmpty else { return }
             app.terminate()
             app.launch()
-            guard app.tabBars.firstMatch.waitForExistence(timeout: 20) else { return }
+            guard app.buttons["tab-0"].waitForExistence(timeout: 20) else { return }
             app.buttons["Settings"].tap()
             let row = app.cells["settings-row-autoRefreshInterval"]
             guard row.waitForExistence(timeout: 8) else { return }
@@ -142,7 +151,7 @@ final class SmokeFlowsUITests: XCTestCase {
         // Relaunch: the value must come back from the database.
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
         app.buttons["Settings"].tap()
         let reopened = app.cells["settings-row-autoRefreshInterval"]
         XCTAssertTrue(reopened.waitForExistence(timeout: 8), "settings sheet did not reopen")
@@ -157,11 +166,10 @@ final class SmokeFlowsUITests: XCTestCase {
     func testChannelSheetFromSubscriptions() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        // Subscriptions is the second strip item on the Podcast tab.
-        let subscriptions = app.staticTexts["Subscriptions"]
-        if subscriptions.exists { subscriptions.tap() }
+        // Subscriptions moved to the library tab with the v2 IA (09 §3.3).
+        app.buttons["tab-2"].tap()
 
         let list = app.collectionViews.firstMatch
         guard list.waitForExistence(timeout: 8), list.cells.count > 0 else {
@@ -189,7 +197,7 @@ final class SmokeFlowsUITests: XCTestCase {
     func testPlayerSheetPagesAndSpeed() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         let miniPlayerTitle = app.staticTexts["mini-player-title"]
         guard miniPlayerTitle.waitForExistence(timeout: 6) else {
@@ -215,25 +223,61 @@ final class SmokeFlowsUITests: XCTestCase {
 
     // MARK: - 6. Cover tap opens the Detail sheet (R1 regression)
 
-    /// The cover is a UIImageView hosting its own tap recognizer; without
-    /// isUserInteractionEnabled the tap fell through to the card expand and
-    /// Detail was unreachable from every list. The Detail sheet is proven
-    /// by its unique "Share episode" control.
-    func testCoverTapOpensDetailSheet() throws {
+    /// v2 cards are text-forward: the whole card opens the Detail sheet
+    /// (the v1 cover slot is gone, 09 §10 批次1); the card cell is located
+    /// by its `more` menu button. The Detail sheet is proven by its unique
+    /// "Share episode" control.
+    func testCardTapOpensDetailSheet() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        let cover = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == 'Episode details'"))
+        let card = app.collectionViews.cells
+            .containing(.button, identifier: "inbox-card-more")
             .firstMatch
-        guard cover.waitForExistence(timeout: 8) else {
+        guard card.waitForExistence(timeout: 8) else {
             throw XCTSkip("no inbox cards on this runner — Detail flow needs db_smoke")
         }
-        cover.tap()
+        card.tap()
 
         let share = app.buttons["Share episode"]
-        XCTAssertTrue(share.waitForExistence(timeout: 6), "Detail sheet did not open from the cover tap")
+        XCTAssertTrue(share.waitForExistence(timeout: 6), "Detail sheet did not open from the card tap")
+
+        let shot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: shot)
+        attachment.name = "inbox-card-detail-v2"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    /// 批次1 swipe surface (09 §7a-C1): a left swipe over an inbox card
+    /// reveals the destructive Remove action. The probe only REVEALS and
+    /// dismisses — a slow short drag, never a full swipe: full-swipe
+    /// performs the first action by default (native delete idiom) and
+    /// would consume a seeded episode on every run.
+    func testInboxSwipeRevealsRemove() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
+
+        let card = app.collectionViews.cells
+            .containing(.button, identifier: "inbox-card-more")
+            .firstMatch
+        guard card.waitForExistence(timeout: 8) else {
+            throw XCTSkip("no inbox cards on this runner — swipe flow needs db_smoke")
+        }
+        let start = card.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.3))
+        let target = card.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.3))
+        start.press(forDuration: 0.1, thenDragTo: target)
+
+        // The revealed action is reachable as a button titled Remove.
+        let remove = app.buttons["Remove"].firstMatch
+        XCTAssertTrue(remove.waitForExistence(timeout: 4), "swipe did not reveal the Remove action")
+
+        // Dismiss without deleting (drag the card back right).
+        target.press(forDuration: 0.1, thenDragTo: start)
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertFalse(remove.exists, "swipe surface stayed open after the dismiss drag")
     }
 
     // MARK: - 7. Playback failure: K6 retry + the loading state must END (R7)
@@ -245,7 +289,7 @@ final class SmokeFlowsUITests: XCTestCase {
     func testPlaybackFailureShowsRetryAndEndsLoading() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         let miniPlayerTitle = app.staticTexts["mini-player-title"]
         guard miniPlayerTitle.waitForExistence(timeout: 6) else {
@@ -275,32 +319,31 @@ final class SmokeFlowsUITests: XCTestCase {
 
     // MARK: - 8. Fly-in overlay probe (R6 — capture the mid-flight frame)
 
-    /// The fly-in runs 0.6 s from the tapped ➕ to the playlist tab. Static
-    /// review found no defect, so this probe taps through the real flow and
-    /// attaches immediate screenshots for manual inspection (the overlay is
-    /// not accessibility-exposed and cannot be asserted directly).
+    /// The fly-in runs 0.6 s from the triggered card to the playlist tab.
+    /// Static review found no defect, so this probe taps through the real
+    /// flow and attaches immediate screenshots for manual inspection (the
+    /// overlay is not accessibility-exposed and cannot be asserted
+    /// directly).
     func testFlyInOverlayCapturedMidFlight() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        // The cover is the one reliably AX-present part of a card. Tapping
-        // it opens Detail, so expand the strip by tapping the text column
-        // (a fixed offset right+below the cover, inside the same card) —
-        // the whole-card gesture lives on the card container.
-        let cover = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == 'Episode details'"))
+        // v2 cards are located by their `more` menu button. Tapping the
+        // card opens Detail, so the "Add to playlist" action is reached by
+        // LONG-PRESS — the native context menu (09 §7a-C1; the strip and
+        // its ➕ button are retired on Inbox).
+        let card = app.collectionViews.cells
+            .containing(.button, identifier: "inbox-card-more")
             .firstMatch
-        guard cover.waitForExistence(timeout: 10) else {
+        guard card.waitForExistence(timeout: 10) else {
             throw XCTSkip("no inbox cards on this runner — fly-in flow needs db_smoke")
         }
-        let textColumn = cover.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .withOffset(CGVector(dx: 220, dy: 30))
-        textColumn.tap()
+        card.press(forDuration: 1.2)
 
         let addButton = app.buttons["Add to playlist"].firstMatch
         guard addButton.waitForExistence(timeout: 4) else {
-            XCTFail("action strip did not expand")
+            XCTFail("context menu did not appear")
             return
         }
 
@@ -316,7 +359,7 @@ final class SmokeFlowsUITests: XCTestCase {
 
         // The flow must not wedge: after the insert settles the shell is
         // still alive and responding.
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 6))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 6))
     }
 
     // MARK: - 9. Login sheet opens from Settings (sandbox UI is not touched)
@@ -331,7 +374,7 @@ final class SmokeFlowsUITests: XCTestCase {
     func testLoginSheetOpens() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         app.buttons["Settings"].tap()
         let account = app.staticTexts["Account"]

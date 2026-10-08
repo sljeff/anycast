@@ -63,6 +63,7 @@ Root(IndexedStack)
 
 标准 `showModalBottomSheet`（Material 原生，`useSafeArea: true, isScrollControlled: true`）：
 - card.dart:131-137 → `Detail`（剧集详情，内部是 `DraggableScrollableSheet`，initialChildSize 0.7 / minChildSize 0.6，detail.dart:41-44）
+- **2026-10-02 v2 裁定（09 §10 批次1 Detail modal v2）**：Detail 整屏换 v2 形态（规范帧 `1784:7538` 开态 + `1593:10342` expanded，2026-10-02 组件级取数）——sheet detents 改 `.large`+`.medium`、圆角 48、grabber 36×5（把手区点击关闭的 A2 适配保留）；内容 = 全宽 hero artwork（≈屏高一半，底部黑渐隐）+ 磨砂渐变内容面板压 hero 尾（32pt semibold 标题 + 元数据行 14 大写 + 状态 tag pill + 节目名 16 + 描述 14/28）+ 底部 blur 渐变播放条（**两钮：金 pill "ADD TO QUEUE"（=加列表动作）+ 深色 play 圆钮**）。**行为变更：Remove 从 Detail 播放条退役**——Inbox 的删除走列表 swipe/长按菜单（§7a-C1 原生优先面），Channel/Search/History 详情的 remove 按钮随各自批次处置。保留不变：动作触发后 Detail 自动 dismiss（§10.1 quirk）、频道名点击在其上叠 Channel（不关闭）、share → shortlink → 系统分享（share 改 hero 右上 44×44 浮钮）、把手区点击关闭。expanded 态的钉顶 scroll header（48 mini artwork + 标题 + share 渐显）记为余量随下轮补。
 - import_export.dart:49-56、feeds.dart:246-253 → `ImportInstructions`（也是 DraggableScrollableSheet 0.7/0.6，import_export.dart:271-274）
 - playlists.dart:297-322 → 历史 item 点按开 `Detail`
 
@@ -87,17 +88,21 @@ Root(IndexedStack)
 
 ### 2.3 Feeds（Inbox，lib/pages/feeds.dart:22-138）
 - 布局：左右 24 padding + `EasyRefresh` 包裹的 `ListView.separated`（间距 12，底部 padding 64 避开 mini player）。
+- **2026-10-02 v2 裁定（09 §10 决策⑥拍板）**：底部 padding 64 遗留退役——v2 外壳的 chrome 避让由 `additionalSafeAreaInsets.bottom` 统一承担（空队列锚 pill 顶+14、播放中锚胶囊顶+14；列表全出血，滚动时内容从 scrim/胶囊下连续流过），section 底部 inset 归零。此前两机制双重计算：滚到底静止点 = 避让值(~150/~216) + 64，pill 顶上方留大片空白的主因。
+- **2026-10-02 v2 裁定（09 §10 批次1 Inbox 半场）**：Inbox 卡换 v2 组件形态（`363:3558` type=inbox card，2026-10-02 组件+原帧像素复测）：文字主导卡——标题 17 onSurface·TITLE 大写（3 行截断）、描述 14 次级色（3 行）、底部 60pt 状态行（36pt 圆节目封面 + 节目名 12 TITLE + 日期 12，间距 12；计数 pill goldAlpha3 底/goldAlpha9 字；`more` 60×60 位）；卡 = surface 底 + outlineVariant 发丝描边 + 阴影 0/1/20/4% + **radius 34（组件实测，§5 原记"radius16"有误）**，内边距 16/20/8。落专用 `InboxEpisodeCardCell`；共享 v1 `EpisodeCardCell` 保留给 Channel/Search/Playlist/History 至各自批次。列表结构改**滚动流 chrome**（header/分类条/提示卡随内容滚动；滚动列 padding 0/16、竖向 gap 12，Figma 1787:7899），列表尾新增 history 入口 pill。交互增补（09 §7a-C1 补齐）：卡面 `more` 按钮 = UIMenu 下拉（与长按 context menu 同三动作）、**trailing swipe = Remove（destructive）**；整卡点按开 Detail、长按 context menu 不变。空态时滚动流 chrome 区整体隐藏（空态视图自带头部）。计数 badge 的"episode count"属性语义设计未明（帧内一律 99+），暂映射单集时长文本，★待设计复核。
 - 下拉刷新（**easy_refresh 配置**，feeds.dart:31-61）：`onRefresh` → `fetchNewEpisodes()` 拉全部订阅 RSS；`refreshOnStart: true`（进入即自动刷新一次）；header 是 `BezierHeader(clamping: false, triggerOffset: 1, spinInCenter: true)`，spinner 区域是一条**随进度增长的 LinearProgressIndicator**（绿色，高 1px，progress 来自 `controller.progress.value`，feeds.dart:48-57）。**无上拉加载**（无 footer、无 onLoad）。
 - 自动刷新：FeedEpisodeController 每 `autoRefreshInterval` 分钟（**DB 默认 300s**；Rx 初值 180 属首启竞态，口径以 DB 为准——《01》§2 裁定）触发 `callRefresh`（states/feed_episode.dart:110-132），启动后 2 秒也自动刷一次；每分钟裁剪 Inbox/History 超量条目（states/player.dart:344-349）。
 - 每个 item 是 `Card`（见 §2.11），展开后的 3 个圆形白底操作按钮（feeds.dart:84-131）：
   1. 播放（`Ic.round_play_arrow`）：加入播放列表顶部 → 从 Inbox 移除 → 播放；
   2. 加入播放列表（`Ic.round_playlist_add`）：先播放 **AnimatedPlaylistIndicator 飞入动画**（加号按钮 → 底部 Playlist tab 图标，600ms，黑底圆角矩形从 200×48 缩到 24×24 淡出，widgets/animation.dart:3-88），再入列表并从 Inbox 移除；
   3. 移除（`Ic.round_clear`）。
+  - **2026-10-02 v2 原生优先裁定（09 §7a-C1）**：Inbox 卡内操作条退役——整卡点按改开 Detail sheet，三动作改**长按 context menu**（Play / Add to playlist / Remove，动作语义与 `InboxActionPlanner` 执行路径不变，飞入动画起点改卡片中心）；Channel/Search/播放列表/历史卡的操作条保留至各自 v2 批次。
 - 空态（feeds.dart:140-267 `ImportBlock`）："It's empty here. Let's change that!" 大字 + 绿色 Explore 按钮（跳 Tab2）+ 白描边 "Import OPML" 按钮（`Get.dialog(ImportExportBlock)`）+ 圆形 `Ic.round_help` 帮助按钮（开 ImportInstructions sheet）。
 
 ### 2.4 Subscriptions（lib/pages/subscriptions.dart）
 - `PodcastCard` 列表（ListView.separated，间距 12）。点击任意卡 → `Channel` sheet（card.dart:330-342）。
 - 空态："Whoops! Looks like your podcast galaxy is still unexplored."（subscriptions.dart:15-32）。
+- **2026-10-02 v2 裁定（09 §10 决策⑥拍板）**：native 列表的 64pt 底部 section inset（v1 手动避让 mini player 的同款残留，随 Library 嵌入 tab 外壳）退役，避让语义同 §2.3 由外壳 `additionalSafeAreaInsets` 承担。
 
 ### 2.5 Playlists（Tab1，lib/pages/playlists.dart:24-59）
 - 每个播放列表一个 Tab（DefaultTabController length = playlists.length，实际数据里通常 1 个默认列表），TabBarView 内容是 `PlaylistEpisodesList`。
@@ -167,7 +172,7 @@ Root(IndexedStack)
 ### 2.11 Card（通用剧集卡，widgets/card.dart:30-297）
 - 注释即规格（card.dart:1-8）：三种场景（Inbox/播放列表/频道页），播放列表卡有**播放进度背景条**。
 - 布局：100 高圆角 20 描边（grey[800]）Row：80×80 圆角 16 封面（**点按开 Detail sheet**，129-154 行）+ 右侧标题（16px PingFang 单行）+ [频道名（maxWidth 114）| 右侧时长·时间文本] + 描述 HTML 转纯文本（12px 灰 `0xFF6B7280`，inter，2 行）。
-- **整卡点按**：`clController.expand(index)` 切换底部 **AnimatedContainer 高 0↔60 的操作按钮条**（200ms easeInOut，279-291 行）；同组卡片互斥（一个 CardListController per 列表）。
+- **整卡点按**：`clController.expand(index)` 切换底部 **AnimatedContainer 高 0↔60 的操作按钮条**（200ms easeInOut，279-291 行）；同组卡片互斥（一个 CardListController per 列表）。（**2026-10-02 v2 裁定，09 §7a-C1**：Inbox 已退役此交互——整卡点按开 Detail、三动作走长按 context menu；其余列表按本条执行至各自 v2 批次。）
 - 播放列表卡：`pe.enclosureUrl == 当前播放` 时进度条宽度实时取 positionData（71-79 行），否则取 playedDuration/duration；右侧文本换 "xx remaining"。
 - 右下角**下载指示**（仅播放列表卡，232-275 行）：未下载 = 16×16 蓝 70% 圆形 `Ic.round_download`（点按开始下载）；下载中 = `CircularPercentIndicator`(半径 8, 线宽 3, 蓝色)；完成 = 绿色 `IconParkSolid.check_one`。
 
@@ -205,7 +210,7 @@ ListView 分组（`SettingsGroup` 圆角 12 底 `0xFF232830`）：
 | bottom_nav_bar.dart:191-207 | mini player 播放钮 | onTap | 播放/暂停 |
 | bottom_nav_bar.dart:208-224 | mini player 快进钮 | onTap | seek(+30s) |
 | bottom_nav_bar.dart:262-277 | BarIcon | onTap | 切 tab；Tab0 重复点击=回顶或刷新 |
-| card.dart:109-112 | Card 卡身 | onTap | 展开/收起底部按钮条（AnimatedContainer 0↔60，200ms easeInOut），同列表互斥 |
+| card.dart:109-112 | Card 卡身 | onTap | 展开/收起底部按钮条（AnimatedContainer 0↔60，200ms easeInOut），同列表互斥；**v2 裁定（09 §7a-C1）**：Inbox 卡身 onTap = 开 Detail，长按 = context menu（3 动作） |
 | card.dart:129-138 | Card 封面 | onTap | 打开 Detail sheet（标准 Material sheet + DraggableScrollableSheet 0.7→0.6） |
 | card.dart:242-260 | 下载小圆钮 | onTap | 开始下载（仅播放列表卡） |
 | card.dart:330-342 | PodcastCard | onTap | 打开 Channel sheet |

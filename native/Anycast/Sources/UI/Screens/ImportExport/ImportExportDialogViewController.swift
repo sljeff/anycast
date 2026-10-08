@@ -114,16 +114,24 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         buttonColumn.alignment = .center
         buttonColumn.spacing = 12
 
-        // Manual RSS URL field (hint 'RSS Feed URL', URL keyboard).
+        // Manual RSS URL field (hint 'RSS Feed URL', URL keyboard). Custom
+        // surface instead of `.roundedRect` — the system style paints pure
+        // black, which is not a palette value and sat as a void on the
+        // surface card (09 audit).
         urlField.placeholder = "RSS Feed URL"
         urlField.font = Typography.htmlBody.font()
         urlField.textColor = Theme.primaryLightMax
+        urlField.backgroundColor = Theme.surfaceContainer
+        urlField.layer.borderColor = AnycastColor.sandAlpha4.cgColor
+        urlField.layer.borderWidth = 1
+        urlField.layer.cornerRadius = Radius.sm
+        urlField.layer.cornerCurve = .continuous
         urlField.keyboardType = .URL
         urlField.autocorrectionType = .no
         urlField.autocapitalizationType = .none
         urlField.returnKeyType = .go
         urlField.clearButtonMode = .whileEditing
-        urlField.borderStyle = .roundedRect
+        urlField.borderStyle = .none
         urlField.delegate = self
         urlField.isAccessibilityElement = true
         urlField.accessibilityLabel = "RSS Feed URL"

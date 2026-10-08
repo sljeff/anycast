@@ -29,7 +29,7 @@ final class RootViewController: UIViewController {
         // Late-bound wiring (weak, UI-side objects die with the scene).
         context.tabs.tabBarController = shell
         context.loginPrompt.presentingAnchor = self
-        context.flyInEndpointProvider.tabBarProvider = { [weak shell] in shell }
+        context.flyInEndpointProvider.pillBarProvider = { [weak shell] in shell?.tabBarView }
 
         addChild(shell)
         view.addSubview(shell.view)

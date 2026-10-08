@@ -26,6 +26,7 @@
 | 06-ios-tech-research.md | 调研（已定稿） | UIKit vs SwiftUI、min target、并发、逐依赖对照、测试工具链 | 建 M1 工程骨架时 |
 | 07-ui-native-mapping.md | 方案 | UI 组件映射与自绘边界：系统/成熟库/自绘归属、适配边界 A1–A9、Liquid Glass 计划、拖拽实现注记 | M3 逐屏实施时 |
 | 08-implementation-review.md | 评审（**已合稿存档**） | 实施细节评审：哪些 Flutter 妥协应换成 iOS 最佳实践（DB 线程/事务、组合根与生命周期、定时器前后台、音频会话、UI 细节），⛔/⚠️/✅ 三档判定 + 采纳映射表；§12 含三轮全量代码走查的必修级发现 | **2026-09-22 采纳条目已按落点并入《05》（K26–K38、G1/G2/G13 等）与《06》/《07》对应章节、本文 M0–M2 任务——读目标章节即可，本文留作依据出处与未采纳项备忘 |
+| 09-native-v2-ui.md | 方案 + 任务清单 | **MV 里程碑（M3.5）**：Figma anycast-v2.0 原生落地——v2 视觉（sand/gold tokens、light+dark）+ IA 重构（Inbox/Queue/Library tab、常驻 mini player、category strip、Welcome/SignUp）；token 对拍表、S1–S21→v2 帧映射、两代风格裁定、能力核对、V1–V5 任务 | MV 执行期间与逐屏实施时 |
 
 **阅读协议（写给按本文执行的 Agent）**：① 进入一个阶段（M0–M5），先按上表「什么时候用」列筛出命中本阶段的文档、读完对应章节再动手；② 动手单个条目前，读完该条目引用的全部《X》§Y——条目引用是最低门槛，不是边界；③ 细节存疑而条目无引用时，回上表定位文档查证，不凭记忆决策，查无答案才自行判断并按文末修订规则登记。不要求通读 01–08，也不得以"已经读过"为由跳过②③——跨会话或长对话后，此前所读一律视为不可靠，需要时重查。
 
@@ -52,7 +53,7 @@
 
 ## 执行阶段
 
-> 阶段估算（solo + AI 辅助）：M0 ≈1 周 → M1 ≈1–2 周 → M2 ≈1–2 周 → M3 ≈4–6 周 → M4 ≈2 周 → M5 ≈1–2 周 + 7 天放量，全程约 3 个月量级。
+> 阶段估算（solo + AI 辅助）：M0 ≈1 周 → M1 ≈1–2 周 → M2 ≈1–2 周 → M3 ≈4–6 周 → **MV ≈5.5–8 周（2026-10-01 增补，见《09》）** → M4 ≈2 周 → M5 ≈1–2 周 + 7 天放量。
 > 依赖关系：M0 完全先行；M1→M2 串行（音频测试依赖数据层）；M3 内部各屏可乱序/并行；M4 依赖 M3 全部完成。
 
 ## M0 · 资产与基线期（全部在 Flutter 仓库，不写一行原生代码）
@@ -170,9 +171,25 @@
 - [x] 每屏完成即补：快照基线（05 §6.1，按 OS 分目录）+ XCUITest 冒烟扩充
 - [x] 无障碍/动态字体不崩溃不溢出（旧版无处理，新实现首次接触，《03》§8）；**iPad 硬性验收（05 §11/§10.3）：任意窗口尺寸/宽高比（iOS 27 可缩放窗口）布局不崩不溢出（`LayoutSanityTests` 四尺寸×三字号的列表非零尺寸 + sheet 越窗断言）**
 
+## MV · v2 视觉与 IA 重构期（2026-10-01 增补，位于 M3 与 M4 之间）
+
+**目标**：按 Figma `anycast-v2.0`（链接存本地 `.env` 的 `FIGMA_ANYCAST_V2_URL`，不入库）把 native 的视觉层与信息架构升级到 v2——light+dark 双主题、Tab 重构为 Inbox/Queue/Library、常驻 mini player 胶囊、新增 Welcome/SignUp。**DoD**：09 文档 V1–V5 任务全勾 + 快照基线双 OS × 双外观重录齐 + 四测试套件全绿。
+
+> **2026-10-01 拍板**：① v2 先落地，**M4/M5 直接验收 v2**（完整手工回归只做一轮）；② light+dark 都做（player 屏按 tokens 固定暖深）；③ 范围锚定 Figma `📋 Implemented Index`，share clips/AI summary/notebook 等探索性功能不做；④ 设计基准取 sand 系（与 `lib/design_system/anycast_theme.dart` 逐值同源），Figma 内更新的 cream/Young Serif 帧为逐屏候选（09 §6 表待终裁）；⑤ 预判无 DB schema 变更（category strip 用既有 `subscription.categories`），SignUp 的 auth 接线与 Flutter 侧同口径留 TODO。规格、映射与任务明细全部在《09》，执行以 09 为准、进度注记同步回本文。
+>
+> **2026-10-01 进度**：**V0（审计+规格冻结）与 V1（设计系统层）完成**——64 个 v2 colorset（Any+Dark 双外观）、Theme 语义层+legacy 桥接（桥接访问器随 V3 逐屏退役）、TypographyV2 系统字阶、Spacing/Radius/Motion 刻度；PlayerProgressBar 首例 CGColor 冻结地雷修复（09 §9a 迁移地雷清单成文）。
+>
+> **2026-10-02 进度**：**V2 外壳与 IA 完成**——MainTabBarController 胶囊化翻转（UITabBarController→自管子 VC + BottomTabBarView；Inbox/queue/library 三 tab，Discover 退役，发现入口=搜索圆钮→过渡搜索入口 sheet）、v2 header 组件三 tab 落位、CategoryStrip 接入 Inbox（选中态按 §3.2 修正 + 分类过滤纯逻辑）、Library 屏（内嵌 Subscriptions + membership 占位块）、mini player v2 胶囊态（两 OS 统一悬浮胶囊，UITabAccessory 路径随翻转消失）、Welcome/SignUp UI 落地（auth 按 §8 留 TODO）。`PodcastsTabContainer` 内页签族删除。UITests 全量改 pill 标识符；快照采集套件适配 IA（S3→library tab、S8 位改采 Library）。iOS 27 模拟器三 tab 截图核验通过。明细与实施期修正见《09》§10 进度注记。
+
+- [ ] V1 设计系统层：Theme/Assets v2 tokens（双外观）+ Typography v2 + Spacing/Radius/Motion + GlassContainerView/组件库/AppIcons reskin + Figma 素材导出
+- [x] V2 外壳与 IA：浮动胶囊 Tab + 搜索圆钮 + mini player（胶囊态落地；通栏条/卡片态随 V3 消费屏）+ v2 header + CategoryStrip（接入+选中态修正）+ Welcome/SignUp + 导航图重梳【2026-10-02】
+- [ ] V3 逐屏重设计：5 批次（Feeds → Queue/Library → Player 族 → Search/Chat → Settings/Auth）
+- [ ] V4 测试与基线：快照双 OS × 双外观重录 + AppTests 期望更新 + LayoutSanity 双外观 + crawl/VLM + 交互备注落 03/05
+- [ ] V5 收尾：文档同步（09/00/03/07）+ CI 保持绿 → 进 M4
+
 ## M4 · 集成期（人工回归主战场）
 
-**目标**：Release Gate 全绿。**DoD**：05 §10.3 清单逐项打勾。
+**目标**：Release Gate 全绿。**DoD**：05 §10.3 清单逐项打勾。**验收对象为 v2**（MV 产出；视觉对拍基准 = MV 重录后的双外观快照，A1–A9 豁免清单按 MV re-triage 后的《07》版本执行）。
 
 - [ ] 升级安装实测循环 ≥3 轮（05 §2.5：dev 签名旧版 + `db_heavy` + Plus 账号 → 原生 TF 覆盖 → 12 项数据断言；含"原生写回→再升级"一轮）
 - [ ] 付费矩阵（05 §8：7 个测试账号 × sandbox 购买/恢复/过期/退款/删号后恢复购买）

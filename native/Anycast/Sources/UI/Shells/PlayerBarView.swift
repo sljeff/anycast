@@ -27,10 +27,9 @@ final class PlayerBarView: UIView {
     /// floating fallback's frame (MainTabBarController.FallbackMetrics).
     static let barHeight: CGFloat = 58
 
-    /// How the host surfaces the bar. ONE component, ONE silhouette: both
-    /// styles are full capsules (radius == half the 58 pt height) — the
-    /// standalone bar must match the system accessory's contour so the
-    /// mini player reads as the same element on every screen.
+    /// How the host surfaces the bar. ONE component, ONE silhouette: every
+    /// style is a full capsule (radius == half the 58 pt height) — the bar
+    /// must read as the same element on every screen.
     enum HostingStyle {
         /// Sheet bottom bars and the iOS 18 floating fallback: this view
         /// draws its own white-10% capsule with 12 pt side margins. (The
@@ -41,12 +40,18 @@ final class PlayerBarView: UIView {
         /// Inside an iOS 26+ `UITabAccessory`: the system provides the
         /// glass capsule, so this view draws content only, edge to edge.
         case systemAccessory
+        /// The v2 floating capsule over the pill tab bar (09 §3.6 state c,
+        /// Figma 83:2562): surface-80% fill + sandAlpha4 1 pt stroke +
+        /// `0 8 10 /5%` shadow, circular 36 pt cover, single centered
+        /// title, no time label. The host owns the horizontal margins.
+        case capsule
     }
 
     /// Set by the host (UIContext.makePlayerBar pre-wires it).
     var onOpenPlayer: (() -> Void)?
 
     private let playback: PlaybackService
+    private let style: HostingStyle
     private let observation = ObservationLoop()
 
     private let capsule = UIView()
@@ -57,6 +62,10 @@ final class PlayerBarView: UIView {
     private let playPauseControl = PlayPauseIconControl(size: 32)
     private let forwardButton = UIButton(type: .custom)
     private var openedByPan = false
+    /// The stacked title's bottom pin — replaced by a center pin in the
+    /// capsule style (single-line centered title).
+    private lazy var titleBottomConstraint: NSLayoutConstraint =
+        titleLabel.bottomAnchor.constraint(equalTo: capsule.centerYAnchor, constant: -1)
     /// Last URL handed to the cover view. `positionData` is in the
     /// observation read, so render() runs every 0.5 s tick — an
     /// unconditional cancel+setImage would restart an in-flight cover
@@ -74,6 +83,7 @@ final class PlayerBarView: UIView {
 
     init(playback: PlaybackService, style: HostingStyle = .standalone) {
         self.playback = playback
+        self.style = style
         super.init(frame: CGRect(x: 0, y: 0, width: 320, height: Self.barHeight))
 
         backgroundColor = .clear
@@ -81,13 +91,30 @@ final class PlayerBarView: UIView {
 
         // One chrome only when the system provides it: the accessory's
         // glass capsule is the surface; standalone paints its own
-        // white-10% surface. Everything else about the capsule is shared.
-        capsule.backgroundColor = style == .standalone
-            ? UIColor.white.withAlphaComponent(0.10)
-            : .clear
-        // Half the bar height in BOTH styles — one capsule silhouette
-        // everywhere (the clip shape for the progress fill; in standalone
-        // also the visible surface's contour).
+        // white-10% surface; capsule paints the v2 surface-80% chrome
+        // (09 §3.6). Everything else about the capsule is shared.
+        switch style {
+        case .standalone:
+            capsule.backgroundColor = UIColor.white.withAlphaComponent(0.10)
+        case .systemAccessory:
+            capsule.backgroundColor = .clear
+        case .capsule:
+            // The v2 chrome family is STATIC light (09 §3.6 literal
+            // rgba(255,255,255,.8) — same ruling as the pill bar; the dark
+            // design frame renders the mini player card bright too).
+            capsule.backgroundColor = UIColor(white: 1, alpha: 0.8)
+            capsule.layer.borderColor = AnycastColor.sandAlpha4.resolvedColor(
+                with: UITraitCollection(userInterfaceStyle: .light)
+            ).cgColor
+            capsule.layer.borderWidth = 1
+            capsule.layer.shadowColor = UIColor.black.cgColor
+            capsule.layer.shadowOpacity = 0.05
+            capsule.layer.shadowOffset = CGSize(width: 0, height: 8)
+            capsule.layer.shadowRadius = 5
+        }
+        // Half the bar height in ALL styles — one capsule silhouette
+        // everywhere (the clip shape for the progress fill; in the
+        // self-painting styles also the visible surface's contour).
         capsule.layer.cornerRadius = Self.barHeight / 2
         capsule.layer.cornerCurve = .continuous
         // The progress fill is a square-cornered layer spanning the full
@@ -98,15 +125,24 @@ final class PlayerBarView: UIView {
         capsule.translatesAutoresizingMaskIntoConstraints = false
         addSubview(capsule)
 
-        backdrop.fillColor = UIColor.white.withAlphaComponent(0.2)
+        backdrop.fillColor = style == .capsule
+            ? AnycastColor.sandAlpha4.resolvedColor(
+                with: UITraitCollection(userInterfaceStyle: .light)
+            )
+            : UIColor.white.withAlphaComponent(0.2)
         backdrop.translatesAutoresizingMaskIntoConstraints = false
         capsule.addSubview(backdrop)
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = 8
+        // v2 capsule: circular 36 pt cover (Figma 83:2562).
+        coverView.layer.cornerRadius = style == .capsule ? 18 : 8
         coverView.layer.cornerCurve = .continuous
-        coverView.backgroundColor = Theme.primaryBackground
+        coverView.backgroundColor = style == .capsule
+            ? AnycastColor.sandAlpha2.resolvedColor(
+                with: UITraitCollection(userInterfaceStyle: .light)
+            )
+            : Theme.primaryBackground
         coverView.isAccessibilityElement = true
         coverView.accessibilityLabel = "Episode artwork"
         coverView.translatesAutoresizingMaskIntoConstraints = false
@@ -116,7 +152,11 @@ final class PlayerBarView: UIView {
             for: .systemFont(ofSize: 16, weight: .medium)
         )
         titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.textColor = Theme.primaryLightMax
+        // The capsule floats on the static white-80 surface — light-variant
+        // ink; the player-hosted styles keep the legacy chrome colors.
+        titleLabel.textColor = style == .capsule
+            ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+            : Theme.primaryLightMax
         titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
         // XCUITest hook: the tap target for "tap the mini player".
@@ -128,7 +168,9 @@ final class PlayerBarView: UIView {
             for: .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         )
         timeLabel.adjustsFontForContentSizeCategory = true
-        timeLabel.textColor = Theme.secondaryText
+        timeLabel.textColor = style == .capsule
+            ? Theme.onSurfaceVariant.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+            : Theme.secondaryText
         timeLabel.numberOfLines = 1
         timeLabel.translatesAutoresizingMaskIntoConstraints = false
         capsule.addSubview(timeLabel)
@@ -149,7 +191,9 @@ final class PlayerBarView: UIView {
             UIImage.SymbolConfiguration(pointSize: 32),
             forImageIn: .normal
         )
-        forwardButton.tintColor = Theme.primaryLightMax
+        forwardButton.tintColor = style == .capsule
+            ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+            : Theme.primaryLightMax
         forwardButton.isAccessibilityElement = true
         forwardButton.accessibilityLabel = "Forward 30 seconds"
         forwardButton.addAction(
@@ -165,8 +209,8 @@ final class PlayerBarView: UIView {
 
         NSLayoutConstraint.activate([
             // Standalone: the capsule owns the 12 pt horizontal margin
-            // (03 §2.9). Accessory: edge to edge — the system glass
-            // already carries its own padding.
+            // (03 §2.9). Accessory/capsule: edge to edge — the host chrome
+            // (system glass / the shell's margins) already carries padding.
             capsule.leadingAnchor.constraint(
                 equalTo: leadingAnchor, constant: style == .standalone ? 12 : 0
             ),
@@ -181,7 +225,7 @@ final class PlayerBarView: UIView {
             backdrop.topAnchor.constraint(equalTo: capsule.topAnchor),
             backdrop.bottomAnchor.constraint(equalTo: capsule.bottomAnchor),
 
-            coverView.leadingAnchor.constraint(equalTo: capsule.leadingAnchor, constant: 12),
+            coverView.leadingAnchor.constraint(equalTo: capsule.leadingAnchor, constant: 8),
             coverView.centerYAnchor.constraint(equalTo: capsule.centerYAnchor),
             coverView.widthAnchor.constraint(equalToConstant: 36),
             coverView.heightAnchor.constraint(equalToConstant: 36),
@@ -198,12 +242,21 @@ final class PlayerBarView: UIView {
 
             titleLabel.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: 12),
             titleLabel.trailingAnchor.constraint(equalTo: forwardButton.leadingAnchor, constant: -4),
-            titleLabel.bottomAnchor.constraint(equalTo: capsule.centerYAnchor, constant: -1),
+            titleBottomConstraint,
 
             timeLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             timeLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
             timeLabel.topAnchor.constraint(equalTo: capsule.centerYAnchor, constant: 1),
         ])
+
+        if style == .capsule {
+            // v2 capsule: single centered title line, no time label
+            // (Figma 83:2562 carries only the title). Replacing the
+            // bottom pin with a center pin avoids fighting constraints.
+            titleBottomConstraint.isActive = false
+            titleLabel.centerYAnchor.constraint(equalTo: capsule.centerYAnchor).isActive = true
+            timeLabel.isHidden = true
+        }
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(openTapped))
         tap.delegate = self
@@ -220,6 +273,16 @@ final class PlayerBarView: UIView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// The capsule border runs through `layer.borderColor` — a frozen
+    /// CGColor that must be re-resolved on appearance flips (09 §9a).
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        if previousTraitCollection?.hasDifferentColorAppearance(comparedTo: traitCollection) ?? false,
+           capsule.layer.borderWidth > 0 {
+            capsule.layer.borderColor = AnycastColor.sandAlpha4.cgColor
+        }
+    }
 
     // MARK: - Playback observation (state is pushed into subviews)
 
@@ -268,7 +331,9 @@ final class PlayerBarView: UIView {
                 isPlaying: playback.isPlaying,
                 isLoading: playback.isLoading
             ),
-            tint: Theme.primaryLightMax
+            tint: style == .capsule
+                ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+                : Theme.primaryLightMax
         )
     }
 

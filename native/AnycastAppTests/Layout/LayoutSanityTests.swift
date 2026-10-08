@@ -259,7 +259,10 @@ struct LayoutSanityTests {
         let labels = Self.subviewsRecursive(in: window)
             .compactMap { $0 as? UILabel }
             .filter { $0.accessibilityIdentifier == "episode-card-description" }
-        let populated = labels.filter { !($0.text ?? "").isEmpty }
+        // Only labels the window actually laid out: a configured-but-detached
+        // cell (list-section prefetch in this private shell) legitimately has
+        // no geometry — same doctrine as the layout-sweep helper.
+        let populated = labels.filter { !($0.text ?? "").isEmpty && $0.window != nil }
         guard !populated.isEmpty else {
             print("[layout] no visible cards with descriptions; skipping"); return
         }
@@ -289,6 +292,39 @@ struct LayoutSanityTests {
             .first { $0.accessibilityIdentifier == "episode-card-description" }
         #expect(desc?.text == "A description line")
         #expect(desc?.bounds.height ?? 0 > 0, "description label collapsed")
+    }
+
+    /// The v2 inbox card (09 §10 批次1): the description and the 60pt state
+    /// row both resolve real frames off the autolayout height chain — the
+    /// card must be tall enough for text + state row (the ≤ bottom
+    /// constraint is the only height driver, so a broken chain shows up as
+    /// a collapsed description or a card shorter than the state row).
+    @Test("v2 inbox card lays out description and state row")
+    func inboxV2CardLayout() {
+        let cell = InboxEpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 370, height: 200))
+        cell.configure(
+            InboxCardContent(
+                title: "An episode title that wraps",
+                showName: "Just pod",
+                dateText: "Nov 21, 2025",
+                badgeText: "45 MIN",
+                descriptionHTML: nil,
+                imageURL: nil,
+                descriptionPlainText: "A description line that also wraps a little"
+            )
+        )
+        cell.layoutIfNeeded()
+        let labels = Self.subviewsRecursive(in: cell).compactMap { $0 as? UILabel }
+        let desc = labels.first { $0.accessibilityIdentifier == "episode-card-description" }
+        #expect(desc?.text == "A description line that also wraps a little")
+        #expect(desc?.bounds.height ?? 0 > 0, "v2 description label collapsed")
+        // The uppercase display language (component textStyle TITLE).
+        #expect(labels.contains { $0.text == "JUST POD" }, "show name not uppercased")
+        // The more button gets its menu from the mirrored payload.
+        cell.menuActions = [
+            EpisodeCardAction(icon: UIImage(), accessibilityLabel: "Play") {},
+        ]
+        #expect(cell.moreButton.menu?.children.count == 1, "more menu not built")
     }
 
     // MARK: - Helpers

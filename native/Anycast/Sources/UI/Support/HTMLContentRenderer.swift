@@ -233,6 +233,12 @@ final class HTMLContentRenderer {
         var replacements: [(NSRange, [NSAttributedString.Key: Any])] = []
         result.enumerateAttributes(in: full) { attrs, range, _ in
             var attributes = attrs
+            // The WebKit import stamps document/paragraph backgrounds on
+            // runs; flutter_html painted show notes on a transparent
+            // surface, so authored-looking backgrounds are an import
+            // artifact — strip them (they rendered as a white block on the
+            // v2 sheet).
+            attributes.removeValue(forKey: .backgroundColor)
             if attrs[.link] != nil {
                 attributes[.foregroundColor] = Theme.tabSelectedGreen
             } else {

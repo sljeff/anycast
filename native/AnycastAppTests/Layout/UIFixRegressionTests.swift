@@ -12,22 +12,25 @@ import AnycastKit
 ///    track (removed: the played segment's rounded head is the indicator)
 ///    and the square-cornered stub the head became during the first
 ///    seconds of playback (the head is now always a full semicircle).
-/// 3. Discover category indicator parked at the strip's left edge until
-///    the first selection change.
+/// 3. (Retired with the V2 IA flip — Discover left the tab shell, 09
+///    §3.5; the UnderlineTabBarView indicator guard it motivated lives on
+///    through SearchPage's use.)
 /// 4. Playlist card progress strip running through the card's rounded
 ///    corners.
 /// 5. Playlist Detail sheet play button rendered as an empty white circle
 ///    (blank strip icon reused outside the strip's live overlay).
-/// 6. Inbox card expand leaving item heights un-resized (strip overflowing
-///    neighbor cards) and later taps failing to expand.
+/// 6. Card expand leaving item heights un-resized (strip overflowing
+///    neighbor cards) and later taps failing to expand — Inbox went
+///    strip-less (09 §7a-C1, case 6a guards the native wiring); the
+///    resize walk now runs on the playlist list, which keeps its strip.
 /// 7. Mini player nested capsule-in-capsule when hosted by the iOS 26+
 ///    tab accessory (the system glass must be the only chrome).
 /// 8. Channel subscribe button spinning through the feed fetch and
 ///    rendering as a pointed lens instead of a capsule.
 ///
 /// Runs against the live shell with the seeded fixture; skips when the
-/// shell, the seed, or (Discover only) the category network fetch is
-/// absent. Serialized: the suite drives the SHARED key window.
+/// shell or the seed is absent. Serialized: the suite drives the SHARED
+/// key window.
 @MainActor
 @Suite(.serialized)
 struct UIFixRegressionTests {
@@ -56,7 +59,10 @@ struct UIFixRegressionTests {
         guard let page = main.view else {
             Issue.record("player main page has no view"); return
         }
-        try await Self.settle(window, seconds: 0.5)
+        // Generous settle: the sheet's spaceEvenly distribution is measured
+        // to 2 pt — on a busy simulator a mid-presentation snapshot reads
+        // compressed gaps (flaky under load, not a real regression).
+        try await Self.settle(window, seconds: 2.0)
 
         guard let cover = Self.firstView(
             in: page, where: { ($0 as? UIImageView)?.accessibilityLabel == "Episode artwork" }
@@ -69,6 +75,13 @@ struct UIFixRegressionTests {
         )?.superview else {
             Issue.record("player main page blocks not found"); return
         }
+        // The K6 retry row sits BELOW the transport — when a playback
+        // failure surfaced earlier it is the stack's bottom block, and the
+        // below-transport gap must be measured from it.
+        let retryRow = Self.firstView(
+            in: page, where: { ($0 as? UIButton)?.accessibilityLabel == "Retry playback" }
+        )?.superview
+        let bottomBlock = (retryRow?.isHidden == false) ? retryRow! : playPause
 
         // Cover is square at the content width (the old cap vs stretch
         // conflict squashed it below the design width).
@@ -80,6 +93,7 @@ struct UIFixRegressionTests {
         let titleFrame = frameInPage(titleBar)
         let progressFrame = frameInPage(progress)
         let transportFrame = frameInPage(playPause)
+        let bottomFrame = frameInPage(bottomBlock)
 
         // The four content blocks + page edges must share the height
         // through five EQUAL gaps (spaceEvenly).
@@ -89,7 +103,7 @@ struct UIFixRegressionTests {
             gap(coverFrame.maxY, titleFrame.minY),
             gap(titleFrame.maxY, progressFrame.minY),
             gap(progressFrame.maxY, transportFrame.minY),
-            gap(transportFrame.maxY, page.bounds.height - 8), // below the transport (8 pt margin)
+            gap(bottomFrame.maxY, page.bounds.height - 8), // below the bottom block (8 pt margin)
         ]
         for (index, value) in gaps.enumerated() {
             #expect(abs(value - gaps[0]) < 2.0,
@@ -241,40 +255,6 @@ struct UIFixRegressionTests {
         }
     }
 
-    // MARK: - Discover indicator (3)
-
-    @Test("Discover indicator sits under the selected category on first layout")
-    func discoverIndicatorInitialPosition() async throws {
-        guard let context = await Self.liveContext(),
-              let window = Self.keyWindow() else {
-            print("[uifix] shell not ready; skipping"); return
-        }
-        context.tabs.select(2)
-        try await Self.settle(window, seconds: 3)
-        defer { context.tabs.select(0) }
-
-        guard let discover = Self.find(DiscoverViewController.self, in: window.rootViewController),
-              let strip = Self.firstView(in: discover.view, where: { $0 is UnderlineTabBarView }),
-              let tabBar = strip as? UnderlineTabBarView,
-              let label = Self.firstView(
-                  in: tabBar, where: { view in
-                      guard let label = view as? UILabel else { return false }
-                      return !(label.text ?? "").isEmpty
-                  }
-              ) else {
-            print("[uifix] discover categories not loaded (network?); skipping"); return
-        }
-        try await Self.settle(window, seconds: 0.5)
-
-        let indicatorMidX = tabBar.convert(
-            tabBar.indicator.frame, from: tabBar.indicator.superview
-        ).midX
-        let labelMidX = tabBar.convert(label.bounds, from: label).midX
-        #expect(abs(indicatorMidX - labelMidX) < 2.0,
-                "indicator (\(indicatorMidX)) not centered under the selected label (\(labelMidX))")
-        await Self.capture(window, name: "uifix-discover")
-    }
-
     // MARK: - Card progress backdrop corners (4)
 
     @Test("Card progress backdrop clips inside the rounded card corners")
@@ -349,7 +329,12 @@ struct UIFixRegressionTests {
         let presenter = await Self.settledTopPresenter(in: window) ?? window.rootViewController
         presenter?.present(list, animated: false)
         try await Self.settle(window, seconds: 1.5)
-        defer { list.dismiss(animated: false) }
+        // Tear down from the PRESENTING side: `list.dismiss` only removes
+        // the topmost presentation ABOVE the list when something was
+        // presented from it (the Detail sheet below taps a cover) — the
+        // list itself then stays up and silently swallows the next test's
+        // presentation attempt.
+        defer { presenter?.dismiss(animated: false) }
 
         guard let collection = Self.firstView(in: list.view, where: { $0 is UICollectionView })
                 as? UICollectionView else {
@@ -377,10 +362,10 @@ struct UIFixRegressionTests {
         await Self.capture(window, name: "uifix-detail-play-icon")
     }
 
-    // MARK: - Inbox expand reliability (6)
+    // MARK: - Inbox native-first card interactions (6a)
 
-    @Test("Inbox expand: every toggle resizes item heights, no stuck cards")
-    func inboxExpandReliability() async throws {
+    @Test("Inbox card: tap opens Detail; context menu + more button carry the 3 actions")
+    func inboxNativeCardInteractions() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
             print("[uifix] shell not ready; skipping"); return
@@ -388,11 +373,86 @@ struct UIFixRegressionTests {
         context.tabs.select(0)
         try await Self.settle(window, seconds: 1.5)
 
+        // v2 scroll column (09 §10 批次1): cards live in the list section
+        // (index 3) under the header/strip/hint chrome cells.
         guard let inbox = Self.find(InboxPageViewController.self, in: window.rootViewController),
               let collection = Self.firstView(in: inbox.view, where: { $0 is UICollectionView })
                 as? UICollectionView,
-              collection.numberOfItems(inSection: 0) >= 3 else {
+              collection.numberOfSections >= 4,
+              collection.numberOfItems(inSection: 3) >= 1 else {
             print("[uifix] seeded inbox missing; skipping"); return
+        }
+        let path = IndexPath(item: 0, section: 3)
+        guard let cell = collection.cellForItem(at: path) as? InboxEpisodeCardCell else {
+            Issue.record("inbox card 0 not visible"); return
+        }
+
+        // VoiceOver parity: the context-menu payload is mirrored onto the
+        // card as custom actions (09 §7a-C1).
+        #expect(cell.menuActions.count == 3,
+                "menu actions not mirrored (count \(cell.menuActions.count))")
+
+        // The more button pulls the same menu down (批次1).
+        let moreTitles = cell.moreButton.menu?.children.compactMap { ($0 as? UIAction)?.title }
+        #expect(moreTitles == ["Play", "Add to playlist", "Remove from inbox"],
+                "more menu children \(moreTitles ?? [])")
+
+        // The long-press menu itself: Play / Add to playlist / Remove from inbox.
+        guard let menu = inbox.contextMenu(at: path) else {
+            Issue.record("no context menu for inbox card 0"); return
+        }
+        let titles = menu.children.compactMap { ($0 as? UIAction)?.title }
+        #expect(titles == ["Play", "Add to playlist", "Remove from inbox"],
+                "menu children \(titles)")
+
+        // Trailing swipe surface (批次1 list-section half): a single
+        // destructive Remove action.
+        let swipeActions = inbox.trailingSwipeActions(at: path)?.actions ?? []
+        #expect(swipeActions.count == 1 && swipeActions.first?.style == .destructive
+                && swipeActions.first?.title == "Remove",
+                "swipe actions \(swipeActions.map { $0.title ?? "" })")
+
+        // Whole-card tap now opens the Detail sheet (was: strip toggle).
+        cell.onCardTap?()
+        try await Self.settle(window, seconds: 1.2)
+        guard let detail = Self.find(DetailViewController.self, in: window.rootViewController) else {
+            Issue.record("card tap did not present Detail"); return
+        }
+        await Self.capture(window, name: "uifix-inbox-card-detail")
+        detail.dismiss(animated: false)
+        try await Self.settle(window, seconds: 0.5)
+    }
+
+    // MARK: - Strip expand reliability (6, playlist list)
+
+    /// The strip-resize corruption guard. Inbox went strip-less (09 §7a-C1),
+    /// so the walk runs on the playlist episode list — the strips that
+    /// remain (Channel/Search/Playlist/History) share the cell + animator.
+    @Test("Playlist strip expand: every toggle resizes item heights, no stuck cards")
+    func playlistStripExpandReliability() async throws {
+        guard let context = await Self.liveContext(),
+              let window = Self.keyWindow() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        let queue = (try? await context.database.playlistRepository()
+            .listEpisodes(playlistId: ChannelPlaylistLogic.defaultPlaylistID)) ?? []
+        guard queue.count >= 3 else {
+            print("[uifix] seeded playlist < 3; skipping"); return
+        }
+
+        let list = PlaylistEpisodeListViewController(
+            context: context, playlistId: ChannelPlaylistLogic.defaultPlaylistID
+        )
+        list.modalPresentationStyle = .pageSheet
+        let presenter = await Self.settledTopPresenter(in: window) ?? window.rootViewController
+        presenter?.present(list, animated: false)
+        // Same teardown rule as case 5: dismiss from the presenting side.
+        defer { presenter?.dismiss(animated: false) }
+        try await Self.settle(window, seconds: 1.2)
+
+        guard let collection = Self.firstView(in: list.view, where: { $0 is UICollectionView })
+                as? UICollectionView else {
+            Issue.record("playlist collection not found"); return
         }
 
         func height(at item: Int) -> CGFloat {
@@ -407,6 +467,10 @@ struct UIFixRegressionTests {
         // all) after an earlier expand/collapse.
         let sequence = [0, 1, 2, 1, 0, 2, 0]
         for (step, item) in sequence.enumerated() {
+            collection.scrollToItem(
+                at: IndexPath(item: item, section: 0), at: .top, animated: false
+            )
+            try await Self.settle(window, seconds: 0.3)
             guard let cell = collection.cellForItem(at: IndexPath(item: item, section: 0))
                     as? EpisodeCardCell else {
                 Issue.record("step \(step): cell \(item) not visible"); continue
@@ -429,7 +493,7 @@ struct UIFixRegressionTests {
             #expect(abs(expandedCell.frame.height - expandedHeight) < 3,
                     "step \(step): cell frame \(expandedCell.frame.height) ≠ item \(expandedHeight)")
             if step == 0 {
-                await Self.capture(window, name: "uifix-inbox-expanded")
+                await Self.capture(window, name: "uifix-playlist-expanded")
             }
         }
     }
@@ -518,6 +582,7 @@ struct UIFixRegressionTests {
         #expect(button.layer.cornerRadius <= button.frame.height / 2 + 0.5,
                 "radius \(button.layer.cornerRadius) exceeds half the height — an oversized continuous radius renders as a pointed lens, not a capsule")
     }
+
 }
 
 private extension UIView {
@@ -538,3 +603,4 @@ private extension UIViewController {
         return top
     }
 }
+

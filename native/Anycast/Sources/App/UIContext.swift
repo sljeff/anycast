@@ -10,31 +10,31 @@ protocol ShareHandoffPresenting: AnyObject {
     func presentShareHandoff(for url: URL)
 }
 
-/// Programmatic tab navigation for screens (the Explore buttons jump to the
-/// Discover tab, 03 §2.3/§2.5) plus the tab-0 re-tap registration point.
-/// Constructed in the composition root together with `UIContext`; the shell
-/// attaches the tab bar controller once installed (weak — UI objects die
-/// with the scene, the context does not own them).
+/// Programmatic tab navigation for screens plus the tab-0 re-tap
+/// registration point. Constructed in the composition root together with
+/// `UIContext`; the shell attaches itself once installed (weak — UI objects
+/// die with the scene, the context does not own them).
 @MainActor
 final class TabNavigation {
 
-    weak var tabBarController: UITabBarController?
+    /// The v2 pill shell (a plain container since the V2 flip, not a
+    /// UITabBarController).
+    weak var tabBarController: MainTabBarController?
 
     /// The Feeds screen registers itself so the tab-0 re-tap rule
-    /// (03 §1.1) can reach the Inbox list; nil until that task lands.
+    /// (03 §1.1) can reach the Inbox list.
     weak var tabZeroTopRefresh: TabZeroTopRefresh?
 
     var selectedIndex: Int { tabBarController?.selectedIndex ?? 0 }
 
     func select(_ index: Int) {
-        guard let tabs = tabBarController as? MainTabBarController else { return }
-        tabs.selectTab(index)
+        tabBarController?.selectTab(index)
     }
 
-    /// Fires the re-tap behavior (MainTabBarController calls this on an
+    /// Fires the re-tap behavior (the shell calls this on an
     /// already-selected tab-0 tap). Extracted so the quirk stays testable:
-    /// the target is the Inbox list even when the Subscriptions inner tab
-    /// is visible — no inner-tab condition (03 §1.1).
+    /// the target is the Inbox list even when another tab is visible — no
+    /// inner-tab condition (03 §1.1).
     func handleTabZeroReTap() {
         tabZeroTopRefresh?.tabZeroReTapped()
     }

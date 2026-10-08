@@ -70,24 +70,17 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S3 Subscriptions list")
+    @Test("S3 Subscriptions list (library tab since the v2 IA flip)")
     func captureSubscriptions() async throws {
         try await Self.withRoot { root in
-            guard let container = Self.find(PodcastsTabContainer.self, in: root) else { return }
-            // Drive the real tap path: strip.select() is the programmatic
-            // sync entry (it deliberately does not fire onSelect, so the
-            // paging container would stay on Inbox). Without the strip the
-            // capture would record the Inbox screen under an S3 name.
-            guard let strip = Self.firstStrip(in: container.view),
-                  let stripStack = strip.subviews.compactMap({ $0 as? UIStackView }).first,
-                  let button = stripStack.arrangedSubviews.dropFirst().first as? UIControl
-            else {
-                Self.missingBaselineInput("inner tab strip (S3)")
+            guard let context = await Self.liveContext() else {
+                Self.missingBaselineInput("live UIContext (S3)")
                 return
             }
-            button.sendActions(for: .touchUpInside)
+            context.tabs.select(2)
             try await Self.settle(1.2)
             try await Self.capture("S3-subscriptions")
+            context.tabs.select(0)
         }
     }
 
@@ -105,16 +98,16 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S8 Discover categories")
-    func captureDiscover() async throws {
+    @Test("Library screen (v2 tab; replaces the retired S8 Discover slot)")
+    func captureLibrary() async throws {
         try await Self.withRoot { root in
             guard let context = await Self.liveContext() else {
                 Self.missingBaselineInput("live UIContext")
                 return
             }
             context.tabs.select(2)
-            try await Self.settle(4.0)
-            try await Self.capture("S8-discover")
+            try await Self.settle(1.5)
+            try await Self.capture("Library-library")
             context.tabs.select(0)
             try await Self.settle(0.5)
         }
@@ -533,14 +526,6 @@ struct ScreenBaselineCaptureTests {
         return nil
     }
 
-    private static func firstStrip(in view: UIView?) -> PodcastsTabStrip? {
-        guard let view else { return nil }
-        if let strip = view as? PodcastsTabStrip { return strip }
-        for subview in view.subviews {
-            if let match = firstStrip(in: subview) { return match }
-        }
-        return nil
-    }
 }
 
 private extension UIImage {
