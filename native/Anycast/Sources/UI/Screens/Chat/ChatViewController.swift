@@ -67,7 +67,7 @@ final class ChatViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
 
         let episode = context.playback.currentEpisode
         titleLabel.text = explicitTitle ?? episode?.title ?? ""

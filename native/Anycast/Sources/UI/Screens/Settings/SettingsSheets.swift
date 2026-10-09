@@ -37,7 +37,7 @@ final class SettingsOptionSheetViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
 
         // Header row: title + close icon, like the picker dialog's top bar.
         headerLabel.text = titleText
@@ -216,7 +216,7 @@ final class SettingsValuePickerSheetViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
 
         picker.dataSource = self
         picker.delegate = self

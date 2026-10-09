@@ -4,21 +4,15 @@ import Testing
 
 /// Rendering-level regression tests for the pill tab bar's chip geometry.
 ///
-/// Motivated by the 2026-10-02 review round: screenshots suggested the
-/// active chip's highlight was a hard rectangle. An injected-opaque-fill
-/// experiment proved the layer capsule is correct — the "rectangle" was a
-/// color-variant problem (dark-variant tokens on a near-black pill). These
-/// tests pin the geometry with an OPAQUE fill (the production 5%-alpha
-/// fill is too faint for pixel assertions) so a future radius regression
-/// fails loudly without eyeballing simulator screenshots.
+/// Pins the selected chip silhouette and adaptive glass backing.
 @MainActor
 struct TabChipRenderingTests {
 
     private func makeBar() -> BottomTabBarView {
         let bar = BottomTabBarView(items: [
-            .init(title: "Inbox", icon: AppIcons.inbox),
-            .init(title: "queue", icon: AppIcons.playlist),
-            .init(title: "library", icon: AppIcons.subscriptions),
+            .init(title: "Podcast", icon: AppIcons.inbox),
+            .init(title: "Playlist", icon: AppIcons.playlist),
+            .init(title: "Discover", icon: AppIcons.discover),
         ])
         bar.frame = CGRect(x: 0, y: 0, width: 440, height: 160)
         bar.layoutIfNeeded()
@@ -116,24 +110,18 @@ struct TabChipRenderingTests {
         }
     }
 
-    @Test("Pill: white-80 static fill and capsule radius survive layout")
-    func pillFillAndRadius() throws {
+    @Test("Pill uses the glass component with an iOS 18 material fallback")
+    func pillGlassSurface() throws {
         let bar = makeBar()
-        guard let pill = bar.pillButtons.first?.superview?.superview else {
+        guard let chip = bar.pillButtons.first?.superview,
+              let content = chip.superview,
+              let pill = content.superview as? GlassContainerView else {
             Issue.record("pill not found")
             return
         }
-        #expect(abs(pill.layer.cornerRadius - 36) < 0.5, "pill radius \(pill.layer.cornerRadius)")
-        // The static fill resolves identically under both traits.
-        let light = pill.backgroundColor?.resolvedColor(
-            with: UITraitCollection(userInterfaceStyle: .light)
-        )
-        let dark = pill.backgroundColor?.resolvedColor(
-            with: UITraitCollection(userInterfaceStyle: .dark)
-        )
-        #expect(light == dark, "pill fill must be the static white-80, not trait-dependent")
-        var white: CGFloat = 0, alpha: CGFloat = 0
-        light?.getWhite(&white, alpha: &alpha)
-        #expect(abs(white - 1) < 0.01 && abs(alpha - 0.8) < 0.01, "pill fill \(String(describing: light))")
+        #expect(pill.subviews.contains { $0 is UIVisualEffectView })
+        #expect(pill.layer.shadowOpacity == 0.08)
+        #expect(Theme.background.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+            != Theme.background.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark)))
     }
 }

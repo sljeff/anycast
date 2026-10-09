@@ -12,7 +12,7 @@ struct SpecimenSnapshotTests {
     @Test("Specimen: card + underline tab bar + gradient title")
     func specimen() throws {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 320))
-        Theme.installDarkBase(on: container)
+        Theme.installPlayerBase(on: container)
 
         let title = GradientTextLabel()
         title.text = "Anycast"

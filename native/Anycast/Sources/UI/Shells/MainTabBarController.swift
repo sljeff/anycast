@@ -37,8 +37,8 @@ enum MiniPlayerVisibility {
 }
 
 /// Derives the fly-in animation endpoint from the LIVE pill bar layout
-/// (07 §3 widget #11): the queue chip's center in the current geometry —
-/// with the v2 pill bar the middle chip (index 1) is the queue entry —
+/// (07 §3 widget #11): the Playlist chip's center in the current geometry —
+/// it remains the middle destination —
 /// degrading to the visible bar's area center, then to the window bottom
 /// center (A1-accepted adaptation). The shell attaches itself through
 /// `pillBarProvider` at install time.
@@ -55,7 +55,7 @@ final class TabBarFlyInEndpointProvider: PlaylistFlyInEndpointProvider {
         }
         let buttons = pillBar.pillButtons
         if !buttons.isEmpty {
-            // With 3 chips the queue entry is the middle one; clamp the
+            // With 3 chips Playlist is the middle one; clamp the
             // index so a degenerate hierarchy cannot over-read.
             let index = min(1, buttons.count - 1)
             let button = buttons[index]
@@ -71,12 +71,8 @@ final class TabBarFlyInEndpointProvider: PlaylistFlyInEndpointProvider {
     }
 }
 
-/// The v2 three-tab shell (09 §3.1/§10 V2): a plain self-managed container
-/// — NOT a UITabBarController — hosting the BottomTabBarView pill over
-/// full-bleed resident children (Inbox / queue / library), all PREWARMED at
-/// startup. The Discover tab retired (09 §3.5 — discovery moves to the
-/// search circle); the search circle pushes the search entry sheet. The
-/// mini player is the v2 floating capsule above the pill on every OS —
+/// The three-tab Flutter destination shell: Podcast / Playlist / Discover,
+/// with the mini player floating above the glass pill on every OS —
 /// with the custom pill bar there is no UITabBarController left to host a
 /// UITabAccessory, so the former iOS 26 accessory path folds into the same
 /// floating capsule (09 §3.6, V2 note).
@@ -94,7 +90,7 @@ final class MainTabBarController: UIViewController {
     private var childPins: [[NSLayoutConstraint]] = []
     private(set) var selectedIndex = 0
 
-    /// The pill bar (BottomTabBarView owns the scrim, chips, search circle).
+    /// The pill bar (BottomTabBarView owns the scrim and destination chips).
     private(set) var tabBarView: BottomTabBarView!
     /// The v2 mini player capsule, floating above the pill.
     private let playerBar: PlayerBarView
@@ -146,12 +142,12 @@ final class MainTabBarController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
 
         tabChildren = [
-            InboxPageViewController(context: context),
+            PodcastHomeViewController(context: context),
             PlaylistsPageViewController(context: context),
-            LibraryViewController(context: context),
+            DiscoverViewController(context: context),
         ]
 
         for child in tabChildren {
@@ -173,15 +169,14 @@ final class MainTabBarController: UIViewController {
         }
 
         tabBarView = BottomTabBarView(items: [
-            .init(title: "Inbox", icon: AppIcons.inbox),
-            .init(title: "queue", icon: AppIcons.playlist),
-            .init(title: "library", icon: AppIcons.subscriptions),
+            .init(title: "Podcast", icon: AppIcons.inbox),
+            .init(title: "Playlist", icon: AppIcons.playlist),
+            .init(title: "Discover", icon: AppIcons.discover),
         ])
         tabBarView.translatesAutoresizingMaskIntoConstraints = false
         tabBarView.onTabTap = { [weak self] index, isRetap in
             self?.handleTabTap(index: index, isRetap: isRetap)
         }
-        tabBarView.onSearchTap = { [weak self] in self?.openSearch() }
         view.addSubview(tabBarView)
         tabBarHeightConstraint = tabBarView.heightAnchor.constraint(
             equalToConstant: ChromeMetrics.barOverlayHeight(safeBottom: view.safeAreaInsets.bottom)
@@ -278,15 +273,6 @@ final class MainTabBarController: UIViewController {
     /// Programmatic selection (UIContext.tabs.select).
     func selectTab(_ index: Int) {
         show(index: index)
-    }
-
-    // MARK: - Search entry (09 §3.1: tap pushes the search screen)
-
-    private func openSearch() {
-        AppSheets.presentForm(
-            SearchEntryViewController(context: context),
-            from: topMostPresented()
-        )
     }
 
     // MARK: - K6: playback failure toast

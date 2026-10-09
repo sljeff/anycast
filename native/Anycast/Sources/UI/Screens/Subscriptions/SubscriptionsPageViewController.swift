@@ -61,7 +61,7 @@ final class SubscriptionsPageViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
 
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = .clear

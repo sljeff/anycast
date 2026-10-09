@@ -9,9 +9,8 @@ import UIKit
 /// Figma source of truth). `Theme.x` stays the only sanctioned color access
 /// — never `UIColor(red:…)` literals in screens.
 ///
-/// The app still force-installs the dark chrome (`installDarkBase`) until
-/// the V3 per-screen migration completes; the trait flip is the final V4
-/// step, not a drive-by change (09 §10).
+/// Screen surfaces follow the system appearance. The player keeps its
+/// intentionally dark presentation in `installPlayerBase`.
 nonisolated enum Theme {
 
     // MARK: - Semantic tokens (anycast_theme.dart `_build(brightness)`)
@@ -72,21 +71,26 @@ nonisolated enum Theme {
 
     // MARK: - Chrome
 
-    /// Applies the app-wide dark chrome to a plain container. NOTE: the
-    /// `overrideUserInterfaceStyle = .dark` force is a TRANSITIONAL v1
-    /// holdover — v2 is dual-theme and this override is removed in V4 once
-    /// every screen has been audited for light mode (09 §10 V4).
-    static func installDarkBase(on view: UIView) {
+    /// Applies the semantic page surface without overriding system appearance.
+    @MainActor
+    static func installPageBase(on view: UIView) {
         view.backgroundColor = background
+        view.overrideUserInterfaceStyle = .unspecified
+    }
+
+    /// The full-screen player intentionally uses the warm-dark UI kit palette.
+    @MainActor
+    static func installPlayerBase(on view: UIView) {
+        view.backgroundColor = playerBackground
         view.overrideUserInterfaceStyle = .dark
     }
 
     // MARK: - Legacy v1 bridge
     //
     // Transitional v1 accessor names re-pointed at v2 semantics so the
-    // not-yet-migrated screens keep compiling and render a plausible v2
-    // dark look. Each accessor is deleted together with its last consumer
-    // during the V3 per-screen migration (09 §10); do not add new uses.
+    // not-yet-migrated screens keep compiling during the per-screen audit.
+    // Each accessor is deleted together with its last consumer during the
+    // V3 per-screen migration (09 §10); do not add new uses.
 
     /// Was the near-white main text → onSurface.
     static let primaryLightMax = onSurface
@@ -108,8 +112,8 @@ nonisolated enum Theme {
     static let brandGreen = AnycastColor.grass9
     /// Was 0x6B7280 → onSurfaceVariant.
     static let secondaryLabelGray = onSurfaceVariant
-    /// Was 0x4B5563 → sandDark9.
-    static let hintGray = AnycastColor.sandDark9
+    /// Placeholder and subdued ink → appearance-aware secondary text.
+    static let hintGray = onSurfaceVariant
     /// Was 0x1E1E1E login card → container.
     static let loginCardBackground = surfaceContainer
     /// Was 0x424242 card border → outline.

@@ -30,8 +30,8 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
-        XCTAssertTrue(app.buttons["tab-1"].exists, "queue chip missing")
-        XCTAssertTrue(app.buttons["tab-2"].exists, "library chip missing")
+        XCTAssertTrue(app.buttons["tab-1"].exists, "Playlist chip missing")
+        XCTAssertTrue(app.buttons["tab-2"].exists, "Discover chip missing")
 
         for tab in ["tab-1", "tab-2", "tab-0"] {
             app.buttons[tab].tap()
@@ -61,9 +61,8 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        app.buttons["tab-search"].tap()
-        let field = app.textFields["search-entry-field"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5), "search entry sheet missing")
+        let field = app.textFields["header-search-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "page header search field missing")
         field.tap()
         guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
             // A connected hardware keyboard suppresses the software one; the
@@ -77,10 +76,8 @@ final class SmokeFlowsUITests: XCTestCase {
             field.typeText("\n")
         }
 
-        // The sheet's own copy is the stable marker (03 §2.6) — do not
-        // weaken with an any-collectionView fallback: one always exists
-        // behind the entry sheet on the Inbox tab, so the disjunct passed
-        // even when the sheet never opened.
+        // The results sheet's own copy is the stable marker — do not weaken
+        // with a collection-view fallback (one is always behind the sheet).
         let marker = app.staticTexts["You are searching for"]
         XCTAssertTrue(
             marker.waitForExistence(timeout: 8),
@@ -168,8 +165,8 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        // Subscriptions moved to the library tab with the v2 IA (09 §3.3).
-        app.buttons["tab-2"].tap()
+        // Subscriptions is the second section within the Podcast destination.
+        app.buttons["podcast-section-1"].tap()
 
         let list = app.collectionViews.firstMatch
         guard list.waitForExistence(timeout: 8), list.cells.count > 0 else {

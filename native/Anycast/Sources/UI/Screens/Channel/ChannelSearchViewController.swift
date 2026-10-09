@@ -95,7 +95,7 @@ final class ChannelSearchViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         // Custom grabber below; the header band taps to close.
         sheetPresentationController?.prefersGrabberVisible = false
 

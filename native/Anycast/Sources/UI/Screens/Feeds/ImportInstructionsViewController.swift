@@ -124,7 +124,7 @@ final class ImportInstructionsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
 
         // Fixed header column (grabber + title) over the scrolling list —
         // the Dart Column[Handler, title, Expanded(ListView)].

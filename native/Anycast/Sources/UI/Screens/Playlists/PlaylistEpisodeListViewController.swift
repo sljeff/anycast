@@ -62,7 +62,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         binder = PlaylistEpisodeListBinder(
             owner: self, context: context, playlistId: playlistId, expandCoordinator: expandCoordinator
         )

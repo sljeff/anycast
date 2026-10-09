@@ -53,7 +53,7 @@ final class HistoryDialogViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         buildDialog()
         configureDataSource()
         Task { await reload() }

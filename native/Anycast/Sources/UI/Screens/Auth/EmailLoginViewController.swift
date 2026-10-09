@@ -23,7 +23,7 @@ final class EmailLoginViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
 
         let stack = UIStackView()
         stack.axis = .vertical

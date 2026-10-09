@@ -50,7 +50,7 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         build()
 
         observation.track(

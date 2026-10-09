@@ -31,6 +31,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     }
 
     private let context: UIContext
+    private let showsHeader: Bool
+    var onStatusChange: ((String) -> Void)?
 
     /// The FULL inbox list — every write path (trim, remove, reload)
     /// operates here; the data source renders the category-filtered view.
@@ -66,8 +68,13 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     // MARK: - Init (the shell constructs `init(context:)`)
 
-    init(context: UIContext, now: @escaping @MainActor () -> Date = { Date() }) {
+    init(
+        context: UIContext,
+        showsHeader: Bool = true,
+        now: @escaping @MainActor () -> Date = { Date() }
+    ) {
         self.context = context
+        self.showsHeader = showsHeader
         self.gate = InboxRefreshGate(now: now)
         // Placeholder layout; the real section provider is attached after
         // super.init once self is complete.
@@ -96,7 +103,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         configureChrome()
         buildCollectionView()
 
@@ -127,10 +134,16 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// cells re-parent the shared views on dequeue, so exactly one
     /// materialized host exists at a time.
     private func configureChrome() {
-        header.configure(HeaderView.Configuration(title: "Inbox", statusText: nil))
+        header.configure(HeaderView.Configuration(title: "Podcast", statusText: nil))
         header.onSettings = { [weak self] in
             guard let self else { return }
             AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
+        }
+        header.onSearch = { [weak self] query in
+            guard let self else { return }
+            SearchPageViewController.present(
+                from: self.topMostPresented(), context: self.context, searchText: query
+            )
         }
 
         categoryStrip.onSelect = { [weak self] value in
@@ -190,12 +203,11 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     }
 
     private func refreshChromeStatus() {
-        header.configure(HeaderView.Configuration(
-            title: "Inbox",
-            statusText: Self.headerStatusText(
-                lastRefresh: gate.lastRefresh, episodeCount: episodes.count
-            )
-        ))
+        let status = Self.headerStatusText(lastRefresh: gate.lastRefresh, episodeCount: episodes.count)
+        if showsHeader {
+            header.configure(HeaderView.Configuration(title: "Podcast", statusText: status))
+        }
+        onStatusChange?(status)
     }
 
     // MARK: - Collection view (03 §2.3 v2: 16 pt sides, 12 pt column gaps;
@@ -209,7 +221,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     private func makeSection(
         index: Int, environment: NSCollectionLayoutEnvironment
     ) -> NSCollectionLayoutSection? {
-        switch index {
+        let sectionIndex = showsHeader ? index : index + 1
+        switch sectionIndex {
         case Section.header:
             return chromeSection(bottomInset: Spacing.gap)
         case Section.strip:
@@ -283,10 +296,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         ])
 
         emptyStateView.onExplore = { [weak self] in
-            // v2 09 §3.5: Discover retired — discovery lives behind the
-            // search circle; the empty state's Explore opens it.
-            guard let self else { return }
-            AppSheets.presentForm(SearchEntryViewController(context: self.context), from: self.topMostPresented())
+            self?.context.tabs.select(2)
         }
         emptyStateView.onImportOPML = { [weak self] in
             // Get.dialog(ImportExportBlock) — the T9 stub is the correct
@@ -684,11 +694,11 @@ extension InboxPageViewController: UICollectionViewDataSource {
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         // The whole scroll column collapses on the empty inbox — the
         // ImportBlock empty state carries its own header (03 §2.3 v2 裁定).
-        displayedEpisodes.isEmpty ? 0 : Section.count
+        displayedEpisodes.isEmpty ? 0 : Section.count - (showsHeader ? 0 : 1)
     }
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        switch section {
+        switch showsHeader ? section : section + 1 {
         case Section.header, Section.strip, Section.hint, Section.tail:
             return 1
         case Section.cards:
@@ -701,7 +711,7 @@ extension InboxPageViewController: UICollectionViewDataSource {
     func collectionView(
         _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
-        switch indexPath.section {
+        switch showsHeader ? indexPath.section : indexPath.section + 1 {
         case Section.header:
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: ChromeHostingCell.reuseIdentifier, for: indexPath
@@ -804,7 +814,7 @@ extension InboxPageViewController: UICollectionViewDelegate {
         contextMenuConfigurationForItemAt indexPath: IndexPath,
         point: CGPoint
     ) -> UIContextMenuConfiguration? {
-        guard indexPath.section == Section.cards else { return nil }
+        guard (showsHeader ? indexPath.section : indexPath.section + 1) == Section.cards else { return nil }
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
             self?.contextMenu(at: indexPath)
         }
@@ -814,7 +824,7 @@ extension InboxPageViewController: UICollectionViewDelegate {
     /// inbox) — same handlers the strip buttons ran. Internal so the
     /// in-app regression suite can assert the wiring directly.
     func contextMenu(at indexPath: IndexPath) -> UIMenu? {
-        guard indexPath.section == Section.cards,
+        guard (showsHeader ? indexPath.section : indexPath.section + 1) == Section.cards,
               displayedEpisodes.indices.contains(indexPath.item) else { return nil }
         let actions = actions(for: displayedEpisodes[indexPath.item], at: indexPath)
         return UIMenu(children: actions.map { action in
@@ -828,7 +838,7 @@ extension InboxPageViewController: UICollectionViewDelegate {
     /// Remove running the same planner path as the menu entry. Internal so
     /// the in-app regression suite can assert the wiring directly.
     func trailingSwipeActions(at indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        guard indexPath.section == Section.cards,
+        guard (showsHeader ? indexPath.section : indexPath.section + 1) == Section.cards,
               displayedEpisodes.indices.contains(indexPath.item) else { return nil }
         let episode = displayedEpisodes[indexPath.item]
         let remove = UIContextualAction(

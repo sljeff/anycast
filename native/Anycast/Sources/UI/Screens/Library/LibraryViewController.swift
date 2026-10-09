@@ -1,24 +1,22 @@
 import UIKit
 import AnycastKit
 
-/// The v2 library tab (Figma `library` 86:2814 — 09 §3.3, V2 wrap scope):
-/// the v2 header over a membership placeholder block and the existing
-/// Subscriptions page, which moves here from the retired inner tab. The
-/// Figma `library block` chrome (pill row + surface card, cover strip,
-/// `recent` block) is the V3 batch-2 deepening — this pass only lands the
-/// IA move plus the membership placeholder (upgrade row: goldAlpha2 fill +
-/// sandAlpha4 hairline + radius 16, Figma 628:6365/366:5127).
+/// The Podcast tab's Subscriptions section. The Flutter flow places the
+/// subscription cards directly below the shared Podcast header and tabs.
 @MainActor
 final class LibraryViewController: UIViewController {
 
     private let context: UIContext
+    private let showsHeader: Bool
+    var onStatusChange: ((String) -> Void)?
 
     private let header = HeaderView()
     private let subscriptions: SubscriptionsPageViewController
     private var notificationObserver: NSObjectProtocol?
 
-    init(context: UIContext) {
+    init(context: UIContext, showsHeader: Bool = true) {
         self.context = context
+        self.showsHeader = showsHeader
         self.subscriptions = SubscriptionsPageViewController(context: context)
         super.init(nibName: nil, bundle: nil)
     }
@@ -30,28 +28,46 @@ final class LibraryViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
 
-        header.configure(HeaderView.Configuration(title: "library"))
-        header.onSettings = { [weak self] in
-            guard let self else { return }
-            AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
+        var contentTop = view.safeAreaLayoutGuide.topAnchor
+        if showsHeader {
+            header.configure(HeaderView.Configuration(title: "Shows"))
+            header.onSettings = { [weak self] in
+                guard let self else { return }
+                AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
+            }
+            header.onSearch = { [weak self] query in
+                guard let self else { return }
+                SearchPageViewController.present(
+                    from: self.topMostPresented(), context: self.context, searchText: query
+                )
+            }
+            header.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(header)
+
+            let membership = buildMembershipCard()
+            membership.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(membership)
+
+            let blockRow = buildBlockRow()
+            blockRow.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(blockRow)
+
+            contentTop = blockRow.bottomAnchor
+            NSLayoutConstraint.activate([
+                header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+                membership.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+                membership.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+                membership.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.chip),
+                blockRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+                blockRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+                blockRow.topAnchor.constraint(equalTo: membership.bottomAnchor, constant: Spacing.chip),
+            ])
         }
-        header.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(header)
 
-        let membership = buildMembershipCard()
-        membership.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(membership)
-
-        let blockRow = buildBlockRow()
-        blockRow.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(blockRow)
-
-        // The wrapped Subscriptions list shares the 16 pt page grid with the
-        // chrome above it; hosting it full-bleed preserves the v1 list rhythm
-        // under the new chrome (the surface-card block visual is V3 batch-2
-        // scope).
         addChild(subscriptions)
         subscriptions.view.backgroundColor = .clear
         subscriptions.view.translatesAutoresizingMaskIntoConstraints = false
@@ -59,21 +75,9 @@ final class LibraryViewController: UIViewController {
         subscriptions.didMove(toParent: self)
 
         NSLayoutConstraint.activate([
-            header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-
-            membership.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
-            membership.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
-            membership.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.chip),
-
-            blockRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
-            blockRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
-            blockRow.topAnchor.constraint(equalTo: membership.bottomAnchor, constant: Spacing.chip),
-
             subscriptions.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             subscriptions.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            subscriptions.view.topAnchor.constraint(equalTo: blockRow.bottomAnchor, constant: Spacing.xs),
+            subscriptions.view.topAnchor.constraint(equalTo: contentTop, constant: Spacing.xs),
             subscriptions.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
@@ -85,6 +89,12 @@ final class LibraryViewController: UIViewController {
             MainActor.assumeIsolated { self?.refreshStatus() }
         }
         refreshStatus()
+        subscriptions.additionalSafeAreaInsets.bottom = additionalSafeAreaInsets.bottom
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        subscriptions.additionalSafeAreaInsets.bottom = additionalSafeAreaInsets.bottom
     }
 
     // MARK: - Status line ("100 episodes remain" placeholder → live count)
@@ -93,10 +103,11 @@ final class LibraryViewController: UIViewController {
         Task { [weak self] in
             guard let self else { return }
             let count = (try? await self.context.database.subscriptionRepository().listAll())?.count ?? 0
-            self.header.configure(HeaderView.Configuration(
-                title: "library",
-                statusText: Self.statusText(showCount: count)
-            ))
+            let status = Self.statusText(showCount: count)
+            if self.showsHeader {
+                self.header.configure(HeaderView.Configuration(title: "Shows", statusText: status))
+            }
+            self.onStatusChange?(status)
         }
     }
 

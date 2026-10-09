@@ -4,9 +4,8 @@ import AnycastKit
 /// The queue tab (lib/pages/playlists.dart:24-59, IA per 09 §3.4): one
 /// page per playlist, switched by horizontal swipe ONLY — the Dart Scaffold
 /// has a TabBarView but NO TabBar (03 §10.1: usually the single default
-/// list; a visible tab strip must not be invented here). The v2 header
-/// (09 §3.8) replaces the v1 AppBar; the embedded search field retired
-/// with the search circle in the pill bar. The full QueueView v2 reskin
+/// list; a visible tab strip must not be invented here). A shared page
+/// header exposes search and settings. The full Playlist v2 reskin
 /// (archive cover strip + queue cards, 1020:7525) is V3 batch-2 scope.
 @MainActor
 final class PlaylistsPageViewController: UIViewController {
@@ -32,7 +31,7 @@ final class PlaylistsPageViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         buildHeader()
         buildPaging()
         Task { await reloadPlaylists() }
@@ -41,10 +40,16 @@ final class PlaylistsPageViewController: UIViewController {
     // MARK: - v2 header (09 §3.8)
 
     private func buildHeader() {
-        header.configure(HeaderView.Configuration(title: "queue"))
+        header.configure(HeaderView.Configuration(title: "Playlist"))
         header.onSettings = { [weak self] in
             guard let self else { return }
             AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
+        }
+        header.onSearch = { [weak self] query in
+            guard let self else { return }
+            SearchPageViewController.present(
+                from: self.topMostPresented(), context: self.context, searchText: query
+            )
         }
         header.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(header)

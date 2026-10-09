@@ -710,13 +710,13 @@ final class QACrawlUITests: XCTestCase {
         return app.buttons["Share episode"].waitForExistence(timeout: 6)
     }
 
-    /// Subscriptions live on the library tab since the v2 IA flip
-    /// (09 §3.3) — tap the chip, then the subscriptions collection must
-    /// show rows.
+    /// Subscriptions is the second section within Podcast — tap it, then
+    /// the subscriptions collection must show rows.
     private func ensureSubscriptionsPage() -> Bool {
         closeSheet()
-        currentTab = "tab-2"
-        _ = tap(app.buttons["tab-2"], "library chip")
+        currentTab = "tab-0"
+        _ = tap(app.buttons["tab-0"], "Podcast chip")
+        _ = tap(app.buttons["podcast-section-1"], "Subscriptions section")
         return app.collectionViews.firstMatch.waitForExistence(timeout: 4)
             && app.collectionViews.firstMatch.cells.count > 0
     }
@@ -788,9 +788,8 @@ final class QACrawlUITests: XCTestCase {
         let steps: [Checkpoint] = [
             Checkpoint(state: "inbox",
                        action: { _ in true },
-                       // v2 IA: the inner Subscriptions strip is gone; the
-                       // pill chips + search circle are the shell markers.
-                       required: ["Settings", "Inbox", "library", "search"],
+                       // Podcast owns an inner Inbox / Subscriptions selector.
+                       required: ["Podcast", "Inbox", "Subscriptions", "Search", "Settings"],
                        probe: true, settle: 5),
 
             Checkpoint(state: "inbox-expanded",
@@ -863,8 +862,9 @@ final class QACrawlUITests: XCTestCase {
             Checkpoint(state: "subscriptions",
                        action: { s in
                            s.closeSheet(times: 2)  // channel, then detail
-                           guard s.tap(s.app.buttons["tab-2"], "library chip") else { return false }
-                           s.currentTab = "tab-2"
+                           s.currentTab = "tab-0"
+                           guard s.tap(s.app.buttons["tab-0"], "Podcast chip") else { return false }
+                           guard s.tap(s.app.buttons["podcast-section-1"], "Subscriptions section") else { return false }
                            return s.app.collectionViews.firstMatch.waitForExistence(timeout: 4)
                        },
                        required: [],
@@ -890,14 +890,11 @@ final class QACrawlUITests: XCTestCase {
                        action: { s in
                            s.closeSheet()
                            s.currentTab = "tab-0"
-                           guard s.tap(s.app.buttons["tab-search"], "search circle") else { return false }
-                           let field = s.app.textFields["search-entry-field"]
+                           let field = s.app.textFields["header-search-field"]
                            guard field.waitForExistence(timeout: 5) else { return false }
                            s.tapElement(field)
-                           // Flutter's engine field does not expose keyboard
-                           // focus reliably and typeText on an unfocused
-                           // field hard-fails the test — the reference dump
-                           // skips submission instead of dying mid-tour.
+                           // The native header field uses the standard
+                           // keyboard submit path into global results.
                            guard s.audit else {
                                s.markSkipped("search", "keyboard submission",
                                              "reference capture does not drive text input")
@@ -933,7 +930,7 @@ final class QACrawlUITests: XCTestCase {
                        action: { s in
                            s.closeSheet()
                            s.currentTab = "tab-1"
-                           return s.tap(s.app.buttons["tab-1"], "queue chip")
+                           return s.tap(s.app.buttons["tab-1"], "Playlist chip")
                        },
                        required: ["Settings"],
                        probe: true, settle: 3),
@@ -998,11 +995,12 @@ final class QACrawlUITests: XCTestCase {
                        required: ["Continuous play"],
                        probe: true, settle: 3),
 
-            Checkpoint(state: "library",
+            Checkpoint(state: "subscriptions",
                        action: { s in
                            s.closeSheet()
-                           s.currentTab = "tab-2"
-                           return s.tap(s.app.buttons["tab-2"], "library chip")
+                           s.currentTab = "tab-0"
+                           guard s.tap(s.app.buttons["tab-0"], "Podcast chip") else { return false }
+                           return s.tap(s.app.buttons["podcast-section-1"], "Subscriptions section")
                        },
                        required: ["Settings"],
                        probe: true, settle: 3),

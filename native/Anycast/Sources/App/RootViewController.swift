@@ -1,7 +1,7 @@
 import UIKit
 
 /// The scene's root: owns URL routing and installs the tab shell once the
-/// startup DAG hands over the `UIContext` (dark base until then — the first
+/// startup DAG hands over the `UIContext` (semantic base until then — the first
 /// frame never waits for the chain, docs/migration/08 §2.3).
 final class RootViewController: UIViewController {
 
@@ -15,7 +15,7 @@ final class RootViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
     }
 
     /// Composition-root callback target (AppEnvironment.onShellReady).

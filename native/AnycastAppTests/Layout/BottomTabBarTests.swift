@@ -2,15 +2,15 @@ import UIKit
 import Testing
 @testable import Anycast
 
-/// The v2 floating pill tab bar (Figma 243:7288 — 09 §3.1).
+/// The shared three-destination floating pill bar.
 @MainActor
 struct BottomTabBarTests {
 
     private func makeBar() -> (BottomTabBarView, [(index: Int, isRetap: Bool)]) {
         let bar = BottomTabBarView(items: [
-            .init(title: "Inbox", icon: AppIcons.inbox),
-            .init(title: "queue", icon: AppIcons.playlist),
-            .init(title: "library", icon: AppIcons.subscriptions),
+            .init(title: "Podcast", icon: AppIcons.inbox),
+            .init(title: "Playlist", icon: AppIcons.playlist),
+            .init(title: "Discover", icon: AppIcons.discover),
         ])
         bar.frame = CGRect(x: 0, y: 0, width: 440, height: 120)
         bar.layoutIfNeeded()
@@ -19,41 +19,37 @@ struct BottomTabBarTests {
         return (bar, taps)
     }
 
-    @Test("Three equal-width chips inside the pill plus the search circle")
+    @Test("Three equal-width destination chips fill the glass pill")
     func chipGeometry() {
         let (bar, _) = makeBar()
         // Chip frames live in the pill's coordinate space; convert to bar
         // coordinates before asserting page insets.
         let chips = bar.pillButtons.map { button -> CGRect in
-            guard let chip = button.superview, let pill = chip.superview else { return .zero }
+            guard let chip = button.superview,
+                  let glassContent = chip.superview,
+                  let pill = glassContent.superview else { return .zero }
             return pill.convert(chip.frame, to: bar)
         }
         #expect(chips.count == 3)
         let widths = chips.map(\.width)
         #expect(widths.allSatisfy { abs($0 - widths[0]) < 0.5 }, "chips are not equal width: \(widths)")
-        // Figma: chip body 64 in a 72 pt pill.
+        // The 64 pt chip body keeps an eight-point inset in the pill.
         #expect(abs(chips[0].height - 64) < 0.5, "chip height \(chips[0].height)")
-        // Search circle is a 72 pt glass surface to the pill's trailing side.
-        let searchHost = bar.searchButton.superview
-        #expect(searchHost != nil)
-        let search = searchHost?.convert(bar.searchButton.frame, to: bar) ?? .zero
-        #expect(abs(search.width - BottomTabBarView.searchButtonSize) < 1)
-        #expect(search.minX > chips[2].maxX, "search button overlaps the pill: \(search.minX) vs \(chips[2].maxX)")
-        // The whole group respects the horizontal page inset.
+        // The pill respects the shared 16 pt page inset.
         #expect(abs(chips[0].minX - (BottomTabBarView.horizontalInset + 4)) < 1, "leading inset \(chips[0].minX)")
-        #expect(abs(search.maxX - (440 - BottomTabBarView.horizontalInset)) < 1, "trailing inset \(search.maxX)")
+        #expect(abs(chips[2].maxX - (440 - BottomTabBarView.horizontalInset - 4)) < 1, "trailing inset \(chips[2].maxX)")
         // Accessibility identifiers the UITests rely on.
         #expect(bar.pillButtons[0].accessibilityIdentifier == "tab-0")
-        #expect(bar.searchButton.accessibilityIdentifier == "tab-search")
+        #expect(bar.pillButtons.map(\.accessibilityIdentifier) == ["tab-0", "tab-1", "tab-2"])
     }
 
     @Test("Selection moves the gold chip; a second tap on the same chip reports a re-tap")
     func selectionAndRetap() {
         final class TapLog { var entries: [(Int, Bool)] = [] }
         let bar = BottomTabBarView(items: [
-            .init(title: "Inbox", icon: AppIcons.inbox),
-            .init(title: "queue", icon: AppIcons.playlist),
-            .init(title: "library", icon: AppIcons.subscriptions),
+            .init(title: "Podcast", icon: AppIcons.inbox),
+            .init(title: "Playlist", icon: AppIcons.playlist),
+            .init(title: "Discover", icon: AppIcons.discover),
         ])
         bar.frame = CGRect(x: 0, y: 0, width: 440, height: 120)
         bar.layoutIfNeeded()
@@ -70,12 +66,21 @@ struct BottomTabBarTests {
         #expect(log.entries.count == 2)
     }
 
-    @Test("Search tap fires the search callback once")
-    func searchTap() {
+    @Test("Destination accessibility labels match the main navigation")
+    func destinationAccessibility() {
         let (bar, _) = makeBar()
-        var count = 0
-        bar.onSearchTap = { count += 1 }
-        bar.searchButton.sendActions(for: .touchUpInside)
-        #expect(count == 1)
+        #expect(bar.pillButtons.map(\.accessibilityLabel) == ["Podcast", "Playlist", "Discover"])
+    }
+
+    @Test("Destination labels scale with accessibility text")
+    func dynamicTypeLabels() {
+        let (bar, _) = makeBar()
+        bar.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraExtraLarge
+        bar.setNeedsLayout()
+        bar.layoutIfNeeded()
+
+        let label = bar.pillButtons.first?.titleLabel
+        #expect((label?.font.pointSize ?? 0) > 12)
+        #expect((label?.frame.maxY ?? .infinity) <= (bar.pillButtons.first?.bounds.height ?? 0))
     }
 }

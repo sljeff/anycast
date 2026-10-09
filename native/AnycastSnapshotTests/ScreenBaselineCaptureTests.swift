@@ -3,7 +3,7 @@ import Testing
 import AnycastKit
 @testable import Anycast
 
-/// Reference baselines for the M3 screen states (05 §6.1 S1–S21).
+/// Reference baselines for the native screen states (05 §6.1 S1–S21).
 ///
 /// These are REFERENCE captures, not pixel assertions: 05 §6.1 prescribes
 /// structural comparison against the Flutter build per OS, and the accepted
@@ -70,17 +70,23 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S3 Subscriptions list (library tab since the v2 IA flip)")
+    @Test("S3 Subscriptions list (Podcast inner section)")
     func captureSubscriptions() async throws {
         try await Self.withRoot { root in
             guard let context = await Self.liveContext() else {
                 Self.missingBaselineInput("live UIContext (S3)")
                 return
             }
-            context.tabs.select(2)
+            context.tabs.select(0)
+            guard let podcast = Self.find(PodcastHomeViewController.self, in: root),
+                  Self.tapButton("podcast-section-1", in: podcast.view)
+            else {
+                Self.missingBaselineInput("Podcast Subscriptions section (S3)")
+                return
+            }
             try await Self.settle(1.2)
             try await Self.capture("S3-subscriptions")
-            context.tabs.select(0)
+            _ = Self.tapButton("podcast-section-0", in: podcast.view)
         }
     }
 
@@ -98,16 +104,16 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("Library screen (v2 tab; replaces the retired S8 Discover slot)")
-    func captureLibrary() async throws {
+    @Test("S8 Discover destination")
+    func captureDiscover() async throws {
         try await Self.withRoot { root in
             guard let context = await Self.liveContext() else {
-                Self.missingBaselineInput("live UIContext")
+                Self.missingBaselineInput("live UIContext (S8)")
                 return
             }
             context.tabs.select(2)
             try await Self.settle(1.5)
-            try await Self.capture("Library-library")
+            try await Self.capture("S8-discover")
             context.tabs.select(0)
             try await Self.settle(0.5)
         }
@@ -422,10 +428,24 @@ struct ScreenBaselineCaptureTests {
         else { return nil }
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if list.numberOfItems(inSection: 0) > 0 { return list }
+            if list.numberOfSections >= 3,
+               list.numberOfItems(inSection: list.numberOfSections - 2) > 0 {
+                return list
+            }
             try? await Task.sleep(for: .milliseconds(250))
         }
         return nil
+    }
+
+    private static func tapButton(_ identifier: String, in view: UIView) -> Bool {
+        if let button = view as? UIButton, button.accessibilityIdentifier == identifier {
+            button.sendActions(for: .touchUpInside)
+            return true
+        }
+        for subview in view.subviews where tapButton(identifier, in: subview) {
+            return true
+        }
+        return false
     }
 
     /// Shows a player page by walking the pager's data source — deterministic

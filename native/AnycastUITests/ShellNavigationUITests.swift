@@ -1,11 +1,11 @@
 import XCTest
 
-/// T0b shell smoke (05 §6.2, v2 pill bar per 09 §10 V2): pill tab
-/// structure, tab switching, the search circle, the mini player (only
+/// Shell smoke: primary destinations, Podcast's inner tabs, header search,
+/// and the mini player (only
 /// meaningful on a seeded simulator), and the player sheet with its
 /// PageTab capsule. Runs unseeded — the mini-player step is guarded on
 /// presence. Tab targets are the BottomTabBarView accessibility
-/// identifiers (tab-0/1/2/tab-search), not system tab-bar buttons.
+/// identifiers (tab-0/1/2), not system tab-bar buttons.
 final class ShellNavigationUITests: XCTestCase {
 
     override func setUpWithError() throws {
@@ -16,55 +16,42 @@ final class ShellNavigationUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        // The pill bar's three chips + the search circle install with the
-        // startup DAG.
+        // The pill bar's three primary destinations install with startup.
         let inboxTab = app.buttons["tab-0"]
         XCTAssertTrue(inboxTab.waitForExistence(timeout: 20), "pill tab bar did not install")
-        XCTAssertTrue(app.buttons["tab-1"].exists, "queue chip missing")
-        XCTAssertTrue(app.buttons["tab-2"].exists, "library chip missing")
-        XCTAssertTrue(app.buttons["tab-search"].exists, "search circle missing")
+        XCTAssertTrue(app.buttons["tab-1"].exists, "Playlist chip missing")
+        XCTAssertTrue(app.buttons["tab-2"].exists, "Discover chip missing")
+        let searchField = app.textFields["header-search-field"]
+        XCTAssertTrue(searchField.exists, "header search field missing")
+
+        let inboxSection = app.buttons["podcast-section-0"]
+        let subscriptionsSection = app.buttons["podcast-section-1"]
+        XCTAssertTrue(inboxSection.exists, "Podcast Inbox section missing")
+        XCTAssertTrue(subscriptionsSection.exists, "Podcast Subscriptions section missing")
+        subscriptionsSection.tap()
+        XCTAssertTrue(subscriptionsSection.isSelected, "Subscriptions section did not become selected")
+        inboxSection.tap()
+        XCTAssertTrue(inboxSection.isSelected, "Inbox section did not become selected")
 
         // Switch through every tab; children are prewarmed so this must
         // be instant (07 §2.1).
         app.buttons["tab-1"].tap()
-        XCTAssertTrue(app.buttons["tab-1"].isSelected, "queue chip did not become selected")
+        XCTAssertTrue(app.buttons["tab-1"].isSelected, "Playlist chip did not become selected")
         app.buttons["tab-2"].tap()
-        XCTAssertTrue(app.buttons["tab-2"].isSelected, "library chip did not become selected")
+        XCTAssertTrue(app.buttons["tab-2"].isSelected, "Discover chip did not become selected")
         app.buttons["tab-0"].tap()
         XCTAssertTrue(app.buttons["tab-0"].isSelected, "Inbox chip did not become selected")
 
-        // The search circle pushes the search entry sheet (09 §3.1).
-        app.buttons["tab-search"].tap()
-        let entryField = app.textFields["search-entry-field"]
-        XCTAssertTrue(
-            entryField.waitForExistence(timeout: 8),
-            "search entry sheet did not open from the search circle"
-        )
-        // Dismiss in two phases. The entry sheet becomes first responder on
-        // appear, so it opens at the LARGE detent (keyboard lifted): drag 1
-        // pulls it back to medium and drops the keyboard; drag 2 crosses the
-        // dismissal threshold. Both press points stay well above the v2
-        // floating mini player capsule (~y 654-712) — a swipe whose press
-        // lands on the capsule triggers its any-direction pan-open quirk
-        // (03 §2.9) and presents the player sheet instead.
-        func dismissEntrySheet() {
-            let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
-            let middle = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
-            upper.press(forDuration: 0.05, thenDragTo: middle)
-            usleep(600_000)
-            middle.press(forDuration: 0.05, thenDragTo: bottom)
+        // The Flutter header field accepts input in place; submitting opens
+        // the same global search results sheet.
+        searchField.tap()
+        guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
+            throw XCTSkip("software keyboard unavailable — skipping search submission")
         }
-        dismissEntrySheet()
-        // Wait out the dismissal — tapping through a still-presented
-        // medium sheet hits the sheet, not the mini player behind it.
-        let dismissDeadline = Date().addingTimeInterval(4)
-        while entryField.exists, Date() < dismissDeadline {
-            usleep(300_000)
-        }
-        if entryField.exists {
-            dismissEntrySheet()
-        }
+        searchField.typeText("news\n")
+        XCTAssertTrue(app.staticTexts["You are searching for"].waitForExistence(timeout: 8))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
+        XCTAssertTrue(searchField.waitForExistence(timeout: 4), "search results sheet did not close")
 
         // Mini player appears only when a queue was restored (db_smoke
         // seeding per native/README.md); skip visibly when unseeded.

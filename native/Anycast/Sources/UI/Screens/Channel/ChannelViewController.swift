@@ -104,7 +104,7 @@ final class ChannelViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         // Custom grabber is drawn inside the header (Detail precedent, A2);
         // the system sheet grabber would double it.
         sheetPresentationController?.prefersGrabberVisible = false

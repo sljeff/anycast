@@ -201,7 +201,7 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPlayerBase(on: view)
 
         let gradientTraits = UITraitCollection(userInterfaceStyle: .dark)
         gradientLayer.colors = [

@@ -1,7 +1,7 @@
 import UIKit
 import AnycastKit
 
-/// Interim search entry sheet behind the pill bar's search circle
+/// Search entry sheet opened from the shared page header
 /// (09 §3.1: first version taps push the Search screen; the "ask
 /// anything" combined input stays pending a product call). Presents a
 /// v2-styled field whose submit opens the existing global search sheet —
@@ -26,7 +26,7 @@ final class SearchEntryViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         sheetPresentationController?.prefersGrabberVisible = true
 
         let icon = UIImageView(image: AppIcons.search)

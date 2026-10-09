@@ -80,7 +80,7 @@ final class SearchPageViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         // Custom grabber below; the header band taps to close.
         sheetPresentationController?.prefersGrabberVisible = false
 
@@ -291,7 +291,7 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         build()
         observation.track(
             read: { [weak self] in
@@ -451,7 +451,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installDarkBase(on: view)
+        Theme.installPageBase(on: view)
         build()
 
         modelObservation.track(

@@ -4,7 +4,7 @@ import AnycastKit
 @testable import Anycast
 
 /// The V2 shell pieces (09 §10 V2): the header component, the category
-/// projection, the mini player capsule chrome, and the library status
+/// projection, the mini player capsule chrome, and the subscriptions status
 /// line. Color values are asserted with an explicit dark resolution
 /// (09 §9a).
 @MainActor
@@ -14,23 +14,23 @@ struct V2ShellTests {
 
     // MARK: - HeaderView (09 §3.8, Figma 624:30831)
 
-    @Test("Header paints the uppercased display title, status caption, and settings slot")
+    @Test("Header paints the display title, status, search field, and settings action")
     func headerBasics() {
         let header = HeaderView()
         header.configure(HeaderView.Configuration(
-            title: "Inbox", statusText: "updated just now - 100 unlistened"
+            title: "Podcast", statusText: "updated just now - 100 unlistened"
         ))
-        header.frame = CGRect(x: 0, y: 0, width: 440, height: 88)
+        header.frame = CGRect(x: 0, y: 0, width: 440, height: 160)
         header.layoutIfNeeded()
 
-        let title = header.subviews.compactMap { $0 as? UIStackView }
-            .flatMap(\.subviews).compactMap { $0 as? UILabel }
+        let title = header.subviews.compactMap { $0 as? UIStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-title" }
-        #expect(title?.text == "INBOX", "title renders uppercased")
+        #expect(title?.text == "Podcast")
         #expect(title?.font.pointSize == 48)
 
-        let status = header.subviews.compactMap { $0 as? UIStackView }
-            .flatMap(\.subviews).compactMap { $0 as? UILabel }
+        let status = header.subviews.compactMap { $0 as? UIStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-status" }
         #expect(status?.text == "updated just now - 100 unlistened")
         #expect(status?.isHidden == false)
@@ -40,23 +40,63 @@ struct V2ShellTests {
             "status caption paints sand9"
         )
 
-        let settings = header.subviews.compactMap { $0 as? UIButton }.first
+        let search = header.subviews.compactMap { $0 as? UITextField }
+            .first { $0.accessibilityIdentifier == "header-search-field" }
+        let settings = header.subviews.compactMap { $0 as? GlassContainerView }
+            .flatMap { $0.glassContentView.subviews.compactMap { $0 as? UIButton } }
+            .first { $0.accessibilityIdentifier == "header-settings" }
+        #expect(search?.accessibilityLabel == "Search")
+        #expect(search?.placeholder == "Shows, episodes, and more")
         #expect(settings?.accessibilityIdentifier == "header-settings")
         #expect(settings?.isHidden == false)
+
+        var submittedQuery: String?
+        var settingsTaps = 0
+        header.onSearch = { submittedQuery = $0 }
+        header.onSettings = { settingsTaps += 1 }
+        search?.text = "  news  "
+        if let search { _ = header.textFieldShouldReturn(search) }
+        settings?.sendActions(for: .touchUpInside)
+        #expect(submittedQuery == "news")
+        #expect(settingsTaps == 1)
+    }
+
+    @Test("Header scales for accessibility text and keeps actions clear")
+    func headerDynamicTypeLayout() {
+        let header = HeaderView()
+        header.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraExtraLarge
+        header.configure(HeaderView.Configuration(title: "Discover", statusText: "Updated just now"))
+        header.frame = CGRect(x: 0, y: 0, width: 393, height: 180)
+        header.layoutIfNeeded()
+
+        let title = header.subviews.compactMap { $0 as? UIStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? UILabel }
+            .first { $0.accessibilityIdentifier == "header-title" }
+        let titleColumn = title?.superview
+        let actions = header.subviews.compactMap { $0 as? GlassContainerView }.first
+        let titleRight = titleColumn?.frame.maxX ?? .infinity
+        let actionLeft = actions?.frame.minX ?? 0
+
+        #expect((title?.font.pointSize ?? 0) > 48)
+        #expect(titleRight <= actionLeft)
     }
 
     @Test("A nil status collapses the caption; settings can hide")
     func headerCollapses() {
         let header = HeaderView()
         header.configure(HeaderView.Configuration(title: "queue", statusText: nil, showsSettings: false))
-        header.frame = CGRect(x: 0, y: 0, width: 440, height: 88)
+        header.frame = CGRect(x: 0, y: 0, width: 440, height: 120)
         header.layoutIfNeeded()
 
-        let status = header.subviews.compactMap { $0 as? UIStackView }
-            .flatMap(\.subviews).compactMap { $0 as? UILabel }
+        let status = header.subviews.compactMap { $0 as? UIStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-status" }
         #expect(status?.isHidden == true)
-        #expect(header.subviews.compactMap { $0 as? UIButton }.first?.isHidden == true)
+        let search = header.subviews.compactMap { $0 as? UITextField }
+            .first { $0.accessibilityIdentifier == "header-search-field" }
+        let settings = header.subviews.compactMap { $0 as? GlassContainerView }.first
+        #expect(search?.isHidden == false)
+        #expect(settings?.isHidden == true)
     }
 
     // MARK: - Inbox category projection (09 §3.2)
@@ -112,8 +152,8 @@ struct V2ShellTests {
 
     // MARK: - Library status line (09 §3.3)
 
-    @Test("Library status pluralizes the show count")
-    func libraryStatusText() {
+    @Test("Subscriptions status pluralizes the show count")
+    func subscriptionsStatusText() {
         #expect(LibraryViewController.statusText(showCount: 0) == "0 shows")
         #expect(LibraryViewController.statusText(showCount: 1) == "1 show")
         #expect(LibraryViewController.statusText(showCount: 7) == "7 shows")
