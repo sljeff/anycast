@@ -3,10 +3,8 @@ import AnycastKit
 import ChatLayout
 
 /// AI chat sheet (lib/pages/chat.dart, 03 §2.8): presented BY the player's
-/// subtitles page over the current episode. Header is the released
-/// baseline's 64 pt playerBackground bar (anycast_theme.dart:122-123 — the
-/// 2026-07 visual refresh replaced the doc-era deep purple) with a round
-/// black close X, the two-line episode title and the trash (clear) button.
+/// subtitles page over the current episode. Header uses the appearance-aware
+/// v2 surface with a round close button, title and trash (clear) button.
 ///
 /// Body is a ChatLayout list styled to the flutter_chat_ui dark defaults
 /// (03 §6) plus the hand-written input bar (ChatInputBar). Non-streaming
@@ -19,9 +17,9 @@ final class ChatViewController: UIViewController {
         static let headerHeight: CGFloat = 64          // AnycastSpacing.sheetTitleH
         static let roundButtonSide: CGFloat = 40
         static let titleHorizontalPadding: CGFloat = 16 // AnycastSpacing.pageH
-        static let chatSurface = UIColor(red: 0x10 / 255, green: 0x10 / 255, blue: 0x10 / 255, alpha: 1)
-        static let headerBackground = UIColor(red: 0x22 / 255, green: 0x22 / 255, blue: 0x21 / 255, alpha: 1)
-        static let headerText = UIColor(red: 0xEE / 255, green: 0xEE / 255, blue: 0xEC / 255, alpha: 1)
+        static let chatSurface = Theme.background
+        static let headerBackground = Theme.surface
+        static let headerText = Theme.onSurface
     }
 
     private let context: UIContext
@@ -106,10 +104,10 @@ final class ChatViewController: UIViewController {
         headerBar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(headerBar)
 
-        closeButton.backgroundColor = UIColor.black.withAlphaComponent(0.26)
+        closeButton.backgroundColor = Theme.surfaceContainer
         closeButton.layer.cornerRadius = Metrics.roundButtonSide / 2
         closeButton.setImage(AppIcons.close, for: .normal)
-        closeButton.tintColor = .white
+        closeButton.tintColor = Theme.onSurface
         closeButton.isAccessibilityElement = true
         closeButton.accessibilityLabel = "Close chat"
         closeButton.addAction(
@@ -131,7 +129,7 @@ final class ChatViewController: UIViewController {
         headerBar.addSubview(titleLabel)
 
         trashButton.setImage(AppIcons.delete, for: .normal)
-        trashButton.tintColor = .white
+        trashButton.tintColor = Theme.onSurfaceVariant
         trashButton.isAccessibilityElement = true
         trashButton.accessibilityLabel = "Clear conversation"
         trashButton.addAction(

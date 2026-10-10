@@ -332,12 +332,12 @@ final class EpisodeCardCell: UICollectionViewCell {
         cardContainer.addSubview(progressBackdrop)
 
         // Download indicator (16×16, right gap 12 / bottom 16).
-        downloadCircle.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.7)
+        downloadCircle.backgroundColor = Theme.primary
         downloadCircle.layer.cornerRadius = 8
         downloadCircle.translatesAutoresizingMaskIntoConstraints = false
         downloadCircle.isHidden = true
         downloadIcon.image = AppIcons.download
-        downloadIcon.tintColor = .white
+        downloadIcon.tintColor = Theme.onPrimary
         downloadIcon.contentMode = .scaleAspectFit
         downloadIcon.translatesAutoresizingMaskIntoConstraints = false
         downloadCircle.addSubview(downloadIcon)
@@ -347,7 +347,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         downloadCircle.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(downloadTapped)))
         cardContainer.addSubview(downloadCircle)
 
-        downloadRing.tintColorOverride = UIColor.systemBlue
+        downloadRing.tintColorOverride = Theme.primary
         downloadRing.translatesAutoresizingMaskIntoConstraints = false
         downloadRing.isHidden = true
         downloadRing.isAccessibilityElement = false

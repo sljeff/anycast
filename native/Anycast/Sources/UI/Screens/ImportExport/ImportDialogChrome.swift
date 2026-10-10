@@ -20,13 +20,12 @@ class DialogBaseViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.black.withAlphaComponent(0.54)
-        view.overrideUserInterfaceStyle = .dark
 
         dimControl.translatesAutoresizingMaskIntoConstraints = false
         dimControl.addTarget(self, action: #selector(barrierTapped), for: .touchUpInside)
         view.addSubview(dimControl)
 
-        cardView.backgroundColor = Theme.cardBackground
+        cardView.backgroundColor = Theme.surface
         cardView.layer.cornerRadius = 28
         cardView.layer.cornerCurve = .continuous
         cardView.translatesAutoresizingMaskIntoConstraints = false
@@ -119,7 +118,6 @@ final class ImportProgressOverlayController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.black.withAlphaComponent(0.54)
-        view.overrideUserInterfaceStyle = .dark
         view.isAccessibilityElement = true
         view.accessibilityLabel = "Importing podcasts"
 

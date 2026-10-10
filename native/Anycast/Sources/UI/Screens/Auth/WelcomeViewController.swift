@@ -196,7 +196,7 @@ final class WelcomeViewController: UIViewController {
 
         let signUpButton = UIButton(type: .system)
         signUpButton.setTitle("Sign up", for: .normal)
-        signUpButton.setTitleColor(AnycastColor.grass9, for: .normal)
+        signUpButton.setTitleColor(Theme.primary, for: .normal)
         signUpButton.titleLabel?.font = TypographyV2.bodySmall.font()
         signUpButton.accessibilityIdentifier = "welcome-signup"
         signUpButton.addAction(

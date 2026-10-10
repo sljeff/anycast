@@ -99,7 +99,7 @@ final class SignUpViewController: UIViewController {
 
         let signInButton = UIButton(type: .system)
         signInButton.setTitle("Sign in", for: .normal)
-        signInButton.setTitleColor(AnycastColor.grass9, for: .normal)
+        signInButton.setTitleColor(Theme.primary, for: .normal)
         signInButton.titleLabel?.font = TypographyV2.bodySmall.font()
         signInButton.accessibilityIdentifier = "signup-signin"
         signInButton.addAction(

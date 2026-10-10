@@ -91,11 +91,9 @@ struct TypographyTests {
         }
     }
 
-    @Test("Color tokens resolve with exact dark values")
+    @Test("Legacy color aliases resolve to v2 values in dark appearance")
     func colorTokensResolve() {
-        // v2 (09 §2): the app still force-installs dark, so the bridged v1
-        // accessor names are asserted against their DARK appearance values,
-        // resolved explicitly for determinism.
+        // Resolve bridged v1 names against dark tokens for deterministic checks.
         let dark = UITraitCollection(userInterfaceStyle: .dark)
         func assertEqual(_ color: UIColor, red: CGFloat, green: CGFloat, blue: CGFloat, _ label: String) {
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
@@ -105,7 +103,7 @@ struct TypographyTests {
         assertEqual(Theme.primaryBackgroundDark, red: 0x19 / 255, green: 0x19 / 255, blue: 0x18 / 255, "primaryBackgroundDark") // Background
         assertEqual(Theme.cardBackground, red: 0x11 / 255, green: 0x11 / 255, blue: 0x10 / 255, "cardBackground")             // Surface
         assertEqual(Theme.tabSelectedGreen, red: 0xCB / 255, green: 0xB9 / 255, blue: 0x9F / 255, "tabSelectedGreen")         // Primary
-        assertEqual(Theme.brandGreen, red: 0x63 / 255, green: 0xC1 / 255, blue: 0x74 / 255, "brandGreen")                     // Grass9
+        assertEqual(Theme.brandGreen, red: 0xCB / 255, green: 0xB9 / 255, blue: 0x9F / 255, "brandGreen")                     // Primary
         assertEqual(Theme.secondaryLabelGray, red: 0xD2 / 255, green: 0xD0 / 255, blue: 0xCA / 255, "secondaryLabelGray")     // OnSurfaceVariant
         assertEqual(Theme.hintGray, red: 0xB5 / 255, green: 0xB3 / 255, blue: 0xAD / 255, "hintGray")                         // SandDark9
         assertEqual(Theme.loginCardBackground, red: 0x22 / 255, green: 0x22 / 255, blue: 0x21 / 255, "loginCardBackground")   // SurfaceContainer
@@ -132,6 +130,8 @@ struct TypographyTests {
         assertEqual(Theme.onSurface, light: f(0x21201C), dark: f(0xEEEEEC), "onSurface")
         assertEqual(Theme.onSurfaceVariant, light: f(0x63635E), dark: f(0xD2D0CA), "onSurfaceVariant")
         assertEqual(Theme.primary, light: f(0x978365), dark: f(0xCBB99F), "primary")
+        assertEqual(Theme.brandGreen, light: f(0x978365), dark: f(0xCBB99F), "brandGreen")
+        assertEqual(Theme.accent, light: f(0x978365), dark: f(0xCBB99F), "accent")
         assertEqual(Theme.outline, light: f(0xDAD9D6), dark: f(0x3B3A37), "outline")
         assertEqual(Theme.tertiary, light: f(0xEF5F00), dark: f(0xFF8B3E), "tertiary")
         assertEqual(Theme.error, light: f(0xBA1A1A), dark: f(0xFF8B8B), "error")

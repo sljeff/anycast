@@ -148,9 +148,6 @@ final class DetailViewController: UIViewController {
         self.now = now
         self.descriptionTextView = HTMLContentRenderer.makeTextView()
         super.init(nibName: nil, bundle: nil)
-        // VC-level: the sheet's system chrome (plate, corner treatment)
-        // is created before viewDidLoad's view-level override lands.
-        overrideUserInterfaceStyle = .dark
     }
 
     @available(*, unavailable)
@@ -175,9 +172,7 @@ final class DetailViewController: UIViewController {
         )
         panelGradientLayer.frame = panelGradientLayer.superlayer?.bounds ?? .zero
         barGradientLayer.frame = barGradientLayer.superlayer?.bounds ?? .zero
-        // Resolve HERE, not at build time: the dark override lives on the
-        // view, so the VC's traitCollection is still light during
-        // viewDidLoad and build()-time cgColors froze light values (§9a).
+        // Resolve HERE so the gradient follows the active light/dark palette.
         applyGradientColors()
     }
 

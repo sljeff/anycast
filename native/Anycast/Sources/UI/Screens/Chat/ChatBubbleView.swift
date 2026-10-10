@@ -1,11 +1,8 @@
 import UIKit
 import ChatLayout
 
-/// Thin plain-text bubble mirroring the flutter_chat_ui defaults the
-/// shipped ChatPage used (03 §2.8/§6): ChatTheme.dark() — sent bubble
-/// 0xFF4169E1 (primary), received 0xFF1C1C1C (surfaceContainer), white
-/// 14 pt body text, 12 pt corner radius, 16/10 bubble padding, and the
-/// small 10 pt timestamp shown at the bubble's bottom end.
+/// Thin plain-text bubble using the Anycast 2.0 primary and container
+/// surfaces while retaining the existing message layout and timestamps.
 final class ChatBubbleView: UIView {
 
     private enum Metrics {
@@ -18,8 +15,6 @@ final class ChatBubbleView: UIView {
         static let maxBubbleWidthFraction: CGFloat = 0.75
     }
 
-    private static let sentBubbleColor = UIColor(red: 0x41 / 255, green: 0x69 / 255, blue: 0xE1 / 255, alpha: 1)
-    private static let receivedBubbleColor = UIColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1C / 255, alpha: 1)
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
@@ -57,7 +52,7 @@ final class ChatBubbleView: UIView {
         // is what breaks and the bubble overflows the list. Let the cap win
         // and wrap the token per character instead.
         textLabel.lineBreakMode = .byCharWrapping
-        textLabel.textColor = .white
+        textLabel.textColor = Theme.onSurface
         textLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(
             for: UIFont.systemFont(ofSize: 14, weight: .regular)
         )
@@ -65,7 +60,7 @@ final class ChatBubbleView: UIView {
         textLabel.setContentHuggingPriority(.required, for: .horizontal)
         textLabel.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
-        timeLabel.textColor = .white
+        timeLabel.textColor = Theme.onSurfaceVariant
         timeLabel.font = UIFontMetrics(forTextStyle: .caption2).scaledFont(
             for: UIFont.systemFont(ofSize: 10, weight: .medium)
         )
@@ -91,7 +86,11 @@ final class ChatBubbleView: UIView {
     }
 
     func configure(with message: ChatMessage) {
-        backgroundColor = message.author == .human ? Self.sentBubbleColor : Self.receivedBubbleColor
+        backgroundColor = message.author == .human ? Theme.primary : Theme.surfaceContainer
+        textLabel.textColor = message.author == .human ? Theme.onPrimary : Theme.onSurface
+        timeLabel.textColor = message.author == .human
+            ? Theme.onPrimary.withAlphaComponent(0.72)
+            : Theme.onSurfaceVariant
         textLabel.text = message.text
         timeLabel.text = Self.timeFormatter.string(from: message.createdAt)
         isAccessibilityElement = true

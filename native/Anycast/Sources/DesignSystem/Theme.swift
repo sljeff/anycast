@@ -100,16 +100,16 @@ nonisolated enum Theme {
     static let primaryBackground = surfaceContainerHigh
     /// Was 0x111316 page background → background.
     static let primaryBackgroundDark = background
-    /// Was 0xFFBC25 yellow accent → orange tertiary.
-    static let accent = tertiary
+    /// Was 0xFFBC25 yellow accent → the v2 gold primary.
+    static let accent = primary
     /// Was 0x96A7AF secondary text → onSurfaceVariant.
     static let secondaryText = onSurfaceVariant
     /// Was 0x232830 card fill → surface.
     static let cardBackground = surface
     /// Was 0x6EE7B7 tab tint → gold accent.
     static let tabSelectedGreen = primary
-    /// Was 0x10B981 brand green → grass.
-    static let brandGreen = AnycastColor.grass9
+    /// The v2 brand accent is gold; green remains reserved for status colors.
+    static let brandGreen = primary
     /// Was 0x6B7280 → onSurfaceVariant.
     static let secondaryLabelGray = onSurfaceVariant
     /// Placeholder and subdued ink → appearance-aware secondary text.
@@ -119,10 +119,9 @@ nonisolated enum Theme {
     /// Was 0x424242 card border → outline.
     static let cardOutline = outline
 
-    /// Lyric line colors pinned to the v1 rendering; the transcript screen
-    /// owns them and re-baselines in V3 batch 3 (09 §4 S13/S14).
-    static let lyricGrey200 = UIColor(red: 0.937, green: 0.961, blue: 0.965, alpha: 1)
-    static let lyricGreenAccent = UIColor(red: 0.412, green: 0.941, blue: 0.678, alpha: 1)
+    /// Player text and active lyric accent use the fixed warm-dark palette.
+    static let lyricGrey200 = playerSecondary
+    static let lyricGreenAccent = primary
 
     /// AppBar gradient title — the v2 header drops the gradient wordmark;
     /// `GradientTextLabel` retires with the PodcastsTabContainer rework

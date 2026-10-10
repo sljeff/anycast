@@ -143,6 +143,7 @@ final class SettingsSwitchListCell: UICollectionViewListCell {
         contentView.addSubview(titleLabel)
 
         switchView.addTarget(self, action: #selector(switchToggled), for: .valueChanged)
+        switchView.onTintColor = Theme.primary
         switchView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(switchView)
         NSLayoutConstraint.activate([
