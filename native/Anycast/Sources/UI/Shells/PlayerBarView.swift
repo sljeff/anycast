@@ -128,10 +128,17 @@ final class PlayerBarView: UIView {
         capsule.translatesAutoresizingMaskIntoConstraints = false
         addSubview(capsule)
 
-        // Capsule: a thin gold progress line on a sand track along the
-        // inner bottom edge; the player-hosted styles keep the full-height
-        // translucent fill (03 §2.9).
-        if style == .capsule {
+        // Capsule and accessory share the compact content (UI kit mini
+        // player): a thin gold progress line on a sand track along the
+        // inner bottom edge, a round cover, one title line, small glyphs.
+        // The standalone sheet bar keeps the full-height fill (03 §2.9).
+        let compact = style != .standalone
+        if style == .systemAccessory {
+            backdrop.trackColor = AnycastColor.sandAlpha3
+            backdrop.fillColor = Theme.primary
+            backdrop.layer.cornerRadius = Self.capsuleProgressHeight / 2
+            backdrop.clipsToBounds = true
+        } else if style == .capsule {
             backdrop.trackColor = AnycastColor.sandAlpha3.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
             backdrop.fillColor = Theme.primary.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
             backdrop.layer.cornerRadius = Self.capsuleProgressHeight / 2
@@ -145,7 +152,7 @@ final class PlayerBarView: UIView {
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
         // v2 capsule: circular 36 pt cover (Figma 83:2562).
-        coverView.layer.cornerRadius = style == .capsule ? 18 : 8
+        coverView.layer.cornerRadius = compact ? 18 : 8
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = style == .capsule
             ? AnycastColor.sandAlpha2.resolvedColor(
@@ -183,7 +190,7 @@ final class PlayerBarView: UIView {
         capsule.addSubview(timeLabel)
 
         playPauseControl.accessibilityLabel = "Play or pause"
-        if style == .capsule {
+        if compact {
             // 24 pt glyph in the 44 pt slot, level with the 22 pt skip glyph.
             playPauseControl.glyphInset = 10
         }
@@ -199,7 +206,7 @@ final class PlayerBarView: UIView {
 
         forwardButton.setImage(AppIcons.forward30, for: .normal)
         forwardButton.setPreferredSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: style == .capsule ? 22 : 32),
+            UIImage.SymbolConfiguration(pointSize: compact ? 22 : 32),
             forImageIn: .normal
         )
         forwardButton.addPressFeedback()
@@ -257,7 +264,7 @@ final class PlayerBarView: UIView {
             timeLabel.topAnchor.constraint(equalTo: capsule.centerYAnchor, constant: 1),
         ])
 
-        if style == .capsule {
+        if compact {
             // Inset by the cap radius so the line stays inside the rounded ends.
             let inset = Self.barHeight / 2
             NSLayoutConstraint.activate([
@@ -275,7 +282,7 @@ final class PlayerBarView: UIView {
             ])
         }
 
-        if style == .capsule {
+        if compact {
             // v2 capsule: single centered title line, no time label
             // (Figma 83:2562 carries only the title). Replacing the
             // bottom pin with a center pin avoids fighting constraints.
