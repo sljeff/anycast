@@ -1,19 +1,17 @@
 import UIKit
 
-/// The v2 Inbox category strip (Figma `inbox category` 637:9506 +
-/// `category capsule item` 599:30274 — 09 §3.2): a horizontal row of capsule
-/// chips (icon + label) derived from `subscription.categories`. The SELECTED
-/// chip is the `state=selected` variant (599:30269): `goldAlpha7` fill +
-/// `sandAlpha4` 1 pt stroke + pill, icon/label in `sand1`; UNSELECTED chips
-/// are `sandAlpha2` pills with `onSurfaceVariant` content. Data mapping
-/// lives in `CategoryStripModel` so the pure dedupe/sort logic is testable
-/// without the view.
+/// The Inbox category strip in the Anycast 2.0 UI kit form (`CategoryStrip`):
+/// a horizontal row of text chips derived from `subscription.categories`
+/// where selection reads through brightness alone — the selected label in
+/// full ink, the rest at `sandAlpha8`, cross-faded on change — with the
+/// selected chip scrolled into view. Data mapping lives in
+/// `CategoryStripModel` so the pure dedupe/sort logic is testable without
+/// the view.
 @MainActor
 final class CategoryStripView: UIView {
 
     struct Chip {
         let label: String
-        let icon: UIImage?
         /// The raw category value this chip filters on (`nil` = all).
         let value: String?
     }
@@ -22,32 +20,46 @@ final class CategoryStripView: UIView {
     var onSelect: ((String?) -> Void)?
 
     private let scrollView = UIScrollView()
+    private let stack = UIStackView()
     private var chips: [Chip] = []
     private var buttons: [UIButton] = []
     private var selectedValue: String?
+
+    static let chipHeight: CGFloat = 44
 
     init() {
         super.init(frame: .zero)
         backgroundColor = .clear
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.backgroundColor = .clear
-        scrollView.contentInset = UIEdgeInsets(top: 0, left: Spacing.pageH, bottom: 0, right: Spacing.pageH)
+        scrollView.delaysContentTouches = false
+        scrollView.contentInset = UIEdgeInsets(top: 0, left: Spacing.xs, bottom: 0, right: Spacing.xs)
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
+
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.spacing = 0
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(stack)
+
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
             heightAnchor.constraint(equalToConstant: Self.chipHeight),
+
+            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            stack.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
         ])
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    static let chipHeight: CGFloat = 44
-    private var previousChip: UIButton?
 
     /// Reloads the strip. `selected` not present in `categories` resets to all.
     func configure(categories: [String], selected: String?) {
@@ -55,56 +67,36 @@ final class CategoryStripView: UIView {
         selectedValue = chips.contains { $0.value == selected } ? selected : nil
 
         buttons.forEach { $0.removeFromSuperview() }
-        buttons.removeAll()
-        previousChip = nil
-
-        for (index, chip) in chips.enumerated() {
+        buttons = chips.map { chip in
             var config = UIButton.Configuration.plain()
-            config.image = chip.icon?.withRenderingMode(.alwaysTemplate)
-            config.imagePadding = Spacing.xxs
+            config.title = chip.label
+            config.titleLineBreakMode = .byClipping
             config.contentInsets = NSDirectionalEdgeInsets(
-                top: 0, leading: Spacing.row, bottom: 0, trailing: Spacing.row
+                top: 0, leading: Spacing.gap, bottom: 0, trailing: Spacing.gap
             )
             config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
                 var outgoing = incoming
-                // Figma selected variant: SF Pro 590 (semibold) 16/21.
-                outgoing.font = TypographyV2.headlineSmall.font()
+                outgoing.font = TypographyV2.titleMedium.font()
                 return outgoing
             }
             let button = UIButton(configuration: config)
-            button.translatesAutoresizingMaskIntoConstraints = false
-            button.setTitle(chip.label, for: .normal)
-            button.layer.cornerRadius = Self.chipHeight / 2
-            button.layer.cornerCurve = .continuous
-            button.clipsToBounds = true
+            button.titleLabel?.adjustsFontForContentSizeCategory = true
             button.accessibilityIdentifier = chip.value.map { "category-\($0)" } ?? "category-all"
             button.accessibilityLabel = chip.label
+            button.heightAnchor.constraint(equalToConstant: Self.chipHeight).isActive = true
+            button.setContentHuggingPriority(.required, for: .horizontal)
+            button.setContentCompressionResistancePriority(.required, for: .horizontal)
+            button.titleLabel?.numberOfLines = 1
             button.addAction(UIAction { [weak self] _ in
-                guard let self else { return }
+                guard let self, chip.value != self.selectedValue else { return }
+                Haptics.selection()
                 self.select(chip.value, animated: true)
                 self.onSelect?(chip.value)
             }, for: .touchUpInside)
-            scrollView.addSubview(button)
-            buttons.append(button)
-
-            let leading: NSLayoutConstraint
-            if let previous = previousChip {
-                leading = button.leadingAnchor.constraint(equalTo: previous.trailingAnchor, constant: Spacing.sm)
-            } else {
-                leading = button.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor)
-            }
-            NSLayoutConstraint.activate([
-                leading,
-                button.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor),
-                button.heightAnchor.constraint(equalToConstant: Self.chipHeight),
-            ])
-            if index == chips.count - 1 {
-                button.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor).isActive = true
-            }
-            previousChip = button
+            stack.addArrangedSubview(button)
+            return button
         }
         applySelection()
-        setNeedsLayout()
     }
 
     var currentSelection: String? { selectedValue }
@@ -112,35 +104,41 @@ final class CategoryStripView: UIView {
     /// Silent selection update (programmatic moves).
     func select(_ value: String?, animated: Bool) {
         selectedValue = chips.contains { $0.value == value } ? value : nil
-        applySelection()
+        guard animated, !Motion.reduceMotion else {
+            applySelection()
+            return
+        }
+        UIView.transition(
+            with: stack, duration: Motion.quick,
+            options: [.transitionCrossDissolve, .allowUserInteraction, .beginFromCurrentState],
+            animations: applySelection
+        )
+        scrollSelectedChipIntoView()
     }
 
     private func applySelection() {
         for (index, button) in buttons.enumerated() {
             let active = chips[index].value == selectedValue
-            // 09 §3.2 selected variant: goldAlpha7 fill + sandAlpha4 1 pt
-            // stroke + sand1 content; unselected: sandAlpha2 fill only,
-            // onSurfaceVariant content.
-            button.backgroundColor = active ? AnycastColor.goldAlpha7 : AnycastColor.sandAlpha2
-            button.layer.borderColor = AnycastColor.sandAlpha4.cgColor
-            button.layer.borderWidth = active ? Spacing.hairline : 0
-            button.tintColor = active ? AnycastColor.sand1 : Theme.onSurfaceVariant
-            button.setTitleColor(active ? AnycastColor.sand1 : Theme.onSurfaceVariant, for: .normal)
+            button.configuration?.baseForegroundColor = active ? Theme.onSurface : AnycastColor.sandAlpha8
             button.accessibilityTraits = active ? [.button, .selected] : [.button]
         }
     }
 
-    /// Re-resolves the chip stroke colors on appearance flips — the border
-    /// runs through `layer.borderColor` (CGColor freeze, 09 §9a).
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-        if previousTraitCollection?.hasDifferentColorAppearance(comparedTo: traitCollection) ?? false {
-            applySelection()
+    /// Keeps the selected chip — plus a peek of its neighbor — on screen.
+    private func scrollSelectedChipIntoView() {
+        guard let index = chips.firstIndex(where: { $0.value == selectedValue }),
+              buttons.indices.contains(index) else { return }
+        layoutIfNeeded()
+        var rect = buttons[index].frame
+        let neighbor = index + 1 < buttons.count ? buttons[index + 1] : (index > 0 ? buttons[index - 1] : nil)
+        if let neighbor {
+            rect = rect.union(neighbor.frame.insetBy(dx: neighbor.frame.width / 4, dy: 0))
         }
+        scrollView.scrollRectToVisible(stack.convert(rect, to: scrollView), animated: true)
     }
 }
 
-/// Pure chip derivation for `CategoryStripView` (09 §3.2): the "all" chip
+/// Pure chip derivation for `CategoryStripView` (09 §3.2): the "All" chip
 /// plus one chip per distinct category from the comma-separated
 /// `subscription.categories` column, case-insensitively deduped, sorted, and
 /// title-cased for display.
@@ -154,9 +152,9 @@ nonisolated enum CategoryStripModel {
             .filter { !$0.isEmpty }
             .filter { seen.insert($0.lowercased()).inserted }
             .sorted { $0.lowercased() < $1.lowercased() }
-        let all = CategoryStripView.Chip(label: "all", icon: AppIcons.subscriptions, value: nil)
+        let all = CategoryStripView.Chip(label: "All", value: nil)
         let rest = distinct.map { category in
-            CategoryStripView.Chip(label: displayLabel(category), icon: nil, value: category)
+            CategoryStripView.Chip(label: displayLabel(category), value: category)
         }
         return [all] + rest
     }

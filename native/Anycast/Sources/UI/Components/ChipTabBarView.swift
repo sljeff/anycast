@@ -1,14 +1,14 @@
 import UIKit
 
-/// The secondary tab strip in the Anycast 2.0 chip language (09 §3.2): each
-/// title is a capsule chip on `sandAlpha2`, and a gold capsule slides under
-/// the selected one (selected = `goldAlpha7` + `sandAlpha4` hairline + sand1
-/// ink, same as `CategoryStripView`). Used by Discover categories (scrolls),
-/// SearchPage tabs, and Channel Newest/Oldest.
+/// The secondary tab strip in the Anycast 2.0 UI kit strip language (same
+/// as `CategoryStripView`): text chips whose selection reads through
+/// brightness alone — the selected title in full ink, the rest at
+/// `sandAlpha8`, cross-faded on change. Used by Discover categories
+/// (scrolls), SearchPage tabs, and Channel Newest/Oldest.
 ///
 /// Interaction notes (03 §2.1/§3.5): the strip mirrors a TabBar — selection
-/// changes animate the capsule, and the strip scrolls horizontally when its
-/// chips overflow (Discover's many categories).
+/// changes animate, and the strip scrolls horizontally when its chips
+/// overflow (Discover's many categories).
 final class ChipTabBarView: UIView {
 
     /// Informed on user tap; the caller updates its page content.
@@ -18,13 +18,8 @@ final class ChipTabBarView: UIView {
     private let stackView = UIStackView()
     private var chips: [UIView] = []
     private var titleLabels: [UILabel] = []
-    /// The sliding selected capsule. Constraint-linked to the selected chip
-    /// so it is correct on the first layout pass and tracks scrolling and
-    /// Dynamic Type.
-    let indicator = UIView()
-    private var indicatorConstraints: [NSLayoutConstraint] = []
 
-    static let chipHeight: CGFloat = 36
+    static let chipHeight: CGFloat = 44
 
     private(set) var selectedIndex: Int = 0
 
@@ -38,32 +33,19 @@ final class ChipTabBarView: UIView {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
 
-        indicator.backgroundColor = AnycastColor.goldAlpha7
-        indicator.layer.borderWidth = Spacing.hairline
-        indicator.layer.cornerRadius = Self.chipHeight / 2
-        indicator.layer.cornerCurve = .continuous
-        indicator.isUserInteractionEnabled = false
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        // In content space, below the chips: the capsule follows its chip
-        // when the strip scrolls.
-        scrollView.addSubview(indicator)
-
         stackView.axis = .horizontal
         stackView.alignment = .center
-        stackView.spacing = Spacing.md
+        stackView.spacing = 0
         stackView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(stackView)
 
-        // titleSmall, capped so accessibility sizes stay inside the chip.
-        let font = UIFontMetrics(forTextStyle: TypographyV2.titleSmall.scalingTextStyle).scaledFont(
-            for: ThemeRegistry.current.typography.font(TypographyV2.titleSmall.size, TypographyV2.titleSmall.weight, .text),
-            maximumPointSize: 20
+        // titleMedium, capped so accessibility sizes stay inside the chip.
+        let font = UIFontMetrics(forTextStyle: TypographyV2.titleMedium.scalingTextStyle).scaledFont(
+            for: ThemeRegistry.current.typography.font(TypographyV2.titleMedium.size, TypographyV2.titleMedium.weight, .text),
+            maximumPointSize: 22
         )
         for (index, title) in titles.enumerated() {
             let chip = UIView()
-            chip.backgroundColor = AnycastColor.sandAlpha2
-            chip.layer.cornerRadius = Self.chipHeight / 2
-            chip.layer.cornerCurve = .continuous
             chip.translatesAutoresizingMaskIntoConstraints = false
             chip.tag = index
             chip.isAccessibilityElement = true
@@ -83,8 +65,8 @@ final class ChipTabBarView: UIView {
 
             NSLayoutConstraint.activate([
                 chip.heightAnchor.constraint(equalToConstant: Self.chipHeight),
-                label.leadingAnchor.constraint(equalTo: chip.leadingAnchor, constant: Spacing.chip),
-                label.trailingAnchor.constraint(equalTo: chip.trailingAnchor, constant: -Spacing.chip),
+                label.leadingAnchor.constraint(equalTo: chip.leadingAnchor, constant: Spacing.gap),
+                label.trailingAnchor.constraint(equalTo: chip.trailingAnchor, constant: -Spacing.gap),
                 label.centerYAnchor.constraint(equalTo: chip.centerYAnchor),
             ])
             stackView.addArrangedSubview(chip)
@@ -98,17 +80,14 @@ final class ChipTabBarView: UIView {
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            stackView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Spacing.pageH),
-            stackView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Spacing.pageH),
+            stackView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Spacing.xs),
+            stackView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Spacing.xs),
             stackView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             stackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             stackView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
         ])
 
         applySelection(animated: false)
-        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _) in
-            self.updateStroke()
-        }
     }
 
     @available(*, unavailable)
@@ -134,49 +113,28 @@ final class ChipTabBarView: UIView {
     }
 
     private func applySelection(animated: Bool) {
-        for (index, label) in titleLabels.enumerated() {
-            let isSelected = index == selectedIndex
-            label.textColor = isSelected ? AnycastColor.sand1 : Theme.onSurfaceVariant
-            chips[index].accessibilityTraits = isSelected ? [.button, .selected] : [.button]
+        let apply = {
+            for (index, label) in self.titleLabels.enumerated() {
+                let isSelected = index == self.selectedIndex
+                label.textColor = isSelected ? Theme.onSurface : AnycastColor.sandAlpha8
+                self.chips[index].accessibilityTraits = isSelected ? [.button, .selected] : [.button]
+            }
         }
-        updateStroke()
-        placeIndicator(animated: animated)
+        if animated, !Motion.reduceMotion {
+            UIView.transition(
+                with: stackView, duration: Motion.quick,
+                options: [.transitionCrossDissolve, .allowUserInteraction, .beginFromCurrentState],
+                animations: apply
+            )
+        } else {
+            apply()
+        }
         if chips.indices.contains(selectedIndex),
            // Only overflowing strips need this, and the pre-layout init pass
            // has no meaningful frames yet.
            chips[selectedIndex].frame.width > 0,
            scrollView.contentSize.width > scrollView.bounds.width {
             scrollView.scrollRectToVisible(chips[selectedIndex].frame.insetBy(dx: -Spacing.pageH, dy: 0), animated: animated)
-        }
-    }
-
-    /// The hairline runs through `layer.borderColor`, which freezes at
-    /// assignment (09 §9a), so it is re-resolved on appearance changes.
-    private func updateStroke() {
-        indicator.layer.borderColor = AnycastColor.sandAlpha4.resolvedColor(with: traitCollection).cgColor
-    }
-
-    private func placeIndicator(animated: Bool) {
-        guard chips.indices.contains(selectedIndex) else { return }
-        let chip = chips[selectedIndex]
-        NSLayoutConstraint.deactivate(indicatorConstraints)
-        indicatorConstraints = [
-            indicator.leadingAnchor.constraint(equalTo: chip.leadingAnchor),
-            indicator.trailingAnchor.constraint(equalTo: chip.trailingAnchor),
-            indicator.topAnchor.constraint(equalTo: chip.topAnchor),
-            indicator.bottomAnchor.constraint(equalTo: chip.bottomAnchor),
-        ]
-        NSLayoutConstraint.activate(indicatorConstraints)
-        if animated {
-            UIView.animate(
-                withDuration: Motion.standard,
-                delay: 0,
-                usingSpringWithDamping: 0.82,
-                initialSpringVelocity: 0,
-                options: [.allowUserInteraction, .beginFromCurrentState]
-            ) {
-                self.layoutIfNeeded()
-            }
         }
     }
 }

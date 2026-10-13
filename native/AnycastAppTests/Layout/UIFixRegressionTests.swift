@@ -365,18 +365,18 @@ struct UIFixRegressionTests {
         context.tabs.select(0)
         try await Self.settle(window, seconds: 1.5)
 
-        // v2 scroll column (09 §10 批次1): cards live in the list section
-        // (index 3) under the header/strip/hint chrome cells.
+        // Locate the first visible card wherever the chrome sections put
+        // it (the embedded Inbox hides its own header).
         guard let inbox = Self.find(InboxPageViewController.self, in: window.rootViewController),
               let collection = Self.firstView(in: inbox.view, where: { $0 is UICollectionView })
                 as? UICollectionView,
-              collection.numberOfSections >= 4,
-              collection.numberOfItems(inSection: 3) >= 1 else {
+              let path = collection.indexPathsForVisibleItems.sorted().first(where: {
+                  collection.cellForItem(at: $0) is InboxEpisodeCardCell
+              }) else {
             print("[uifix] seeded inbox missing; skipping"); return
         }
-        let path = IndexPath(item: 0, section: 3)
         guard let cell = collection.cellForItem(at: path) as? InboxEpisodeCardCell else {
-            Issue.record("inbox card 0 not visible"); return
+            Issue.record("inbox card not visible"); return
         }
 
         // VoiceOver parity: the context-menu payload is mirrored onto the
@@ -396,6 +396,11 @@ struct UIFixRegressionTests {
         let titles = menu.children.compactMap { ($0 as? UIAction)?.title }
         #expect(titles == ["Play", "Add to playlist", "Remove from inbox"],
                 "menu children \(titles)")
+
+        // Leading swipe adds to the playlist (UI kit swipe right).
+        let leading = inbox.leadingSwipeActions(at: path)?.actions ?? []
+        #expect(leading.count == 1 && leading.first?.title == "Add to playlist",
+                "leading swipe actions \(leading.map { $0.title ?? "" })")
 
         // Trailing swipe surface (批次1 list-section half): a single
         // destructive Remove action.
