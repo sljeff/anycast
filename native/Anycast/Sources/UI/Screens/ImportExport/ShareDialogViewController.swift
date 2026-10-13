@@ -38,7 +38,7 @@ final class ShareDialogViewController: DialogBaseViewController {
 
         let titleLabel = UILabel()
         titleLabel.text = "Import Podcasts"
-        titleLabel.font = Typography.secondaryTitle.font()
+        titleLabel.font = TypographyV2.headlineMedium.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -64,7 +64,7 @@ final class ShareDialogViewController: DialogBaseViewController {
             configuration.title = "OK"
             configuration.baseForegroundColor = Theme.primary
             ok.configuration = configuration
-            ok.titleLabel?.font = Typography.mainText.font()
+            ok.titleLabel?.font = TypographyV2.bodyMedium.font()
             ok.addAction(
                 UIAction { [weak self] _ in self?.dismiss(animated: true) },
                 for: .touchUpInside
@@ -116,7 +116,7 @@ final class ShareDialogViewController: DialogBaseViewController {
         closeConfiguration.title = "Close"
         closeConfiguration.baseForegroundColor = Theme.onSurfaceVariant
         close.configuration = closeConfiguration
-        close.titleLabel?.font = Typography.mainText.font()
+        close.titleLabel?.font = TypographyV2.bodyMedium.font()
         close.addAction(
             UIAction { [weak self] _ in self?.dismiss(animated: true) },
             for: .touchUpInside
@@ -131,7 +131,7 @@ final class ShareDialogViewController: DialogBaseViewController {
             top: 10, leading: 24, bottom: 10, trailing: 24
         )
         confirm.configuration = confirmConfiguration
-        confirm.titleLabel?.font = Typography.mainText.font()
+        confirm.titleLabel?.font = TypographyV2.bodyMedium.font()
         confirm.addAction(
             UIAction { [weak self] _ in self?.startImport() },
             for: .touchUpInside
@@ -225,7 +225,7 @@ final class ShareEntryCell: UITableViewCell {
         card.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(card)
 
-        titleLabel.font = Typography.cardTitleBold.font()
+        titleLabel.font = TypographyV2.headlineSmall.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1

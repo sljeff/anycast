@@ -46,7 +46,7 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         // Title row: 'Import/Export' + help IconButton (help_outline_rounded).
         let titleLabel = UILabel()
         titleLabel.text = "Import/Export"
-        titleLabel.font = Typography.secondaryTitle.font()
+        titleLabel.font = TypographyV2.headlineMedium.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0
@@ -85,7 +85,7 @@ final class ImportExportDialogViewController: DialogBaseViewController,
             top: 12, leading: 32, bottom: 12, trailing: 32
         )
         importButton.configuration = importConfiguration
-        importButton.titleLabel?.font = Typography.mainText.font()
+        importButton.titleLabel?.font = TypographyV2.bodyMedium.font()
         importButton.titleLabel?.adjustsFontForContentSizeCategory = true
         importButton.addAction(
             UIAction { [weak self] _ in self?.pickOPMLFile() },
@@ -102,7 +102,7 @@ final class ImportExportDialogViewController: DialogBaseViewController,
             top: 12, leading: 32, bottom: 12, trailing: 32
         )
         exportButton.configuration = exportConfiguration
-        exportButton.titleLabel?.font = Typography.mainText.font()
+        exportButton.titleLabel?.font = TypographyV2.bodyMedium.font()
         exportButton.titleLabel?.adjustsFontForContentSizeCategory = true
         exportButton.addAction(
             UIAction { [weak self] _ in self?.exportSubscriptions() },
@@ -315,7 +315,7 @@ final class ImportExportDialogViewController: DialogBaseViewController,
             title: ImportCopy.invalidFeedURLTitle, message: nil, preferredStyle: .alert
         )
         let title = NSAttributedString(string: ImportCopy.invalidFeedURLTitle, attributes: [
-            .font: Typography.cardTitleBold.font(),
+            .font: TypographyV2.headlineSmall.font(),
             .foregroundColor: UIColor.systemRed,
         ])
         let body = NSAttributedString(string: message, attributes: [

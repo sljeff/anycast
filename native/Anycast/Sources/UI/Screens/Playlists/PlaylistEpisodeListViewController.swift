@@ -148,7 +148,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
 
         let titleLabel = UILabel()
         titleLabel.text = "All caught up?"
-        titleLabel.font = Typography.secondaryTitle.font()
+        titleLabel.font = TypographyV2.headlineMedium.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
@@ -156,24 +156,13 @@ final class PlaylistEpisodeListViewController: UIViewController {
 
         let messageLabel = UILabel()
         messageLabel.text = "Explore new shows!"
-        messageLabel.font = Typography.defaultText.font()
+        messageLabel.font = TypographyV2.bodySmall.font()
         messageLabel.textColor = Theme.onSurfaceVariant
         messageLabel.textAlignment = .center
         messageLabel.adjustsFontForContentSizeCategory = true
         messageLabel.numberOfLines = 0
 
-        var exploreConfiguration = UIButton.Configuration.filled()
-        exploreConfiguration.image = AppIcons.explore
-        exploreConfiguration.imagePadding = 8
-        exploreConfiguration.baseBackgroundColor = Theme.primary
-        exploreConfiguration.baseForegroundColor = .white
-        exploreConfiguration.attributedTitle = AttributedString(
-            "Explore", attributes: AttributeContainer([
-                .font: Typography.mainText.font(),
-            ])
-        )
-        exploreConfiguration.cornerStyle = .capsule
-        emptyExploreButton.configuration = exploreConfiguration
+        emptyExploreButton.configuration = AnycastButton.configuration(.primary, title: "Explore", image: AppIcons.explore)
         emptyExploreButton.addTarget(self, action: #selector(exploreTapped), for: .touchUpInside)
 
         let stack = UIStackView(arrangedSubviews: [iconCircle, titleLabel, messageLabel, emptyExploreButton])

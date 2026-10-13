@@ -126,9 +126,7 @@ final class SettingsPageViewController: UIViewController {
         func sectionLabel(_ text: String) -> UILabel {
             let label = UILabel()
             label.text = text
-            label.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-                for: UIFont(name: "Comfortaa-Bold", size: 12) ?? .systemFont(ofSize: 12, weight: .bold)
-            )
+            label.font = TypographyV2.labelMedium.font()
             label.textColor = Theme.onSurface
             label.adjustsFontForContentSizeCategory = true
             return label
@@ -283,7 +281,7 @@ private final class InlineTooltip {
 
     init(text: String) {
         label.text = text
-        label.font = Typography.defaultText.font()
+        label.font = TypographyV2.bodySmall.font()
         label.textColor = Theme.onSurface
         label.numberOfLines = 0
         label.textAlignment = .center

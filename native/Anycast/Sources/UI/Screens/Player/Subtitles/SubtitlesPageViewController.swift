@@ -171,7 +171,7 @@ final class SubtitlesPageViewController: UIViewController {
         artworkView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(artworkView)
 
-        titleLabel.font = UIFont(name: "Comfortaa-Bold", size: 12)
+        titleLabel.font = TypographyV2.labelMedium.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 2

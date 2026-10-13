@@ -93,7 +93,7 @@ final class PlayerMainPageViewController: UIViewController {
 
         let transport = buildControls()
 
-        stateMessageLabel.font = Typography.defaultText.font()
+        stateMessageLabel.font = TypographyV2.bodySmall.font()
         stateMessageLabel.textColor = Theme.onSurface
         stateMessageLabel.adjustsFontForContentSizeCategory = true
         stateMessageLabel.isHidden = true

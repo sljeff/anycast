@@ -41,7 +41,7 @@ final class SettingsOptionSheetViewController: UIViewController {
 
         // Header row: title + close icon, like the picker dialog's top bar.
         headerLabel.text = titleText
-        headerLabel.font = Typography.secondaryTitle.font()
+        headerLabel.font = TypographyV2.headlineMedium.font()
         headerLabel.textColor = Theme.onSurface
         headerLabel.adjustsFontForContentSizeCategory = true
         headerLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -59,7 +59,7 @@ final class SettingsOptionSheetViewController: UIViewController {
             var config = cell.defaultContentConfiguration()
             config.text = option.name
             config.textProperties.color = Theme.onSurface
-            config.textProperties.font = Typography.mainText.font()
+            config.textProperties.font = TypographyV2.bodyMedium.font()
             cell.contentConfiguration = config
             cell.accessories = option.code == selectedCode ? [.checkmark()] : []
             // v2 surface token instead of the system insetGrouped gray
@@ -135,7 +135,7 @@ final class SettingsSwitchListCell: UICollectionViewListCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        titleLabel.font = Typography.mainText.font()
+        titleLabel.font = TypographyV2.bodyMedium.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1
@@ -267,7 +267,7 @@ enum SettingsTooltipOverlay {
 
         let label = UILabel()
         label.text = message
-        label.font = Typography.defaultText.font()
+        label.font = TypographyV2.bodySmall.font()
         label.textColor = Theme.onSurface
         label.numberOfLines = 0
         label.textAlignment = .natural

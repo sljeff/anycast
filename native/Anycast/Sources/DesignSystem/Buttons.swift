@@ -13,6 +13,13 @@ enum AnycastButton {
     }
 
     static func make(_ kind: Kind, title: String, image: UIImage? = nil) -> UIButton {
+        let button = UIButton(configuration: configuration(kind, title: title, image: image))
+        button.titleLabel?.adjustsFontForContentSizeCategory = true
+        return button
+    }
+
+    /// The same styling for an existing button (`button.configuration = …`).
+    static func configuration(_ kind: Kind, title: String, image: UIImage? = nil) -> UIButton.Configuration {
         var configuration = baseConfiguration(kind)
         configuration.title = title
         configuration.image = image
@@ -27,9 +34,7 @@ enum AnycastButton {
             outgoing.font = TypographyV2.labelLarge.font()
             return outgoing
         }
-        let button = UIButton(configuration: configuration)
-        button.titleLabel?.adjustsFontForContentSizeCategory = true
-        return button
+        return configuration
     }
 
     private static func baseConfiguration(_ kind: Kind) -> UIButton.Configuration {

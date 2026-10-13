@@ -23,7 +23,7 @@ final class ToastPresenter {
 
         let label = UILabel()
         label.text = message
-        label.font = Typography.defaultText.font()
+        label.font = TypographyV2.bodySmall.font()
         label.textColor = Theme.onSurface
         label.textAlignment = .center
         label.numberOfLines = 1

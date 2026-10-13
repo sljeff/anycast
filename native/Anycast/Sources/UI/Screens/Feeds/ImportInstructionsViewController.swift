@@ -133,7 +133,7 @@ final class ImportInstructionsViewController: UIViewController {
 
         let titleLabel = UILabel()
         titleLabel.text = ImportInstructionsContent.headerTitle
-        titleLabel.font = Typography.secondaryTitle.font()
+        titleLabel.font = TypographyV2.headlineMedium.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -239,7 +239,7 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        titleLabel.font = Typography.cardTitleBold.font()
+        titleLabel.font = TypographyV2.headlineSmall.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -300,8 +300,8 @@ final class ImportSectionStepsCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        stepsLabel.font = Typography.cardDescription.font()
-        stepsLabel.textColor = Typography.cardDescription.color
+        stepsLabel.font = TypographyV2.bodySmall.font()
+        stepsLabel.textColor = Theme.onSurfaceVariant
         stepsLabel.numberOfLines = 0
         stepsLabel.adjustsFontForContentSizeCategory = true
         stepsLabel.translatesAutoresizingMaskIntoConstraints = false

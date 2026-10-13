@@ -80,7 +80,7 @@ final class HistoryDialogViewController: UIViewController {
         view.addSubview(dimmingView)
 
         cardView.backgroundColor = Theme.background
-        cardView.layer.cornerRadius = 12
+        cardView.layer.cornerRadius = Radius.card
         cardView.layer.cornerCurve = .continuous
         cardView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(cardView)
@@ -92,7 +92,7 @@ final class HistoryDialogViewController: UIViewController {
 
         // The empty branch is the Dart `AlertDialog(title: Text('No history'))`.
         emptyLabel.text = "No history"
-        emptyLabel.font = Typography.secondaryTitle.font()
+        emptyLabel.font = TypographyV2.headlineMedium.font()
         emptyLabel.textColor = Theme.primary
         emptyLabel.textAlignment = .center
         emptyLabel.numberOfLines = 1
@@ -109,12 +109,14 @@ final class HistoryDialogViewController: UIViewController {
         var clearConfiguration = UIButton.Configuration.filled()
         clearConfiguration.attributedTitle = AttributedString(
             "Clear All", attributes: AttributeContainer([
-                .font: Typography.defaultText.font(),
-                .foregroundColor: UIColor.white,
+                .font: TypographyV2.labelLarge.font(),
             ])
         )
-        clearConfiguration.baseBackgroundColor = UIColor(red: 0xEF / 255, green: 0x53 / 255, blue: 0x50 / 255, alpha: 1)
-        clearConfiguration.background.cornerRadius = 12
+        // Destructive action: the error token, with surface ink for
+        // contrast in both appearances.
+        clearConfiguration.baseBackgroundColor = Theme.error
+        clearConfiguration.baseForegroundColor = Theme.surface
+        clearConfiguration.cornerStyle = .capsule
         clearAllButton.configuration = clearConfiguration
         clearAllButton.addTarget(self, action: #selector(clearAllTapped), for: .touchUpInside)
         clearAllButton.translatesAutoresizingMaskIntoConstraints = false
@@ -336,10 +338,10 @@ final class HistoryRowCell: UICollectionViewCell {
     var onDeleteTap: (() -> Void)?
     var onTap: (() -> Void)?
 
-    private let container = UIView()
+    private let container = CardSurfaceView(radius: Radius.md)
     private let coverView = UIImageView()
     private let titleLabel = MarqueeLabelFactory.makeHistoryTitle(
-        font: Typography.cardTitleBold.font(), textColor: Theme.onSurface
+        font: TypographyV2.headlineSmall.font(), textColor: Theme.onSurface
     )
     private let channelLabel = UILabel()
     private let deleteButton = UIButton(type: .custom)
@@ -362,23 +364,18 @@ final class HistoryRowCell: UICollectionViewCell {
     private func build() {
         contentView.backgroundColor = .clear
 
-        container.backgroundColor = Theme.surface
-        container.layer.borderColor = Theme.outline.cgColor
-        container.layer.borderWidth = 1
-        container.layer.cornerRadius = 12
-        container.layer.cornerCurve = .continuous
         container.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(container)
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = 8
+        coverView.layer.cornerRadius = Radius.sm
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(coverView)
 
-        channelLabel.font = Typography.defaultText.font()
+        channelLabel.font = TypographyV2.bodySmall.font()
         channelLabel.textColor = Theme.primary
         channelLabel.numberOfLines = 1
         channelLabel.adjustsFontForContentSizeCategory = true

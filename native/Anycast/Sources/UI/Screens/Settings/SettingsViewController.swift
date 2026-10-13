@@ -166,7 +166,7 @@ final class SettingsViewController: UIViewController {
             var config = header.defaultContentConfiguration()
             config.text = title
             config.textProperties.color = Theme.onSurfaceVariant
-            config.textProperties.font = Typography.mainText.font()
+            config.textProperties.font = TypographyV2.bodyMedium.font()
             header.contentConfiguration = config
             header.backgroundConfiguration = .clear()
         }
@@ -250,10 +250,10 @@ final class SettingsViewController: UIViewController {
     private func configure(_ cell: UICollectionViewListCell, for row: SettingsPageModel.Row) {
         var config = cell.defaultContentConfiguration()
         config.textProperties.color = Theme.onSurface
-        config.textProperties.font = Typography.mainText.font()
+        config.textProperties.font = TypographyV2.bodyMedium.font()
         config.textProperties.adjustsFontForContentSizeCategory = true
         config.secondaryTextProperties.color = Theme.onSurfaceVariant
-        config.secondaryTextProperties.font = Typography.cardTextLight.font()
+        config.secondaryTextProperties.font = TypographyV2.bodySmall.font()
         config.secondaryTextProperties.adjustsFontForContentSizeCategory = true
 
         var accessibilityValue: String?
@@ -300,13 +300,13 @@ final class SettingsViewController: UIViewController {
             config.attributedText = Self.underlined(
                 SettingsPageModel.title(for: row),
                 color: Theme.primary,
-                font: Typography.cardTextLight.font()
+                font: TypographyV2.bodySmall.font()
             )
         case .privacyPolicy, .termsOfUse:
             config.attributedText = Self.underlined(
                 SettingsPageModel.title(for: row),
                 color: Theme.primary,
-                font: Typography.cardTextLight.font()
+                font: TypographyV2.bodySmall.font()
             )
         }
 

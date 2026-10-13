@@ -219,11 +219,9 @@ final class DetailViewController: UIViewController {
         hero.layer.addSublayer(heroFadeLayer)
 
         // Frosted content panel (Figma: backdrop blur 50 + sand1 gradient
-        // 0→50%→100%). NO UIVisualEffectView: blur materials ignore
-        // overrideUserInterfaceStyle, so under the app's forced dark the
-        // frost renders light (measured white block, §9a). The gradient
-        // scrim alone carries the design until the V4 trait flip restores
-        // real blur.
+        // 0→50%→100%), carried by the gradient scrim alone. A masked
+        // UIVisualEffectView renders nothing (§9a), so restoring the blur
+        // needs a progressive-blur treatment, not a plain effect view.
         let panel = UIView()
         panel.translatesAutoresizingMaskIntoConstraints = false
         panelGradientLayer = CAGradientLayer()
@@ -415,8 +413,8 @@ final class DetailViewController: UIViewController {
         if addAction != nil {
             addConfig.title = "add to queue".localizedUppercase
         }
-        addConfig.baseBackgroundColor = AnycastColor.gold9
-        addConfig.baseForegroundColor = AnycastColor.sand1
+        addConfig.baseBackgroundColor = Theme.primary
+        addConfig.baseForegroundColor = Theme.onPrimary
         addConfig.cornerStyle = .capsule
         addButton.configuration = addConfig
         addButton.accessibilityLabel = "Add to playlist"
@@ -429,8 +427,8 @@ final class DetailViewController: UIViewController {
         }
 
         playButton.setImage(AppIcons.play, for: .normal)
-        playButton.tintColor = AnycastColor.sand1
-        playButton.backgroundColor = AnycastColor.sand12
+        playButton.tintColor = Theme.surface
+        playButton.backgroundColor = Theme.onSurface
         playButton.layer.cornerRadius = 28
         playButton.layer.cornerCurve = .continuous
         playButton.accessibilityLabel = "Play"
