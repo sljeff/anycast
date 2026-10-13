@@ -11,7 +11,7 @@ import Testing
 @MainActor
 struct ChatBubbleWidthTests {
 
-    @Test("chat bubbles use v2 surfaces and the gold primary in both appearances")
+    @Test("listener messages sit in a sand bubble; replies read on the page")
     func bubblesUseV2Colors() {
         let human = ChatBubbleView(frame: .zero)
         human.configure(with: ChatMessage(
@@ -25,9 +25,8 @@ struct ChatBubbleWidthTests {
         for style in [UIUserInterfaceStyle.light, .dark] {
             let traits = UITraitCollection(userInterfaceStyle: style)
             #expect(human.backgroundColor?.resolvedColor(with: traits)
-                == Theme.primary.resolvedColor(with: traits))
-            #expect(assistant.backgroundColor?.resolvedColor(with: traits)
-                == Theme.surfaceContainer.resolvedColor(with: traits))
+                == AnycastColor.sandAlpha3.resolvedColor(with: traits))
+            #expect(assistant.backgroundColor == .clear)
         }
     }
 

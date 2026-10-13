@@ -135,7 +135,7 @@ final class SettingsSwitchListCell: UICollectionViewListCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        titleLabel.font = TypographyV2.bodyMedium.font()
+        titleLabel.font = TypographyV2.bodyLarge.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1

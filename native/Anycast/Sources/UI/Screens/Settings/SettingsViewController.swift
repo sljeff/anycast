@@ -30,11 +30,12 @@ struct SettingsLanguageChangeApplier {
     }
 }
 
-/// Settings sheet (lib/pages/settings.dart, 03 §2.13): inset-grouped list
-/// mirroring the Dart groups. Presented via AppSheets.presentExpand from the
-/// shell's gear button; children (Login/ImportExport/History) are presented
-/// from here. iOS 26 glass comes free with the system list appearance — no
-/// custom background painting (07 §2.7).
+/// Settings sheet (lib/pages/settings.dart, 03 §2.13): an inset-grouped list
+/// mirroring the Dart groups, in the Anycast 2.0 settings language — a page
+/// title, surface plates on the sand page, values trailing their labels,
+/// chevrons on rows that open something. Presented via
+/// AppSheets.presentExpand from the shell's gear button; children
+/// (Login/ImportExport/History) are presented from here.
 final class SettingsViewController: UIViewController {
 
     private let context: UIContext
@@ -79,6 +80,9 @@ final class SettingsViewController: UIViewController {
             var config = UICollectionLayoutListConfiguration(
                 appearance: plain ? .plain : .insetGrouped
             )
+            // The page paints the sand base; the list default would lay the
+            // system grouped gray over it.
+            config.backgroundColor = .clear
             if sections.indices.contains(sectionIndex) {
                 config.headerMode = sections[sectionIndex].header == nil ? .none : .supplementary
                 if plain {
@@ -98,14 +102,27 @@ final class SettingsViewController: UIViewController {
 
         configureDataSource()
 
+        let titleLabel = UILabel()
+        titleLabel.text = "Settings"
+        titleLabel.font = TypographyV2.headlineLarge.font()
+        titleLabel.textColor = Theme.onSurface
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.accessibilityTraits = .header
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(titleLabel)
+
         collectionView.delegate = self
         collectionView.backgroundColor = .clear
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionView)
         NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
+            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: Spacing.xs),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
@@ -188,7 +205,7 @@ final class SettingsViewController: UIViewController {
             // the default material is not part of the palette and halved
             // the card/background contrast step (09 audit).
             var background = UIBackgroundConfiguration.clear()
-            background.backgroundColor = Theme.surfaceContainer
+            background.backgroundColor = Theme.surface
             cell.backgroundConfiguration = background
             return cell
         }
@@ -248,16 +265,23 @@ final class SettingsViewController: UIViewController {
     }
 
     private func configure(_ cell: UICollectionViewListCell, for row: SettingsPageModel.Row) {
-        var config = cell.defaultContentConfiguration()
+        // Value rows: the current value trails the label (UI kit settings).
+        var config = UIListContentConfiguration.valueCell()
         config.textProperties.color = Theme.onSurface
-        config.textProperties.font = TypographyV2.bodyMedium.font()
+        config.textProperties.font = TypographyV2.bodyLarge.font()
         config.textProperties.adjustsFontForContentSizeCategory = true
         config.secondaryTextProperties.color = Theme.onSurfaceVariant
-        config.secondaryTextProperties.font = TypographyV2.bodySmall.font()
+        config.secondaryTextProperties.font = TypographyV2.bodyLarge.font()
         config.secondaryTextProperties.adjustsFontForContentSizeCategory = true
 
         var accessibilityValue: String?
-        cell.accessories = []
+        // Chevrons only on rows that open something in the app.
+        switch row {
+        case .contactEmail, .privacyPolicy, .termsOfUse, .enableTranslation:
+            cell.accessories = []
+        default:
+            cell.accessories = [.disclosureIndicator(options: .init(tintColor: Theme.onSurfaceVariant))]
+        }
 
         switch row {
         case .account:

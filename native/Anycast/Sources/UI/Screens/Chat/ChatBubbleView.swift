@@ -1,12 +1,14 @@
 import UIKit
 import ChatLayout
 
-/// Thin plain-text bubble using the Anycast 2.0 primary and container
-/// surfaces while retaining the existing message layout and timestamps.
+/// Plain-text message in the Anycast 2.0 UI kit chat language
+/// (reading-first): the listener's messages sit in a quiet sand bubble, the
+/// assistant's replies read as plain text on the page; layout and
+/// timestamps are unchanged.
 final class ChatBubbleView: UIView {
 
     private enum Metrics {
-        static let bubbleRadius: CGFloat = 12
+        static let bubbleRadius = Radius.md
         static let bubbleHorizontalPadding: CGFloat = 16
         static let bubbleVerticalPadding: CGFloat = 10
         static let timeGap: CGFloat = 2
@@ -53,7 +55,7 @@ final class ChatBubbleView: UIView {
         // and wrap the token per character instead.
         textLabel.lineBreakMode = .byCharWrapping
         textLabel.textColor = Theme.onSurface
-        textLabel.font = TypographyV2.bodyCompact.font()
+        textLabel.font = TypographyV2.bodyLarge.font()
         textLabel.adjustsFontForContentSizeCategory = true
         textLabel.setContentHuggingPriority(.required, for: .horizontal)
         textLabel.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
@@ -82,11 +84,9 @@ final class ChatBubbleView: UIView {
     }
 
     func configure(with message: ChatMessage) {
-        backgroundColor = message.author == .human ? Theme.primary : Theme.surfaceContainer
-        textLabel.textColor = message.author == .human ? Theme.onPrimary : Theme.onSurface
-        timeLabel.textColor = message.author == .human
-            ? Theme.onPrimary.withAlphaComponent(0.72)
-            : Theme.onSurfaceVariant
+        backgroundColor = message.author == .human ? AnycastColor.sandAlpha3 : .clear
+        textLabel.textColor = Theme.onSurface
+        timeLabel.textColor = Theme.onSurfaceVariant
         textLabel.text = message.text
         timeLabel.text = Self.timeFormatter.string(from: message.createdAt)
         isAccessibilityElement = true
