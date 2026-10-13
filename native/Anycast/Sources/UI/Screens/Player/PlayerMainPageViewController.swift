@@ -295,12 +295,13 @@ final class PlayerMainPageViewController: UIViewController {
         let episode = context.playback.currentEpisode
         let position = context.playback.positionData
 
-        let coverURL = (episode?.imageUrl.flatMap(URL.init(string:)))
-            ?? URL(string: "https://placehold.co/400/000000/FFF.png?text=No+Episode")
-        if coverURL != renderedCoverURL {
+        // A missing cover shows the shared local placeholder (no remote
+        // "No Episode" image request).
+        let coverURL = episode?.imageUrl.flatMap(URL.init(string:))
+        if coverURL != renderedCoverURL || coverURL == nil {
             renderedCoverURL = coverURL
             coverView.kf.cancelDownloadTask()
-            coverView.kf.setImage(with: coverURL)
+            coverView.setArtwork(coverURL, title: episode?.channelTitle)
         }
 
         titleBar.update(
@@ -384,7 +385,7 @@ final class PlayerMainPageViewController: UIViewController {
     }
 
     /// Channel-name color = getTextSafeColor(dominant) — the palette rule
-    /// (formatters.dart:139-153; luminance < 0.2 falls back to 0x10B981).
+    /// (formatters.dart:139-153; luminance < 0.2 falls back to the brand gold).
     private var paletteImageURL: String?
 
     private func updateChannelNameColor(imageURL: String?) {
@@ -444,7 +445,7 @@ final class PlayerMainPageViewController: UIViewController {
 
 /// Channel image (64×64 r12, tap → Channel) + title (24 pt w600; marquee
 /// only when the MEASURED width overflows — K33) + channel name (16 pt w600,
-/// `getTextSafeColor(dominant)` → 0x10B981 when the dominant is too dark;
+/// `getTextSafeColor(dominant)` → brand gold when the dominant is too dark;
 /// also taps to Channel).
 @MainActor
 private final class PlayerTitleBarView: UIView {
@@ -475,8 +476,7 @@ private final class PlayerTitleBarView: UIView {
         imageView.layer.cornerRadius = Radius.sm
         imageView.layer.cornerCurve = .continuous
         imageView.backgroundColor = Theme.surfaceContainerHigh
-        imageView.image = AppIcons.photo
-        imageView.tintColor = Theme.onSurface
+        imageView.image = ArtworkPlaceholder.image(for: nil)
         imageView.isUserInteractionEnabled = false
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageButton.addSubview(imageView)
@@ -599,20 +599,12 @@ private final class PlayerTitleBarView: UIView {
         }
         guard imageURL != fetchedImageURL else { return }
         fetchedImageURL = imageURL
-        if imageURL.isEmpty {
-            imageView.kf.cancelDownloadTask()
-            imageView.image = AppIcons.photo
-        } else {
-            imageView.kf.setImage(
-                with: URL(string: imageURL),
-                placeholder: AppIcons.photo,
-                options: [.transition(.none)]
-            )
-        }
+        imageView.kf.cancelDownloadTask()
+        imageView.setArtwork(imageURL.isEmpty ? nil : URL(string: imageURL), title: channelTitle)
     }
 
     /// Dominant color for the channel-name safe-color rule; nil resets to
-    /// the app link green (the Dart fallback applies to every too-dark
+    /// the brand gold (the fallback applies to every too-dark
     /// dominant, including the palette fallback itself).
     func setDominantColor(_ color: UIColor?) {
         var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
@@ -620,7 +612,7 @@ private final class PlayerTitleBarView: UIView {
             let rgb = (UInt32(red * 255) << 16) | (UInt32(green * 255) << 8) | UInt32(blue * 255)
             setChannelColor(PlayerPaletteRules.channelNameColor(dominantRGB: rgb | 0xFF00_0000))
         } else {
-            // Luminance 0 → the fallback green applies.
+            // Luminance 0 → the gold fallback applies.
             setChannelColor(PlayerPaletteRules.channelNameColor(dominantRGB: 0))
         }
     }

@@ -406,7 +406,7 @@ final class HistoryRowCell: UICollectionViewCell {
 
     func configure(_ episode: HistoryEpisodeRow) {
         let url = episode.imageUrl.flatMap(URL.init(string:))
-        coverView.kf.setImage(with: url, options: [.transition(.none)])
+        coverView.setArtwork(url, title: episode.channelTitle)
         titleLabel.text = episode.title ?? ""
         channelLabel.text = episode.channelTitle ?? ""
         isAccessibilityElement = true

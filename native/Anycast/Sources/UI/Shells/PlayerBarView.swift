@@ -315,11 +315,7 @@ final class PlayerBarView: UIView {
         if coverURL != renderedCoverURL {
             renderedCoverURL = coverURL
             coverView.kf.cancelDownloadTask()
-            coverView.kf.setImage(
-                with: coverURL,
-                placeholder: nil,
-                options: [.transition(.none)]
-            )
+            coverView.setArtwork(coverURL, title: episode?.channelTitle)
         }
 
         playPauseControl.update(

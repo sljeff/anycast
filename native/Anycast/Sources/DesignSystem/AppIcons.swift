@@ -56,7 +56,7 @@ import UIKit
 ///   ph.arrow_elbow_down_right_bold           → arrow.turn.down.right
 ///   FluentIcons.mail_inbox_all_24_filled     → tray.fill
 ///   FluentIcons.library_24_filled            → books.vertical.fill
-///   MdiIcons.cloudSearch                     → magnifyingglass.circle
+///   MdiIcons.cloudSearch                     → safari (2.0: discover ≠ search)
 ///   Remix.forward_30_fill                    → goforward.30
 ///
 ///   Ri.google_fill is a brand logo with no SF Symbol — the login task
@@ -66,7 +66,8 @@ nonisolated enum AppIcons {
     // Tab bar (03 §1.1)
     static let home = symbol("house.fill")
     static let playlist = symbol("play.rectangle.on.rectangle")
-    static let discover = symbol("magnifyingglass.circle")
+    /// Compass: "discover", distinct from the header search field.
+    static let discover = symbol("safari")
 
     // PodcastsPage secondary tabs (03 §2.1)
     static let inbox = symbol("tray.fill")
@@ -125,7 +126,7 @@ nonisolated enum AppIcons {
     /// Every SF Symbol name referenced above — the registration test asserts
     /// each resolves on the running OS (a typo would otherwise render blanks).
     static let symbolNames: [String] = [
-        "house.fill", "play.rectangle.on.rectangle", "magnifyingglass.circle", "tray.fill",
+        "house.fill", "play.rectangle.on.rectangle", "safari", "tray.fill",
         "books.vertical.fill", "play.fill", "pause.fill", "text.badge.plus",
         "checklist", "xmark", "arrow.down.circle", "checkmark.circle.fill",
         "square.and.arrow.up", "chevron.left", "gobackward.10",

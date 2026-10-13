@@ -54,9 +54,9 @@ struct PlayerTitleMarqueeTests {
             return String(format: "%02X%02X%02X", Int(red * 255), Int(green * 255), Int(blue * 255))
         }
 
-        // Too dark (luminance < 0.2) → 0x10B981 (TextSafeColor.fallback).
-        #expect(rgbString(PlayerPaletteRules.channelNameColor(dominantRGB: 0x11_13_16)) == "10B981")
-        #expect(rgbString(PlayerPaletteRules.channelNameColor(dominantRGB: 0)) == "10B981")
+        // Too dark (luminance < 0.2) → the brand gold goldDark9.
+        #expect(rgbString(PlayerPaletteRules.channelNameColor(dominantRGB: 0x11_13_16)) == "CBB99F")
+        #expect(rgbString(PlayerPaletteRules.channelNameColor(dominantRGB: 0)) == "CBB99F")
         // A bright dominant passes through unchanged.
         #expect(rgbString(PlayerPaletteRules.channelNameColor(dominantRGB: 0xD8_C8_AE)) == "D8C8AE")
         #expect(rgbString(PlayerPaletteRules.channelNameColor(dominantRGB: 0x63_C1_74)) == "63C174")

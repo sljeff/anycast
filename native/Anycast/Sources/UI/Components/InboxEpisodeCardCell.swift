@@ -126,7 +126,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         if url != renderedCoverURL {
             renderedCoverURL = url
             coverView.kf.cancelDownloadTask()
-            coverView.kf.setImage(with: url, placeholder: nil, options: [.transition(.none)])
+            coverView.setArtwork(url, title: content.showName)
         }
     }
 

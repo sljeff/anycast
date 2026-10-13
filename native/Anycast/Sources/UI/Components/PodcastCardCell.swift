@@ -12,8 +12,7 @@ struct PodcastCardContent {
 
 /// The channel card (lib/widgets/card.dart:323-453, 03 §2.12) in the
 /// Anycast 2.0 card language: `CardSurfaceView` plate, 64×64 artwork-radius
-/// cover (Kingfisher with a 20pt spinner placeholder and a podcast glyph on
-/// error), titleSmall single-line title, bodySmall two-line description.
+/// cover (the shared artwork placeholder while loading and on error), titleSmall single-line title, bodySmall two-line description.
 /// Whole-card tap opens the Channel sheet via the injected callback.
 final class PodcastCardCell: UICollectionViewCell {
 
@@ -25,15 +24,8 @@ final class PodcastCardCell: UICollectionViewCell {
     var onTap: ((PodcastCardContent) -> Void)?
 
     private var content: PodcastCardContent?
-    /// Bumps on every (re)configure; a completion handler from a stale
-    /// request — prepareForReuse's cancel lands its `.failure` callback one
-    /// runloop turn later, after the reuse has already started a new load —
-    /// must not clobber the new spinner/error state.
-    private var coverGeneration = 0
     private let cardContainer = CardSurfaceView()
     private let coverView = UIImageView()
-    private let spinner = UIActivityIndicatorView(style: .medium)
-    private let errorIconView = UIImageView()
     private let titleLabel = UILabel()
     private let descriptionLabel = UILabel()
 
@@ -48,10 +40,7 @@ final class PodcastCardCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         onTap = nil
-        coverGeneration += 1
         coverView.kf.cancelDownloadTask()
-        spinner.startAnimating()
-        errorIconView.isHidden = true
     }
 
     func configure(_ content: PodcastCardContent) {
@@ -63,22 +52,7 @@ final class PodcastCardCell: UICollectionViewCell {
         titleLabel.text = content.title
         descriptionLabel.text = content.description
 
-        coverGeneration += 1
-        let generation = coverGeneration
-        spinner.startAnimating()
-        errorIconView.isHidden = true
-        coverView.kf.setImage(
-            with: content.imageURL.flatMap(URL.init(string:)),
-            placeholder: nil,
-            options: [.transition(.none)],
-            completionHandler: { [weak self] result in
-                guard let self, generation == self.coverGeneration else { return }
-                self.spinner.stopAnimating()
-                if case .failure = result {
-                    self.errorIconView.isHidden = false
-                }
-            }
-        )
+        coverView.setArtwork(content.imageURL.flatMap(URL.init(string:)), title: content.title)
     }
 
     private func build() {
@@ -98,17 +72,6 @@ final class PodcastCardCell: UICollectionViewCell {
         coverView.translatesAutoresizingMaskIntoConstraints = false
         cardContainer.addSubview(coverView)
 
-        spinner.color = Theme.primary
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        spinner.hidesWhenStopped = true
-        coverView.addSubview(spinner)
-
-        errorIconView.image = AppIcons.playerMain
-        errorIconView.tintColor = Theme.onSurfaceVariant
-        errorIconView.contentMode = .center
-        errorIconView.isHidden = true
-        errorIconView.translatesAutoresizingMaskIntoConstraints = false
-        coverView.addSubview(errorIconView)
 
         titleLabel.font = TypographyV2.titleSmall.font()
         titleLabel.textColor = Theme.onSurface
@@ -144,13 +107,6 @@ final class PodcastCardCell: UICollectionViewCell {
             coverView.widthAnchor.constraint(equalToConstant: 64),
             coverView.heightAnchor.constraint(equalToConstant: 64),
 
-            spinner.centerXAnchor.constraint(equalTo: coverView.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: coverView.centerYAnchor),
-            spinner.widthAnchor.constraint(equalToConstant: 20),
-            spinner.heightAnchor.constraint(equalToConstant: 20),
-
-            errorIconView.centerXAnchor.constraint(equalTo: coverView.centerXAnchor),
-            errorIconView.centerYAnchor.constraint(equalTo: coverView.centerYAnchor),
 
             textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
             textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.gap),
