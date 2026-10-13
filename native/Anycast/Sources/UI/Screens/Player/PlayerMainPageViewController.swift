@@ -378,9 +378,12 @@ final class PlayerMainPageViewController: UIViewController {
         // onto the new one (same identity guard as
         // SubtitlesPageViewController.updateHeader).
         guard rssFeedURL == titleBar.channelURLString else { return }
+        // Unsubscribed shows have no row: fall back to the episode's own
+        // artwork and show name so the thumbnail is never an empty tile.
+        let episode = context.playback.currentEpisode
         titleBar.applyChannel(
-            imageURL: subscription?.imageUrl ?? "",
-            channelTitle: subscription?.title ?? ""
+            imageURL: subscription?.imageUrl ?? episode?.imageUrl ?? "",
+            channelTitle: subscription?.title ?? episode?.channelTitle ?? ""
         )
     }
 
