@@ -37,7 +37,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Player page distribution (1) + thumb height (2)
 
-    @Test("Player main page: square cover and five equal spaceEvenly gaps")
+    @Test("Player main page: square capped cover, balanced whitespace, centered play")
     func playerPageDistribution() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -59,57 +59,48 @@ struct UIFixRegressionTests {
         guard let page = main.view else {
             Issue.record("player main page has no view"); return
         }
-        // Generous settle: the sheet's spaceEvenly distribution is measured
-        // to 2 pt — on a busy simulator a mid-presentation snapshot reads
-        // compressed gaps (flaky under load, not a real regression).
+        // Generous settle: the balance is measured to 2 pt — on a busy
+        // simulator a mid-presentation snapshot reads compressed gaps.
         try await Self.settle(window, seconds: 2.0)
 
         guard let cover = Self.firstView(
             in: page, where: { ($0 as? UIImageView)?.accessibilityLabel == "Episode artwork" }
-        ), let titleBar = Self.firstView(
-            in: page, where: { ($0 as? UIButton)?.accessibilityLabel == "Open channel" }
+        ), let titleRow = Self.firstView(
+            in: page, where: { $0.accessibilityLabel == "Share episode" }
         )?.superview, let progress = Self.firstView(
             in: page, where: { $0 is PlayerProgressBarView }
         ), let playPause = Self.firstView(
             in: page, where: { ($0 as? UIButton)?.accessibilityLabel == "Play or pause" }
-        )?.superview else {
+        ) else {
             Issue.record("player main page blocks not found"); return
         }
-        // The K6 retry row sits BELOW the transport — when a playback
-        // failure surfaced earlier it is the stack's bottom block, and the
-        // below-transport gap must be measured from it.
-        let retryRow = Self.firstView(
-            in: page, where: { ($0 as? UIButton)?.accessibilityLabel == "Retry playback" }
-        )?.superview
-        let bottomBlock = (retryRow?.isHidden == false) ? retryRow! : playPause
-
-        // Cover is square at the content width (the old cap vs stretch
-        // conflict squashed it below the design width).
-        #expect(abs(cover.bounds.width - cover.bounds.height) < 1.5,
-                "cover is not square: \(cover.bounds)")
+        guard let bottomStack = progress.superview else {
+            Issue.record("scrubber has no host stack"); return
+        }
 
         func frameInPage(_ v: UIView) -> CGRect { page.convert(v.bounds, from: v) }
         let coverFrame = frameInPage(cover)
-        let titleFrame = frameInPage(titleBar)
-        let progressFrame = frameInPage(progress)
-        let transportFrame = frameInPage(playPause)
-        let bottomFrame = frameInPage(bottomBlock)
+        let titleFrame = frameInPage(titleRow)
+        let bottomFrame = frameInPage(bottomStack)
+        let playFrame = frameInPage(playPause)
 
-        // The four content blocks + page edges must share the height
-        // through five EQUAL gaps (spaceEvenly).
-        let gap = { (a: CGFloat, b: CGFloat) in b - a }
-        let gaps: [CGFloat] = [
-            gap(8, coverFrame.minY),                       // above the cover (8 pt stack margin)
-            gap(coverFrame.maxY, titleFrame.minY),
-            gap(titleFrame.maxY, progressFrame.minY),
-            gap(progressFrame.maxY, transportFrame.minY),
-            gap(bottomFrame.maxY, page.bounds.height - 8), // below the bottom block (8 pt margin)
-        ]
-        for (index, value) in gaps.enumerated() {
-            #expect(abs(value - gaps[0]) < 2.0,
-                    "gap \(index) (\(value)) is not even with gap 0 (\(gaps[0]))")
+        // Square, capped at the UI kit's 320 pt and horizontally centered.
+        #expect(abs(coverFrame.width - coverFrame.height) < 1.5, "cover is not square: \(coverFrame)")
+        #expect(coverFrame.width <= 320.5, "cover exceeds its 320 pt cap: \(coverFrame.width)")
+        #expect(abs(coverFrame.midX - page.bounds.midX) < 1, "cover is off center")
+
+        // The whitespace above the cover equals the gap between the title
+        // and the scrubber block (UI kit balance), unless a floor binds.
+        let topGap = coverFrame.minY
+        let middleGap = bottomFrame.minY - titleFrame.maxY
+        #expect(topGap >= 24 - 0.5, "content is crammed against the sheet top: \(topGap)")
+        #expect(middleGap >= 12 - 0.5, "title runs into the scrubber: \(middleGap)")
+        if topGap > 24.5 && middleGap > 12.5 {
+            #expect(abs(topGap - middleGap) < 2.0, "unbalanced: top \(topGap) vs middle \(middleGap)")
         }
-        #expect(gaps[0] > 8, "content is crammed against the sheet top: \(gaps[0])")
+
+        // Play sits exactly on the page's center line.
+        #expect(abs(playFrame.midX - page.bounds.midX) < 1, "play is off center: \(playFrame.midX)")
         await Self.capture(window, name: "uifix-player-page")
     }
 
@@ -204,12 +195,12 @@ struct UIFixRegressionTests {
             return r + g + b > 700
         }
 
-        // The resting 6 pt track is centered at y 40 in the 40 pt touch band;
-        // the head ends at x≈25.
-        #expect(isWhite(15, 40), "head mid-height not filled: px=\(channels(15, 40))")
-        #expect(!isWhite(2, 22), "white reaches the bar's top-left — square stub or clip leak: px=\(channels(2, 22))")
-        #expect(!isWhite(2, 59), "white reaches the bar's bottom-left — square stub or clip leak: px=\(channels(2, 59))")
-        #expect(!isWhite(35, 40), "white extends past the round head: px=\(channels(35, 40))")
+        // The resting 6 pt track is centered at y 20 in the top 40 pt touch
+        // band (times sit below); the head ends at x≈25.
+        #expect(isWhite(15, 20), "head mid-height not filled: px=\(channels(15, 20))")
+        #expect(!isWhite(2, 2), "white reaches the bar's top-left — square stub or clip leak: px=\(channels(2, 2))")
+        #expect(!isWhite(2, 26), "white reaches the bar's bottom-left — square stub or clip leak: px=\(channels(2, 26))")
+        #expect(!isWhite(35, 20), "white extends past the round head: px=\(channels(35, 20))")
 
         // Diagnostic capture (same convention as capture()): the bar at a
         // start-of-playback fraction, for offline visual inspection.

@@ -105,25 +105,28 @@ nonisolated enum Typography {
 
     // MARK: - Player / lyrics (03 §2.10)
 
-    /// Lyric main line — 14pt M PLUS Rounded 1c on grey[200].
+    /// Transcript lines (Anycast 2.0 UI kit `TranscriptLineCell`): one size
+    /// for every line so the follow highlight never changes line height —
+    /// the active line differs only by brightness.
     static let lyricMain = Style(
-        postScriptName: "RoundedMplus1c-Regular", size: 14, kern: 0,
-        color: Theme.playerSecondary,
-        scalingTextStyle: .subheadline
-    )
-
-    /// Lyric active line — 16pt, greenAccent.
-    static let lyricActive = Style(
         postScriptName: "RoundedMplus1c-Regular", size: 16, kern: 0,
-        color: Theme.primary,
+        color: Theme.playerSecondary,
         scalingTextStyle: .body
     )
 
-    /// Lyric translation — 14pt greenAccent (active translation grey[300]).
+    /// Active transcript line — full-strength player text.
+    static let lyricActive = Style(
+        postScriptName: "RoundedMplus1c-Regular", size: 16, kern: 0,
+        color: Theme.playerText,
+        scalingTextStyle: .body
+    )
+
+    /// Transcript translation — one step dimmer than the main line
+    /// (the active line's translation uses `playerSecondary`).
     static let lyricTranslation = Style(
-        postScriptName: "RoundedMplus1c-Regular", size: 14, kern: 0,
-        color: Theme.primary,
-        scalingTextStyle: .subheadline
+        postScriptName: "RoundedMplus1c-Regular", size: 16, kern: 0,
+        color: Theme.playerSecondary.withAlphaComponent(0.55),
+        scalingTextStyle: .body
     )
 
     // MARK: - Misc pinned sizes

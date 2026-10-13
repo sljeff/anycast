@@ -69,10 +69,6 @@ nonisolated enum Theme {
         [0.20, 0.25, 0.376, 0.40, 0.50].map { playerWarm.withAlphaComponent($0) }
     }
 
-    /// The palette fallback when a cover yields no dominant color. v2 keys
-    /// artwork gradients to the player's warm base.
-    static let paletteFallback = playerBackground
-
     // MARK: - Chrome
 
     /// Applies the semantic page surface without overriding system appearance.

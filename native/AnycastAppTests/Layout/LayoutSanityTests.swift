@@ -227,12 +227,12 @@ struct LayoutSanityTests {
         try await Self.settleLayout(window)
 
         let views = Self.subviewsRecursive(in: page.view)
-        // imageButton is "Open channel"; channelButton becomes
-        // "Open channel <title>" once a channel name lands.
+        // The show-name button is "Open channel", then "Open channel
+        // <title>" once a channel name lands.
         let channelControls = views.filter {
             $0.accessibilityLabel?.hasPrefix("Open channel") == true
         }
-        #expect(channelControls.count >= 2, "title bar controls missing")
+        #expect(channelControls.count >= 1, "title block show name missing")
         for control in channelControls {
             #expect(control.bounds.width > 0 && control.bounds.height > 0,
                     "title bar child collapsed to \(control.bounds.size)")

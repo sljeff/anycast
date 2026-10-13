@@ -2,29 +2,6 @@ import UIKit
 import SafariServices
 import AnycastKit
 
-/// Palette-derived player rules shared by the player pages (kept pure for
-/// tests; the channel page header can reuse them in T5).
-enum PlayerPaletteRules {
-
-    /// Channel-name color = getTextSafeColor(dominant) (formatters.dart:
-    /// 139-153 at the 1.2.1 baseline): a dominant with luminance < 0.2 is
-    /// unreadable on the dark player, so it folds to the brand gold
-    /// (goldDark9) in place of the v1 fallback green; otherwise the
-    /// dominant itself.
-    static func channelNameColor(dominantRGB: UInt32) -> UIColor {
-        let safe = TextSafeColor.getTextSafeColor(argb: dominantRGB | 0xFF00_0000)
-        if safe == TextSafeColor.fallback {
-            return AnycastColor.goldDark9
-        }
-        return UIColor(
-            red: CGFloat((safe >> 16) & 0xFF) / 255,
-            green: CGFloat((safe >> 8) & 0xFF) / 255,
-            blue: CGFloat(safe & 0xFF) / 255,
-            alpha: 1
-        )
-    }
-}
-
 extension HTMLContentRenderer {
 
     /// The app-side shared renderer instance for player show notes (one

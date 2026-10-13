@@ -65,17 +65,19 @@ enum PlayerProgressClock {
 
 /// The player progress bar (self-drawn widget #4, 07 §2.4; Dart MyProgressBar
 /// over audio_video_progress_bar), in the Anycast 2.0 scrubber form: a 6 pt
-/// rounded track (white 12%, buffered 24%) that grows to 12 pt
-/// while held, inside a 40 pt touch band, with a white played segment — the
-/// played segment's rounded head IS the position indicator (no separate
-/// thumb: a same-white knob would be invisible against the fill, and the
-/// Dart glow halo read as a dark ring over the track). The head stays a
-/// full semicircle at ANY fraction — a plain rounded rect clamps its
-/// corner radius to width/2, which rendered the first seconds of playback
-/// as a square-cornered stub. Time labels sit ABOVE the ends (12 pt
-/// comfortaa w700 white; right label shows REMAINING time). Drag (or tap)
-/// anywhere on the control seeks through `onSeek(positionMilliseconds:)`
-/// on release.
+/// rounded track (white 12%, buffered 24%) in a 40 pt touch band, with a
+/// white played segment whose rounded head IS the position indicator (no
+/// separate thumb). The head stays a full semicircle at ANY fraction — a
+/// plain rounded rect clamps its corner radius to width/2, which rendered
+/// the first seconds of playback as a square-cornered stub. Elapsed and
+/// remaining times sit BELOW the ends (monospaced digits).
+///
+/// Holding the bar (UI kit scrubber physics): the track grows to 12 pt and
+/// widens past its ends, a time bubble follows the finger above the track
+/// (09 §9 — touching shows the position, dragging updates it, releasing
+/// restores the resting look and keeps the new position), and dragging
+/// past either end stretches the track like a rubber band. Drag (or tap)
+/// anywhere seeks through `onSeek(positionMilliseconds:)` on release.
 final class PlayerProgressBarView: UIControl {
 
     var onSeek: (@MainActor (Int64) -> Void)?
@@ -99,6 +101,11 @@ final class PlayerProgressBarView: UIControl {
     private let playedLayer = CAShapeLayer()
     private let positionLabel = UILabel()
     private let remainingLabel = UILabel()
+    /// The time bubble shown above the track while held.
+    private let timeBubble = UIView()
+    private let timeBubbleLabel = UILabel()
+    private var timeBubbleCenterX: NSLayoutConstraint!
+    private var overscroll: CGFloat = 0
 
     private var positionMilliseconds: Int64 = 0
     private var bufferedMilliseconds: Int64 = 0
@@ -130,33 +137,56 @@ final class PlayerProgressBarView: UIControl {
         NSLayoutConstraint.activate([
             barContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
             barContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
-            // Centered in the bottom touch band.
-            barContainer.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -Self.barHeight / 2),
+            // Centered in the top touch band; the time labels sit below.
+            barContainer.centerYAnchor.constraint(equalTo: topAnchor, constant: Self.barHeight / 2),
             barContainer.heightAnchor.constraint(equalToConstant: Self.trackHeight),
         ])
         layoutBarLayers()
 
         for label in [positionLabel, remainingLabel] {
             // Monospaced digits keep the ticking times from jittering.
-            label.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-                for: ThemeRegistry.current.typography.font(12, .semibold, .text).monospacedDigits()
+            label.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(
+                for: ThemeRegistry.current.typography.font(13, .regular, .text).monospacedDigits()
             )
-            label.textColor = .white
+            label.textColor = Theme.playerSecondary
             label.adjustsFontForContentSizeCategory = true
             label.translatesAutoresizingMaskIntoConstraints = false
             addSubview(label)
         }
 
+        timeBubbleLabel.font = UIFontMetrics(forTextStyle: .title3).scaledFont(
+            for: ThemeRegistry.current.typography.font(20, .semibold, .text).monospacedDigits()
+        )
+        timeBubbleLabel.adjustsFontForContentSizeCategory = true
+        timeBubbleLabel.textColor = Theme.playerBackground
+        timeBubbleLabel.translatesAutoresizingMaskIntoConstraints = false
+        timeBubble.backgroundColor = Theme.playerText
+        timeBubble.layer.cornerRadius = Radius.sm
+        timeBubble.layer.cornerCurve = .continuous
+        timeBubble.alpha = 0
+        timeBubble.isUserInteractionEnabled = false
+        timeBubble.translatesAutoresizingMaskIntoConstraints = false
+        timeBubble.addSubview(timeBubbleLabel)
+        addSubview(timeBubble)
+        timeBubbleCenterX = timeBubble.centerXAnchor.constraint(equalTo: leadingAnchor)
+        timeBubbleCenterX.priority = .defaultHigh
+
         NSLayoutConstraint.activate([
-            // Labels sit inside the control, in the 20 pt band above the bar.
+            // Labels sit inside the control, in the band below the bar.
             positionLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
-            positionLabel.bottomAnchor.constraint(
-                equalTo: bottomAnchor, constant: -(Self.barHeight + 4)
-            ),
+            positionLabel.topAnchor.constraint(equalTo: barContainer.centerYAnchor, constant: Spacing.md),
             remainingLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
-            remainingLabel.bottomAnchor.constraint(
-                equalTo: bottomAnchor, constant: -(Self.barHeight + 4)
-            ),
+            remainingLabel.topAnchor.constraint(equalTo: barContainer.centerYAnchor, constant: Spacing.md),
+
+            timeBubbleLabel.topAnchor.constraint(equalTo: timeBubble.topAnchor, constant: Spacing.sm),
+            timeBubbleLabel.bottomAnchor.constraint(equalTo: timeBubble.bottomAnchor, constant: -Spacing.sm),
+            timeBubbleLabel.leadingAnchor.constraint(equalTo: timeBubble.leadingAnchor, constant: Spacing.gap),
+            timeBubbleLabel.trailingAnchor.constraint(equalTo: timeBubble.trailingAnchor, constant: -Spacing.gap),
+            // Floats above the control, following the finger, kept on screen.
+            timeBubble.bottomAnchor.constraint(equalTo: barContainer.topAnchor, constant: -Spacing.md),
+            timeBubbleCenterX,
+            timeBubble.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
+            timeBubble.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
         ])
 
         isAccessibilityElement = true
@@ -177,7 +207,7 @@ final class PlayerProgressBarView: UIControl {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    /// 20 pt label band + the 40 pt bar; width is host-driven. Without an
+    /// The 40 pt bar + 20 pt label band; width is host-driven. Without an
     /// intrinsic height a `.fill` stack either collapses the control or —
     /// losing the hugging tie against a plain UIView sibling — stretches
     /// it far past the design height.
@@ -253,6 +283,8 @@ final class PlayerProgressBarView: UIControl {
         playedLayer.path = fillPath(width: x(forFraction: playedFraction))
 
         positionLabel.text = PlayerProgressClock.positionText(effectivePosition)
+        timeBubbleLabel.text = positionLabel.text
+        timeBubbleCenterX.constant = x(forFraction: playedFraction)
         remainingLabel.text = PlayerProgressClock.remainingText(
             positionMilliseconds: effectivePosition,
             durationMilliseconds: duration
@@ -289,39 +321,64 @@ final class PlayerProgressBarView: UIControl {
         return Int64(Double(fraction) * Double(max(durationMilliseconds, 0)))
     }
 
-    /// Grows the track under the finger and settles it back on release.
+    /// Resting: 6 pt track at full width. Held: 12 pt, widened past both
+    /// ends, shifted by any rubber-band overscroll.
+    private func barTransform(expanded: Bool) -> CGAffineTransform {
+        guard expanded else { return CGAffineTransform(scaleX: 1, y: Self.restScale) }
+        let widen = 1 + Motion.scrubberFocusOutset * 2 / max(bounds.width, 1)
+        return CGAffineTransform(translationX: Motion.rubberBand(overscroll), y: 0)
+            .scaledBy(x: widen, y: 1)
+    }
+
+    /// Grows the track under the finger (with the time bubble) and settles
+    /// it back on release.
     private func setExpanded(_ expanded: Bool) {
-        let transform = expanded ? .identity : CGAffineTransform(scaleX: 1, y: Self.restScale)
+        if !expanded { overscroll = 0 }
+        let transform = barTransform(expanded: expanded)
+        let bubbleAlpha: CGFloat = expanded ? 1 : 0
         guard !Motion.reduceMotion else {
             barContainer.transform = transform
+            timeBubble.alpha = bubbleAlpha
             return
         }
         UIView.animate(
-            withDuration: Motion.pressRelease, delay: 0,
-            usingSpringWithDamping: 0.75, initialSpringVelocity: 0,
+            withDuration: expanded ? Motion.pressRelease : Motion.standard, delay: 0,
+            usingSpringWithDamping: 0.7, initialSpringVelocity: 0,
             options: [.allowUserInteraction, .beginFromCurrentState]
-        ) { self.barContainer.transform = transform }
+        ) {
+            self.barContainer.transform = transform
+            self.timeBubble.alpha = bubbleAlpha
+        }
+    }
+
+    /// Tracks the finger; past either end the overscroll feeds the rubber band.
+    private func track(_ touch: UITouch) {
+        let x = touch.location(in: self).x
+        dragPositionMilliseconds = position(atX: x)
+        overscroll = x < 0 ? x : (x > bounds.width ? x - bounds.width : 0)
+        if !Motion.reduceMotion {
+            barContainer.transform = barTransform(expanded: true)
+        }
+        render()
     }
 
     override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
         Haptics.scrubberGrab()
-        setExpanded(true)
         isDragging = true
-        dragPositionMilliseconds = position(atX: touch.location(in: self).x)
-        render()
+        track(touch)
+        setExpanded(true)
         return true
     }
 
     override func continueTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
-        dragPositionMilliseconds = position(atX: touch.location(in: self).x)
-        render()
+        track(touch)
         return true
     }
 
     override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
+        let target = touch.map { position(atX: $0.location(in: self).x) } ?? dragPositionMilliseconds
         setExpanded(false)
         isDragging = false
-        let target = touch.map { position(atX: $0.location(in: self).x) } ?? dragPositionMilliseconds
         dragPositionMilliseconds = target
         render()
         if isEnabled {

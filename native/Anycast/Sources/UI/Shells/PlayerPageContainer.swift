@@ -1,4 +1,5 @@
 import UIKit
+import Kingfisher
 import AnycastKit
 
 /// Pure page-selection state for the player's three-page pager
@@ -33,11 +34,10 @@ final class PlayerPageSelection {
     }
 }
 
-/// The bottom capsule selector (lib/pages/player.dart:89-116, widget #7):
-/// 56 pt tall pill (Dart radius 36 on a 56-high pill == capsule), 1 pt
-/// 0x4B5563 border, 0x19-alpha 0x232830 background, three 48×48 buttons
-/// (settings / podcasts / AI topology brand icon); the selected button is
-/// white with a black icon.
+/// The bottom page selector (lib/pages/player.dart:89-116, widget #7) in the
+/// Anycast 2.0 button-group form: a tinted capsule of 44 pt icon buttons
+/// (settings / main / AI transcript); the selected page's button carries a
+/// lighter capsule and full-strength icon.
 @MainActor
 final class PlayerPageTabView: UIView {
 
@@ -49,62 +49,55 @@ final class PlayerPageTabView: UIView {
     var onSelect: ((Int) -> Void)?
 
     private var buttons: [UIButton] = []
-    private var iconViews: [UIImageView] = []
     private(set) var selectedIndex = 0
 
     init(items: [Item]) {
-        super.init(frame: CGRect(x: 0, y: 0, width: items.count * 48 + (items.count - 1) * 24, height: 56))
-
-        backgroundColor = Theme.surface.withAlphaComponent(0x19 / 255.0)
-        layer.borderColor = Theme.onSurfaceVariant.cgColor
-        layer.borderWidth = 1
-        // Dart BorderRadius.circular(36) on a 56 pt pill → capsule.
-        layer.cornerRadius = 28
-        layer.cornerCurve = .continuous
-
-        let stack = UIStackView()
-        stack.axis = .horizontal
-        // The Dart Row packs 48 pt buttons with no spacing (player.dart:171-178).
-        stack.spacing = 0
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
+        super.init(frame: .zero)
 
         for (index, item) in items.enumerated() {
             let button = UIButton(type: .custom)
             // Brand SVGs load as 1 pt vector images (width="1em" in the
-            // source), so icon sizing is explicit, not image-size driven.
-            let iconView = UIImageView(image: item.icon)
+            // source), so the glyph box is explicit, not image-size driven.
+            let iconView = UIImageView(image: item.icon.withRenderingMode(.alwaysTemplate))
             iconView.contentMode = .scaleAspectFit
+            iconView.preferredSymbolConfiguration = IconStyle.groupAction.configuration
             iconView.isUserInteractionEnabled = false
             iconView.translatesAutoresizingMaskIntoConstraints = false
             button.addSubview(iconView)
             button.isAccessibilityElement = true
             button.accessibilityLabel = item.accessibilityLabel
             button.accessibilityIdentifier = "player-page-tab-\(index)"
-            button.tag = index
+            button.layer.cornerRadius = AnycastIconButton.standardDiameter / 2
+            button.layer.cornerCurve = .continuous
             button.addAction(
                 UIAction { [weak self] _ in self?.tapped(index: index) },
                 for: .touchUpInside
             )
+            button.addPressFeedback()
             NSLayoutConstraint.activate([
                 iconView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
                 iconView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-                iconView.widthAnchor.constraint(equalToConstant: 24),
-                iconView.heightAnchor.constraint(equalToConstant: 24),
+                iconView.widthAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs),
+                iconView.heightAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs),
+                button.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
+                button.heightAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
             ])
-            button.widthAnchor.constraint(equalToConstant: 48).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 48).isActive = true
-            stack.addArrangedSubview(button)
             buttons.append(button)
-            iconViews.append(iconView)
         }
 
+        let group = AnycastButtonGroup(
+            buttons: buttons,
+            background: AnycastColor.sandAlpha3,
+            spacing: Spacing.gap,
+            insets: .init(top: Spacing.xs, leading: Spacing.xs, bottom: Spacing.xs, trailing: Spacing.xs)
+        )
+        group.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(group)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 4),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4),
-            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            // Capsule wraps the buttons (mainAxisSize.min).
-            widthAnchor.constraint(equalTo: stack.widthAnchor, constant: 8),
+            group.topAnchor.constraint(equalTo: topAnchor),
+            group.bottomAnchor.constraint(equalTo: bottomAnchor),
+            group.leadingAnchor.constraint(equalTo: leadingAnchor),
+            group.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
 
         applySelection()
@@ -121,6 +114,7 @@ final class PlayerPageTabView: UIView {
 
     private func tapped(index: Int) {
         guard index != selectedIndex else { return }
+        Haptics.selection()
         selectedIndex = index
         applySelection()
         onSelect?(index)
@@ -129,12 +123,9 @@ final class PlayerPageTabView: UIView {
     private func applySelection() {
         for (index, button) in buttons.enumerated() {
             let isSelected = index == selectedIndex
-            iconViews[index].tintColor = isSelected ? .black : Theme.onSurface
-            button.backgroundColor = isSelected
-                ? Theme.onSurface
-                : .clear
-            button.layer.cornerRadius = 24
-            button.layer.cornerCurve = .continuous
+            button.tintColor = isSelected ? Theme.playerText : Theme.playerSecondary.withAlphaComponent(0.7)
+            button.backgroundColor = isSelected ? AnycastColor.sandAlpha4 : .clear
+            button.subviews.forEach { $0.tintColor = button.tintColor }
             button.accessibilityTraits = isSelected ? [.button, .selected] : [.button]
         }
     }
@@ -142,12 +133,12 @@ final class PlayerPageTabView: UIView {
 
 /// The full-screen player sheet (lib/pages/player.dart:40-87, 03 §2.10):
 /// presented as a full-height page sheet with system chrome (A2: system
-/// grabber, no custom handler), over a three-stop vertical gradient
-/// (palette dominant → 0x111316 → 0x111316), containing the three-page
-/// pager and the PageTab capsule. Closing resets to page 1 (PopScope).
+/// grabber, no custom handler), containing the three-page pager and the
+/// page selector. Closing resets to page 1 (PopScope).
 ///
-/// Pages 0/1/2 are stubs at this stage; their real tasks replace the page
-/// controllers, not this container.
+/// Background (Anycast 2.0 UI kit player): the episode artwork, blurred
+/// under a dark material and a five-stop black scrim; the warm-dark player
+/// base shows when there is no artwork.
 @MainActor
 final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
 
@@ -160,9 +151,9 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         navigationOrientation: .horizontal
     )
     private let pageTab: PlayerPageTabView
-    private let gradientLayer = CAGradientLayer()
-    private let paletteObservation = ObservationLoop()
-    private var gradientImageURL: String?
+    private let backdropImageView = UIImageView()
+    private let backdropObservation = ObservationLoop()
+    private var backdropImageURL: String?
 
     static func present(from presenter: UIViewController, context: UIContext) {
         let controller = PlayerPageContainer(context: context)
@@ -202,15 +193,7 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPlayerBase(on: view)
-
-        let gradientTraits = UITraitCollection(userInterfaceStyle: .dark)
-        gradientLayer.colors = [
-            Theme.paletteFallback.cgColor,
-            Theme.background.resolvedColor(with: gradientTraits).cgColor,
-            Theme.background.resolvedColor(with: gradientTraits).cgColor,
-        ]
-        gradientLayer.locations = [0, 0.5, 1]
-        view.layer.insertSublayer(gradientLayer, at: 0)
+        installBackdrop()
 
         addChild(pageController)
         view.addSubview(pageController.view)
@@ -230,9 +213,8 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
             pageController.view.bottomAnchor.constraint(equalTo: pageTab.topAnchor),
 
             pageTab.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            pageTab.heightAnchor.constraint(equalToConstant: 56),
             pageTab.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.md
             ),
         ])
 
@@ -242,18 +224,11 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         pageTab.select(selection.selectedIndex)
         showPage(selection.selectedIndex, animated: false)
 
-        paletteObservation.track(
+        backdropObservation.track(
             read: { [weak self] in _ = self?.context.playback.currentEpisode?.imageUrl },
-            onChange: { [weak self] in self?.updateGradient() }
+            onChange: { [weak self] in self?.updateBackdrop() }
         )
-        updateGradient()
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // CALayer autoresizing is macOS-only; track bounds manually so any
-        // window size keeps the gradient pinned (07 §4).
-        gradientLayer.frame = view.bounds
+        updateBackdrop()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -326,41 +301,53 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         pageTab.select(index)
     }
 
-    // MARK: - Gradient background (03 §5.4)
+    // MARK: - Backdrop
 
-    private func updateGradient() {
+    private func installBackdrop() {
+        backdropImageView.contentMode = .scaleAspectFill
+        backdropImageView.clipsToBounds = true
+        // The material is explicitly dark: blur ignores trait overrides
+        // (09 §9a), and the player is warm-dark by design.
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterialDark))
+        let scrim = PlayerBackdropScrimView()
+        for layer in [backdropImageView, blur, scrim] {
+            layer.isUserInteractionEnabled = false
+            layer.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(layer)
+            NSLayoutConstraint.activate([
+                layer.topAnchor.constraint(equalTo: view.topAnchor),
+                layer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+                layer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                layer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            ])
+        }
+    }
+
+    private func updateBackdrop() {
         let urlString = context.playback.currentEpisode?.imageUrl
-        guard urlString != gradientImageURL else { return }
-        gradientImageURL = urlString
+        guard urlString != backdropImageURL else { return }
+        backdropImageURL = urlString
+        backdropImageView.kf.cancelDownloadTask()
+        backdropImageView.image = nil
+        guard let urlString, let url = URL(string: urlString) else { return }
+        backdropImageView.kf.setImage(with: url)
+    }
+}
 
-        guard let urlString else {
-            applyGradient(Theme.paletteFallback)
-            return
+/// The player backdrop's five-stop black scrim (UI kit `PlayerBackgroundGradientView`).
+private final class PlayerBackdropScrimView: UIView {
+
+    override class var layerClass: AnyClass { CAGradientLayer.self }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        let gradient = layer as! CAGradientLayer
+        gradient.colors = [0.2, 0.25, 0.376, 0.4, 0.5].map {
+            UIColor.black.withAlphaComponent($0).cgColor
         }
-        if let cached = PaletteService.shared.cachedDominantColor(for: urlString) {
-            applyGradient(cached)
-            return
-        }
-        Task { [weak self] in
-            guard let self else { return }
-            let color = await PaletteService.shared.dominantColor(from: urlString)
-            guard self.gradientImageURL == urlString else { return }
-            self.applyGradient(color)
-        }
+        gradient.locations = [0, 0.25, 0.5, 0.745, 1]
     }
 
-    private func applyGradient(_ dominant: UIColor) {
-        // The trailing stops use a DYNAMIC semantic token: resolving with
-        // explicit dark traits avoids the CGColor freeze where the Task
-        // context resolves the Light variant (#F9F9F8) and washes the
-        // player's dark text out (09 §9a; the player stack is pinned
-        // warm-dark by design, 09 §2.1). PlayerProgressBar follows the
-        // same pattern.
-        let dark = UITraitCollection(userInterfaceStyle: .dark)
-        gradientLayer.colors = [
-            dominant.cgColor,
-            Theme.background.resolvedColor(with: dark).cgColor,
-            Theme.background.resolvedColor(with: dark).cgColor,
-        ]
-    }
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
