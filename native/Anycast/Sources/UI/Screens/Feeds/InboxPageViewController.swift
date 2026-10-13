@@ -555,12 +555,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     private func presentDetail(episode: FeedEpisodeRow) {
         guard let enclosureURL = episode.enclosureUrl else { return }
-        // Status tag pills (v2 tag row): the inbox source plus live queue
-        // membership ("queued" when the playback queue carries this episode).
-        var tags = ["inbox"]
-        if context.playback.queue.contains(where: { $0.enclosureUrl == enclosureURL }) {
-            tags.append("queued")
-        }
         let detailEpisode = DetailViewController.Episode(
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? "",
@@ -593,7 +587,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             shortenURL: { [weak self] url in
                 await self?.context.api.getShortURL(for: url) ?? url
             },
-            tags: tags
+            isInPlaylist: context.playback.queue.contains(where: { $0.enclosureUrl == enclosureURL })
         )
     }
 

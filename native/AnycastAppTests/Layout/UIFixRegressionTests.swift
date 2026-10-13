@@ -457,7 +457,9 @@ struct UIFixRegressionTests {
                 at: IndexPath(item: item, section: 0)
             )?.frame.height ?? 0
         }
-        let collapsed = height(at: 0)
+        // Collapsed heights per card (titles wrap to two lines, so cards
+        // differ in height).
+        let collapsedHeights = (0..<min(3, collection.numberOfItems(inSection: 0))).map(height(at:))
 
         // Walk a toggle sequence across three cards — the shipped defect
         // surfaced as a later toggle failing to resize (or to expand at
@@ -476,10 +478,10 @@ struct UIFixRegressionTests {
             try await Self.settle(window, seconds: 0.5)
 
             let expandedHeight = height(at: item)
-            #expect(expandedHeight > collapsed + 40,
-                    "step \(step): item \(item) expanded to \(expandedHeight) (collapsed \(collapsed))")
-            for other in 0..<min(3, collection.numberOfItems(inSection: 0)) where other != item {
-                #expect(abs(height(at: other) - collapsed) < 8,
+            #expect(expandedHeight > collapsedHeights[item] + 40,
+                    "step \(step): item \(item) expanded to \(expandedHeight) (collapsed \(collapsedHeights[item]))")
+            for other in collapsedHeights.indices where other != item {
+                #expect(abs(height(at: other) - collapsedHeights[other]) < 8,
                         "step \(step): item \(other) did not collapse (\(height(at: other)))")
             }
             // The expanded cell's own frame must match its item height —

@@ -223,7 +223,7 @@ final class SmokeFlowsUITests: XCTestCase {
     /// v2 cards are text-forward: the whole card opens the Detail sheet
     /// (the v1 cover slot is gone, 09 §10 批次1); the card cell is located
     /// by its `more` menu button. The Detail sheet is proven by its unique
-    /// "Share episode" control.
+    /// overflow control ("More episode actions", which carries Share).
     func testCardTapOpensDetailSheet() throws {
         let app = XCUIApplication()
         app.launch()
@@ -237,8 +237,8 @@ final class SmokeFlowsUITests: XCTestCase {
         }
         card.tap()
 
-        let share = app.buttons["Share episode"]
-        XCTAssertTrue(share.waitForExistence(timeout: 6), "Detail sheet did not open from the card tap")
+        let overflow = app.buttons["More episode actions"]
+        XCTAssertTrue(overflow.waitForExistence(timeout: 6), "Detail sheet did not open from the card tap")
 
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)
