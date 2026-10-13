@@ -35,16 +35,22 @@ final class PodcastSectionBar: UIView {
             configuration.imagePadding = 1
             configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16)
             configuration.baseForegroundColor = Theme.onSurfaceVariant
-            configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-                var outgoing = incoming
-                outgoing.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-                    for: .systemFont(ofSize: 12, weight: .semibold)
-                )
-                return outgoing
-            }
             configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
 
             let button = UIButton(configuration: configuration)
+            // Scale against the button's own traits; capped to fit the bar.
+            button.configurationUpdateHandler = { button in
+                let traits = button.traitCollection
+                button.configuration?.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+                    var outgoing = incoming
+                    outgoing.font = UIFontMetrics(forTextStyle: .body).scaledFont(
+                        for: .systemFont(ofSize: 12, weight: .semibold),
+                        maximumPointSize: 16,
+                        compatibleWith: traits
+                    )
+                    return outgoing
+                }
+            }
             button.translatesAutoresizingMaskIntoConstraints = false
             button.accessibilityIdentifier = "podcast-section-\(index)"
             button.accessibilityLabel = item.title

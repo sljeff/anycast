@@ -64,6 +64,8 @@ struct V2ShellTests {
     @Test("Header scales for accessibility text and keeps actions clear")
     func headerDynamicTypeLayout() {
         let header = HeaderView()
+        let window = TraitHostWindow.attach(header)
+        defer { TraitHostWindow.detach(window) }
         header.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraExtraLarge
         header.configure(HeaderView.Configuration(title: "Discover", statusText: "Updated just now"))
         header.frame = CGRect(x: 0, y: 0, width: 393, height: 180)

@@ -105,7 +105,7 @@ struct TypographyTests {
         assertEqual(Theme.tabSelectedGreen, red: 0xCB / 255, green: 0xB9 / 255, blue: 0x9F / 255, "tabSelectedGreen")         // Primary
         assertEqual(Theme.brandGreen, red: 0xCB / 255, green: 0xB9 / 255, blue: 0x9F / 255, "brandGreen")                     // Primary
         assertEqual(Theme.secondaryLabelGray, red: 0xD2 / 255, green: 0xD0 / 255, blue: 0xCA / 255, "secondaryLabelGray")     // OnSurfaceVariant
-        assertEqual(Theme.hintGray, red: 0xB5 / 255, green: 0xB3 / 255, blue: 0xAD / 255, "hintGray")                         // SandDark9
+        assertEqual(Theme.hintGray, red: 0xD2 / 255, green: 0xD0 / 255, blue: 0xCA / 255, "hintGray")                         // OnSurfaceVariant
         assertEqual(Theme.loginCardBackground, red: 0x22 / 255, green: 0x22 / 255, blue: 0x21 / 255, "loginCardBackground")   // SurfaceContainer
         assertEqual(Theme.primary, red: 0xCB / 255, green: 0xB9 / 255, blue: 0x9F / 255, "primary")                           // Primary
     }

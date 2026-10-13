@@ -57,15 +57,22 @@ final class BottomTabBarView: UIView {
             config.imagePadding = 4
             config.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 22)
             config.background = .clear()
-            config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-                var outgoing = incoming
-                outgoing.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-                    for: .systemFont(ofSize: 12, weight: .medium)
-                )
-                return outgoing
-            }
 
             let button = UIButton(configuration: config)
+            // Scale against the button's own traits (re-run on trait change)
+            // and cap so accessibility sizes stay inside the 64pt chip.
+            button.configurationUpdateHandler = { button in
+                let traits = button.traitCollection
+                button.configuration?.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+                    var outgoing = incoming
+                    outgoing.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
+                        for: .systemFont(ofSize: 12, weight: .medium),
+                        maximumPointSize: 16,
+                        compatibleWith: traits
+                    )
+                    return outgoing
+                }
+            }
             button.translatesAutoresizingMaskIntoConstraints = false
             button.setTitle(item.title.uppercased(), for: .normal)
             button.tintColor = Theme.onSurfaceVariant

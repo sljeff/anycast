@@ -113,9 +113,11 @@ struct TabChipRenderingTests {
     @Test("Pill uses the glass component with an iOS 18 material fallback")
     func pillGlassSurface() throws {
         let bar = makeBar()
-        guard let chip = bar.pillButtons.first?.superview,
-              let content = chip.superview,
-              let pill = content.superview as? GlassContainerView else {
+        // The chip sits in the glass content view (an effect view's
+        // contentView on iOS 26+, the glass view itself on iOS 18).
+        guard let button = bar.pillButtons.first,
+              let pill = sequence(first: button as UIView, next: { $0.superview })
+                  .lazy.compactMap({ $0 as? GlassContainerView }).first else {
             Issue.record("pill not found")
             return
         }

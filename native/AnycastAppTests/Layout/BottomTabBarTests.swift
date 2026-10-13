@@ -75,6 +75,8 @@ struct BottomTabBarTests {
     @Test("Destination labels scale with accessibility text")
     func dynamicTypeLabels() {
         let (bar, _) = makeBar()
+        let window = TraitHostWindow.attach(bar)
+        defer { TraitHostWindow.detach(window) }
         bar.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraExtraLarge
         bar.setNeedsLayout()
         bar.layoutIfNeeded()
