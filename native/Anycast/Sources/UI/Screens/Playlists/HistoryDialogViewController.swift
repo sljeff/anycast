@@ -106,17 +106,7 @@ final class HistoryDialogViewController: UIViewController {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         cardView.addSubview(collectionView)
 
-        var clearConfiguration = UIButton.Configuration.filled()
-        clearConfiguration.attributedTitle = AttributedString(
-            "Clear All", attributes: AttributeContainer([
-                .font: TypographyV2.labelLarge.font(),
-            ])
-        )
-        // Destructive action: the error token, with surface ink for
-        // contrast in both appearances.
-        clearConfiguration.baseBackgroundColor = Theme.error
-        clearConfiguration.baseForegroundColor = Theme.surface
-        clearConfiguration.cornerStyle = .capsule
+        let clearConfiguration = AnycastButton.configuration(.destructive, title: "Clear All")
         clearAllButton.configuration = clearConfiguration
         clearAllButton.addTarget(self, action: #selector(clearAllTapped), for: .touchUpInside)
         clearAllButton.translatesAutoresizingMaskIntoConstraints = false
@@ -344,7 +334,7 @@ final class HistoryRowCell: UICollectionViewCell {
         font: TypographyV2.headlineSmall.font(), textColor: Theme.onSurface
     )
     private let channelLabel = UILabel()
-    private let deleteButton = UIButton(type: .custom)
+    private let deleteButton = AnycastIconButton(style: .tonal, icon: AppIcons.close, accessibilityLabel: "Delete", diameter: 40)
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -387,18 +377,10 @@ final class HistoryRowCell: UICollectionViewCell {
         textColumn.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(textColumn)
 
-        deleteButton.setImage(AppIcons.close, for: .normal)
-        deleteButton.tintColor = Theme.background
-        deleteButton.backgroundColor = Theme.onSurface
-        deleteButton.layer.cornerRadius = 20
-        deleteButton.layer.cornerCurve = .continuous
-        deleteButton.isAccessibilityElement = true
-        deleteButton.accessibilityLabel = "Delete"
         deleteButton.addAction(
             UIAction { [weak self] _ in self?.onDeleteTap?() },
             for: .touchUpInside
         )
-        deleteButton.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(deleteButton)
 
         NSLayoutConstraint.activate([
@@ -419,8 +401,6 @@ final class HistoryRowCell: UICollectionViewCell {
 
             deleteButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
             deleteButton.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            deleteButton.widthAnchor.constraint(equalToConstant: 40),
-            deleteButton.heightAnchor.constraint(equalToConstant: 40),
         ])
     }
 

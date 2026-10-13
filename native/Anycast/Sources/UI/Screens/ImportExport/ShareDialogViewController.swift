@@ -220,7 +220,7 @@ final class ShareEntryCell: UITableViewCell {
         backgroundColor = .clear
 
         card.backgroundColor = Theme.surfaceContainer
-        card.layer.cornerRadius = 8
+        card.layer.cornerRadius = Radius.md
         card.layer.cornerCurve = .continuous
         card.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(card)

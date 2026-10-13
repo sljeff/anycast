@@ -201,9 +201,7 @@ final class LibraryViewController: UIViewController {
         )
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-                for: .systemFont(ofSize: 16, weight: .semibold)
-            )
+            outgoing.font = TypographyV2.headlineSmall.font()
             return outgoing
         }
         config.title = "all shows"

@@ -42,8 +42,7 @@ struct V2ShellTests {
 
         let search = header.subviews.compactMap { $0 as? UITextField }
             .first { $0.accessibilityIdentifier == "header-search-field" }
-        let settings = header.subviews.compactMap { $0 as? GlassContainerView }
-            .flatMap { $0.glassContentView.subviews.compactMap { $0 as? UIButton } }
+        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }
             .first { $0.accessibilityIdentifier == "header-settings" }
         #expect(search?.accessibilityLabel == "Search")
         #expect(search?.placeholder == "Shows, episodes, and more")
@@ -75,7 +74,7 @@ struct V2ShellTests {
             .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-title" }
         let titleColumn = title?.superview
-        let actions = header.subviews.compactMap { $0 as? GlassContainerView }.first
+        let actions = header.subviews.compactMap { $0 as? AnycastIconButton }.first
         let titleRight = titleColumn?.frame.maxX ?? .infinity
         let actionLeft = actions?.frame.minX ?? 0
 
@@ -96,7 +95,7 @@ struct V2ShellTests {
         #expect(status?.isHidden == true)
         let search = header.subviews.compactMap { $0 as? UITextField }
             .first { $0.accessibilityIdentifier == "header-search-field" }
-        let settings = header.subviews.compactMap { $0 as? GlassContainerView }.first
+        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }.first
         #expect(search?.isHidden == false)
         #expect(settings?.isHidden == true)
     }

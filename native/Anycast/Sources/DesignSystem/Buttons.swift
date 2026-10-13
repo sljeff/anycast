@@ -10,11 +10,14 @@ enum AnycastButton {
     enum Kind {
         case primary
         case secondary
+        /// Irreversible actions (Clear All, Delete account).
+        case destructive
     }
 
     static func make(_ kind: Kind, title: String, image: UIImage? = nil) -> UIButton {
         let button = UIButton(configuration: configuration(kind, title: title, image: image))
         button.titleLabel?.adjustsFontForContentSizeCategory = true
+        button.addPressFeedback(scale: Motion.pressScaleSubtle)
         return button
     }
 
@@ -47,6 +50,11 @@ enum AnycastButton {
         case .primary:
             var configuration = UIButton.Configuration.filled()
             configuration.baseBackgroundColor = Theme.onSurface
+            configuration.baseForegroundColor = Theme.surface
+            return configuration
+        case .destructive:
+            var configuration = UIButton.Configuration.filled()
+            configuration.baseBackgroundColor = Theme.error
             configuration.baseForegroundColor = Theme.surface
             return configuration
         case .secondary:

@@ -154,14 +154,14 @@ final class SubtitlesPageViewController: UIViewController {
         container.backgroundColor = Theme.transcriptSurface
         container.layer.borderColor = Theme.onSurface.withAlphaComponent(0.12).cgColor
         container.layer.borderWidth = 1
-        container.layer.cornerRadius = 8
+        container.layer.cornerRadius = Radius.sm
         container.layer.cornerCurve = .continuous
         container.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(container)
 
         artworkView.contentMode = .scaleAspectFill
         artworkView.clipsToBounds = true
-        artworkView.layer.cornerRadius = 8
+        artworkView.layer.cornerRadius = Radius.sm
         artworkView.layer.cornerCurve = .continuous
         artworkView.backgroundColor = Theme.surface
         artworkView.tintColor = Theme.onSurfaceVariant
@@ -662,7 +662,7 @@ final class SubtitlesPageViewController: UIViewController {
 
         let pill = UIView()
         pill.backgroundColor = UIColor.black.withAlphaComponent(0.87)
-        pill.layer.cornerRadius = 8
+        pill.layer.cornerRadius = Radius.sm
         pill.layer.cornerCurve = .continuous
         pill.translatesAutoresizingMaskIntoConstraints = false
         label.translatesAutoresizingMaskIntoConstraints = false

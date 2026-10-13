@@ -31,7 +31,7 @@ final class ToastPresenter {
 
         let pill = UIView()
         pill.backgroundColor = Theme.inverseSurface
-        pill.layer.cornerRadius = 16
+        pill.layer.cornerRadius = Radius.md
         pill.layer.cornerCurve = .continuous
         pill.translatesAutoresizingMaskIntoConstraints = false
         label.translatesAutoresizingMaskIntoConstraints = false

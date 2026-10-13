@@ -288,7 +288,7 @@ private final class InlineTooltip {
         label.adjustsFontForContentSizeCategory = true
 
         bubble.backgroundColor = .black.withAlphaComponent(0.87)
-        bubble.layer.cornerRadius = 8
+        bubble.layer.cornerRadius = Radius.sm
         bubble.layer.cornerCurve = .continuous
         bubble.addSubview(label)
         label.translatesAutoresizingMaskIntoConstraints = false

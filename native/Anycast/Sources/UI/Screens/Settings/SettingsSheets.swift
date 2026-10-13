@@ -276,7 +276,7 @@ enum SettingsTooltipOverlay {
 
         let pill = UIView()
         pill.backgroundColor = Theme.inverseSurface
-        pill.layer.cornerRadius = 12
+        pill.layer.cornerRadius = Radius.md
         pill.layer.cornerCurve = .continuous
         pill.alpha = 0
         pill.translatesAutoresizingMaskIntoConstraints = false

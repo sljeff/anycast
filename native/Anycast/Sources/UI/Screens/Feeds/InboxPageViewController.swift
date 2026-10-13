@@ -935,108 +935,46 @@ final class HistoryTailCell: UICollectionViewCell {
 // MARK: - Empty state (ImportBlock, feeds.dart:147-197)
 
 
-/// AnycastEmptyState + the ImportBlock action column: 64 pt circle icon,
-/// title, message, then Explore (primary) over a row with the secondary
+/// AnycastEmptyState + the ImportBlock action column on the shared
+/// `EmptyStateView`: Explore (primary) over a row with the secondary
 /// Import OPML button and the round help button. Hosted as the
 /// collection background so the page stays pull-to-refreshable.
-final class InboxEmptyStateView: UIView {
+final class InboxEmptyStateView: EmptyStateView {
 
     var onExplore: (() -> Void)?
     var onImportOPML: (() -> Void)?
     var onHelp: (() -> Void)?
 
-    init() {
-        super.init(frame: .zero)
-
-        let iconCircle = UIView()
-        iconCircle.backgroundColor = AnycastColor.sandAlpha3
-        iconCircle.layer.cornerRadius = 32
-        iconCircle.layer.cornerCurve = .continuous
-        iconCircle.translatesAutoresizingMaskIntoConstraints = false
-        let icon = UIImageView(image: UIImage(systemName: "tray"))
-        icon.tintColor = Theme.primary
-        icon.contentMode = .center
-        icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 30)
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        iconCircle.addSubview(icon)
-
-        let titleLabel = UILabel()
-        titleLabel.text = "It’s empty here."
-        titleLabel.font = TypographyV2.headlineMedium.font()
-        titleLabel.textColor = Theme.onSurface
-        titleLabel.textAlignment = .center
-        titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.numberOfLines = 0
-
-        let messageLabel = UILabel()
-        messageLabel.text = "Let's change that!"
-        messageLabel.font = TypographyV2.bodyLarge.font()
-        messageLabel.textColor = Theme.onSurfaceVariant
-        messageLabel.textAlignment = .center
-        messageLabel.adjustsFontForContentSizeCategory = true
-        messageLabel.numberOfLines = 0
-
+    override init() {
+        super.init()
         let explore = AnycastButton.make(.primary, title: "Explore", image: AppIcons.explore)
         explore.addAction(UIAction { [weak self] _ in self?.onExplore?() }, for: .touchUpInside)
 
         let importButton = AnycastButton.make(.secondary, title: "Import OPML", image: UIImage(systemName: "arrow.down.doc"))
         importButton.addAction(UIAction { [weak self] _ in self?.onImportOPML?() }, for: .touchUpInside)
 
-        let help = UIButton(type: .system)
-        help.setImage(UIImage(systemName: "questionmark.circle"), for: .normal)
-        help.tintColor = Theme.onSurfaceVariant
-        help.backgroundColor = AnycastColor.sandAlpha3
-        help.layer.cornerRadius = 24
-        help.layer.cornerCurve = .continuous
-        help.isAccessibilityElement = true
-        help.accessibilityLabel = "Import help"
+        let help = AnycastIconButton(
+            style: .tonal,
+            icon: UIImage(systemName: "questionmark"),
+            accessibilityLabel: "Import help",
+            diameter: AnycastIconButton.largeDiameter
+        )
         help.addAction(UIAction { [weak self] _ in self?.onHelp?() }, for: .touchUpInside)
-        help.widthAnchor.constraint(equalToConstant: 48).isActive = true
-        help.heightAnchor.constraint(equalToConstant: 48).isActive = true
 
         let buttonRow = UIStackView(arrangedSubviews: [importButton, help])
         buttonRow.axis = .horizontal
         buttonRow.alignment = .center
-        buttonRow.spacing = 8
-
-        let actionColumn = UIStackView(arrangedSubviews: [explore, buttonRow])
-        actionColumn.axis = .vertical
-        actionColumn.alignment = .center
-        actionColumn.spacing = 8
-
-        let column = UIStackView(arrangedSubviews: [iconCircle, titleLabel, messageLabel, actionColumn])
-        column.axis = .vertical
-        column.alignment = .center
-        column.spacing = 8
-        column.setCustomSpacing(20, after: iconCircle)
-        column.setCustomSpacing(24, after: messageLabel)
-        column.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(column)
+        buttonRow.spacing = Spacing.md
 
         NSLayoutConstraint.activate([
-            iconCircle.widthAnchor.constraint(equalToConstant: 64),
-            iconCircle.heightAnchor.constraint(equalToConstant: 64),
-            icon.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
-            explore.heightAnchor.constraint(equalToConstant: 48),
-            importButton.heightAnchor.constraint(equalToConstant: 48),
-
-            column.leadingAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.leadingAnchor),
-            column.trailingAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.trailingAnchor),
-            column.topAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.topAnchor),
-            column.bottomAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.bottomAnchor),
-            column.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
-            column.centerXAnchor.constraint(equalTo: centerXAnchor),
-            // Centered in the area the mini player and tab bar leave free;
-            // yields to the margin bounds when the column is taller.
-            {
-                let center = column.centerYAnchor.constraint(equalTo: layoutMarginsGuide.centerYAnchor)
-                center.priority = .defaultHigh
-                return center
-            }(),
+            explore.heightAnchor.constraint(equalToConstant: AnycastIconButton.largeDiameter),
+            importButton.heightAnchor.constraint(equalToConstant: AnycastIconButton.largeDiameter),
         ])
+        configure(Content(
+            icon: UIImage(systemName: "tray"),
+            title: "It’s empty here.",
+            message: "Let's change that!",
+            actions: [explore, buttonRow]
+        ))
     }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }

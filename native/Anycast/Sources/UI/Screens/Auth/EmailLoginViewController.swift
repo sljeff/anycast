@@ -64,15 +64,9 @@ final class EmailLoginViewController: UIViewController {
             for: .editingDidEndOnExit
         )
 
-        // ElevatedButton theme: onSurface fill / surface text, pill, 48 min
-        // (anycast_theme elevatedButtonTheme).
-        loginButton.backgroundColor = Theme.onSurface
-        loginButton.setTitleColor(Theme.background, for: .normal)
-        loginButton.setTitle(LoginPageModel.EmailLogin.loginButtonTitle, for: .normal)
-        loginButton.titleLabel?.font = LoginViewController.font(17, .semibold, .body)
-        loginButton.titleLabel?.adjustsFontForContentSizeCategory = true
-        loginButton.layer.cornerRadius = 24
-        loginButton.layer.cornerCurve = .continuous
+        // The shared primary capsule, 48 min.
+        loginButton.configuration = AnycastButton.configuration(.primary, title: LoginPageModel.EmailLogin.loginButtonTitle)
+        loginButton.addPressFeedback(scale: Motion.pressScaleSubtle)
         loginButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
         loginButton.addAction(
             UIAction { [weak self] _ in self?.loginTapped() },
@@ -115,19 +109,7 @@ final class EmailLoginViewController: UIViewController {
     }
 
     private func configureField(_ field: UITextField, hint: String, secure: Bool) {
-        field.placeholder = hint
-        field.font = LoginViewController.font(17, .regular, .body)
-        field.adjustsFontForContentSizeCategory = true
-        field.textColor = Theme.onSurface
-        field.backgroundColor = Theme.surface
-        field.setDynamicBorderColor(Theme.outline)
-        field.layer.borderWidth = 1
-        field.layer.cornerRadius = 16
-        field.layer.cornerCurve = .continuous
-        field.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 1))
-        field.rightView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 1))
-        field.leftViewMode = .always
-        field.rightViewMode = .always
+        field.applyAnycastStyle(placeholder: hint)
         field.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
         field.autocorrectionType = .no
         field.autocapitalizationType = .none

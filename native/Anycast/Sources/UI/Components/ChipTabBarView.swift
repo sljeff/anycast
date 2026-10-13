@@ -128,7 +128,7 @@ final class ChipTabBarView: UIView {
             return
         }
         selectedIndex = index
-        UISelectionFeedbackGenerator().selectionChanged()
+        Haptics.selection()
         applySelection(animated: true)
         onSelect?(index)
     }

@@ -68,9 +68,7 @@ final class CategoryStripView: UIView {
             config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
                 var outgoing = incoming
                 // Figma selected variant: SF Pro 590 (semibold) 16/21.
-                outgoing.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-                    for: .systemFont(ofSize: 16, weight: .semibold)
-                )
+                outgoing.font = TypographyV2.headlineSmall.font()
                 return outgoing
             }
             let button = UIButton(configuration: config)

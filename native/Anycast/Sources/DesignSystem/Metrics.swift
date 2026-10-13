@@ -59,6 +59,17 @@ nonisolated enum Motion {
         CAMediaTimingFunction(controlPoints: 0.215, 0.61, 0.355, 1)
     }
 
+    // Press feedback (Anycast 2.0 UI kit interaction-physics spec): scale
+    // down on touch, spring back on release.
+    static let pressScale: CGFloat = 0.92
+    /// Cards and rows move less than buttons.
+    static let pressScaleSubtle: CGFloat = 0.97
+    static let pressIn: TimeInterval = 0.12
+    static let pressRelease: TimeInterval = 0.3
+    static let pressReleaseDamping: CGFloat = 0.5
+
+    static var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
+
     /// `UIView.animate` convenience with the standard v2 curve/duration.
     @MainActor
     static func animate(_ duration: TimeInterval = Motion.standard, _ animations: @escaping () -> Void, completion: (() -> Void)? = nil) {
@@ -93,5 +104,29 @@ extension UICollectionView {
         if backgroundView.directionalLayoutMargins != margins {
             backgroundView.directionalLayoutMargins = margins
         }
+    }
+}
+
+extension UIControl {
+    /// The shared press feedback: scale to `scale` on touch-down, spring
+    /// back on release; Reduce Motion keeps the haptic but skips the scale.
+    /// Callers must not add another scale effect on the same view.
+    @MainActor
+    func addPressFeedback(scale: CGFloat = Motion.pressScale, haptic: Bool = true) {
+        addAction(UIAction { [weak self] _ in
+            if haptic { Haptics.tap() }
+            guard !Motion.reduceMotion else { return }
+            UIView.animate(withDuration: Motion.pressIn, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
+                self?.transform = CGAffineTransform(scaleX: scale, y: scale)
+            }
+        }, for: .touchDown)
+        addAction(UIAction { [weak self] _ in
+            guard let self, self.transform != .identity else { return }
+            UIView.animate(
+                withDuration: Motion.pressRelease, delay: 0,
+                usingSpringWithDamping: Motion.pressReleaseDamping, initialSpringVelocity: 0,
+                options: [.allowUserInteraction, .beginFromCurrentState]
+            ) { self.transform = .identity }
+        }, for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
     }
 }

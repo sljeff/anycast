@@ -118,9 +118,7 @@ final class ChatViewController: UIViewController {
         headerBar.addSubview(closeButton)
 
         // Material titleMedium: 16 pt w500 on playerText, two-line ellipsis.
-        titleLabel.font = UIFontMetrics(forTextStyle: .headline).scaledFont(
-            for: UIFont.systemFont(ofSize: 16, weight: .medium)
-        )
+        titleLabel.font = TypographyV2.titleMedium.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textColor = Metrics.headerText
         titleLabel.numberOfLines = 2

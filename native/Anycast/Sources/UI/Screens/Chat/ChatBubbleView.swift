@@ -53,17 +53,13 @@ final class ChatBubbleView: UIView {
         // and wrap the token per character instead.
         textLabel.lineBreakMode = .byCharWrapping
         textLabel.textColor = Theme.onSurface
-        textLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: UIFont.systemFont(ofSize: 14, weight: .regular)
-        )
+        textLabel.font = TypographyV2.bodyCompact.font()
         textLabel.adjustsFontForContentSizeCategory = true
         textLabel.setContentHuggingPriority(.required, for: .horizontal)
         textLabel.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
         timeLabel.textColor = Theme.onSurfaceVariant
-        timeLabel.font = UIFontMetrics(forTextStyle: .caption2).scaledFont(
-            for: UIFont.systemFont(ofSize: 10, weight: .medium)
-        )
+        timeLabel.font = TypographyV2.labelSmall.font()
         timeLabel.adjustsFontForContentSizeCategory = true
         timeLabel.setContentHuggingPriority(.required, for: .horizontal)
         timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)

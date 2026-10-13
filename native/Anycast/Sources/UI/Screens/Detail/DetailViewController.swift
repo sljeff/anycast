@@ -78,7 +78,7 @@ final class DetailViewController: UIViewController {
     private let scrollView = UIScrollView()
     private let descriptionTextView: UITextView
     private let shareSpinner = UIActivityIndicatorView(style: .medium)
-    private let playButton = UIButton(type: .custom)
+    private let playButton = AnycastIconButton(style: .inverse, icon: AppIcons.play, accessibilityLabel: "Play", diameter: 56, glyphSize: 22)
     private let addButton = UIButton(type: .custom)
 
     /// CAGradientLayers have no autolayout — frames sync in
@@ -228,25 +228,21 @@ final class DetailViewController: UIViewController {
         panel.layer.addSublayer(panelGradientLayer)
         scrollView.addSubview(panel)
 
-        let titleMetrics = UIFontMetrics(forTextStyle: .title2)
         let titleLabel = UILabel()
         // 32pt Semibold 590 (open-state header, 1784:7542). The frame paints
         // it white over the dark hero tail; without the design's 50pt blur
         // the panel is translucent there, so onSurface keeps it readable
         // (deviation noted in 09 §10).
-        titleLabel.font = titleMetrics.scaledFont(
-            for: .systemFont(ofSize: 32, weight: .semibold)
-        )
+        titleLabel.font = TypographyV2.headlineLarge.font()
         titleLabel.text = episode.title
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 3
         titleLabel.adjustsFontForContentSizeCategory = true
 
-        let metaMetrics = UIFontMetrics(forTextStyle: .subheadline)
         func metaLabel(_ text: String) -> UILabel {
             let label = UILabel()
             label.text = text
-            label.font = metaMetrics.scaledFont(for: .systemFont(ofSize: 14, weight: .regular))
+            label.font = TypographyV2.bodyCompact.font()
             label.textColor = Theme.onSurface
             label.adjustsFontForContentSizeCategory = true
             return label
@@ -271,8 +267,7 @@ final class DetailViewController: UIViewController {
         for tag in tags {
             let pill = UILabel()
             pill.text = tag.localizedUppercase
-            pill.font = UIFontMetrics(forTextStyle: .caption1)
-                .scaledFont(for: .systemFont(ofSize: 12, weight: .regular))
+            pill.font = TypographyV2.caption.font()
             pill.textColor = Theme.onSurface
             pill.backgroundColor = AnycastColor.sandAlpha4
             pill.layer.cornerRadius = 11
@@ -292,8 +287,7 @@ final class DetailViewController: UIViewController {
         hostConfig.title = episode.channelTitle
         hostConfig.contentInsets = .zero
         hostButton.configuration = hostConfig
-        hostButton.titleLabel?.font = UIFontMetrics(forTextStyle: .callout)
-            .scaledFont(for: .systemFont(ofSize: 16, weight: .regular))
+        hostButton.titleLabel?.font = TypographyV2.bodyLarge.font()
         hostButton.contentHorizontalAlignment = .leading
         hostButton.accessibilityLabel = "Open channel \(episode.channelTitle)"
         hostButton.addAction(
@@ -301,8 +295,7 @@ final class DetailViewController: UIViewController {
             for: .touchUpInside
         )
 
-        descriptionTextView.font = UIFontMetrics(forTextStyle: .subheadline)
-            .scaledFont(for: .systemFont(ofSize: 14, weight: .regular))
+        descriptionTextView.font = TypographyV2.bodyCompact.font()
         descriptionTextView.textColor = Theme.onSurface
         descriptionTextView.adjustsFontForContentSizeCategory = true
 
@@ -332,20 +325,8 @@ final class DetailViewController: UIViewController {
 
         // Share: 44×44 floating circle pinned over the hero's top right
         // (the Figma header share slot, kept reachable at rest).
-        let shareButton = UIButton(type: .custom)
-        shareButton.setImage(AppIcons.share, for: .normal)
-        shareButton.tintColor = Theme.onSurface
-        shareButton.backgroundColor = Theme.surface
-        shareButton.layer.cornerRadius = 22
-        shareButton.layer.cornerCurve = .continuous
-        shareButton.layer.shadowColor = UIColor.black.cgColor
-        shareButton.layer.shadowOpacity = 0.1
-        shareButton.layer.shadowOffset = CGSize(width: 0, height: 4)
-        shareButton.layer.shadowRadius = 10
-        shareButton.isAccessibilityElement = true
-        shareButton.accessibilityLabel = "Share episode"
+        let shareButton = AnycastIconButton(style: .glass, icon: AppIcons.share, accessibilityLabel: "Share episode")
         shareButton.addAction(UIAction { [weak self] _ in self?.shareTapped() }, for: .touchUpInside)
-        shareButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(shareButton)
 
         shareSpinner.color = Theme.onSurface
@@ -364,6 +345,10 @@ final class DetailViewController: UIViewController {
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
+            // Vertical-only scrolling: content is exactly as wide as the
+            // visible sheet (without this, long text set the content width
+            // and ran past the right edge on inset sheets).
+            scrollView.contentLayoutGuide.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
             hero.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             hero.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
             hero.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
@@ -391,8 +376,6 @@ final class DetailViewController: UIViewController {
 
             shareButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 24),
             shareButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            shareButton.widthAnchor.constraint(equalToConstant: 44),
-            shareButton.heightAnchor.constraint(equalToConstant: 44),
             shareSpinner.centerXAnchor.constraint(equalTo: shareButton.centerXAnchor),
             shareSpinner.centerYAnchor.constraint(equalTo: shareButton.centerYAnchor),
         ])
@@ -402,21 +385,17 @@ final class DetailViewController: UIViewController {
         applyGradientColors()
     }
 
-    /// Gold "ADD TO QUEUE" (fills) + dark play pill, mapped from the
+    /// Secondary "ADD TO QUEUE" capsule + primary play disc, mapped from the
     /// injected action payload by accessibility label (09 §10 批次1: remove
     /// retired from the bar — the lists own it via swipe/context menu).
     private func buildActionButtons(into playBar: UIView) {
         let addAction = actions.first { $0.accessibilityLabel == "Add to playlist" }
         let playAction = actions.first { $0.accessibilityLabel == "Play" }
 
-        var addConfig = UIButton.Configuration.filled()
-        if addAction != nil {
-            addConfig.title = "add to queue".localizedUppercase
-        }
-        addConfig.baseBackgroundColor = Theme.primary
-        addConfig.baseForegroundColor = Theme.onPrimary
-        addConfig.cornerStyle = .capsule
-        addButton.configuration = addConfig
+        addButton.configuration = AnycastButton.configuration(
+            .secondary, title: addAction != nil ? "add to queue".localizedUppercase : ""
+        )
+        addButton.addPressFeedback(scale: Motion.pressScaleSubtle)
         addButton.accessibilityLabel = "Add to playlist"
         addButton.translatesAutoresizingMaskIntoConstraints = false
         playBar.addSubview(addButton)
@@ -426,13 +405,6 @@ final class DetailViewController: UIViewController {
             )
         }
 
-        playButton.setImage(AppIcons.play, for: .normal)
-        playButton.tintColor = Theme.surface
-        playButton.backgroundColor = Theme.onSurface
-        playButton.layer.cornerRadius = 28
-        playButton.layer.cornerCurve = .continuous
-        playButton.accessibilityLabel = "Play"
-        playButton.translatesAutoresizingMaskIntoConstraints = false
         playBar.addSubview(playButton)
         if let playAction {
             playButton.addAction(
@@ -455,8 +427,6 @@ final class DetailViewController: UIViewController {
             ),
             barRow.heightAnchor.constraint(equalToConstant: 56),
             addButton.heightAnchor.constraint(equalToConstant: 56),
-            playButton.widthAnchor.constraint(equalToConstant: 56),
-            playButton.heightAnchor.constraint(equalToConstant: 56),
         ])
     }
 

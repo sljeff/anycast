@@ -238,6 +238,10 @@ nonisolated enum TypographyV2 {
     static let bodyLarge = Style(size: 17, lineHeight: 22, weight: .regular, color: Theme.onSurface, scalingTextStyle: .body)
     static let bodyMedium = Style(size: 15, lineHeight: 20, weight: .regular, color: Theme.onSurface, scalingTextStyle: .subheadline)
     static let bodySmall = Style(size: 13, lineHeight: 18, weight: .regular, color: Theme.onSurface, scalingTextStyle: .footnote)
+    /// Figma's 14 pt card copy (inbox card description, detail metadata).
+    static let bodyCompact = Style(size: 14, lineHeight: 20, weight: .regular, color: Theme.onSurface, scalingTextStyle: .subheadline)
+    /// Figma's 12 pt meta line (show name, dates).
+    static let caption = Style(size: 12, lineHeight: 16, weight: .regular, color: Theme.onSurface, scalingTextStyle: .caption1)
     static let labelLarge = Style(size: 17, lineHeight: 22, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .body)
     static let labelMedium = Style(size: 12, lineHeight: 16, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .caption1)
     static let labelSmall = Style(size: 11, lineHeight: 13, weight: .medium, color: Theme.onSurface, scalingTextStyle: .caption2)
@@ -246,7 +250,7 @@ nonisolated enum TypographyV2 {
     static let allStyles: [Style] = [
         displayLarge, displayMedium, displaySmall, headlineLarge, headlineMedium,
         headlineSmall, titleLarge, titleMedium, titleSmall, bodyLarge, bodyMedium,
-        bodySmall, labelLarge, labelMedium, labelSmall,
+        bodySmall, bodyCompact, caption, labelLarge, labelMedium, labelSmall,
     ]
 }
 
@@ -264,7 +268,23 @@ extension TypographyV2.Style {
     static let bodyLarge = TypographyV2.bodyLarge
     static let bodyMedium = TypographyV2.bodyMedium
     static let bodySmall = TypographyV2.bodySmall
+    static let bodyCompact = TypographyV2.bodyCompact
+    static let caption = TypographyV2.caption
     static let labelLarge = TypographyV2.labelLarge
     static let labelMedium = TypographyV2.labelMedium
     static let labelSmall = TypographyV2.labelSmall
+}
+
+extension UIFont {
+    /// Same face with tabular (monospaced) digits, for times and counters
+    /// that change in place.
+    func monospacedDigits() -> UIFont {
+        let descriptor = fontDescriptor.addingAttributes([
+            .featureSettings: [[
+                UIFontDescriptor.FeatureKey.type: kNumberSpacingType,
+                UIFontDescriptor.FeatureKey.selector: kMonospacedNumbersSelector,
+            ]],
+        ])
+        return UIFont(descriptor: descriptor, size: pointSize)
+    }
 }

@@ -356,7 +356,7 @@ struct UIFixRegressionTests {
         guard let play = playButtons.first else {
             Issue.record("detail play button not found"); return
         }
-        let iconSize = play.currentImage?.size ?? .zero
+        let iconSize = (play.configuration?.image ?? play.currentImage)?.size ?? .zero
         #expect(iconSize.width > 1 && iconSize.height > 1,
                 "detail play button icon is blank (\(iconSize))")
         await Self.capture(window, name: "uifix-detail-play-icon")

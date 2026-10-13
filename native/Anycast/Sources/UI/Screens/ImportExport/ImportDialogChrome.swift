@@ -26,7 +26,7 @@ class DialogBaseViewController: UIViewController {
         view.addSubview(dimControl)
 
         cardView.backgroundColor = Theme.surface
-        cardView.layer.cornerRadius = 28
+        cardView.layer.cornerRadius = Radius.card
         cardView.layer.cornerCurve = .continuous
         cardView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(cardView)

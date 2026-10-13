@@ -66,7 +66,7 @@ final class PlayerMainPageViewController: UIViewController {
         coverContainer.translatesAutoresizingMaskIntoConstraints = false
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = 8
+        coverView.layer.cornerRadius = Radius.sm
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.isAccessibilityElement = true
@@ -472,7 +472,7 @@ private final class PlayerTitleBarView: UIView {
 
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 12
+        imageView.layer.cornerRadius = Radius.sm
         imageView.layer.cornerCurve = .continuous
         imageView.backgroundColor = Theme.surfaceContainerHigh
         imageView.image = AppIcons.photo
@@ -499,9 +499,7 @@ private final class PlayerTitleBarView: UIView {
         channelConfig.baseForegroundColor = Theme.primary
         channelConfig.contentInsets = .zero
         channelButton.configuration = channelConfig
-        channelButton.titleLabel?.font = UIFontMetrics(forTextStyle: .title3).scaledFont(
-            for: .systemFont(ofSize: 16, weight: .semibold)
-        )
+        channelButton.titleLabel?.font = TypographyV2.headlineSmall.font()
         channelButton.titleLabel?.adjustsFontForContentSizeCategory = true
         channelButton.contentHorizontalAlignment = .leading
         channelButton.isAccessibilityElement = true
@@ -548,9 +546,7 @@ private final class PlayerTitleBarView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     private func applyTitleFont() {
-        let font = UIFontMetrics(forTextStyle: .title2).scaledFont(
-            for: .systemFont(ofSize: 24, weight: .semibold)
-        )
+        let font = TypographyV2.headlineMedium.font()
         if titleLabel is MarqueeLabel {
             (titleLabel as! MarqueeLabel).font = font
         } else {
@@ -647,9 +643,7 @@ private final class PlayerTitleBarView: UIView {
     /// width through MarqueeLabelFactory).
     private func applyTitle() {
         guard laidOutWidth > 0 else { return }
-        let font = titleLabel.font ?? UIFontMetrics(forTextStyle: .title2).scaledFont(
-            for: .systemFont(ofSize: 24, weight: .semibold)
-        )
+        let font = titleLabel.font ?? TypographyV2.headlineMedium.font()
         let needsMarquee = MarqueeLabelFactory.titleNeedsMarquee(
             currentTitle, font: font, availableWidth: laidOutWidth
         )

@@ -30,8 +30,13 @@ final class HeaderView: UIView, UITextFieldDelegate {
     private let titleLabel = UILabel()
     private let statusLabel = UILabel()
     private let searchField = UITextField()
-    private let settingsButton = UIButton(type: .custom)
-    private let settingsGlass = GlassContainerView(cornerRadius: Spacing.xxl / 2)
+    private let settingsButton = AnycastIconButton(
+        style: .glass,
+        icon: AppIcons.settings,
+        accessibilityLabel: "Settings",
+        diameter: AnycastIconButton.largeDiameter,
+        glyphSize: 20
+    )
     private var searchFieldTopConstraint: NSLayoutConstraint!
     private var searchFieldHeightConstraint: NSLayoutConstraint!
 
@@ -63,7 +68,7 @@ final class HeaderView: UIView, UITextFieldDelegate {
         titleColumn.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(titleColumn)
-        addSubview(settingsGlass)
+        addSubview(settingsButton)
         addSubview(searchField)
 
         searchFieldTopConstraint = searchField.topAnchor.constraint(
@@ -76,12 +81,10 @@ final class HeaderView: UIView, UITextFieldDelegate {
         NSLayoutConstraint.activate([
             titleColumn.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.pageH),
             titleColumn.topAnchor.constraint(equalTo: topAnchor),
-            titleColumn.trailingAnchor.constraint(lessThanOrEqualTo: settingsGlass.leadingAnchor, constant: -Spacing.md),
+            titleColumn.trailingAnchor.constraint(lessThanOrEqualTo: settingsButton.leadingAnchor, constant: -Spacing.md),
 
-            settingsGlass.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.pageH),
-            settingsGlass.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
-            settingsGlass.widthAnchor.constraint(equalToConstant: Spacing.xxl),
-            settingsGlass.heightAnchor.constraint(equalToConstant: Spacing.xxl),
+            settingsButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.pageH),
+            settingsButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
 
             searchField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.pageH),
             searchField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.pageH),
@@ -103,31 +106,11 @@ final class HeaderView: UIView, UITextFieldDelegate {
         searchFieldTopConstraint.constant = configuration.showsSearch ? Spacing.gap : 0
         searchFieldHeightConstraint.constant = configuration.showsSearch
             ? Self.searchFieldHeight(for: traitCollection) : 0
-        settingsGlass.isHidden = !configuration.showsSettings
+        settingsButton.isHidden = !configuration.showsSettings
     }
 
     private func configureSearchField() {
-        let icon = UIImageView(image: AppIcons.search)
-        icon.tintColor = Theme.onSurfaceVariant
-        icon.contentMode = .center
-        icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 20)
-        icon.frame = CGRect(x: 0, y: 0, width: 44, height: 48)
-
-        searchField.leftView = icon
-        searchField.leftViewMode = .always
-        searchField.placeholder = "Shows, episodes, and more"
-        searchField.font = TypographyV2.bodyLarge.font()
-        searchField.adjustsFontForContentSizeCategory = true
-        searchField.textColor = Theme.onSurface
-        searchField.attributedPlaceholder = NSAttributedString(
-            string: searchField.placeholder ?? "",
-            attributes: [.foregroundColor: Theme.onSurfaceVariant]
-        )
-        searchField.backgroundColor = Theme.surfaceContainer
-        searchField.layer.cornerRadius = Radius.md
-        searchField.layer.cornerCurve = .continuous
-        searchField.layer.borderWidth = 0.5
-        searchField.layer.borderColor = Theme.outlineVariant.resolvedColor(with: traitCollection).cgColor
+        searchField.applyAnycastStyle(placeholder: "Shows, episodes, and more", icon: AppIcons.search)
         searchField.returnKeyType = .search
         searchField.autocorrectionType = .no
         searchField.autocapitalizationType = .none
@@ -136,40 +119,11 @@ final class HeaderView: UIView, UITextFieldDelegate {
         searchField.accessibilityIdentifier = "header-search-field"
         searchField.delegate = self
         searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchField.addTarget(self, action: #selector(searchEditingChanged), for: .editingDidBegin)
-        searchField.addTarget(self, action: #selector(searchEditingChanged), for: .editingDidEnd)
     }
 
     private func configureSettingsAction() {
-        settingsButton.setImage(AppIcons.settings, for: .normal)
-        settingsButton.setPreferredSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 20, weight: .medium),
-            forImageIn: .normal
-        )
-        settingsButton.tintColor = Theme.onSurfaceVariant
-        settingsButton.accessibilityLabel = "Settings"
         settingsButton.accessibilityIdentifier = "header-settings"
         settingsButton.addAction(UIAction { [weak self] _ in self?.onSettings?() }, for: .touchUpInside)
-
-        settingsGlass.translatesAutoresizingMaskIntoConstraints = false
-        settingsGlass.backgroundColor = Theme.surfaceContainerHigh
-        settingsGlass.layer.shadowColor = UIColor.black.cgColor
-        settingsGlass.layer.shadowOpacity = 0.04
-        settingsGlass.layer.shadowOffset = CGSize(width: 0, height: 2)
-        settingsGlass.layer.shadowRadius = 6
-        settingsButton.translatesAutoresizingMaskIntoConstraints = false
-        settingsGlass.glassContentView.addSubview(settingsButton)
-        NSLayoutConstraint.activate([
-            settingsButton.leadingAnchor.constraint(equalTo: settingsGlass.glassContentView.leadingAnchor),
-            settingsButton.trailingAnchor.constraint(equalTo: settingsGlass.glassContentView.trailingAnchor),
-            settingsButton.topAnchor.constraint(equalTo: settingsGlass.glassContentView.topAnchor),
-            settingsButton.bottomAnchor.constraint(equalTo: settingsGlass.glassContentView.bottomAnchor),
-        ])
-    }
-
-    @objc private func searchEditingChanged() {
-        searchField.layer.borderColor = (searchField.isFirstResponder ? Theme.primary : Theme.outlineVariant)
-            .resolvedColor(with: traitCollection).cgColor
     }
 
     @objc private func searchSubmitted() {
@@ -186,9 +140,6 @@ final class HeaderView: UIView, UITextFieldDelegate {
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
-        if previousTraitCollection?.hasDifferentColorAppearance(comparedTo: traitCollection) ?? false {
-            searchEditingChanged()
-        }
         if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
             let showsSearch = !searchField.isHidden
             searchFieldHeightConstraint.constant = showsSearch

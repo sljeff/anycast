@@ -298,7 +298,7 @@ final class EpisodeCardCell: UICollectionViewCell {
 
         // Tabular figures (FontFeature.tabularFigures in the Dart row).
         rightTextLabel.font = metaMetrics.scaledFont(
-            for: .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+            for: ThemeRegistry.current.typography.font(12, .regular, .text).monospacedDigits()
         )
         rightTextLabel.textColor = Theme.onSurfaceVariant
         rightTextLabel.numberOfLines = 1
@@ -507,17 +507,11 @@ final class EpisodeCardCell: UICollectionViewCell {
         actionButtons = []
         guard !actions.isEmpty else { return }
         for (index, action) in actions.enumerated() {
-            let button = UIButton(type: .custom)
-            button.setImage(action.icon, for: .normal)
-            button.tintColor = Theme.background
-            button.backgroundColor = Theme.onSurface
-            button.layer.cornerRadius = 20
-            button.layer.cornerCurve = .continuous
-            button.accessibilityLabel = action.accessibilityLabel
+            let button = AnycastIconButton(
+                style: .inverse, icon: action.icon, accessibilityLabel: action.accessibilityLabel, diameter: 40
+            )
             button.tag = index
             button.addTarget(self, action: #selector(actionTapped(_:)), for: .touchUpInside)
-            button.widthAnchor.constraint(equalToConstant: 40).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 40).isActive = true
             if let stripRow = stripContainer.subviews.first as? UIStackView {
                 stripRow.addArrangedSubview(button)
             }

@@ -261,9 +261,9 @@ enum SubscriptionsVisualState: Equatable {
 
 // MARK: - State views (AnycastLoadingState / AnycastEmptyState)
 
-/// The centered spinner-or-empty-state block hosted as the collection
-/// background: 64 pt circle icon + title + message (+ optional action).
-final class CollectionStateView: UIView {
+/// The Subscriptions loading / error / empty block on the shared
+/// `EmptyStateView`, hosted as the collection background.
+final class CollectionStateView: EmptyStateView {
 
     enum Kind {
         case loading
@@ -271,125 +271,32 @@ final class CollectionStateView: UIView {
         case empty
     }
 
-    private let iconCircle = UIView()
-    private let iconView = UIImageView()
-    private let titleLabel = UILabel()
-    private let messageLabel = UILabel()
-    private let actionButton = UIButton(type: .system)
-    private let spinner = UIActivityIndicatorView(style: .medium)
-
-    init() {
-        super.init(frame: .zero)
-        iconCircle.backgroundColor = AnycastColor.sandAlpha3
-        iconCircle.layer.cornerRadius = 32
-        iconCircle.layer.cornerCurve = .continuous
-        iconCircle.translatesAutoresizingMaskIntoConstraints = false
-        iconCircle.addSubview(iconView)
-        iconView.contentMode = .center
-        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 30)
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-
-        spinner.color = Theme.primary
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        spinner.hidesWhenStopped = true
-        iconCircle.addSubview(spinner)
-
-        titleLabel.font = TypographyV2.headlineMedium.font()
-        titleLabel.textColor = Theme.onSurface
-        titleLabel.textAlignment = .center
-        titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.numberOfLines = 0
-
-        messageLabel.font = TypographyV2.bodyLarge.font()
-        messageLabel.textColor = Theme.onSurfaceVariant
-        messageLabel.textAlignment = .center
-        messageLabel.adjustsFontForContentSizeCategory = true
-        messageLabel.numberOfLines = 0
-
-        var actionConfiguration = UIButton.Configuration.plain()
-        actionConfiguration.imagePadding = 8
-        actionConfiguration.baseForegroundColor = Theme.primary
-        actionConfiguration.contentInsets = .zero
-        actionConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-            var outgoing = incoming
-            outgoing.font = TypographyV2.titleSmall.font()
-            return outgoing
-        }
-        actionButton.configuration = actionConfiguration
-        actionButton.addAction(UIAction { [weak self] _ in self?.onAction?() }, for: .touchUpInside)
-
-        let column = UIStackView(arrangedSubviews: [iconCircle, titleLabel, messageLabel, actionButton])
-        column.axis = .vertical
-        column.alignment = .center
-        column.spacing = 8
-        column.setCustomSpacing(20, after: iconCircle)
-        column.setCustomSpacing(24, after: messageLabel)
-        column.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(column)
-
-        NSLayoutConstraint.activate([
-            iconCircle.widthAnchor.constraint(equalToConstant: 64),
-            iconCircle.heightAnchor.constraint(equalToConstant: 64),
-            iconView.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
-            iconView.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
-            spinner.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
-
-            column.leadingAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.leadingAnchor),
-            column.trailingAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.trailingAnchor),
-            column.topAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.topAnchor),
-            column.bottomAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.bottomAnchor),
-            column.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
-            column.centerXAnchor.constraint(equalTo: centerXAnchor),
-            // Centered in the area the mini player and tab bar leave free;
-            // yields to the margin bounds when the column is taller.
-            {
-                let center = column.centerYAnchor.constraint(equalTo: layoutMarginsGuide.centerYAnchor)
-                center.priority = .defaultHigh
-                return center
-            }(),
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
     private var onAction: (() -> Void)?
 
     func configure(kind: Kind, action: (() -> Void)? = nil) {
         onAction = action
         switch kind {
         case .loading:
-            iconView.isHidden = true
-            spinner.isHidden = false
-            spinner.startAnimating()
-            titleLabel.text = nil
-            messageLabel.text = "Loading subscriptions…"
-            actionButton.isHidden = true
+            configure(Content(showsSpinner: true, message: "Loading subscriptions…"))
         case .error:
-            iconView.isHidden = false
-            spinner.stopAnimating()
-            iconView.tintColor = Theme.primary
-            iconView.image = UIImage(systemName: "icloud.slash")
-            titleLabel.text = "Couldn’t load subscriptions"
-            messageLabel.text = "Check the local library and try again."
+            var actions: [UIView] = []
             if action != nil {
-                actionButton.isHidden = false
-                actionButton.setImage(
-                    UIImage(systemName: "arrow.clockwise"), for: .normal
-                )
-                actionButton.setTitle("Try again", for: .normal)
-            } else {
-                actionButton.isHidden = true
+                let retry = AnycastButton.make(.secondary, title: "Try again", image: UIImage(systemName: "arrow.clockwise"))
+                retry.addAction(UIAction { [weak self] _ in self?.onAction?() }, for: .touchUpInside)
+                actions.append(retry)
             }
+            configure(Content(
+                icon: UIImage(systemName: "icloud.slash"),
+                title: "Couldn’t load subscriptions",
+                message: "Check the local library and try again.",
+                actions: actions
+            ))
         case .empty:
-            iconView.isHidden = false
-            spinner.stopAnimating()
-            iconView.tintColor = Theme.primary
-            iconView.image = UIImage(systemName: "music.note.list")
-            titleLabel.text = "No subscriptions yet"
-            messageLabel.text = "Follow a podcast to keep it close at hand."
-            actionButton.isHidden = true
+            configure(Content(
+                icon: UIImage(systemName: "music.note.list"),
+                title: "No subscriptions yet",
+                message: "Follow a podcast to keep it close at hand."
+            ))
         }
     }
 }

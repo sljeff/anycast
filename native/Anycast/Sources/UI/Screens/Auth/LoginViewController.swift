@@ -655,7 +655,7 @@ final class LoginViewController: UIViewController {
         bubble.backgroundColor = Theme.background
         bubble.layer.borderColor = Theme.outline.cgColor
         bubble.layer.borderWidth = 1
-        bubble.layer.cornerRadius = 8
+        bubble.layer.cornerRadius = Radius.sm
         bubble.layer.cornerCurve = .continuous
         bubble.translatesAutoresizingMaskIntoConstraints = false
 
@@ -741,14 +741,7 @@ final class LoginViewController: UIViewController {
         }
         offeringsContainer.addArrangedSubview(cardsRow)
 
-        let confirm = UIButton(type: .system)
-        confirm.backgroundColor = Theme.onSurface
-        confirm.setTitleColor(Theme.background, for: .normal)
-        confirm.setTitle(LoginPageModel.confirmPurchaseTitle, for: .normal)
-        confirm.titleLabel?.font = Self.font(17, .semibold, .body)
-        confirm.titleLabel?.adjustsFontForContentSizeCategory = true
-        confirm.layer.cornerRadius = 24
-        confirm.layer.cornerCurve = .continuous
+        let confirm = AnycastButton.make(.primary, title: LoginPageModel.confirmPurchaseTitle)
         confirm.heightAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
         confirm.addAction(
             UIAction { [weak self] _ in self?.confirmPurchaseTapped() },
@@ -1150,7 +1143,7 @@ final class IntroSlideCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        contentView.layer.cornerRadius = 8
+        contentView.layer.cornerRadius = Radius.md
         contentView.layer.cornerCurve = .continuous
         contentView.layer.masksToBounds = true
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)

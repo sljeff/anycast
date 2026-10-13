@@ -44,7 +44,7 @@ final class PodcastSectionBar: UIView {
                 button.configuration?.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
                     var outgoing = incoming
                     outgoing.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-                        for: .systemFont(ofSize: 12, weight: .semibold),
+                        for: ThemeRegistry.current.typography.font(12, .semibold, .text),
                         maximumPointSize: 16,
                         compatibleWith: traits
                     )

@@ -584,8 +584,13 @@ final class ChannelHeaderView: UICollectionReusableView {
     /// trait flips).
     private var headerDominant: UIColor = ChannelViewModel.playerWarmColor
     private let grabber = SheetGrabberView()
-    private let backButton = UIButton(type: .custom)
-    private let shareButton = UIButton(type: .custom)
+    // 40 pt keeps ChannelFoldGeometry.buttonRowHeight; the row stays tappable.
+    private let backButton = AnycastIconButton(
+        style: .tonal, icon: AppIcons.back, accessibilityLabel: "Close channel", diameter: 40
+    )
+    private let shareButton = AnycastIconButton(
+        style: .tonal, icon: AppIcons.share, accessibilityLabel: "Share channel", diameter: 40
+    )
     private let subscriptionButton = SubscriptionCapsuleButton()
     private let coverView = UIImageView()
     private let titleLabel = UILabel()
@@ -635,13 +640,9 @@ final class ChannelHeaderView: UICollectionReusableView {
         grabber.translatesAutoresizingMaskIntoConstraints = false
         addSubview(grabber)
 
-        configureCircleButton(backButton, icon: AppIcons.back, label: "Close channel")
-        backButton.translatesAutoresizingMaskIntoConstraints = false
         backButton.addAction(
             UIAction { [weak self] _ in self?.actions?.onBack() }, for: .touchUpInside
         )
-        configureCircleButton(shareButton, icon: AppIcons.share, label: "Share channel")
-        shareButton.translatesAutoresizingMaskIntoConstraints = false
         shareButton.addAction(
             UIAction { [weak self] _ in self?.actions?.onShare(self?.shareButton ?? UIView()) },
             for: .touchUpInside
@@ -687,13 +688,7 @@ final class ChannelHeaderView: UICollectionReusableView {
         domainButton.accessibilityLabel = "Copy RSS URL"
 
         latestButton.configuration = latestConfiguration(loading: false)
-        latestButton.tintColor = Theme.background
-        latestButton.backgroundColor = Theme.onSurface
-        // Half the 40 pt height — see SubscriptionCapsuleButton for why
-        // the Dart 36 literal is not carried over.
-        latestButton.layer.cornerRadius = 20
-        latestButton.layer.cornerCurve = .continuous
-        latestButton.clipsToBounds = true
+        latestButton.addPressFeedback(scale: Motion.pressScaleSubtle)
         latestButton.isAccessibilityElement = true
         latestButton.accessibilityLabel = "Play latest episode"
         latestButton.translatesAutoresizingMaskIntoConstraints = false
@@ -725,13 +720,9 @@ final class ChannelHeaderView: UICollectionReusableView {
 
             backButton.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor, constant: 22),
             backButton.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
-            backButton.widthAnchor.constraint(equalToConstant: 40),
-            backButton.heightAnchor.constraint(equalToConstant: 40),
 
             shareButton.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor, constant: 22),
             shareButton.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
-            shareButton.widthAnchor.constraint(equalToConstant: 40),
-            shareButton.heightAnchor.constraint(equalToConstant: 40),
 
             subscriptionButton.centerYAnchor.constraint(equalTo: backButton.centerYAnchor),
             subscriptionButton.trailingAnchor.constraint(
@@ -759,37 +750,16 @@ final class ChannelHeaderView: UICollectionReusableView {
             fadeGroup.centerXAnchor.constraint(equalTo: layoutMarginsGuide.centerXAnchor),
             fadeGroup.widthAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.widthAnchor),
 
-            latestButton.widthAnchor.constraint(equalToConstant: 184),
-            latestButton.heightAnchor.constraint(equalToConstant: 40),
+            latestButton.heightAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.standardDiameter),
         ])
     }
 
+    /// The shared primary capsule; while the feed loads it shows the
+    /// configuration's own activity indicator in place of the glyph.
     private func latestConfiguration(loading: Bool) -> UIButton.Configuration {
-        var configuration = UIButton.Configuration.plain()
-        configuration.imagePadding = 4
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
-        configuration.baseForegroundColor = Theme.background
-        if loading {
-            configuration.image = nil
-            configuration.attributedTitle = nil
-        } else {
-            configuration.image = AppIcons.play
-            var title = AttributedString("Latest Episode")
-            title.font = TypographyV2.labelLarge.font()
-            title.foregroundColor = Theme.background
-            configuration.attributedTitle = title
-        }
+        var configuration = AnycastButton.configuration(.primary, title: "Latest Episode", image: AppIcons.play)
+        configuration.showsActivityIndicator = loading
         return configuration
-    }
-
-    private func configureCircleButton(_ button: UIButton, icon: UIImage, label: String) {
-        button.setImage(icon, for: .normal)
-        button.tintColor = Theme.onSurface
-        button.backgroundColor = AnycastColor.sandAlpha4
-        button.layer.cornerRadius = 20
-        button.layer.cornerCurve = .continuous
-        button.isAccessibilityElement = true
-        button.accessibilityLabel = label
     }
 
     // MARK: Configure
@@ -1014,47 +984,14 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     private func build() {
-        let icon = UIImageView(image: AppIcons.search)
-        icon.tintColor = Theme.onSurfaceVariant
-        icon.contentMode = .center
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        let iconBox = UIView()
-        iconBox.translatesAutoresizingMaskIntoConstraints = false
-        iconBox.addSubview(icon)
-        NSLayoutConstraint.activate([
-            // Explicit box size — UITextField measures the leftView via
-            // systemLayoutSizeFitting; an unsized box collapses to 0×0 and
-            // the icon floats at the field's top edge (same fix as the
-            // shared AppBar search field).
-            iconBox.widthAnchor.constraint(equalToConstant: 42),
-            iconBox.heightAnchor.constraint(equalToConstant: 24),
-
-            icon.leadingAnchor.constraint(equalTo: iconBox.leadingAnchor, constant: 12),
-            icon.centerYAnchor.constraint(equalTo: iconBox.centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 24),
-            icon.heightAnchor.constraint(equalToConstant: 24),
-        ])
-
-        searchField.leftView = iconBox
-        searchField.leftViewMode = .always
-        searchField.placeholder = "Search episodes"
-        searchField.font = TypographyV2.bodyLarge.font()
-        searchField.adjustsFontForContentSizeCategory = true
-        searchField.textColor = Theme.onSurface
-        searchField.attributedPlaceholder = NSAttributedString(
-            string: "Search episodes",
-            attributes: [.foregroundColor: Theme.onSurfaceVariant]
-        )
-        searchField.backgroundColor = Theme.surface
-        searchField.layer.cornerRadius = 12
-        searchField.layer.cornerCurve = .continuous
+        searchField.applyAnycastStyle(placeholder: "Search episodes", icon: AppIcons.search)
         searchField.returnKeyType = .search
         searchField.autocorrectionType = .no
         searchField.clearButtonMode = .never
         searchField.isAccessibilityElement = true
         searchField.accessibilityLabel = "Search episodes"
         searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchField.heightAnchor.constraint(equalToConstant: 56).isActive = true
+        searchField.heightAnchor.constraint(equalToConstant: Spacing.xxl).isActive = true
         searchField.addTarget(self, action: #selector(editingChanged), for: .editingChanged)
         searchField.addTarget(self, action: #selector(submitted), for: .primaryActionTriggered)
 

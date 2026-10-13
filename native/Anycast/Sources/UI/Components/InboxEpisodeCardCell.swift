@@ -150,8 +150,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         )
         cardContainer.isAccessibilityElement = false
 
-        let titleMetrics = UIFontMetrics(forTextStyle: .body)
-        titleLabel.font = titleMetrics.scaledFont(for: .systemFont(ofSize: 17, weight: .regular))
+        titleLabel.font = TypographyV2.bodyLarge.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 3
         titleLabel.adjustsFontForContentSizeCategory = true
@@ -161,10 +160,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         titleLabel.isAccessibilityElement = true
         titleLabel.accessibilityTraits = [.button]
 
-        let descriptionMetrics = UIFontMetrics(forTextStyle: .subheadline)
-        descriptionLabel.font = descriptionMetrics.scaledFont(
-            for: .systemFont(ofSize: 14, weight: .regular)
-        )
+        descriptionLabel.font = TypographyV2.bodyCompact.font()
         descriptionLabel.textColor = Theme.onSurfaceVariant
         descriptionLabel.numberOfLines = 3
         descriptionLabel.adjustsFontForContentSizeCategory = true
@@ -190,13 +186,12 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         coverView.translatesAutoresizingMaskIntoConstraints = false
         cardContainer.addSubview(coverView)
 
-        let metaMetrics = UIFontMetrics(forTextStyle: .caption1)
-        showNameLabel.font = metaMetrics.scaledFont(for: .systemFont(ofSize: 12, weight: .regular))
+        showNameLabel.font = TypographyV2.caption.font()
         showNameLabel.textColor = Theme.onSurfaceVariant
         showNameLabel.adjustsFontForContentSizeCategory = true
         showNameLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        dateLabel.font = metaMetrics.scaledFont(for: .systemFont(ofSize: 12, weight: .regular))
+        dateLabel.font = TypographyV2.caption.font()
         dateLabel.textColor = Theme.onSurfaceVariant
         dateLabel.adjustsFontForContentSizeCategory = true
 
@@ -215,9 +210,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         badge.translatesAutoresizingMaskIntoConstraints = false
         cardContainer.addSubview(badge)
 
-        badgeLabel.font = descriptionMetrics.scaledFont(
-            for: .systemFont(ofSize: 14, weight: .regular)
-        )
+        badgeLabel.font = TypographyV2.bodyCompact.font()
         badgeLabel.textColor = AnycastColor.goldAlpha9
         badgeLabel.adjustsFontForContentSizeCategory = true
         badgeLabel.translatesAutoresizingMaskIntoConstraints = false

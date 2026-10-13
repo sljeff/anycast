@@ -118,20 +118,12 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         // surface instead of `.roundedRect` — the system style paints pure
         // black, which is not a palette value and sat as a void on the
         // surface card (09 audit).
-        urlField.placeholder = "RSS Feed URL"
-        urlField.font = Typography.htmlBody.font()
-        urlField.textColor = Theme.onSurface
-        urlField.backgroundColor = Theme.surfaceContainer
-        urlField.setDynamicBorderColor(AnycastColor.sandAlpha4)
-        urlField.layer.borderWidth = 1
-        urlField.layer.cornerRadius = Radius.sm
-        urlField.layer.cornerCurve = .continuous
+        urlField.clearButtonMode = .whileEditing
+        urlField.applyAnycastStyle(placeholder: "RSS Feed URL")
         urlField.keyboardType = .URL
         urlField.autocorrectionType = .no
         urlField.autocapitalizationType = .none
         urlField.returnKeyType = .go
-        urlField.clearButtonMode = .whileEditing
-        urlField.borderStyle = .none
         urlField.delegate = self
         urlField.isAccessibilityElement = true
         urlField.accessibilityLabel = "RSS Feed URL"

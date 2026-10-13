@@ -148,9 +148,7 @@ final class PlayerBarView: UIView {
         coverView.translatesAutoresizingMaskIntoConstraints = false
         capsule.addSubview(coverView)
 
-        titleLabel.font = UIFontMetrics(forTextStyle: .headline).scaledFont(
-            for: .systemFont(ofSize: 16, weight: .medium)
-        )
+        titleLabel.font = TypographyV2.titleMedium.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         // The capsule floats on the static white-80 surface — light-variant
         // ink; the player-hosted styles keep the legacy chrome colors.
@@ -165,7 +163,7 @@ final class PlayerBarView: UIView {
         capsule.addSubview(titleLabel)
 
         timeLabel.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-            for: .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+            for: ThemeRegistry.current.typography.font(11, .regular, .text).monospacedDigits()
         )
         timeLabel.adjustsFontForContentSizeCategory = true
         timeLabel.textColor = style == .capsule

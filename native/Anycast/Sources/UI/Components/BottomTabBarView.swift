@@ -66,7 +66,7 @@ final class BottomTabBarView: UIView {
                 button.configuration?.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
                     var outgoing = incoming
                     outgoing.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-                        for: .systemFont(ofSize: 12, weight: .medium),
+                        for: ThemeRegistry.current.typography.font(12, .medium, .text),
                         maximumPointSize: 16,
                         compatibleWith: traits
                     )

@@ -130,7 +130,7 @@ final class PlayerProgressBarView: UIControl {
         for label in [positionLabel, remainingLabel] {
             // Monospaced digits keep the ticking times from jittering.
             label.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-                for: .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+                for: ThemeRegistry.current.typography.font(12, .semibold, .text).monospacedDigits()
             )
             label.textColor = .white
             label.adjustsFontForContentSizeCategory = true
