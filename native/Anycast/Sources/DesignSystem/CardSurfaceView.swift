@@ -8,7 +8,7 @@ final class CardSurfaceView: UIView {
 
     private let radius: CGFloat
 
-    init(radius: CGFloat = Radius.card) {
+    init(radius: CGFloat = Radius.largeCard) {
         self.radius = radius
         super.init(frame: .zero)
         backgroundColor = Theme.surface

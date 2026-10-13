@@ -23,7 +23,7 @@ actor PlainTextHTMLCache {
         if let cached = storage[key] {
             return cached
         }
-        let text = HtmlText.htmlToText(html)
+        let text = DisplayText.clean(HtmlText.htmlToText(html))
         if storage.count >= limit {
             storage.removeAll(keepingCapacity: true)   // cache, safe to drop
         }
@@ -39,5 +39,21 @@ actor PlainTextHTMLCache {
         SHA256.hash(data: Data(html.utf8))
             .map { String(format: "%02x", $0) }
             .joined()
+    }
+}
+
+/// Feeds often ship escaped or partial markup inside plain-text fields
+/// (`&nbsp;`, a mid-string `<br/>`), which the Dart-parity `HtmlText` path
+/// passes through verbatim. Display surfaces decode it so readers never see
+/// raw markup; line breaks survive as newlines.
+nonisolated enum DisplayText {
+
+    static func clean(_ text: String) -> String {
+        guard text.contains("&") || text.contains("<") else { return text }
+        let breaks = text.replacingOccurrences(
+            of: "<br\\s*/?>", with: "\n", options: [.regularExpression, .caseInsensitive]
+        )
+        let decoded = HtmlText.htmlToText("<p>\(breaks)</p>")
+        return decoded.isEmpty ? text : decoded
     }
 }

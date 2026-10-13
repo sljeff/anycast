@@ -64,9 +64,25 @@ nonisolated enum Motion {
     static let pressScale: CGFloat = 0.92
     /// Cards and rows move less than buttons.
     static let pressScaleSubtle: CGFloat = 0.97
+    /// The player's transport controls press deeper.
+    static let pressScaleStrong: CGFloat = 0.88
     static let pressIn: TimeInterval = 0.12
     static let pressRelease: TimeInterval = 0.3
     static let pressReleaseDamping: CGFloat = 0.5
+
+    // Scrubber physics (UI kit): a held track also widens past its ends by
+    // `scrubberFocusOutset` per side; a drag past either end stretches it
+    // like a rubber band, capped at `rubberBandLimit`.
+    static let scrubberFocusOutset: CGFloat = 10
+    static let rubberBandLimit: CGFloat = 34
+    static let rubberBandResistance: CGFloat = 0.55
+
+    /// Rubber-band offset for an `overscroll` past an end (sign preserved).
+    static func rubberBand(_ overscroll: CGFloat) -> CGFloat {
+        let magnitude = abs(overscroll)
+        let stretched = (1 - 1 / (magnitude * rubberBandResistance / rubberBandLimit + 1)) * rubberBandLimit
+        return overscroll < 0 ? -stretched : stretched
+    }
 
     static var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
 

@@ -233,6 +233,8 @@ nonisolated enum TypographyV2 {
     static let headlineMedium = Style(size: 22, lineHeight: 28, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .title2)
     static let headlineSmall = Style(size: 17, lineHeight: 22, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .headline)
     static let titleLarge = Style(size: 20, lineHeight: 25, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .title2)
+    /// Episode card / queue row titles (UI kit 20 pt regular).
+    static let cardTitle = Style(size: 20, lineHeight: 25, weight: .regular, color: Theme.onSurface, scalingTextStyle: .title3)
     static let titleMedium = Style(size: 16, lineHeight: 21, weight: .medium, color: Theme.onSurface, scalingTextStyle: .body)
     static let titleSmall = Style(size: 15, lineHeight: 20, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .subheadline)
     static let bodyLarge = Style(size: 17, lineHeight: 22, weight: .regular, color: Theme.onSurface, scalingTextStyle: .body)
@@ -249,7 +251,7 @@ nonisolated enum TypographyV2 {
     /// All v2 styles, for tests and enumerations.
     static let allStyles: [Style] = [
         displayLarge, displayMedium, displaySmall, headlineLarge, headlineMedium,
-        headlineSmall, titleLarge, titleMedium, titleSmall, bodyLarge, bodyMedium,
+        headlineSmall, titleLarge, cardTitle, titleMedium, titleSmall, bodyLarge, bodyMedium,
         bodySmall, bodyCompact, caption, labelLarge, labelMedium, labelSmall,
     ]
 }
@@ -263,6 +265,7 @@ extension TypographyV2.Style {
     static let headlineMedium = TypographyV2.headlineMedium
     static let headlineSmall = TypographyV2.headlineSmall
     static let titleLarge = TypographyV2.titleLarge
+    static let cardTitle = TypographyV2.cardTitle
     static let titleMedium = TypographyV2.titleMedium
     static let titleSmall = TypographyV2.titleSmall
     static let bodyLarge = TypographyV2.bodyLarge
