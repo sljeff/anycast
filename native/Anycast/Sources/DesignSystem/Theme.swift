@@ -7,57 +7,61 @@ import UIKit
 /// trait-dynamic with no code-side branching. Values are byte-identical to
 /// `lib/design_system/anycast_theme.dart` (the Flutter-side port of the same
 /// Figma source of truth). `Theme.x` stays the only sanctioned color access
-/// — never `UIColor(red:…)` literals in screens.
+/// — never `UIColor(red:…)` literals in screens. Token values come from the
+/// active `ThemeSpec` (ThemeSpec.swift); restyle there, not here.
 ///
 /// Screen surfaces follow the system appearance. The player keeps its
 /// intentionally dark presentation in `installPlayerBase`.
 nonisolated enum Theme {
 
+    /// The active theme's palette (`ThemeSpec`); tokens below are its stable names.
+    private static let palette = ThemeRegistry.current.palette
+
     // MARK: - Semantic tokens (anycast_theme.dart `_build(brightness)`)
 
     /// Page background — sand2 / sandDark2.
-    static let background = UIColor(named: "Background")!
+    static let background = palette.background
     /// Card / sheet fill — sand1 / sandDark1.
-    static let surface = UIColor(named: "Surface")!
+    static let surface = palette.surface
     /// Inset fills, input fields — sand3 / sandDark3.
-    static let surfaceContainer = UIColor(named: "SurfaceContainer")!
+    static let surfaceContainer = palette.surfaceContainer
     /// Elevated inset fills — sand4 / sandDark4.
-    static let surfaceContainerHigh = UIColor(named: "SurfaceContainerHigh")!
+    static let surfaceContainerHigh = palette.surfaceContainerHigh
     /// Highest elevation fills — sand6 / sandDark6.
-    static let surfaceContainerHighest = UIColor(named: "SurfaceContainerHighest")!
+    static let surfaceContainerHighest = palette.surfaceContainerHighest
     /// Strokes / hairlines — sand6 / sandDark6.
-    static let outline = UIColor(named: "Outline")!
+    static let outline = palette.outline
     /// Card borders — sandAlpha4 pair.
-    static let outlineVariant = UIColor(named: "OutlineVariant")!
+    static let outlineVariant = palette.outlineVariant
     /// Primary text — sand12 / sandDark12.
-    static let onSurface = UIColor(named: "OnSurface")!
+    static let onSurface = palette.onSurface
     /// Secondary text — sand11 / sandDark11.
-    static let onSurfaceVariant = UIColor(named: "OnSurfaceVariant")!
+    static let onSurfaceVariant = palette.onSurfaceVariant
     /// Brand accent (gold) — gold9 / goldDark9.
-    static let primary = UIColor(named: "Primary")!
+    static let primary = palette.primary
     /// Content on gold — sand1 / sand12.
-    static let onPrimary = UIColor(named: "OnPrimary")!
+    static let onPrimary = palette.onPrimary
     /// Gold-tinted container — sandAlpha4 pair.
-    static let primaryContainer = UIColor(named: "PrimaryContainer")!
-    static let onPrimaryContainer = UIColor(named: "OnPrimaryContainer")!
+    static let primaryContainer = palette.primaryContainer
+    static let onPrimaryContainer = palette.onPrimaryContainer
     /// Inset group container — sand3 / sandDark3.
-    static let secondaryContainer = UIColor(named: "SecondaryContainer")!
+    static let secondaryContainer = palette.secondaryContainer
     /// Orange accent — orange10 / FF8B3E.
-    static let tertiary = UIColor(named: "Tertiary")!
+    static let tertiary = palette.tertiary
     /// Error — BA1A1A / FF8B8B.
-    static let error = UIColor(named: "Error")!
+    static let error = palette.error
     /// Inverse surfaces (toasts) — onSurface inverted.
-    static let inverseSurface = UIColor(named: "InverseSurface")!
-    static let inversePrimary = UIColor(named: "InversePrimary")!
+    static let inverseSurface = palette.inverseSurface
+    static let inversePrimary = palette.inversePrimary
 
     // MARK: - Player (fixed warm-dark, trait-independent — 09 §2.1)
 
-    static let playerWarm = UIColor(named: "PlayerWarm")!             // 0x867D75
-    static let playerBackground = UIColor(named: "PlayerBackground")! // 0x222221
-    static let playerText = UIColor(named: "PlayerText")!             // 0xEEEEEC
-    static let playerSecondary = UIColor(named: "PlayerSecondary")!   // 0xD2D0CA
-    static let playerArtworkScrim = UIColor(named: "PlayerArtworkScrim")!
-    static let transcriptSurface = UIColor(named: "TranscriptSurface")!
+    static let playerWarm = palette.playerWarm             // 0x867D75
+    static let playerBackground = palette.playerBackground // 0x222221
+    static let playerText = palette.playerText             // 0xEEEEEC
+    static let playerSecondary = palette.playerSecondary   // 0xD2D0CA
+    static let playerArtworkScrim = palette.playerArtworkScrim
+    static let transcriptSurface = palette.transcriptSurface
 
     /// Artwork scrim gradient over `playerWarm` (anycast_theme.dart
     /// `playerGradientOverlayColors`, alpha-blended over the warm base).

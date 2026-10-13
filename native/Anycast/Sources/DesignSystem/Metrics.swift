@@ -34,13 +34,14 @@ nonisolated enum Spacing {
 }
 
 /// Anycast 2.0 corner radii (`AnycastRadius`).
+/// Values come from the active theme (`ThemeSpec.Shape`).
 nonisolated enum Radius {
-    static let sm: CGFloat = 8
-    static let md: CGFloat = 16
-    static let artwork: CGFloat = 18
-    static let card: CGFloat = 24
-    static let largeCard: CGFloat = 32
-    static let modal: CGFloat = 58
+    static let sm = ThemeRegistry.current.shape.sm
+    static let md = ThemeRegistry.current.shape.md
+    static let artwork = ThemeRegistry.current.shape.artwork
+    static let card = ThemeRegistry.current.shape.card
+    static let largeCard = ThemeRegistry.current.shape.largeCard
+    static let modal = ThemeRegistry.current.shape.modal
     /// Capsules; clamp at draw time, this just exceeds any frame.
     static let pill: CGFloat = 999
 }

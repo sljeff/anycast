@@ -195,9 +195,11 @@ nonisolated enum TypographyV2 {
         let weight: UIFont.Weight
         let color: UIColor
         let scalingTextStyle: UIFont.TextStyle
+        /// Which theme face renders this style (`ThemeSpec.Typography`).
+        var role: ThemeSpec.FontRole = .text
 
         func font(traits: UITraitCollection? = nil) -> UIFont {
-            let base = UIFont.systemFont(ofSize: size, weight: weight)
+            let base = ThemeRegistry.current.typography.font(size, weight, role)
             let metrics = UIFontMetrics(forTextStyle: scalingTextStyle)
             if let traits {
                 return metrics.scaledFont(for: base, compatibleWith: traits)
@@ -218,7 +220,7 @@ nonisolated enum TypographyV2 {
         }
     }
 
-    static let displayLarge = Style(size: 48, lineHeight: 48, weight: .black, color: Theme.onSurface, scalingTextStyle: .largeTitle)
+    static let displayLarge = Style(size: 48, lineHeight: 48, weight: .black, color: Theme.onSurface, scalingTextStyle: .largeTitle, role: .display)
     static let displayMedium = Style(size: 34, lineHeight: 41, weight: .regular, color: Theme.onSurface, scalingTextStyle: .largeTitle)
     static let displaySmall = Style(size: 28, lineHeight: 34, weight: .regular, color: Theme.onSurface, scalingTextStyle: .title1)
     static let headlineLarge = Style(size: 28, lineHeight: 34, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .title1)

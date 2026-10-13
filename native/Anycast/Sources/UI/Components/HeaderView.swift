@@ -38,8 +38,7 @@ final class HeaderView: UIView, UITextFieldDelegate {
     init() {
         super.init(frame: .zero)
 
-        let displayBase = UIFont.systemFont(ofSize: 48, weight: .black, width: .expanded)
-        titleLabel.font = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: displayBase)
+        titleLabel.font = TypographyV2.displayLarge.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 1
