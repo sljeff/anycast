@@ -1,9 +1,9 @@
 import UIKit
 import AnycastKit
 
-/// Tab0 Subscriptions page (lib/pages/subscriptions.dart, 03 §2.4): the
-/// PodcastCard list of subscriptions; tapping any card opens the Channel
-/// sheet (card.dart:330-342). No pull-to-refresh (03 §3.3). The four visual
+/// Tab0 Subscriptions page (lib/pages/subscriptions.dart, 03 §2.4) as the
+/// Anycast 2.0 cover grid: three columns of square artwork over the show
+/// title; tapping a cover opens the Channel sheet (card.dart:330-342). No pull-to-refresh (03 §3.3). The four visual
 /// states (loading / error / empty / content) follow the Dart
 /// anycastCollectionVisualState mapping.
 final class SubscriptionsPageViewController: UIViewController {
@@ -28,23 +28,24 @@ final class SubscriptionsPageViewController: UIViewController {
         let layout = UICollectionViewCompositionalLayout { _, _ in
             let item = NSCollectionLayoutItem(
                 layoutSize: NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(1),
-                    heightDimension: .estimated(PodcastCardCell.cardHeight)
+                    widthDimension: .fractionalWidth(1.0 / 3),
+                    heightDimension: .estimated(160)
                 )
             )
-            // v2 page margin (16) — same correction as the Inbox list: the
-            // v1 24 pt inset clashed with the 16 pt grid the header and
-            // membership card use above this embedded list.
-            item.contentInsets = NSDirectionalEdgeInsets(
-                top: 0, leading: Spacing.pageH, bottom: 0, trailing: Spacing.pageH
+            let group = NSCollectionLayoutGroup.horizontal(
+                layoutSize: NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1), heightDimension: .estimated(160)
+                ),
+                repeatingSubitem: item, count: 3
             )
-            let group = NSCollectionLayoutGroup.horizontal(layoutSize: item.layoutSize, subitems: [item])
+            group.interItemSpacing = .fixed(Spacing.gap)
             let section = NSCollectionLayoutSection(group: group)
-            section.interGroupSpacing = PodcastCardCell.spacing
-            // Zero bottom inset (09 §10 决策⑥): same double-counted v1
-            // clearance as the Inbox list — the shell's
-            // additionalSafeAreaInsets owns the chrome avoidance now.
-            section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 0, trailing: 0)
+            section.interGroupSpacing = Spacing.cardInner
+            // Zero bottom inset (09 §10 决策⑥): the shell owns the chrome
+            // avoidance.
+            section.contentInsets = NSDirectionalEdgeInsets(
+                top: Spacing.gap, leading: Spacing.pageH, bottom: 0, trailing: Spacing.pageH
+            )
             return section
         }
         self.collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
@@ -71,10 +72,8 @@ final class SubscriptionsPageViewController: UIViewController {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = .clear
         collectionView.dataSource = self
-        collectionView.register(
-            PodcastCardCell.self,
-            forCellWithReuseIdentifier: PodcastCardCell.reuseIdentifier
-        )
+        collectionView.register(ShowCoverCell.self, forCellWithReuseIdentifier: ShowCoverCell.reuseIdentifier)
+        collectionView.delegate = self
         view.addSubview(collectionView)
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -217,28 +216,30 @@ extension SubscriptionsPageViewController: UICollectionViewDataSource {
         _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: PodcastCardCell.reuseIdentifier,
+            withReuseIdentifier: ShowCoverCell.reuseIdentifier,
             for: indexPath
         )
-        if let card = cell as? PodcastCardCell, subscriptions.indices.contains(indexPath.item) {
+        if let cover = cell as? ShowCoverCell, subscriptions.indices.contains(indexPath.item) {
             let subscription = subscriptions[indexPath.item]
-            card.configure(PodcastCardContent(
-                rssFeedURL: subscription.rssFeedUrl ?? "",
-                title: subscription.title ?? "",
-                description: subscription.description ?? "",
-                imageURL: subscription.imageUrl
-            ))
-            card.onTap = { [weak self] content in
-                guard let self else { return }
-                ChannelViewController.present(
-                    from: self,
-                    context: self.context,
-                    rssFeedURL: content.rssFeedURL,
-                    seed: subscription
-                )
-            }
+            cover.configure(title: subscription.title ?? "", imageURL: subscription.imageUrl)
         }
         return cell
+    }
+}
+
+extension SubscriptionsPageViewController: UICollectionViewDelegate {
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+        guard subscriptions.indices.contains(indexPath.item) else { return }
+        let subscription = subscriptions[indexPath.item]
+        Haptics.tap()
+        ChannelViewController.present(
+            from: self,
+            context: context,
+            rssFeedURL: subscription.rssFeedUrl ?? "",
+            seed: subscription
+        )
     }
 }
 
