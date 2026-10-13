@@ -42,12 +42,12 @@ final class SettingsOptionSheetViewController: UIViewController {
         // Header row: title + close icon, like the picker dialog's top bar.
         headerLabel.text = titleText
         headerLabel.font = Typography.secondaryTitle.font()
-        headerLabel.textColor = Theme.primaryLightMax
+        headerLabel.textColor = Theme.onSurface
         headerLabel.adjustsFontForContentSizeCategory = true
         headerLabel.translatesAutoresizingMaskIntoConstraints = false
 
         closeButton.setImage(AppIcons.close, for: .normal)
-        closeButton.tintColor = Theme.secondaryText
+        closeButton.tintColor = Theme.onSurfaceVariant
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         closeButton.isPointerInteractionEnabled = true
         closeButton.accessibilityLabel = "Close"
@@ -58,7 +58,7 @@ final class SettingsOptionSheetViewController: UIViewController {
             let option = options[index]
             var config = cell.defaultContentConfiguration()
             config.text = option.name
-            config.textProperties.color = Theme.primaryLightMax
+            config.textProperties.color = Theme.onSurface
             config.textProperties.font = Typography.mainText.font()
             cell.contentConfiguration = config
             cell.accessories = option.code == selectedCode ? [.checkmark()] : []
@@ -136,7 +136,7 @@ final class SettingsSwitchListCell: UICollectionViewListCell {
         super.init(frame: frame)
 
         titleLabel.font = Typography.mainText.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -268,7 +268,7 @@ enum SettingsTooltipOverlay {
         let label = UILabel()
         label.text = message
         label.font = Typography.defaultText.font()
-        label.textColor = Theme.primaryLightMax
+        label.textColor = Theme.onSurface
         label.numberOfLines = 0
         label.textAlignment = .natural
         label.adjustsFontForContentSizeCategory = true

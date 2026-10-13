@@ -416,7 +416,7 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
                 isPlaying: playback.isPlaying,
                 isLoading: playback.isLoading
             ),
-            tint: Theme.primaryBackgroundDark
+            tint: Theme.background
         )
         button.accessibilityLabel = overlay.accessibilityLabel
     }
@@ -430,7 +430,7 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
         switch display {
         case .processing:
             button.setImage(UIImage(), for: .normal)
-            button.tintColor = Theme.primaryBackgroundDark
+            button.tintColor = Theme.background
             // Reuse an in-flight robot: visible cards reconfigure on every
             // playback / download tick, and rebuilding the lottie restarts
             // it from frame 0 — a processing robot would effectively freeze

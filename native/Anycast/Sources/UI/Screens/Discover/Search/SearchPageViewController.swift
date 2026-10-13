@@ -121,7 +121,7 @@ final class SearchPageViewController: UIViewController {
             for: .systemFont(ofSize: 12, weight: .semibold)
         )
         keywordPrefixLabel.adjustsFontForContentSizeCategory = true
-        keywordPrefixLabel.textColor = Theme.primaryLightMax
+        keywordPrefixLabel.textColor = Theme.onSurface
         keywordPrefixLabel.textAlignment = .center
         keywordPrefixLabel.numberOfLines = 1
 
@@ -312,7 +312,7 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
             for: .systemFont(ofSize: 17)
         )
         statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.textColor = Theme.primaryLightMax
+        statusLabel.textColor = Theme.onSurface
         statusLabel.textAlignment = .center
         statusLabel.isHidden = true
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -493,7 +493,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             for: .systemFont(ofSize: 17)
         )
         statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.textColor = Theme.primaryLightMax
+        statusLabel.textColor = Theme.onSurface
         statusLabel.textAlignment = .center
         statusLabel.isHidden = true
         statusLabel.translatesAutoresizingMaskIntoConstraints = false

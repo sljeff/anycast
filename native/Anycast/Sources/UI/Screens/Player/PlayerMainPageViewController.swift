@@ -68,7 +68,7 @@ final class PlayerMainPageViewController: UIViewController {
         coverView.clipsToBounds = true
         coverView.layer.cornerRadius = 8
         coverView.layer.cornerCurve = .continuous
-        coverView.backgroundColor = Theme.primaryBackground
+        coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.isAccessibilityElement = true
         coverView.accessibilityLabel = "Episode artwork"
         coverView.translatesAutoresizingMaskIntoConstraints = false
@@ -94,7 +94,7 @@ final class PlayerMainPageViewController: UIViewController {
         let transport = buildControls()
 
         stateMessageLabel.font = Typography.defaultText.font()
-        stateMessageLabel.textColor = Theme.primaryLightMax
+        stateMessageLabel.textColor = Theme.onSurface
         stateMessageLabel.adjustsFontForContentSizeCategory = true
         stateMessageLabel.isHidden = true
 
@@ -116,8 +116,8 @@ final class PlayerMainPageViewController: UIViewController {
             retryConfig.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16)
         }
         retryConfig.title = "Retry"
-        retryConfig.baseForegroundColor = Theme.primaryLightMax
-        retryConfig.baseBackgroundColor = Theme.cardBackground
+        retryConfig.baseForegroundColor = Theme.onSurface
+        retryConfig.baseBackgroundColor = Theme.surface
         retryConfig.cornerStyle = .capsule
         retryConfig.imagePadding = 8
         retryConfig.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
@@ -219,7 +219,7 @@ final class PlayerMainPageViewController: UIViewController {
             UIImage.SymbolConfiguration(pointSize: 48), forImageIn: .normal
         )
         for button in [replayButton, forwardButton] {
-            button.tintColor = Theme.primaryLightMax
+            button.tintColor = Theme.onSurface
             button.isAccessibilityElement = true
         }
         replayButton.accessibilityLabel = "Seek back 10 seconds"
@@ -236,7 +236,7 @@ final class PlayerMainPageViewController: UIViewController {
         replayButton.accessibilityIdentifier = "player-replay-10"
         forwardButton.accessibilityIdentifier = "player-forward-30"
 
-        playPauseButton.backgroundColor = Theme.brandGreen
+        playPauseButton.backgroundColor = Theme.primary
         playPauseButton.layer.cornerRadius = 36
         playPauseButton.layer.cornerCurve = .continuous
         playPauseButton.isAccessibilityElement = true
@@ -339,8 +339,8 @@ final class PlayerMainPageViewController: UIViewController {
         forwardButton.isEnabled = controlsEnabled
         playPauseButton.isEnabled = controlsEnabled
         let tint: UIColor = controlsEnabled
-            ? Theme.primaryLightMax
-            : Theme.primaryLightMax.withAlphaComponent(0.38)
+            ? Theme.onSurface
+            : Theme.onSurface.withAlphaComponent(0.38)
         replayButton.tintColor = tint
         forwardButton.tintColor = tint
         playPauseButton.alpha = controlsEnabled ? 1 : 0.38
@@ -352,7 +352,7 @@ final class PlayerMainPageViewController: UIViewController {
                 isPlaying: context.playback.isPlaying,
                 isLoading: context.playback.isLoading
             ),
-            tint: Theme.primaryLightMax
+            tint: Theme.onSurface
         )
 
         // K6: error surfaced by the shell toast; this is the manual retry.
@@ -474,9 +474,9 @@ private final class PlayerTitleBarView: UIView {
         imageView.clipsToBounds = true
         imageView.layer.cornerRadius = 12
         imageView.layer.cornerCurve = .continuous
-        imageView.backgroundColor = Theme.primaryBackground
+        imageView.backgroundColor = Theme.surfaceContainerHigh
         imageView.image = AppIcons.photo
-        imageView.tintColor = Theme.primaryLightMax
+        imageView.tintColor = Theme.onSurface
         imageView.isUserInteractionEnabled = false
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageButton.addSubview(imageView)
@@ -491,12 +491,12 @@ private final class PlayerTitleBarView: UIView {
         imageButton.accessibilityLabel = "Open channel"
 
         applyTitleFont()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.textColor = Theme.onSurface
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleContainer.addSubview(titleLabel)
 
         var channelConfig = UIButton.Configuration.plain()
-        channelConfig.baseForegroundColor = Theme.tabSelectedGreen
+        channelConfig.baseForegroundColor = Theme.primary
         channelConfig.contentInsets = .zero
         channelButton.configuration = channelConfig
         channelButton.titleLabel?.font = UIFontMetrics(forTextStyle: .title3).scaledFont(
@@ -654,7 +654,7 @@ private final class PlayerTitleBarView: UIView {
             currentTitle, font: font, availableWidth: laidOutWidth
         )
         if needsMarquee != titleIsMarquee {
-            let textColor = Theme.primaryLightMax
+            let textColor = Theme.onSurface
             titleLabel.removeFromSuperview()
             if needsMarquee {
                 titleLabel = MarqueeLabelFactory.makePlayerTitle(font: font, textColor: textColor)

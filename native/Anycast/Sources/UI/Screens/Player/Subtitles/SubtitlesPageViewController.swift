@@ -152,7 +152,7 @@ final class SubtitlesPageViewController: UIViewController {
 
     private func buildChrome() {
         container.backgroundColor = Theme.transcriptSurface
-        container.layer.borderColor = Theme.primaryLightMax.withAlphaComponent(0.12).cgColor
+        container.layer.borderColor = Theme.onSurface.withAlphaComponent(0.12).cgColor
         container.layer.borderWidth = 1
         container.layer.cornerRadius = 8
         container.layer.cornerCurve = .continuous
@@ -163,23 +163,23 @@ final class SubtitlesPageViewController: UIViewController {
         artworkView.clipsToBounds = true
         artworkView.layer.cornerRadius = 8
         artworkView.layer.cornerCurve = .continuous
-        artworkView.backgroundColor = Theme.cardBackground
-        artworkView.tintColor = Theme.secondaryText
+        artworkView.backgroundColor = Theme.surface
+        artworkView.tintColor = Theme.onSurfaceVariant
         artworkView.image = AppIcons.playerMain.withTintColor(
-            Theme.secondaryText, renderingMode: .alwaysOriginal
+            Theme.onSurfaceVariant, renderingMode: .alwaysOriginal
         )
         artworkView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(artworkView)
 
         titleLabel.font = UIFont(name: "Comfortaa-Bold", size: 12)
         titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 2
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(titleLabel)
 
-        divider.backgroundColor = Theme.primaryLightMax.withAlphaComponent(0.12)
+        divider.backgroundColor = Theme.onSurface.withAlphaComponent(0.12)
         divider.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(divider)
 
@@ -321,7 +321,7 @@ final class SubtitlesPageViewController: UIViewController {
             artworkView.kf.setImage(with: url, options: [.transition(.none)])
         } else {
             artworkView.image = AppIcons.playerMain.withTintColor(
-                Theme.secondaryText, renderingMode: .alwaysOriginal
+                Theme.onSurfaceVariant, renderingMode: .alwaysOriginal
             )
         }
     }
@@ -420,17 +420,17 @@ final class SubtitlesPageViewController: UIViewController {
         let title = UILabel()
         title.text = "Generate transcript with AI (Beta)"
         title.font = SubtitlesPageViewController.systemFont(size: 16, weight: .regular)
-        title.textColor = Theme.primaryLightMax
+        title.textColor = Theme.onSurface
         title.textAlignment = .center
         title.numberOfLines = 0
         title.adjustsFontForContentSizeCategory = true
 
         let questionDot = UIButton(type: .custom)
-        questionDot.backgroundColor = Theme.brandGreen
+        questionDot.backgroundColor = Theme.primary
         questionDot.layer.cornerRadius = 10
         questionDot.layer.cornerCurve = .continuous
         questionDot.setTitle("?", for: .normal)
-        questionDot.setTitleColor(Theme.primaryBackgroundDark, for: .normal)
+        questionDot.setTitleColor(Theme.background, for: .normal)
         questionDot.titleLabel?.font = SubtitlesPageViewController.systemFont(size: 12, weight: .regular)
         questionDot.isAccessibilityElement = true
         questionDot.accessibilityLabel = "About AI transcripts"
@@ -447,7 +447,7 @@ final class SubtitlesPageViewController: UIViewController {
         headline.spacing = 8
 
         let generateButton = UIButton(type: .custom)
-        generateButton.backgroundColor = Theme.brandGreen
+        generateButton.backgroundColor = Theme.primary
         generateButton.layer.cornerRadius = 24
         generateButton.layer.cornerCurve = .continuous
         generateButton.setImage(AppIcons.newDoc, for: .normal)
@@ -485,7 +485,7 @@ final class SubtitlesPageViewController: UIViewController {
             let label = UILabel()
             label.text = text
             label.font = SubtitlesPageViewController.systemFont(size: size, weight: weight)
-            label.textColor = Theme.primaryLightMax
+            label.textColor = Theme.onSurface
             label.textAlignment = .center
             label.numberOfLines = 0
             label.adjustsFontForContentSizeCategory = true
@@ -515,8 +515,8 @@ final class SubtitlesPageViewController: UIViewController {
         let retry = UIButton(type: .system)
         var configuration = UIButton.Configuration.filled()
         configuration.title = "Retry"
-        configuration.baseBackgroundColor = Theme.accent
-        configuration.baseForegroundColor = Theme.primaryBackgroundDark
+        configuration.baseBackgroundColor = Theme.primary
+        configuration.baseForegroundColor = Theme.background
         configuration.cornerStyle = .capsule
         configuration.contentInsets = NSDirectionalEdgeInsets(
             top: 10, leading: 24, bottom: 10, trailing: 24
@@ -570,12 +570,12 @@ final class SubtitlesPageViewController: UIViewController {
     /// Unavailable (no episode): "Transcript unavailable" — player.dart:701-710.
     private func makeUnavailablePanel() {
         let column = UIStackView(arrangedSubviews: [
-            makeStatusIcon("doc.text", tintColor: Theme.primaryLightMax),
+            makeStatusIcon("doc.text", tintColor: Theme.onSurface),
             makeStatusLine("Transcript unavailable", size: 16, weight: .semibold,
-                           color: Theme.primaryLightMax),
+                           color: Theme.onSurface),
             makeStatusLine(
                 "Choose an episode to view or generate its transcript.",
-                size: 14, weight: .regular, color: Theme.secondaryText
+                size: 14, weight: .regular, color: Theme.onSurfaceVariant
             ),
         ])
         embedCentered(column)
@@ -587,7 +587,7 @@ final class SubtitlesPageViewController: UIViewController {
     /// player.dart:806-815.
     private func makeLoadingPanel() {
         let spinner = UIActivityIndicatorView(style: .medium)
-        spinner.color = Theme.accent
+        spinner.color = Theme.primary
         spinner.startAnimating()
         spinner.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -597,10 +597,10 @@ final class SubtitlesPageViewController: UIViewController {
         let column = UIStackView(arrangedSubviews: [
             spinner,
             makeStatusLine("Loading transcript…", size: 16, weight: .semibold,
-                           color: Theme.primaryLightMax),
+                           color: Theme.onSurface),
             makeStatusLine(
                 "Preparing the saved transcript for playback.",
-                size: 14, weight: .regular, color: Theme.secondaryText
+                size: 14, weight: .regular, color: Theme.onSurfaceVariant
             ),
         ])
         embedCentered(column)
@@ -615,8 +615,8 @@ final class SubtitlesPageViewController: UIViewController {
         var configuration = UIButton.Configuration.filled()
         configuration.title = "Try again"
         configuration.image = UIImage(systemName: "arrow.triangle.2.circlepath")
-        configuration.baseBackgroundColor = Theme.accent
-        configuration.baseForegroundColor = Theme.primaryBackgroundDark
+        configuration.baseBackgroundColor = Theme.primary
+        configuration.baseForegroundColor = Theme.background
         configuration.cornerStyle = .capsule
         configuration.contentInsets = NSDirectionalEdgeInsets(
             top: 10, leading: 24, bottom: 10, trailing: 24
@@ -632,10 +632,10 @@ final class SubtitlesPageViewController: UIViewController {
         let column = UIStackView(arrangedSubviews: [
             makeStatusIcon("arrow.triangle.2.circlepath", tintColor: .systemRed),
             makeStatusLine("Couldn't load transcript", size: 16, weight: .semibold,
-                           color: Theme.primaryLightMax),
+                           color: Theme.onSurface),
             makeStatusLine(
                 "The saved transcript is temporarily unavailable.",
-                size: 14, weight: .regular, color: Theme.secondaryText
+                size: 14, weight: .regular, color: Theme.onSurfaceVariant
             ),
             retry,
         ])
@@ -655,7 +655,7 @@ final class SubtitlesPageViewController: UIViewController {
         let label = UILabel()
         label.text = "AI transcript may take about 2 ~ 5 minutes"
         label.font = SubtitlesPageViewController.systemFont(size: 12, weight: .regular)
-        label.textColor = Theme.primaryLightMax
+        label.textColor = Theme.onSurface
         label.numberOfLines = 0
         label.textAlignment = .center
         label.adjustsFontForContentSizeCategory = true
@@ -789,7 +789,7 @@ final class SubtitlesPageViewController: UIViewController {
         overlay = glass
 
         let chatIcon = UIImageView(image: AppIcons.aiChat)
-        chatIcon.tintColor = Theme.brandGreen
+        chatIcon.tintColor = Theme.primary
         chatIcon.contentMode = .scaleAspectFit
         chatIcon.isUserInteractionEnabled = true
         chatIcon.isAccessibilityElement = true
@@ -800,7 +800,7 @@ final class SubtitlesPageViewController: UIViewController {
 
         let moreButton = UIButton(type: .system)
         moreButton.setImage(AppIcons.more, for: .normal)
-        moreButton.tintColor = Theme.secondaryText
+        moreButton.tintColor = Theme.onSurfaceVariant
         moreButton.isAccessibilityElement = true
         moreButton.accessibilityLabel = "More transcript actions"
         moreButton.showsMenuAsPrimaryAction = true
@@ -837,7 +837,7 @@ final class SubtitlesPageViewController: UIViewController {
         var elements: [UIView] = []
         if spinner {
             let indicator = UIActivityIndicatorView(style: .medium)
-            indicator.color = Theme.accent
+            indicator.color = Theme.primary
             indicator.startAnimating()
             indicator.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
@@ -849,7 +849,7 @@ final class SubtitlesPageViewController: UIViewController {
         let label = UILabel()
         label.text = message
         label.font = SubtitlesPageViewController.systemFont(size: 15, weight: .semibold)
-        label.textColor = Theme.secondaryText
+        label.textColor = Theme.onSurfaceVariant
         label.adjustsFontForContentSizeCategory = true
         elements.append(label)
 

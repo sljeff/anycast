@@ -30,8 +30,8 @@ extension HTMLContentRenderer {
         // K7 registered enhancement: show-notes links open in-app through
         // SFSafariViewController (the Dart baseline had dead links).
         let safari = SFSafariViewController(url: url)
-        safari.preferredBarTintColor = Theme.primaryBackgroundDark
-        safari.preferredControlTintColor = Theme.primaryLightMax
+        safari.preferredBarTintColor = Theme.background
+        safari.preferredControlTintColor = Theme.onSurface
         if let anchor = HTMLContentRenderer.topMostViewController() {
             anchor.present(safari, animated: true)
         }

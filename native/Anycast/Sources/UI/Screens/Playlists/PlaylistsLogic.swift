@@ -252,7 +252,7 @@ enum AITranscriptDisplay: Equatable {
         switch self {
         case .succeeded: return UIColor(red: 0x63 / 255, green: 0xC1 / 255, blue: 0x74 / 255, alpha: 1)
         case .failed: return UIColor(red: 0xFF / 255, green: 0x8B / 255, blue: 0x8B / 255, alpha: 1)
-        default: return Theme.primaryBackgroundDark
+        default: return Theme.background
         }
     }
 }

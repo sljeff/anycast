@@ -50,8 +50,12 @@ final class ShellNavigationUITests: XCTestCase {
         }
         searchField.typeText("news\n")
         XCTAssertTrue(app.staticTexts["You are searching for"].waitForExistence(timeout: 8))
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
-        XCTAssertTrue(searchField.waitForExistence(timeout: 4), "search results sheet did not close")
+        // The grabber band is the sheet's close affordance.
+        app.buttons["Close"].firstMatch.tap()
+        XCTAssertTrue(
+            app.staticTexts["You are searching for"].waitForNonExistence(timeout: 4),
+            "search results sheet did not close"
+        )
 
         // Mini player appears only when a queue was restored (db_smoke
         // seeding per native/README.md); skip visibly when unseeded.

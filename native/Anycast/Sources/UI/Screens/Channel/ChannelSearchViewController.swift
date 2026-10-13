@@ -143,11 +143,9 @@ final class ChannelSearchViewController: UIViewController {
         view.addGestureRecognizer(headerTap)
 
         noResultsLabel.text = "No results"
-        noResultsLabel.font = UIFontMetrics(forTextStyle: .title3).scaledFont(
-            for: .systemFont(ofSize: 22, weight: .semibold)
-        )
+        noResultsLabel.font = TypographyV2.headlineMedium.font()
         noResultsLabel.adjustsFontForContentSizeCategory = true
-        noResultsLabel.textColor = Theme.primaryLightMax
+        noResultsLabel.textColor = Theme.onSurface
         noResultsLabel.isHidden = true
         noResultsLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(noResultsLabel)

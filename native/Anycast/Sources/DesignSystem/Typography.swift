@@ -53,19 +53,19 @@ nonisolated enum Typography {
     /// (styles.dart mainTitle).
     static let mainTitle = Style(
         postScriptName: "Comfortaa-Bold", size: 44, kern: 4.4,
-        color: Theme.primaryLightMax, scalingTextStyle: .largeTitle
+        color: Theme.onSurface, scalingTextStyle: .largeTitle
     )
 
     /// 24pt comfortaa w700, tracking 2.4 (styles.dart secondaryTitle).
     static let secondaryTitle = Style(
         postScriptName: "Comfortaa-Bold", size: 24, kern: 2.4,
-        color: Theme.primaryLightMax, scalingTextStyle: .title1
+        color: Theme.onSurface, scalingTextStyle: .title1
     )
 
     /// 14pt comfortaa regular (styles.dart defaultMainText).
     static let mainText = Style(
         postScriptName: "Comfortaa-Regular", size: 14, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .subheadline
+        color: Theme.onSurface, scalingTextStyle: .subheadline
     )
 
     /// 16pt notoSans w700 (styles.dart defaultTitle / cardTitleBold). This
@@ -75,7 +75,7 @@ nonisolated enum Typography {
     /// the parity rendering and must not switch to this style.
     static let cardTitleBold = Style(
         postScriptName: "NotoSans-Bold", size: 16, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .headline
+        color: Theme.onSurface, scalingTextStyle: .headline
     )
     static let defaultTitle = cardTitleBold
 
@@ -88,13 +88,13 @@ nonisolated enum Typography {
     /// 12pt inter, secondary text (styles.dart defaultText).
     static let defaultText = Style(
         postScriptName: "Inter-Regular", size: 12, kern: 0,
-        color: Theme.secondaryText, scalingTextStyle: .caption1
+        color: Theme.onSurfaceVariant, scalingTextStyle: .caption1
     )
 
     /// Card description — 12pt inter on 0x6B7280 (03 §2.11).
     static let cardDescription = Style(
         postScriptName: "Inter-Regular", size: 12, kern: 0,
-        color: Theme.secondaryLabelGray, scalingTextStyle: .caption1
+        color: Theme.onSurfaceVariant, scalingTextStyle: .caption1
     )
 
     // MARK: - Player / lyrics (03 §2.10)
@@ -102,21 +102,21 @@ nonisolated enum Typography {
     /// Lyric main line — 14pt M PLUS Rounded 1c on grey[200].
     static let lyricMain = Style(
         postScriptName: "RoundedMplus1c-Regular", size: 14, kern: 0,
-        color: Theme.lyricGrey200,
+        color: Theme.playerSecondary,
         scalingTextStyle: .subheadline
     )
 
     /// Lyric active line — 16pt, greenAccent.
     static let lyricActive = Style(
         postScriptName: "RoundedMplus1c-Regular", size: 16, kern: 0,
-        color: Theme.lyricGreenAccent,
+        color: Theme.primary,
         scalingTextStyle: .body
     )
 
     /// Lyric translation — 14pt greenAccent (active translation grey[300]).
     static let lyricTranslation = Style(
         postScriptName: "RoundedMplus1c-Regular", size: 14, kern: 0,
-        color: Theme.lyricGreenAccent,
+        color: Theme.primary,
         scalingTextStyle: .subheadline
     )
 
@@ -125,13 +125,13 @@ nonisolated enum Typography {
     /// Secondary tab labels — 12pt comfortaa (main.dart TabBar theme).
     static let tabLabel = Style(
         postScriptName: "Comfortaa-Regular", size: 12, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .caption1
+        color: Theme.onSurface, scalingTextStyle: .caption1
     )
 
     /// Login menu small text — roboto (login.dart:237).
     static let loginSmall = Style(
         postScriptName: "Roboto-Regular", size: 14, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .subheadline
+        color: Theme.onSurface, scalingTextStyle: .subheadline
     )
 
     /// HTML render error text — 12pt roboto mono, red (formatters renderHtml).
@@ -149,7 +149,7 @@ nonisolated enum Typography {
     /// re-baseline decision, not a drive-by fix.
     static let htmlBody = Style(
         postScriptName: "Inter-Regular", size: 14, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .subheadline
+        color: Theme.onSurface, scalingTextStyle: .subheadline
     )
 
     /// All semantic styles, for tests and enumerations.

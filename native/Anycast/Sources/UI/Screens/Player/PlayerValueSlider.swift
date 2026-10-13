@@ -103,7 +103,7 @@ final class PlayerValueSlider: UIControl {
 
         super.init(frame: CGRect(x: 0, y: 0, width: 240, height: Self.capsuleHeight))
 
-        backgroundColor = Theme.cardBackground
+        backgroundColor = Theme.surface
         layer.cornerRadius = Self.capsuleHeight / 2
         layer.cornerCurve = .continuous
         clipsToBounds = true
@@ -115,7 +115,7 @@ final class PlayerValueSlider: UIControl {
             tickLayers.append(dot)
         }
 
-        thumbView.backgroundColor = Theme.primaryLightMax
+        thumbView.backgroundColor = Theme.onSurface
         thumbView.layer.cornerRadius = Self.thumbRadius
         thumbView.layer.cornerCurve = .continuous
         thumbView.frame = CGRect(x: 0, y: 0, width: Self.thumbRadius * 2, height: Self.thumbRadius * 2)
@@ -128,7 +128,7 @@ final class PlayerValueSlider: UIControl {
         // CustomSliderThumbCircle: fontSize = thumbRadius * 0.6, bold,
         // valueIndicatorColor (0x111316) as the text color.
         thumbLabel.font = .systemFont(ofSize: Self.thumbRadius * 0.6, weight: .bold)
-        thumbLabel.textColor = Theme.primaryBackgroundDark
+        thumbLabel.textColor = Theme.background
         thumbLabel.textAlignment = .center
         thumbLabel.adjustsFontForContentSizeCategory = false
         thumbLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -236,7 +236,7 @@ final class PlayerValueSlider: UIControl {
                 let dark = UITraitCollection(userInterfaceStyle: .dark)
                 dot.fillColor = index <= selectedIndex
                     ? UIColor.white.cgColor
-                    : Theme.cardBackground.resolvedColor(with: dark).cgColor
+                    : Theme.surface.resolvedColor(with: dark).cgColor
             }
         }
     }

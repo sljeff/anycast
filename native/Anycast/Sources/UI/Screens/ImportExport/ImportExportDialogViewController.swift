@@ -47,13 +47,13 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         let titleLabel = UILabel()
         titleLabel.text = "Import/Export"
         titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0
 
         let helpButton = UIButton(type: .system)
         helpButton.setImage(AppIcons.help, for: .normal)
-        helpButton.tintColor = Theme.secondaryText
+        helpButton.tintColor = Theme.onSurfaceVariant
         helpButton.isAccessibilityElement = true
         helpButton.accessibilityLabel = "Import help"
         helpButton.widthAnchor.constraint(equalToConstant: 44).isActive = true
@@ -78,8 +78,8 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         let importButton = UIButton(type: .system)
         var importConfiguration = UIButton.Configuration.filled()
         importConfiguration.title = "Import"
-        importConfiguration.baseBackgroundColor = Theme.primaryLightMax
-        importConfiguration.baseForegroundColor = Theme.primaryBackgroundDark
+        importConfiguration.baseBackgroundColor = Theme.onSurface
+        importConfiguration.baseForegroundColor = Theme.background
         importConfiguration.cornerStyle = .capsule
         importConfiguration.contentInsets = NSDirectionalEdgeInsets(
             top: 12, leading: 32, bottom: 12, trailing: 32
@@ -120,7 +120,7 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         // surface card (09 audit).
         urlField.placeholder = "RSS Feed URL"
         urlField.font = Typography.htmlBody.font()
-        urlField.textColor = Theme.primaryLightMax
+        urlField.textColor = Theme.onSurface
         urlField.backgroundColor = Theme.surfaceContainer
         urlField.layer.borderColor = AnycastColor.sandAlpha4.cgColor
         urlField.layer.borderWidth = 1

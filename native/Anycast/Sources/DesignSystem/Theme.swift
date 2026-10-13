@@ -91,41 +91,8 @@ nonisolated enum Theme {
 
     // MARK: - Legacy v1 bridge
     //
-    // Transitional v1 accessor names re-pointed at v2 semantics so the
-    // not-yet-migrated screens keep compiling during the per-screen audit.
-    // Each accessor is deleted together with its last consumer during the
-    // V3 per-screen migration (09 §10); do not add new uses.
-
-    /// Was the near-white main text → onSurface.
-    static let primaryLightMax = onSurface
-    static let primaryLightPlus1 = primary
-    static let primaryDark = onSurfaceVariant
-    /// Was 0x30444E panels → elevated container.
-    static let primaryBackground = surfaceContainerHigh
-    /// Was 0x111316 page background → background.
-    static let primaryBackgroundDark = background
-    /// Was 0xFFBC25 yellow accent → the v2 gold primary.
-    static let accent = primary
-    /// Was 0x96A7AF secondary text → onSurfaceVariant.
-    static let secondaryText = onSurfaceVariant
-    /// Was 0x232830 card fill → surface.
-    static let cardBackground = surface
-    /// Was 0x6EE7B7 tab tint → gold accent.
-    static let tabSelectedGreen = primary
-    /// The v2 brand accent is gold; green remains reserved for status colors.
-    static let brandGreen = primary
-    /// Was 0x6B7280 → onSurfaceVariant.
-    static let secondaryLabelGray = onSurfaceVariant
-    /// Placeholder and subdued ink → appearance-aware secondary text.
-    static let hintGray = onSurfaceVariant
-    /// Was 0x1E1E1E login card → container.
-    static let loginCardBackground = surfaceContainer
-    /// Was 0x424242 card border → outline.
-    static let cardOutline = outline
-
-    /// Player text and active lyric accent use the fixed warm-dark palette.
-    static let lyricGrey200 = playerSecondary
-    static let lyricGreenAccent = primary
+    // The v1 color aliases are retired; only the gradient wordmark pair
+    // remains for `GradientTextLabel` (specimen snapshot only).
 
     /// AppBar gradient title — the v2 header drops the gradient wordmark;
     /// `GradientTextLabel` retires with the PodcastsTabContainer rework

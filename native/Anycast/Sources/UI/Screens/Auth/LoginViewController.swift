@@ -175,7 +175,7 @@ final class LoginViewController: UIViewController {
         let headline = UILabel()
         headline.text = LoginPageModel.signUpHeadline
         headline.font = Self.font(17, .semibold, .body)
-        headline.textColor = Theme.primaryLightMax
+        headline.textColor = Theme.onSurface
         headline.textAlignment = .center
         headline.numberOfLines = 0
         headline.adjustsFontForContentSizeCategory = true
@@ -187,8 +187,8 @@ final class LoginViewController: UIViewController {
 
         let apple = Self.authButton(
             title: LoginPageModel.appleButtonTitle,
-            background: Theme.primaryLightMax,
-            foreground: Theme.primaryBackgroundDark,
+            background: Theme.onSurface,
+            foreground: Theme.background,
             icon: { UIImageView(image: AppIcons.appleLogo) },
             iconSize: 22
         ) { [weak self] in
@@ -199,8 +199,8 @@ final class LoginViewController: UIViewController {
 
         let google = Self.authButton(
             title: LoginPageModel.googleButtonTitle,
-            background: Theme.primaryLightMax,
-            foreground: Theme.primaryBackgroundDark,
+            background: Theme.onSurface,
+            foreground: Theme.background,
             icon: { GoogleMarkView() },
             iconSize: 20
         ) { [weak self] in
@@ -213,7 +213,7 @@ final class LoginViewController: UIViewController {
         let email = Self.authButton(
             title: LoginPageModel.emailButtonTitle,
             background: UIColor.black.withAlphaComponent(0.12),
-            foreground: Theme.primaryLightMax,
+            foreground: Theme.onSurface,
             icon: { UIImageView(image: AppIcons.email) },
             iconSize: 16
         ) { [weak self] in
@@ -350,7 +350,7 @@ final class LoginViewController: UIViewController {
 
         let title = Self.label(LoginPageModel.userInfoTitle, font: Self.font(16, .medium, .body))
 
-        avatarIconView.backgroundColor = Theme.cardBackground
+        avatarIconView.backgroundColor = Theme.surface
         avatarIconView.layer.cornerRadius = 25
         avatarIconView.layer.cornerCurve = .continuous
         avatarIconView.translatesAutoresizingMaskIntoConstraints = false
@@ -368,7 +368,7 @@ final class LoginViewController: UIViewController {
         ])
 
         emailLabel.font = Self.font(15, .semibold, .subheadline)
-        emailLabel.textColor = Theme.primaryLightMax
+        emailLabel.textColor = Theme.onSurface
         emailLabel.numberOfLines = 2
         emailLabel.adjustsFontForContentSizeCategory = true
         emailLabel.lineBreakMode = .byTruncatingMiddle
@@ -380,7 +380,7 @@ final class LoginViewController: UIViewController {
 
         let menuButton = UIButton(type: .system)
         menuButton.setImage(AppIcons.more, for: .normal)
-        menuButton.tintColor = Theme.secondaryText
+        menuButton.tintColor = Theme.onSurfaceVariant
         menuButton.accessibilityLabel = "Account menu"
         menuButton.menu = UIMenu(children: [
             UIAction(title: LoginPageModel.copyEmailMenuTitle, image: AppIcons.copy) { [weak self] _ in
@@ -426,7 +426,7 @@ final class LoginViewController: UIViewController {
     private func addAvatarIcon(_ iconView: UIView, pointSize: CGFloat) {
         if let imageView = iconView as? UIImageView {
             imageView.contentMode = .scaleAspectFit
-            imageView.tintColor = Theme.secondaryText
+            imageView.tintColor = Theme.onSurfaceVariant
         }
         iconView.translatesAutoresizingMaskIntoConstraints = false
         avatarInnerStack.addArrangedSubview(iconView)
@@ -460,11 +460,11 @@ final class LoginViewController: UIViewController {
         let stack = card.contentStack
 
         tierLabel.font = Self.font(16, .semibold, .body)
-        tierLabel.textColor = Theme.primaryLightMax
+        tierLabel.textColor = Theme.onSurface
         tierLabel.adjustsFontForContentSizeCategory = true
 
         expiryLabel.font = Self.font(15, .regular, .subheadline)
-        expiryLabel.textColor = Theme.primaryLightMax
+        expiryLabel.textColor = Theme.onSurface
         expiryLabel.adjustsFontForContentSizeCategory = true
 
         remainingCountLabel.font = Self.font(16, .bold, .body)
@@ -472,7 +472,7 @@ final class LoginViewController: UIViewController {
         remainingCountLabel.adjustsFontForContentSizeCategory = true
 
         remainingSuffixLabel.font = Self.font(15, .regular, .subheadline)
-        remainingSuffixLabel.textColor = Theme.primaryLightMax
+        remainingSuffixLabel.textColor = Theme.onSurface
         remainingSuffixLabel.adjustsFontForContentSizeCategory = true
         remainingSuffixLabel.numberOfLines = 0
 
@@ -546,7 +546,7 @@ final class LoginViewController: UIViewController {
 
         let infoButton = UIButton(type: .system)
         infoButton.setImage(AppIcons.infoOutline, for: .normal)
-        infoButton.tintColor = Theme.secondaryText
+        infoButton.tintColor = Theme.onSurfaceVariant
         infoButton.accessibilityLabel = "Auto renewal information"
         infoButton.widthAnchor.constraint(equalToConstant: 28).isActive = true
         infoButton.addAction(UIAction { [weak self, weak infoButton] _ in
@@ -562,7 +562,7 @@ final class LoginViewController: UIViewController {
         stack.addSpacer(15)
         stack.addArrangedSubview(makeCarousel())
 
-        offeringsSpinner.color = Theme.secondaryText
+        offeringsSpinner.color = Theme.onSurfaceVariant
         offeringsSpinner.startAnimating()
         offeringsContainer.axis = .vertical
         offeringsContainer.alignment = .fill
@@ -575,7 +575,7 @@ final class LoginViewController: UIViewController {
 
         let restore = UIButton(type: .system)
         restore.setTitle(LoginPageModel.restorePurchasesTitle, for: .normal)
-        restore.setTitleColor(Theme.secondaryText, for: .normal)
+        restore.setTitleColor(Theme.onSurfaceVariant, for: .normal)
         restore.titleLabel?.font = Self.font(12, .semibold, .caption1)
         restore.titleLabel?.adjustsFontForContentSizeCategory = true
         restore.addAction(UIAction { [weak self] _ in self?.restoreTapped() }, for: .touchUpInside)
@@ -652,8 +652,8 @@ final class LoginViewController: UIViewController {
 
         // Tooltip copy + 4 s display (login.dart:416-421).
         let bubble = UIView()
-        bubble.backgroundColor = Theme.primaryBackgroundDark
-        bubble.layer.borderColor = Theme.cardOutline.cgColor
+        bubble.backgroundColor = Theme.background
+        bubble.layer.borderColor = Theme.outline.cgColor
         bubble.layer.borderWidth = 1
         bubble.layer.cornerRadius = 8
         bubble.layer.cornerCurve = .continuous
@@ -662,7 +662,7 @@ final class LoginViewController: UIViewController {
         let label = UILabel()
         label.text = LoginPageModel.autoRenewalTooltip
         label.font = Self.font(13, .regular, .footnote)
-        label.textColor = Theme.primaryLightMax
+        label.textColor = Theme.onSurface
         label.numberOfLines = 0
         label.adjustsFontForContentSizeCategory = true
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -742,8 +742,8 @@ final class LoginViewController: UIViewController {
         offeringsContainer.addArrangedSubview(cardsRow)
 
         let confirm = UIButton(type: .system)
-        confirm.backgroundColor = Theme.primaryLightMax
-        confirm.setTitleColor(Theme.primaryBackgroundDark, for: .normal)
+        confirm.backgroundColor = Theme.onSurface
+        confirm.setTitleColor(Theme.background, for: .normal)
         confirm.setTitle(LoginPageModel.confirmPurchaseTitle, for: .normal)
         confirm.titleLabel?.font = Self.font(17, .semibold, .body)
         confirm.titleLabel?.adjustsFontForContentSizeCategory = true
@@ -772,11 +772,11 @@ final class LoginViewController: UIViewController {
 
         let title = UILabel()
         title.font = Self.font(15, .bold, .subheadline)
-        title.textColor = Theme.primaryLightMax
+        title.textColor = Theme.onSurface
         title.adjustsFontForContentSizeCategory = true
 
         let chevron = UIImageView(image: UIImage(systemName: "chevron.down"))
-        chevron.tintColor = Theme.secondaryText
+        chevron.tintColor = Theme.onSurfaceVariant
         chevron.contentMode = .scaleAspectFit
         chevron.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -804,7 +804,7 @@ final class LoginViewController: UIViewController {
                 string: full,
                 attributes: [
                     .font: Self.font(13, .regular, .footnote),
-                    .foregroundColor: Theme.primaryLightMax,
+                    .foregroundColor: Theme.onSurface,
                 ]
             )
             if !bullet.bold.isEmpty {
@@ -1045,7 +1045,7 @@ final class LoginViewController: UIViewController {
         let label = UILabel()
         label.text = text
         label.font = font
-        label.textColor = Theme.primaryLightMax
+        label.textColor = Theme.onSurface
         label.adjustsFontForContentSizeCategory = true
         label.numberOfLines = 0
         return label
@@ -1055,8 +1055,8 @@ final class LoginViewController: UIViewController {
     /// 24 pt continuous radius, 15 pt content inset.
     private static func card() -> (container: UIView, contentStack: UIStackView) {
         let container = UIView()
-        container.backgroundColor = Theme.cardBackground
-        container.layer.borderColor = Theme.cardOutline.cgColor
+        container.backgroundColor = Theme.surface
+        container.layer.borderColor = Theme.outline.cgColor
         container.layer.borderWidth = 1
         container.layer.cornerRadius = 24
         container.layer.cornerCurve = .continuous
@@ -1180,12 +1180,12 @@ final class IntroSlideCell: UICollectionViewCell {
 
     func configure(index: Int) {
         if index == 0 {
-            gradientLayer.colors = [Theme.primaryDark.cgColor, Theme.primary.cgColor]
+            gradientLayer.colors = [Theme.onSurfaceVariant.cgColor, Theme.primary.cgColor]
             iconView.image = AppIcons.aiTranscript
         } else {
             gradientLayer.colors = [
                 UIColor(red: 0.85, green: 0.45, blue: 0.05, alpha: 1).cgColor,
-                Theme.accent.cgColor,
+                Theme.primary.cgColor,
             ]
             iconView.image = AppIcons.newDoc
         }
@@ -1225,7 +1225,7 @@ final class PlanCardView: UIControl {
         self.plan = plan
         super.init(frame: .zero)
 
-        layer.borderColor = Theme.cardOutline.cgColor
+        layer.borderColor = Theme.outline.cgColor
         layer.borderWidth = 1
         layer.cornerRadius = 24
         layer.cornerCurve = .continuous
@@ -1233,14 +1233,14 @@ final class PlanCardView: UIControl {
         let title = UILabel()
         title.text = plan.title
         title.font = LoginViewController.font(15, .bold, .subheadline)
-        title.textColor = Theme.primaryLightMax
+        title.textColor = Theme.onSurface
         title.textAlignment = .center
         title.adjustsFontForContentSizeCategory = true
 
         let price = UILabel()
         price.text = plan.priceLine
         price.font = LoginViewController.font(12, .semibold, .caption1)
-        price.textColor = Theme.primaryLightMax
+        price.textColor = Theme.onSurface
         price.textAlignment = .center
         price.adjustsFontForContentSizeCategory = true
 
@@ -1279,9 +1279,9 @@ final class PlanCardView: UIControl {
         // Tap-selected card takes the green container tone (03 §2.14).
         backgroundColor = isSelectedPlan
             ? Theme.primary.withAlphaComponent(0.16)
-            : Theme.cardBackground
-        layer.borderColor = isSelectedPlan ? Theme.primary.cgColor : Theme.cardOutline.cgColor
-        captionLabel.textColor = isSelectedPlan ? Theme.primary : Theme.secondaryText
+            : Theme.surface
+        layer.borderColor = isSelectedPlan ? Theme.primary.cgColor : Theme.outline.cgColor
+        captionLabel.textColor = isSelectedPlan ? Theme.primary : Theme.onSurfaceVariant
     }
 
     @objc private func tapped() {

@@ -142,7 +142,7 @@ final class PlayerBarView: UIView {
             ? AnycastColor.sandAlpha2.resolvedColor(
                 with: UITraitCollection(userInterfaceStyle: .light)
             )
-            : Theme.primaryBackground
+            : Theme.surfaceContainerHigh
         coverView.isAccessibilityElement = true
         coverView.accessibilityLabel = "Episode artwork"
         coverView.translatesAutoresizingMaskIntoConstraints = false
@@ -156,7 +156,7 @@ final class PlayerBarView: UIView {
         // ink; the player-hosted styles keep the legacy chrome colors.
         titleLabel.textColor = style == .capsule
             ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-            : Theme.primaryLightMax
+            : Theme.onSurface
         titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
         // XCUITest hook: the tap target for "tap the mini player".
@@ -170,7 +170,7 @@ final class PlayerBarView: UIView {
         timeLabel.adjustsFontForContentSizeCategory = true
         timeLabel.textColor = style == .capsule
             ? Theme.onSurfaceVariant.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-            : Theme.secondaryText
+            : Theme.onSurfaceVariant
         timeLabel.numberOfLines = 1
         timeLabel.translatesAutoresizingMaskIntoConstraints = false
         capsule.addSubview(timeLabel)
@@ -193,7 +193,7 @@ final class PlayerBarView: UIView {
         )
         forwardButton.tintColor = style == .capsule
             ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-            : Theme.primaryLightMax
+            : Theme.onSurface
         forwardButton.isAccessibilityElement = true
         forwardButton.accessibilityLabel = "Forward 30 seconds"
         forwardButton.addAction(
@@ -333,7 +333,7 @@ final class PlayerBarView: UIView {
             ),
             tint: style == .capsule
                 ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-                : Theme.primaryLightMax
+                : Theme.onSurface
         )
     }
 

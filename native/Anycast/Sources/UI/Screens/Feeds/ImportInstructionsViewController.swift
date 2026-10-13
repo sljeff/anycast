@@ -134,7 +134,7 @@ final class ImportInstructionsViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = ImportInstructionsContent.headerTitle
         titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -240,7 +240,7 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
         titleLabel.font = Typography.cardTitleBold.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(titleLabel)
@@ -280,7 +280,7 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
         titleLabel.text = title
         accessibilityLabel = title
         accessibilityValue = expanded ? "expanded" : "collapsed"
-        chevron.tintColor = expanded ? Theme.primary : Theme.secondaryText
+        chevron.tintColor = expanded ? Theme.primary : Theme.onSurfaceVariant
         let transform = CGAffineTransform(rotationAngle: expanded ? .pi : 0)
         UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseInOut]) {
             self.chevron.transform = transform

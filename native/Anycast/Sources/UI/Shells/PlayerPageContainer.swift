@@ -55,8 +55,8 @@ final class PlayerPageTabView: UIView {
     init(items: [Item]) {
         super.init(frame: CGRect(x: 0, y: 0, width: items.count * 48 + (items.count - 1) * 24, height: 56))
 
-        backgroundColor = Theme.cardBackground.withAlphaComponent(0x19 / 255.0)
-        layer.borderColor = Theme.hintGray.cgColor
+        backgroundColor = Theme.surface.withAlphaComponent(0x19 / 255.0)
+        layer.borderColor = Theme.onSurfaceVariant.cgColor
         layer.borderWidth = 1
         // Dart BorderRadius.circular(36) on a 56 pt pill → capsule.
         layer.cornerRadius = 28
@@ -129,9 +129,9 @@ final class PlayerPageTabView: UIView {
     private func applySelection() {
         for (index, button) in buttons.enumerated() {
             let isSelected = index == selectedIndex
-            iconViews[index].tintColor = isSelected ? .black : Theme.primaryLightMax
+            iconViews[index].tintColor = isSelected ? .black : Theme.onSurface
             button.backgroundColor = isSelected
-                ? Theme.primaryLightMax
+                ? Theme.onSurface
                 : .clear
             button.layer.cornerRadius = 24
             button.layer.cornerCurve = .continuous
@@ -206,8 +206,8 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         let gradientTraits = UITraitCollection(userInterfaceStyle: .dark)
         gradientLayer.colors = [
             Theme.paletteFallback.cgColor,
-            Theme.primaryBackgroundDark.resolvedColor(with: gradientTraits).cgColor,
-            Theme.primaryBackgroundDark.resolvedColor(with: gradientTraits).cgColor,
+            Theme.background.resolvedColor(with: gradientTraits).cgColor,
+            Theme.background.resolvedColor(with: gradientTraits).cgColor,
         ]
         gradientLayer.locations = [0, 0.5, 1]
         view.layer.insertSublayer(gradientLayer, at: 0)
@@ -359,8 +359,8 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         let dark = UITraitCollection(userInterfaceStyle: .dark)
         gradientLayer.colors = [
             dominant.cgColor,
-            Theme.primaryBackgroundDark.resolvedColor(with: dark).cgColor,
-            Theme.primaryBackgroundDark.resolvedColor(with: dark).cgColor,
+            Theme.background.resolvedColor(with: dark).cgColor,
+            Theme.background.resolvedColor(with: dark).cgColor,
         ]
     }
 }

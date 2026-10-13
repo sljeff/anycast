@@ -165,7 +165,7 @@ final class SettingsViewController: UIViewController {
                   let title = sections[indexPath.section].header else { return }
             var config = header.defaultContentConfiguration()
             config.text = title
-            config.textProperties.color = Theme.secondaryText
+            config.textProperties.color = Theme.onSurfaceVariant
             config.textProperties.font = Typography.mainText.font()
             header.contentConfiguration = config
             header.backgroundConfiguration = .clear()
@@ -249,10 +249,10 @@ final class SettingsViewController: UIViewController {
 
     private func configure(_ cell: UICollectionViewListCell, for row: SettingsPageModel.Row) {
         var config = cell.defaultContentConfiguration()
-        config.textProperties.color = Theme.primaryLightMax
+        config.textProperties.color = Theme.onSurface
         config.textProperties.font = Typography.mainText.font()
         config.textProperties.adjustsFontForContentSizeCategory = true
-        config.secondaryTextProperties.color = Theme.secondaryText
+        config.secondaryTextProperties.color = Theme.onSurfaceVariant
         config.secondaryTextProperties.font = Typography.cardTextLight.font()
         config.secondaryTextProperties.adjustsFontForContentSizeCategory = true
 
@@ -262,7 +262,7 @@ final class SettingsViewController: UIViewController {
         switch row {
         case .account:
             config.image = AppIcons.person
-            config.imageProperties.tintColor = Theme.secondaryText
+            config.imageProperties.tintColor = Theme.onSurfaceVariant
             config.text = SettingsPageModel.title(for: row)
         case .country:
             config.text = SettingsPageModel.title(for: row)
@@ -275,7 +275,7 @@ final class SettingsViewController: UIViewController {
             // Indented sub-row: the Dart `arrow_elbow_down_right_bold` prefix
             // (settings.dart:511-519) becomes a leading elbow icon + indent.
             config.image = AppIcons.elbowIndent
-            config.imageProperties.tintColor = Theme.secondaryText
+            config.imageProperties.tintColor = Theme.onSurfaceVariant
             config.text = SettingsPageModel.title(for: row)
             config.secondaryText = SettingsPageModel.languageName(forCode: settings.targetLanguage)
             accessibilityValue = config.secondaryText
@@ -299,13 +299,13 @@ final class SettingsViewController: UIViewController {
         case .contactEmail:
             config.attributedText = Self.underlined(
                 SettingsPageModel.title(for: row),
-                color: Theme.accent,
+                color: Theme.primary,
                 font: Typography.cardTextLight.font()
             )
         case .privacyPolicy, .termsOfUse:
             config.attributedText = Self.underlined(
                 SettingsPageModel.title(for: row),
-                color: Theme.brandGreen,
+                color: Theme.primary,
                 font: Typography.cardTextLight.font()
             )
         }

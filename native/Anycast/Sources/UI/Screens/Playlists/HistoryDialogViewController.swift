@@ -79,7 +79,7 @@ final class HistoryDialogViewController: UIViewController {
         dimmingView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(dimmingView)
 
-        cardView.backgroundColor = Theme.primaryBackgroundDark
+        cardView.backgroundColor = Theme.background
         cardView.layer.cornerRadius = 12
         cardView.layer.cornerCurve = .continuous
         cardView.translatesAutoresizingMaskIntoConstraints = false
@@ -339,7 +339,7 @@ final class HistoryRowCell: UICollectionViewCell {
     private let container = UIView()
     private let coverView = UIImageView()
     private let titleLabel = MarqueeLabelFactory.makeHistoryTitle(
-        font: Typography.cardTitleBold.font(), textColor: Theme.primaryLightMax
+        font: Typography.cardTitleBold.font(), textColor: Theme.onSurface
     )
     private let channelLabel = UILabel()
     private let deleteButton = UIButton(type: .custom)
@@ -362,8 +362,8 @@ final class HistoryRowCell: UICollectionViewCell {
     private func build() {
         contentView.backgroundColor = .clear
 
-        container.backgroundColor = Theme.cardBackground
-        container.layer.borderColor = Theme.cardOutline.cgColor
+        container.backgroundColor = Theme.surface
+        container.layer.borderColor = Theme.outline.cgColor
         container.layer.borderWidth = 1
         container.layer.cornerRadius = 12
         container.layer.cornerCurve = .continuous
@@ -374,7 +374,7 @@ final class HistoryRowCell: UICollectionViewCell {
         coverView.clipsToBounds = true
         coverView.layer.cornerRadius = 8
         coverView.layer.cornerCurve = .continuous
-        coverView.backgroundColor = Theme.primaryBackground
+        coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(coverView)
 
@@ -391,8 +391,8 @@ final class HistoryRowCell: UICollectionViewCell {
         container.addSubview(textColumn)
 
         deleteButton.setImage(AppIcons.close, for: .normal)
-        deleteButton.tintColor = Theme.primaryBackgroundDark
-        deleteButton.backgroundColor = Theme.primaryLightMax
+        deleteButton.tintColor = Theme.background
+        deleteButton.backgroundColor = Theme.onSurface
         deleteButton.layer.cornerRadius = 20
         deleteButton.layer.cornerCurve = .continuous
         deleteButton.isAccessibilityElement = true

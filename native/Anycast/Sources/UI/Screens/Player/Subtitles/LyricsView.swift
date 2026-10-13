@@ -601,7 +601,7 @@ final class LyricsTimeBarView: UIView {
         playButton.layer.cornerCurve = .continuous
         playButton.backgroundColor = UIColor.white.withAlphaComponent(0.34)
         playButton.setImage(AppIcons.play, for: .normal)
-        playButton.tintColor = Theme.accent
+        playButton.tintColor = Theme.primary
         playButton.isAccessibilityElement = true
         playButton.accessibilityLabel = "Play from selected line"
         playButton.translatesAutoresizingMaskIntoConstraints = false

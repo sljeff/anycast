@@ -124,7 +124,7 @@ final class ImportProgressOverlayController: UIViewController {
         switch mode {
         case .determinate(let lineWidth):
             let track = ProgressRingView(lineWidth: lineWidth)
-            track.tintColorOverride = Theme.secondaryLabelGray   // Colors.grey track
+            track.tintColorOverride = Theme.onSurfaceVariant   // Colors.grey track
             track.setProgress(1)
             let ring = ProgressRingView(lineWidth: lineWidth)
 
@@ -146,7 +146,7 @@ final class ImportProgressOverlayController: UIViewController {
             progressRing = ring
         case .indeterminate:
             let indicator = UIActivityIndicatorView(style: .large)
-            indicator.color = Theme.primaryLightMax
+            indicator.color = Theme.onSurface
             indicator.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(indicator)
             NSLayoutConstraint.activate([

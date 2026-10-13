@@ -91,25 +91,6 @@ struct TypographyTests {
         }
     }
 
-    @Test("Legacy color aliases resolve to v2 values in dark appearance")
-    func colorTokensResolve() {
-        // Resolve bridged v1 names against dark tokens for deterministic checks.
-        let dark = UITraitCollection(userInterfaceStyle: .dark)
-        func assertEqual(_ color: UIColor, red: CGFloat, green: CGFloat, blue: CGFloat, _ label: String) {
-            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-            color.resolvedColor(with: dark).getRed(&r, green: &g, blue: &b, alpha: &a)
-            #expect(abs(r - red) < 0.004 && abs(g - green) < 0.004 && abs(b - blue) < 0.004, "\(label)")
-        }
-        assertEqual(Theme.primaryBackgroundDark, red: 0x19 / 255, green: 0x19 / 255, blue: 0x18 / 255, "primaryBackgroundDark") // Background
-        assertEqual(Theme.cardBackground, red: 0x11 / 255, green: 0x11 / 255, blue: 0x10 / 255, "cardBackground")             // Surface
-        assertEqual(Theme.tabSelectedGreen, red: 0xCB / 255, green: 0xB9 / 255, blue: 0x9F / 255, "tabSelectedGreen")         // Primary
-        assertEqual(Theme.brandGreen, red: 0xCB / 255, green: 0xB9 / 255, blue: 0x9F / 255, "brandGreen")                     // Primary
-        assertEqual(Theme.secondaryLabelGray, red: 0xD2 / 255, green: 0xD0 / 255, blue: 0xCA / 255, "secondaryLabelGray")     // OnSurfaceVariant
-        assertEqual(Theme.hintGray, red: 0xD2 / 255, green: 0xD0 / 255, blue: 0xCA / 255, "hintGray")                         // OnSurfaceVariant
-        assertEqual(Theme.loginCardBackground, red: 0x22 / 255, green: 0x22 / 255, blue: 0x21 / 255, "loginCardBackground")   // SurfaceContainer
-        assertEqual(Theme.primary, red: 0xCB / 255, green: 0xB9 / 255, blue: 0x9F / 255, "primary")                           // Primary
-    }
-
     @Test("v2 semantic tokens resolve both appearances exactly")
     func v2SemanticTokensResolveDualAppearance() {
         let light = UITraitCollection(userInterfaceStyle: .light)
@@ -130,8 +111,6 @@ struct TypographyTests {
         assertEqual(Theme.onSurface, light: f(0x21201C), dark: f(0xEEEEEC), "onSurface")
         assertEqual(Theme.onSurfaceVariant, light: f(0x63635E), dark: f(0xD2D0CA), "onSurfaceVariant")
         assertEqual(Theme.primary, light: f(0x978365), dark: f(0xCBB99F), "primary")
-        assertEqual(Theme.brandGreen, light: f(0x978365), dark: f(0xCBB99F), "brandGreen")
-        assertEqual(Theme.accent, light: f(0x978365), dark: f(0xCBB99F), "accent")
         assertEqual(Theme.outline, light: f(0xDAD9D6), dark: f(0x3B3A37), "outline")
         assertEqual(Theme.tertiary, light: f(0xEF5F00), dark: f(0xFF8B3E), "tertiary")
         assertEqual(Theme.error, light: f(0xBA1A1A), dark: f(0xFF8B8B), "error")
@@ -159,21 +138,19 @@ struct TypographyTests {
         // `UIColor(named:)!`; a missing colorset crashes here instead of at
         // first use in the UI.
         let tokens: [String: UIColor?] = [
+            "background": Theme.background,
+            "surface": Theme.surface,
+            "surfaceContainer": Theme.surfaceContainer,
+            "surfaceContainerHigh": Theme.surfaceContainerHigh,
+            "surfaceContainerHighest": Theme.surfaceContainerHighest,
+            "outline": Theme.outline,
+            "outlineVariant": Theme.outlineVariant,
+            "onSurface": Theme.onSurface,
+            "onSurfaceVariant": Theme.onSurfaceVariant,
             "primary": Theme.primary,
-            "primaryLightPlus1": Theme.primaryLightPlus1,
-            "primaryLightMax": Theme.primaryLightMax,
-            "primaryDark": Theme.primaryDark,
-            "primaryBackground": Theme.primaryBackground,
-            "primaryBackgroundDark": Theme.primaryBackgroundDark,
-            "accent": Theme.accent,
-            "secondaryText": Theme.secondaryText,
-            "cardBackground": Theme.cardBackground,
-            "tabSelectedGreen": Theme.tabSelectedGreen,
-            "brandGreen": Theme.brandGreen,
-            "secondaryLabelGray": Theme.secondaryLabelGray,
-            "hintGray": Theme.hintGray,
-            "loginCardBackground": Theme.loginCardBackground,
-            "cardOutline": Theme.cardOutline,
+            "onPrimary": Theme.onPrimary,
+            "tertiary": Theme.tertiary,
+            "error": Theme.error,
             "appBarGradientStart": Theme.appBarGradientStart,
             "appBarGradientEnd": Theme.appBarGradientEnd,
         ]

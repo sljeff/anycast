@@ -66,8 +66,8 @@ final class EmailLoginViewController: UIViewController {
 
         // ElevatedButton theme: onSurface fill / surface text, pill, 48 min
         // (anycast_theme elevatedButtonTheme).
-        loginButton.backgroundColor = Theme.primaryLightMax
-        loginButton.setTitleColor(Theme.primaryBackgroundDark, for: .normal)
+        loginButton.backgroundColor = Theme.onSurface
+        loginButton.setTitleColor(Theme.background, for: .normal)
         loginButton.setTitle(LoginPageModel.EmailLogin.loginButtonTitle, for: .normal)
         loginButton.titleLabel?.font = LoginViewController.font(17, .semibold, .body)
         loginButton.titleLabel?.adjustsFontForContentSizeCategory = true
@@ -118,9 +118,9 @@ final class EmailLoginViewController: UIViewController {
         field.placeholder = hint
         field.font = LoginViewController.font(17, .regular, .body)
         field.adjustsFontForContentSizeCategory = true
-        field.textColor = Theme.primaryLightMax
-        field.backgroundColor = Theme.cardBackground
-        field.layer.borderColor = Theme.cardOutline.cgColor
+        field.textColor = Theme.onSurface
+        field.backgroundColor = Theme.surface
+        field.layer.borderColor = Theme.outline.cgColor
         field.layer.borderWidth = 1
         field.layer.cornerRadius = 16
         field.layer.cornerCurve = .continuous

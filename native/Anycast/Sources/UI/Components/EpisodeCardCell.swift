@@ -223,6 +223,11 @@ final class EpisodeCardCell: UICollectionViewCell {
 
     // MARK: - Build
 
+    /// The hairline is a CGColor (frozen at assignment, 09 §9a).
+    private func updateCardStroke() {
+        cardContainer.layer.borderColor = AnycastColor.sandAlpha3.resolvedColor(with: traitCollection).cgColor
+    }
+
     private func build() {
         contentView.backgroundColor = .clear
         // Any content that outruns its item height must clip instead of
@@ -237,11 +242,14 @@ final class EpisodeCardCell: UICollectionViewCell {
         stack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stack)
 
-        // Card row (v2: surface card, radius16, hairline outline; 16pt inner
-        // padding — 09 §5 inbox card spec).
-        cardContainer.backgroundColor = Theme.cardBackground
-        cardContainer.layer.borderColor = Theme.cardOutline.cgColor
-        cardContainer.layer.borderWidth = 1
+        // Card row (v2: surface card, radius16, sandAlpha3 hairline; 16pt
+        // inner padding — 09 §5 inbox card spec).
+        cardContainer.backgroundColor = Theme.surface
+        cardContainer.layer.borderWidth = Spacing.hairline
+        updateCardStroke()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _) in
+            self.updateCardStroke()
+        }
         cardContainer.layer.cornerRadius = Radius.md
         cardContainer.layer.cornerCurve = .continuous
         // The 4pt progress backdrop spans the card's full width with
@@ -263,7 +271,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         coverView.clipsToBounds = true
         coverView.layer.cornerRadius = Radius.artwork
         coverView.layer.cornerCurve = .continuous
-        coverView.backgroundColor = Theme.primaryBackground
+        coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.translatesAutoresizingMaskIntoConstraints = false
         coverView.isAccessibilityElement = true
         coverView.accessibilityTraits = [.button]
@@ -271,10 +279,9 @@ final class EpisodeCardCell: UICollectionViewCell {
         cardContainer.addSubview(coverView)
         coverView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(coverTapped)))
 
-        // 16pt system (PingFang on the Chinese stack) single line — 03 §2.11.
-        let titleMetrics = UIFontMetrics(forTextStyle: .headline)
-        titleLabel.font = titleMetrics.scaledFont(for: .systemFont(ofSize: 16, weight: .semibold))
-        titleLabel.textColor = Theme.primaryLightMax
+        // headlineSmall (PingFang on the Chinese stack), single line — 03 §2.11.
+        titleLabel.font = TypographyV2.headlineSmall.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 1
         titleLabel.adjustsFontForContentSizeCategory = true
         // The card action for VoiceOver (sighted users tap the whole card);
@@ -284,8 +291,8 @@ final class EpisodeCardCell: UICollectionViewCell {
         titleLabel.onActivate = { [weak self] in self?.onCardTap?() }
 
         let metaMetrics = UIFontMetrics(forTextStyle: .caption1)
-        channelLabel.font = metaMetrics.scaledFont(for: .systemFont(ofSize: 12, weight: .semibold))
-        channelLabel.textColor = Theme.secondaryText
+        channelLabel.font = TypographyV2.labelMedium.font()
+        channelLabel.textColor = Theme.onSurfaceVariant
         channelLabel.numberOfLines = 1
         channelLabel.adjustsFontForContentSizeCategory = true
 
@@ -293,13 +300,13 @@ final class EpisodeCardCell: UICollectionViewCell {
         rightTextLabel.font = metaMetrics.scaledFont(
             for: .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         )
-        rightTextLabel.textColor = Theme.secondaryText
+        rightTextLabel.textColor = Theme.onSurfaceVariant
         rightTextLabel.numberOfLines = 1
         rightTextLabel.adjustsFontForContentSizeCategory = true
         rightTextLabel.textAlignment = .right
 
-        descriptionLabel.font = Typography.cardDescription.font()
-        descriptionLabel.textColor = Typography.cardDescription.color
+        descriptionLabel.font = TypographyV2.bodySmall.font()
+        descriptionLabel.textColor = Theme.onSurfaceVariant
         descriptionLabel.numberOfLines = 2
         descriptionLabel.adjustsFontForContentSizeCategory = true
         // Layout-regression hook (the description is resolved async — tests
@@ -326,7 +333,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         channelMaxWidth = channelLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 114)
 
         // Progress backdrop: 4pt strip along the card bottom edge.
-        progressBackdrop.trackColor = UIColor.white.withAlphaComponent(0.12)
+        progressBackdrop.trackColor = AnycastColor.sandAlpha3
         progressBackdrop.fillColor = Theme.primary
         progressBackdrop.translatesAutoresizingMaskIntoConstraints = false
         cardContainer.addSubview(progressBackdrop)
@@ -354,8 +361,8 @@ final class EpisodeCardCell: UICollectionViewCell {
         cardContainer.addSubview(downloadRing)
 
         downloadDoneIcon.image = AppIcons.downloadDone
-        // grass9 dark (AnycastColor.grass9(Brightness.dark), 03 §2.11).
-        downloadDoneIcon.tintColor = UIColor(red: 0x63 / 255, green: 0xC1 / 255, blue: 0x74 / 255, alpha: 1)
+        // grass9 (03 §2.11), appearance-aware.
+        downloadDoneIcon.tintColor = AnycastColor.grass9
         downloadDoneIcon.contentMode = .scaleAspectFit
         downloadDoneIcon.translatesAutoresizingMaskIntoConstraints = false
         downloadDoneIcon.isHidden = true
@@ -502,8 +509,8 @@ final class EpisodeCardCell: UICollectionViewCell {
         for (index, action) in actions.enumerated() {
             let button = UIButton(type: .custom)
             button.setImage(action.icon, for: .normal)
-            button.tintColor = Theme.primaryBackgroundDark
-            button.backgroundColor = Theme.primaryLightMax
+            button.tintColor = Theme.background
+            button.backgroundColor = Theme.onSurface
             button.layer.cornerRadius = 20
             button.layer.cornerCurve = .continuous
             button.accessibilityLabel = action.accessibilityLabel

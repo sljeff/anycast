@@ -137,7 +137,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
         view.addSubview(emptyState)
 
         let iconCircle = UIView()
-        iconCircle.backgroundColor = Theme.cardBackground
+        iconCircle.backgroundColor = Theme.surface
         iconCircle.layer.cornerRadius = 32
         iconCircle.translatesAutoresizingMaskIntoConstraints = false
         let icon = UIImageView(image: UIImage(systemName: "music.note.list"))
@@ -149,7 +149,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = "All caught up?"
         titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.textColor = Theme.onSurface
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0
@@ -157,7 +157,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
         let messageLabel = UILabel()
         messageLabel.text = "Explore new shows!"
         messageLabel.font = Typography.defaultText.font()
-        messageLabel.textColor = Theme.secondaryText
+        messageLabel.textColor = Theme.onSurfaceVariant
         messageLabel.textAlignment = .center
         messageLabel.adjustsFontForContentSizeCategory = true
         messageLabel.numberOfLines = 0
@@ -165,7 +165,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
         var exploreConfiguration = UIButton.Configuration.filled()
         exploreConfiguration.image = AppIcons.explore
         exploreConfiguration.imagePadding = 8
-        exploreConfiguration.baseBackgroundColor = Theme.brandGreen
+        exploreConfiguration.baseBackgroundColor = Theme.primary
         exploreConfiguration.baseForegroundColor = .white
         exploreConfiguration.attributedTitle = AttributedString(
             "Explore", attributes: AttributeContainer([

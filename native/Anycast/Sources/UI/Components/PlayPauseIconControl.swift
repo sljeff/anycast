@@ -26,7 +26,7 @@ final class PlayPauseIconControl: UIControl {
     private let iconView = UIImageView()
     private var lottieView: LottieAnimationView?
     private var lottieVariantIsWhite = true
-    private var tintColorValue: UIColor = Theme.primaryLightMax
+    private var tintColorValue: UIColor = Theme.onSurface
 
     /// Icon point size (24 default, 32 mini player, 72 player center).
     private(set) var size: CGFloat

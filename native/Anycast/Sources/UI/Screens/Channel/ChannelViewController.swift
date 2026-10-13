@@ -175,8 +175,8 @@ final class ChannelViewController: UIViewController {
         view.addSubview(fullPageSpinner)
 
         emptyChannelLabel.text = "No channel"
-        emptyChannelLabel.textColor = Theme.secondaryText
-        emptyChannelLabel.font = Typography.secondaryTitle.font()
+        emptyChannelLabel.textColor = Theme.onSurfaceVariant
+        emptyChannelLabel.font = TypographyV2.headlineSmall.font()
         emptyChannelLabel.isHidden = true
         emptyChannelLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyChannelLabel)
@@ -449,7 +449,7 @@ final class ChannelViewController: UIViewController {
         let title = viewModel.channel.title ?? ""
 
         let spinner = UIActivityIndicatorView(style: .medium)
-        spinner.color = Theme.primaryLightMax
+        spinner.color = Theme.onSurface
         spinner.translatesAutoresizingMaskIntoConstraints = false
         spinner.startAnimating()
         sender.addSubview(spinner)
@@ -655,35 +655,29 @@ final class ChannelHeaderView: UICollectionReusableView {
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = 16
+        coverView.layer.cornerRadius = Radius.md
         coverView.layer.cornerCurve = .continuous
-        coverView.backgroundColor = Theme.primaryBackground
+        coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.isAccessibilityElement = true
         coverView.accessibilityLabel = "Channel artwork"
         coverView.translatesAutoresizingMaskIntoConstraints = false
 
-        // 20pt comfortaa bold, white, centered, 2 lines (03 §2.7).
-        titleLabel.font = UIFontMetrics(forTextStyle: .title2).scaledFont(
-            for: UIFont(name: "Comfortaa-Bold", size: 20) ?? .systemFont(ofSize: 20, weight: .bold)
-        )
-        titleLabel.textColor = Theme.primaryLightMax
+        // titleLarge, centered, 2 lines (03 §2.7).
+        titleLabel.font = TypographyV2.titleLarge.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.textAlignment = .center
         titleLabel.numberOfLines = 2
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        authorLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 17)
-        )
-        authorLabel.textColor = Theme.primaryLightMax
+        authorLabel.font = TypographyV2.bodyLarge.font()
+        authorLabel.textColor = Theme.onSurface
         authorLabel.textAlignment = .center
         authorLabel.adjustsFontForContentSizeCategory = true
         authorLabel.translatesAutoresizingMaskIntoConstraints = false
 
         domainButton.setTitleColor(Theme.primary, for: .normal)
-        domainButton.titleLabel?.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 17, weight: .semibold)
-        )
+        domainButton.titleLabel?.font = TypographyV2.labelLarge.font()
         domainButton.titleLabel?.adjustsFontForContentSizeCategory = true
         domainButton.translatesAutoresizingMaskIntoConstraints = false
         domainButton.addAction(
@@ -693,8 +687,8 @@ final class ChannelHeaderView: UICollectionReusableView {
         domainButton.accessibilityLabel = "Copy RSS URL"
 
         latestButton.configuration = latestConfiguration(loading: false)
-        latestButton.tintColor = Theme.primaryBackgroundDark
-        latestButton.backgroundColor = Theme.primaryLightMax
+        latestButton.tintColor = Theme.background
+        latestButton.backgroundColor = Theme.onSurface
         // Half the 40 pt height — see SubscriptionCapsuleButton for why
         // the Dart 36 literal is not carried over.
         latestButton.layer.cornerRadius = 20
@@ -774,17 +768,15 @@ final class ChannelHeaderView: UICollectionReusableView {
         var configuration = UIButton.Configuration.plain()
         configuration.imagePadding = 4
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
-        configuration.baseForegroundColor = Theme.primaryBackgroundDark
+        configuration.baseForegroundColor = Theme.background
         if loading {
             configuration.image = nil
             configuration.attributedTitle = nil
         } else {
             configuration.image = AppIcons.play
             var title = AttributedString("Latest Episode")
-            title.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-                for: .systemFont(ofSize: 17, weight: .semibold)
-            )
-            title.foregroundColor = Theme.primaryBackgroundDark
+            title.font = TypographyV2.labelLarge.font()
+            title.foregroundColor = Theme.background
             configuration.attributedTitle = title
         }
         return configuration
@@ -792,8 +784,8 @@ final class ChannelHeaderView: UICollectionReusableView {
 
     private func configureCircleButton(_ button: UIButton, icon: UIImage, label: String) {
         button.setImage(icon, for: .normal)
-        button.tintColor = Theme.primaryLightMax
-        button.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        button.tintColor = Theme.onSurface
+        button.backgroundColor = AnycastColor.sandAlpha4
         button.layer.cornerRadius = 20
         button.layer.cornerCurve = .continuous
         button.isAccessibilityElement = true
@@ -824,18 +816,16 @@ final class ChannelHeaderView: UICollectionReusableView {
         applyHeaderGradient(dominant: dominant)
     }
 
-    /// The pinned-header gradient. The bottom stop is a DYNAMIC semantic
-    /// token: `.cgColor` would freeze whatever traits the caller carries —
-    /// built off-window it resolved Light and washed the header into a
-    /// pale band with unreadable text (09 §9a). Resolving with explicit
-    /// dark traits matches the page's pinned style; the layer is refreshed
-    /// on trait flips for the V4 dual-theme flip-over.
+    /// The pinned-header gradient: 30% artwork tint over the page
+    /// background, fading into the background, resolved against this
+    /// view's traits so the header matches the page in light and dark and
+    /// the dynamic header ink stays readable. CGColors freeze at
+    /// assignment (09 §9a), so the layer is rebuilt on appearance changes.
     func applyHeaderGradient(dominant: UIColor) {
         headerDominant = dominant
-        let dark = UITraitCollection(userInterfaceStyle: .dark)
         gradientLayer.colors = [
-            ChannelFoldGeometry.blendOverBackground(dominant).cgColor,
-            Theme.primaryBackgroundDark.resolvedColor(with: dark).cgColor,
+            ChannelFoldGeometry.blendOverBackground(dominant, traits: traitCollection).cgColor,
+            Theme.background.resolvedColor(with: traitCollection).cgColor,
         ]
     }
 
@@ -924,14 +914,12 @@ final class SubscriptionCapsuleButton: UIControl {
 
         iconView.contentMode = .scaleAspectFit
         iconView.translatesAutoresizingMaskIntoConstraints = false
-        spinner.color = Theme.primaryLightMax
+        spinner.color = Theme.onSurface
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         spinner.isAccessibilityElement = false
 
-        label.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 17, weight: .semibold)
-        )
+        label.font = TypographyV2.labelLarge.font()
         label.adjustsFontForContentSizeCategory = true
 
         row.axis = .horizontal
@@ -966,32 +954,32 @@ final class SubscriptionCapsuleButton: UIControl {
     func configure(display: ChannelSubscriptionDisplay) {
         switch display {
         case .loading:
-            backgroundColor = UIColor.white.withAlphaComponent(0.12)
+            backgroundColor = AnycastColor.sandAlpha4
             iconView.isHidden = true
             spinner.isHidden = false
             spinner.startAnimating()
             label.text = "Loading..."
-            label.textColor = Theme.primaryLightMax
+            label.textColor = Theme.onSurface
             accessibilityLabel = "Subscribing"
         case .subscribe:
-            backgroundColor = UIColor.white.withAlphaComponent(0.12)
+            backgroundColor = AnycastColor.sandAlpha4
             iconView.isHidden = false
             spinner.isHidden = true
             spinner.stopAnimating()
             iconView.image = AppIcons.addCircle
-            iconView.tintColor = Theme.primaryLightMax
+            iconView.tintColor = Theme.onSurface
             label.text = "Subscribe"
-            label.textColor = Theme.primaryLightMax
+            label.textColor = Theme.onSurface
             accessibilityLabel = "Subscribe"
         case .unsubscribe:
-            backgroundColor = Theme.primaryLightMax
+            backgroundColor = Theme.onSurface
             iconView.isHidden = false
             spinner.isHidden = true
             spinner.stopAnimating()
             iconView.image = AppIcons.remove
-            iconView.tintColor = Theme.primaryBackgroundDark
+            iconView.tintColor = Theme.background
             label.text = "Unsubscribe"
-            label.textColor = Theme.primaryBackgroundDark
+            label.textColor = Theme.background
             accessibilityLabel = "Unsubscribe"
         }
     }
@@ -1027,7 +1015,7 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
 
     private func build() {
         let icon = UIImageView(image: AppIcons.search)
-        icon.tintColor = Theme.secondaryText
+        icon.tintColor = Theme.onSurfaceVariant
         icon.contentMode = .center
         icon.translatesAutoresizingMaskIntoConstraints = false
         let iconBox = UIView()
@@ -1050,14 +1038,14 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
         searchField.leftView = iconBox
         searchField.leftViewMode = .always
         searchField.placeholder = "Search episodes"
-        searchField.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: .systemFont(ofSize: 17))
+        searchField.font = TypographyV2.bodyLarge.font()
         searchField.adjustsFontForContentSizeCategory = true
-        searchField.textColor = Theme.primaryLightMax
+        searchField.textColor = Theme.onSurface
         searchField.attributedPlaceholder = NSAttributedString(
             string: "Search episodes",
-            attributes: [.foregroundColor: Theme.hintGray]
+            attributes: [.foregroundColor: Theme.onSurfaceVariant]
         )
-        searchField.backgroundColor = Theme.cardBackground
+        searchField.backgroundColor = Theme.surface
         searchField.layer.cornerRadius = 12
         searchField.layer.cornerCurve = .continuous
         searchField.returnKeyType = .search
@@ -1072,9 +1060,7 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
 
         clearButton.setTitle("Clear", for: .normal)
         clearButton.setTitleColor(Theme.primary, for: .normal)
-        clearButton.titleLabel?.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 17, weight: .semibold)
-        )
+        clearButton.titleLabel?.font = TypographyV2.labelLarge.font()
         clearButton.titleLabel?.adjustsFontForContentSizeCategory = true
         clearButton.isHidden = true
         clearButton.addAction(UIAction { [weak self] _ in
@@ -1091,7 +1077,7 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
 
         orderStrip.onSelect = { [weak self] index in self?.onOrderSelect?(index) }
 
-        separator.backgroundColor = Theme.cardBackground
+        separator.backgroundColor = Theme.surface
         separator.translatesAutoresizingMaskIntoConstraints = false
 
         let stack = UIStackView(arrangedSubviews: [searchRow, orderStrip])

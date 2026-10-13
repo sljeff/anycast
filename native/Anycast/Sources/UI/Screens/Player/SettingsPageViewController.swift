@@ -129,7 +129,7 @@ final class SettingsPageViewController: UIViewController {
             label.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
                 for: UIFont(name: "Comfortaa-Bold", size: 12) ?? .systemFont(ofSize: 12, weight: .bold)
             )
-            label.textColor = Theme.primaryLightMax
+            label.textColor = Theme.onSurface
             label.adjustsFontForContentSizeCategory = true
             return label
         }
@@ -143,11 +143,11 @@ final class SettingsPageViewController: UIViewController {
         countdownBlock.spacing = 8
 
         tooltipButton.setImage(AppIcons.info, for: .normal)
-        tooltipButton.tintColor = Theme.secondaryLabelGray
+        tooltipButton.tintColor = Theme.onSurfaceVariant
         tooltipButton.isAccessibilityElement = true
         tooltipButton.accessibilityLabel = "About continuous play"
 
-        continuousSwitch.onTintColor = Theme.brandGreen
+        continuousSwitch.onTintColor = Theme.primary
         continuousSwitch.isAccessibilityElement = true
         continuousSwitch.accessibilityLabel = "Continuous play"
 
@@ -284,7 +284,7 @@ private final class InlineTooltip {
     init(text: String) {
         label.text = text
         label.font = Typography.defaultText.font()
-        label.textColor = Theme.primaryLightMax
+        label.textColor = Theme.onSurface
         label.numberOfLines = 0
         label.textAlignment = .center
         label.adjustsFontForContentSizeCategory = true
