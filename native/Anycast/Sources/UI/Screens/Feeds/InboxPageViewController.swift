@@ -539,6 +539,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
                 case .skipInsertCurrentlyPlaying:
                     break
                 case .removeFromInbox:
+                    if steps == [.removeFromInbox] { Haptics.queueRemoved() }
                     await self.removeFromInbox(urls: [enclosureURL])
                 case .playInsertedEpisode:
                     await self.context.playback.playByEpisode(insertedRow)

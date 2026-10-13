@@ -281,6 +281,7 @@ final class PlayerProgressBarView: UIControl {
     }
 
     override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
+        Haptics.scrubberGrab()
         isDragging = true
         dragPositionMilliseconds = position(atX: touch.location(in: self).x)
         render()
@@ -299,6 +300,7 @@ final class PlayerProgressBarView: UIControl {
         dragPositionMilliseconds = target
         render()
         if isEnabled {
+            Haptics.seekCommit()
             onSeek?(target)
         }
     }

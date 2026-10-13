@@ -355,6 +355,7 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
     /// playback and clears the player state.
     func removeTapped(_ episode: PlaylistEpisodeRow) {
         guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return }
+        Haptics.queueRemoved()
         Task { [weak self] in
             guard let self else { return }
             let repository = self.context.database.playlistRepository()

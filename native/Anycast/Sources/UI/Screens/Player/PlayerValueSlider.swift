@@ -252,6 +252,7 @@ final class PlayerValueSlider: UIControl {
         if index != selectedIndex {
             selectedIndex = index
             textValue = spec.values[index]
+            Haptics.selection()
             // Fire before rendering: the owner may push a corrected text
             // payload (the COUNTDOWN thumb shows remaining time, not the
             // stop value) via refreshThumbText.
@@ -287,6 +288,7 @@ final class PlayerValueSlider: UIControl {
         guard spec.values.indices.contains(target) else { return }
         selectedIndex = target
         textValue = spec.values[target]
+        Haptics.selection()
         onValueChanged?(target, spec.values[target])
         sendActions(for: .valueChanged)
         renderThumb()
