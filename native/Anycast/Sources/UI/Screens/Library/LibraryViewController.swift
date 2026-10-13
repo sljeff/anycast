@@ -89,12 +89,6 @@ final class LibraryViewController: UIViewController {
             MainActor.assumeIsolated { self?.refreshStatus() }
         }
         refreshStatus()
-        subscriptions.additionalSafeAreaInsets.bottom = additionalSafeAreaInsets.bottom
-    }
-
-    override func viewSafeAreaInsetsDidChange() {
-        super.viewSafeAreaInsetsDidChange()
-        subscriptions.additionalSafeAreaInsets.bottom = additionalSafeAreaInsets.bottom
     }
 
     // MARK: - Status line ("100 episodes remain" placeholder → live count)

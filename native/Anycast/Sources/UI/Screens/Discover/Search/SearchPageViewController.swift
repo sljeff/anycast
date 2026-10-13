@@ -21,7 +21,7 @@ final class SearchPageViewController: UIViewController {
     private let grabber = SheetGrabberView()
     private let keywordPrefixLabel = UILabel()
     private let keywordLabel = UILabel()
-    private let tabStrip: UnderlineTabBarView
+    private let tabStrip: ChipTabBarView
     private var pagingContainer: DiscoverPagingContainer!
     private let channelsPage: SearchChannelsPageViewController
     private let episodesPage: SearchEpisodesPageViewController
@@ -38,11 +38,7 @@ final class SearchPageViewController: UIViewController {
         self.context = context
         self.viewModel = SearchPageViewModel(searchText: searchText, api: context.api)
 
-        tabStrip = UnderlineTabBarView(
-            titles: ["Channels", "Episodes"],
-            selectedFont: Self.tabFont(),
-            unselectedFont: Self.tabFont()
-        )
+        tabStrip = ChipTabBarView(titles: ["Channels", "Episodes"])
         channelsPage = SearchChannelsPageViewController(context: context, viewModel: viewModel)
         episodesPage = SearchEpisodesPageViewController(context: context, viewModel: viewModel)
 
@@ -65,14 +61,6 @@ final class SearchPageViewController: UIViewController {
         AppSheets.presentExpand(
             SearchPageViewController(context: context, searchText: searchText),
             from: presenter
-        )
-    }
-
-    /// Secondary-tab label font — Dart labelLarge: 17 pt w600 system
-    /// (anycast_theme.dart:327-331).
-    private static func tabFont() -> UIFont {
-        UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 17, weight: .semibold)
         )
     }
 

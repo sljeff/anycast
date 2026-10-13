@@ -59,6 +59,11 @@ final class SubscriptionsPageViewController: UIViewController {
 
     // MARK: - Lifecycle
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        collectionView.alignBackgroundViewMargins()
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
@@ -275,7 +280,7 @@ final class CollectionStateView: UIView {
 
     init() {
         super.init(frame: .zero)
-        iconCircle.backgroundColor = UIColor.white.withAlphaComponent(0.06)
+        iconCircle.backgroundColor = AnycastColor.sandAlpha3
         iconCircle.layer.cornerRadius = 32
         iconCircle.layer.cornerCurve = .continuous
         iconCircle.translatesAutoresizingMaskIntoConstraints = false
@@ -289,14 +294,14 @@ final class CollectionStateView: UIView {
         spinner.hidesWhenStopped = true
         iconCircle.addSubview(spinner)
 
-        titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0
 
-        messageLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: .systemFont(ofSize: 16))
-        messageLabel.textColor = Theme.secondaryText
+        messageLabel.font = TypographyV2.bodyLarge.font()
+        messageLabel.textColor = Theme.onSurfaceVariant
         messageLabel.textAlignment = .center
         messageLabel.adjustsFontForContentSizeCategory = true
         messageLabel.numberOfLines = 0
@@ -305,8 +310,12 @@ final class CollectionStateView: UIView {
         actionConfiguration.imagePadding = 8
         actionConfiguration.baseForegroundColor = Theme.primary
         actionConfiguration.contentInsets = .zero
+        actionConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.titleSmall.font()
+            return outgoing
+        }
         actionButton.configuration = actionConfiguration
-        actionButton.titleLabel?.font = Typography.mainText.font()
         actionButton.addAction(UIAction { [weak self] _ in self?.onAction?() }, for: .touchUpInside)
 
         let column = UIStackView(arrangedSubviews: [iconCircle, titleLabel, messageLabel, actionButton])
@@ -332,7 +341,13 @@ final class CollectionStateView: UIView {
             column.bottomAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.bottomAnchor),
             column.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
             column.centerXAnchor.constraint(equalTo: centerXAnchor),
-            column.centerYAnchor.constraint(equalTo: centerYAnchor),
+            // Centered in the area the mini player and tab bar leave free;
+            // yields to the margin bounds when the column is taller.
+            {
+                let center = column.centerYAnchor.constraint(equalTo: layoutMarginsGuide.centerYAnchor)
+                center.priority = .defaultHigh
+                return center
+            }(),
         ])
     }
 

@@ -13,7 +13,7 @@ import AnycastKit
 ///    and the square-cornered stub the head became during the first
 ///    seconds of playback (the head is now always a full semicircle).
 /// 3. (Retired with the V2 IA flip — Discover left the tab shell, 09
-///    §3.5; the UnderlineTabBarView indicator guard it motivated lives on
+///    §3.5; the ChipTabBarView indicator guard it motivated lives on
 ///    through SearchPage's use.)
 /// 4. Playlist card progress strip running through the card's rounded
 ///    corners.

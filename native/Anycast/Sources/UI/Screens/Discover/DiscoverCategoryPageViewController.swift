@@ -88,8 +88,8 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
 
         // Centered white "Network Error" (discover.dart:73-78).
         errorLabel.text = "Network Error"
-        errorLabel.textColor = Theme.secondaryText
-        errorLabel.font = Typography.secondaryTitle.font()
+        errorLabel.textColor = Theme.onSurfaceVariant
+        errorLabel.font = TypographyV2.headlineSmall.font()
         errorLabel.adjustsFontForContentSizeCategory = true
         errorLabel.textAlignment = .center
         errorLabel.isHidden = true

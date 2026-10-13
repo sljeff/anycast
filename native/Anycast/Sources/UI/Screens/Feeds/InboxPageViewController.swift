@@ -101,6 +101,11 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     // MARK: - Lifecycle
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        collectionView.alignBackgroundViewMargins()
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
@@ -900,10 +905,13 @@ final class HistoryTailCell: UICollectionViewCell {
             top: 0, leading: 4, bottom: 0, trailing: 4
         )
         configuration.cornerStyle = .capsule
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.bodySmall.font()
+            return outgoing
+        }
         button.configuration = configuration
         button.contentHorizontalAlignment = .leading
-        button.titleLabel?.font = UIFontMetrics(forTextStyle: .subheadline)
-            .scaledFont(for: .systemFont(ofSize: 13, weight: .regular))
         button.tintColor = Theme.onSurfaceVariant
         button.translatesAutoresizingMaskIntoConstraints = false
         button.accessibilityIdentifier = "inbox-history-tail"
@@ -928,8 +936,8 @@ final class HistoryTailCell: UICollectionViewCell {
 
 
 /// AnycastEmptyState + the ImportBlock action column: 64 pt circle icon,
-/// big title, message, then Explore (filled green) over a row with the
-/// outlined Import OPML button and the round help button. Hosted as the
+/// title, message, then Explore (primary) over a row with the secondary
+/// Import OPML button and the round help button. Hosted as the
 /// collection background so the page stays pull-to-refreshable.
 final class InboxEmptyStateView: UIView {
 
@@ -941,7 +949,7 @@ final class InboxEmptyStateView: UIView {
         super.init(frame: .zero)
 
         let iconCircle = UIView()
-        iconCircle.backgroundColor = UIColor.white.withAlphaComponent(0.06)
+        iconCircle.backgroundColor = AnycastColor.sandAlpha3
         iconCircle.layer.cornerRadius = 32
         iconCircle.layer.cornerCurve = .continuous
         iconCircle.translatesAutoresizingMaskIntoConstraints = false
@@ -954,55 +962,30 @@ final class InboxEmptyStateView: UIView {
 
         let titleLabel = UILabel()
         titleLabel.text = "It’s empty here."
-        titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0
 
         let messageLabel = UILabel()
         messageLabel.text = "Let's change that!"
-        messageLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: .systemFont(ofSize: 16))
-        messageLabel.textColor = Theme.secondaryText
+        messageLabel.font = TypographyV2.bodyLarge.font()
+        messageLabel.textColor = Theme.onSurfaceVariant
         messageLabel.textAlignment = .center
         messageLabel.adjustsFontForContentSizeCategory = true
         messageLabel.numberOfLines = 0
 
-        let explore = UIButton(type: .system)
-        var exploreConfiguration = UIButton.Configuration.filled()
-        exploreConfiguration.image = AppIcons.explore
-        exploreConfiguration.imagePadding = 8
-        exploreConfiguration.title = "Explore"
-        exploreConfiguration.baseBackgroundColor = Theme.brandGreen
-        exploreConfiguration.baseForegroundColor = .white
-        exploreConfiguration.cornerStyle = .capsule
-        exploreConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 12, leading: 20, bottom: 12, trailing: 20
-        )
-        explore.configuration = exploreConfiguration
-        explore.titleLabel?.font = Typography.mainText.font()
+        let explore = AnycastButton.make(.primary, title: "Explore", image: AppIcons.explore)
         explore.addAction(UIAction { [weak self] _ in self?.onExplore?() }, for: .touchUpInside)
 
-        let importButton = UIButton(type: .system)
-        var importConfiguration = UIButton.Configuration.plain()
-        importConfiguration.image = UIImage(systemName: "arrow.down.doc")
-        importConfiguration.imagePadding = 8
-        importConfiguration.title = "Import OPML"
-        importConfiguration.baseForegroundColor = Theme.primaryLightMax
-        importConfiguration.background.strokeColor = Theme.primaryLightMax
-        importConfiguration.background.strokeWidth = 1
-        importConfiguration.cornerStyle = .capsule
-        importConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 12, leading: 20, bottom: 12, trailing: 20
-        )
-        importButton.configuration = importConfiguration
-        importButton.titleLabel?.font = Typography.mainText.font()
+        let importButton = AnycastButton.make(.secondary, title: "Import OPML", image: UIImage(systemName: "arrow.down.doc"))
         importButton.addAction(UIAction { [weak self] _ in self?.onImportOPML?() }, for: .touchUpInside)
 
         let help = UIButton(type: .system)
         help.setImage(UIImage(systemName: "questionmark.circle"), for: .normal)
-        help.tintColor = Theme.secondaryText
-        help.backgroundColor = UIColor.white.withAlphaComponent(0.06)
+        help.tintColor = Theme.onSurfaceVariant
+        help.backgroundColor = AnycastColor.sandAlpha3
         help.layer.cornerRadius = 24
         help.layer.cornerCurve = .continuous
         help.isAccessibilityElement = true
@@ -1044,7 +1027,13 @@ final class InboxEmptyStateView: UIView {
             column.bottomAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.bottomAnchor),
             column.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
             column.centerXAnchor.constraint(equalTo: centerXAnchor),
-            column.centerYAnchor.constraint(equalTo: centerYAnchor),
+            // Centered in the area the mini player and tab bar leave free;
+            // yields to the margin bounds when the column is taller.
+            {
+                let center = column.centerYAnchor.constraint(equalTo: layoutMarginsGuide.centerYAnchor)
+                center.priority = .defaultHigh
+                return center
+            }(),
         ])
     }
 

@@ -10,11 +10,11 @@ struct PodcastCardContent {
     var imageURL: String?
 }
 
-/// The channel card (lib/widgets/card.dart:323-453, 03 §2.12): rounded-20
-/// bordered row, 64×64 rounded-12 cover (Kingfisher with a 20pt spinner
-/// placeholder and a gray podcast glyph on error), 14pt comfortaa w700
-/// single-line title, 12pt two-line description. Whole-card tap opens the
-/// Channel sheet via the injected callback.
+/// The channel card (lib/widgets/card.dart:323-453, 03 §2.12) in the
+/// Anycast 2.0 card language: `CardSurfaceView` plate, 64×64 artwork-radius
+/// cover (Kingfisher with a 20pt spinner placeholder and a podcast glyph on
+/// error), titleSmall single-line title, bodySmall two-line description.
+/// Whole-card tap opens the Channel sheet via the injected callback.
 final class PodcastCardCell: UICollectionViewCell {
 
     static let reuseIdentifier = "PodcastCardCell"
@@ -30,7 +30,7 @@ final class PodcastCardCell: UICollectionViewCell {
     /// runloop turn later, after the reuse has already started a new load —
     /// must not clobber the new spinner/error state.
     private var coverGeneration = 0
-    private let cardContainer = UIView()
+    private let cardContainer = CardSurfaceView()
     private let coverView = UIImageView()
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let errorIconView = UIImageView()
@@ -84,11 +84,6 @@ final class PodcastCardCell: UICollectionViewCell {
     private func build() {
         contentView.backgroundColor = .clear
 
-        cardContainer.backgroundColor = Theme.cardBackground
-        cardContainer.layer.borderColor = Theme.cardOutline.cgColor
-        cardContainer.layer.borderWidth = 1
-        cardContainer.layer.cornerRadius = 20
-        cardContainer.layer.cornerCurve = .continuous
         cardContainer.translatesAutoresizingMaskIntoConstraints = false
         cardContainer.isAccessibilityElement = true
         cardContainer.accessibilityTraits = [.button]
@@ -97,9 +92,9 @@ final class PodcastCardCell: UICollectionViewCell {
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = 12
+        coverView.layer.cornerRadius = Radius.artwork
         coverView.layer.cornerCurve = .continuous
-        coverView.backgroundColor = Theme.primaryBackground
+        coverView.backgroundColor = Theme.surfaceContainerHighest
         coverView.translatesAutoresizingMaskIntoConstraints = false
         cardContainer.addSubview(coverView)
 
@@ -109,31 +104,25 @@ final class PodcastCardCell: UICollectionViewCell {
         coverView.addSubview(spinner)
 
         errorIconView.image = AppIcons.playerMain
-        errorIconView.tintColor = Theme.secondaryText
+        errorIconView.tintColor = Theme.onSurfaceVariant
         errorIconView.contentMode = .center
         errorIconView.isHidden = true
         errorIconView.translatesAutoresizingMaskIntoConstraints = false
         coverView.addSubview(errorIconView)
 
-        // 14pt comfortaa w700 per 03 §2.12 (styles.dart defaultTitle is 16 —
-        // the PodcastCard pins its own size).
-        let baseTitle = UIFont(name: "Comfortaa-Bold", size: 14)
-            ?? UIFont.systemFont(ofSize: 14, weight: .bold)
-        titleLabel.font = UIFontMetrics(forTextStyle: .headline).scaledFont(for: baseTitle)
-        titleLabel.textColor = Typography.cardTitleBold.color
+        titleLabel.font = TypographyV2.titleSmall.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 1
         titleLabel.adjustsFontForContentSizeCategory = true
 
-        descriptionLabel.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(
-            for: .systemFont(ofSize: 12)
-        )
-        descriptionLabel.textColor = Theme.secondaryLabelGray
+        descriptionLabel.font = TypographyV2.bodySmall.font()
+        descriptionLabel.textColor = Theme.onSurfaceVariant
         descriptionLabel.numberOfLines = 2
         descriptionLabel.adjustsFontForContentSizeCategory = true
 
         let textColumn = UIStackView(arrangedSubviews: [titleLabel])
         textColumn.axis = .vertical
-        textColumn.spacing = 2
+        textColumn.spacing = Spacing.xxs
         textColumn.alignment = .fill
         textColumn.translatesAutoresizingMaskIntoConstraints = false
         textColumn.addArrangedSubview(descriptionLabel)
@@ -150,8 +139,8 @@ final class PodcastCardCell: UICollectionViewCell {
             cardContainer.heightAnchor.constraint(
                 greaterThanOrEqualToConstant: Self.cardHeight),
 
-            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: 12),
-            coverView.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: 12),
+            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.gap),
+            coverView.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.gap),
             coverView.widthAnchor.constraint(equalToConstant: 64),
             coverView.heightAnchor.constraint(equalToConstant: 64),
 
@@ -163,10 +152,10 @@ final class PodcastCardCell: UICollectionViewCell {
             errorIconView.centerXAnchor.constraint(equalTo: coverView.centerXAnchor),
             errorIconView.centerYAnchor.constraint(equalTo: coverView.centerYAnchor),
 
-            textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: 12),
-            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -12),
-            textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: 12),
-            textColumn.bottomAnchor.constraint(lessThanOrEqualTo: cardContainer.bottomAnchor, constant: -12),
+            textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
+            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.gap),
+            textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.gap),
+            textColumn.bottomAnchor.constraint(lessThanOrEqualTo: cardContainer.bottomAnchor, constant: -Spacing.gap),
         ])
     }
 

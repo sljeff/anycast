@@ -1011,20 +1011,11 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
 
     private let searchField = UITextField()
     private let clearButton = UIButton(type: .system)
-    private let orderStrip: UnderlineTabBarView
+    private let orderStrip: ChipTabBarView
     private let separator = UIView()
 
     override init(frame: CGRect) {
-        // headlineMedium: the Dart theme pins it at 22 pt w600 on the
-        // system face (anycast_theme.dart:279-284).
-        let font = UIFontMetrics(forTextStyle: .title3).scaledFont(
-            for: .systemFont(ofSize: 22, weight: .semibold)
-        )
-        orderStrip = UnderlineTabBarView(
-            titles: ["Newest", "Oldest"],
-            selectedFont: font,
-            unselectedFont: font
-        )
+        orderStrip = ChipTabBarView(titles: ["Newest", "Oldest"])
         super.init(frame: frame)
 
         contentView.backgroundColor = .clear
@@ -1136,7 +1127,7 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
         onSubmit?(searchField.text ?? "")
     }
 
-    /// The cell embeds UnderlineTabBarView's scroll view; self-sizing must
+    /// The cell embeds ChipTabBarView's scroll view; self-sizing must
     /// never consult it (a scroll view inside a self-sizing item explodes
     /// the content size). The height is fixed and the search/order block
     /// owns its own layout.

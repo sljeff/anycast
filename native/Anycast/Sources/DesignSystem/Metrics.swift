@@ -72,3 +72,26 @@ nonisolated enum Motion {
         }
     }
 }
+
+extension UICollectionView {
+    /// Background views of a collection view do not inherit the safe area —
+    /// UIKit folds it into `adjustedContentInset` — so empty and error
+    /// states hosted there would sit under the header or the floating
+    /// mini player. Call from `viewDidLayoutSubviews` to feed the inset in
+    /// as layout margins.
+    @MainActor
+    func alignBackgroundViewMargins() {
+        guard let backgroundView else { return }
+        backgroundView.insetsLayoutMarginsFromSafeArea = false
+        let inset = adjustedContentInset
+        let margins = NSDirectionalEdgeInsets(
+            top: inset.top + Spacing.pageH,
+            leading: Spacing.pageH,
+            bottom: inset.bottom + Spacing.pageH,
+            trailing: Spacing.pageH
+        )
+        if backgroundView.directionalLayoutMargins != margins {
+            backgroundView.directionalLayoutMargins = margins
+        }
+    }
+}

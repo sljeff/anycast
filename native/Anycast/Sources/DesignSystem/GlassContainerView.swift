@@ -42,6 +42,11 @@ final class GlassContainerView: UIView {
         super.init(frame: .zero)
 
         backgroundColor = .clear
+        // The own layer carries the shape too, so a tint backgroundColor or
+        // a shadow follows the corners on both OS paths (no masking here —
+        // that would clip the glass edge highlight on iOS 26).
+        layer.cornerRadius = cornerRadius
+        layer.cornerCurve = .continuous
 
         let effectView = UIVisualEffectView()
         effectView.frame = bounds
@@ -93,8 +98,6 @@ final class GlassContainerView: UIView {
         }
         // iOS 18 fallback: chrome-material blur + plain corner radius.
         effectView.effect = UIBlurEffect(style: .systemChromeMaterial)
-        layer.cornerRadius = cornerRadius
         layer.masksToBounds = true
-        layer.cornerCurve = .continuous
     }
 }
