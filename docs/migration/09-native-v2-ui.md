@@ -18,6 +18,9 @@
 | 展示字体 | **未定稿，待拍板** | Figma 实测三种衬线并存：sand 系帧 Cormorant Garamond、cream 系 Young Serif、另有 Instrument Serif（mini player 卡片态标题 `149:3499`、Index 克隆帧 header 动作字 `1202:23074`（24/36）实测；主画板另有 Young Serif specimen `637:9487`）；V3 批次 5 前拍板，未定稿不随包新增字体文件 |
 | 交互件实现 | **原生优先（native-first）**【2026-10-02】 | 交互件默认系统控件与系统交互；自绘准入仅限 ① Figma 帧明确要求系统无法表达的形态（胶囊 pill、独立玻璃圆钮、thumb 显值 slider）② 实测原生达不到。逐件裁定见 §7a，存量自绘件随 V3 批次复核；凡自绘 → 原生的切换属行为变更，先改基线文档（03 对应条目 / 05 §11 K 表）再改实现 |
 | 内容避让语义 | **避让到胶囊顶（维持锚点语义）+ 退役 64pt 双重避让**【2026-10-02 拍板，批次1 前置】 | `additionalSafeAreaInsets.bottom` 锚点维持现状（空队列 pill 顶+14 / 播放中胶囊顶+14），静止内容永不被胶囊遮挡（系统浮层 accessory idiom）；列表全出血，滚动时内容本就从 scrim/胶囊下连续流过。v1 Dart-parity 的 64pt 底部 section inset 与上述避让双重计算（Inbox/Subscriptions 两处，滚到底空白主因）一并退役，03 §2.3/§2.4 已注记。否决项：锚 pill 顶（Figma 字面）——末卡静止时被白 80% 胶囊遮住约 58pt |
+| IA 与视觉基准（改判）| **Flutter 流程 + Anycast 2.0 视觉**【2026-10-08 musepy 拍板，`c713ef6` 落地】 | 底部三目的地回到 Flutter 的 Podcast（Inbox/Subscriptions）/ Playlist / Discover，搜索与设置在页 header，mini player 在底栏上方；视觉取 sand 基准与 Anycast 2.0 UIKit 原型（UI kit）的组件/交互语言。**取代 §3 第 1–5 条与 §4 中 Inbox/queue/library 三 tab、Discover 退役、搜索圆钮的 IA 部分**（组件规格与 token 仍有效）。决策记录：`research/native-ui-redesign-review.html` |
+| 展示字体（定稿）| **SF Pro，不打包衬线**【2026-10-13 musepy】 | display 角色 = SF Pro black expanded（与 UI kit `AnycastFont.display` 一致）；§0 "展示字体未定稿" 一行与 §2.4 待拍板注记作废 |
+| 主题切换 | **`ThemeSpec` 单点切换**【2026-10-13】 | 语义色、player 色、字体角色、Radius 刻度经 `ThemeRegistry.current`（`DesignSystem/ThemeSpec.swift`）；换风格 = 新增一个 `ThemeSpec` 并改默认值，DEBUG 可用 `-AnycastTheme <name>` 预览 |
 
 ## 1. Figma 文件地图与工具坑
 
@@ -163,6 +166,8 @@ v1 的 16 个 colorset（PrimaryColor 0x34D399 系等）**整体退役**，同�
 
 ## 3. IA 变更清单（v1 → v2）
 
+> **2026-10-08 改判**：第 1–5 条的 tab 结构已被 §0「IA 与视觉基准（改判）」取代（native 维持 Flutter 的 Podcast / Playlist / Discover 流程）；条目内的组件规格仍作为视觉参考。
+
 1. **底部 Tab**：Podcasts(Inbox+Subscriptions)/Playlists/Discover → **Inbox / queue / library** 三 tab + **圆形搜索按钮**。
    - 规格（Buttom Tab 组件 `243:7288`，light 实测）：外层渐变 scrim `linear(180°, transparent→sand1)` + blur(10)；内层**浮动胶囊** `rgba(255,255,255,.8)` + `Radius.pill` + 阴影 `0 20 40 /10%`（**无描边**——2026-10-02 复测确认），padding 4；tab 按钮 100×64（icon 24 + SF Pro 12 **Regular·TITLE 大写** label，间距 4），激活态 `goldAlpha2` 底 + `sandAlpha4` 0.5px 描边 + pill 圆角，icon/label 色 `goldAlpha9`；非激活色 `sandAlpha10`、无底无描边。图标：inbox→`inbox`、queue→`subscriptions`、library→`collections_bookmark`。**scrim 根节点实测（同日）**：padding 24/16（pill 上方仅 24pt 渐隐带）；pill 深色形态未定——组件 fill 为静态 `rgba(255,255,255,.8)` 非变量（无 dark 模式值），native 落地 `Theme.surface` 80%（深色近黑胶囊），深色下是否应白色系待设计复核。
    - **搜索按钮**：72×72 玻璃圆钮（`rgba(177,177,177,.3)` + 高光描边渐变 + 48pt 白 30% blur2.5 高光层 + 双层渐变描边 2px/0.5px + 阴影 `0 30 30 /10%`，图标 **MS Rounded 32pt**）位于 scrim 行内 **pill 右侧**（组件 243:7288 节点树实测：row = pill(fill) + gap12 + 圆钮；activeTab4-6 的 72 高输入条形态同样在右侧）。**勘误（2026-10-02）**：本条原文"居中悬浮"为 V0 误读，"居中"仅指与 pill 垂直居中（alignItems: center）；native 落地右置正确。注意玻璃规格实测于 Inbox 变体的圆钮 `240:7217`（glass 子层填充 + 双层 highlight 描边，阴影 `0 30 30 /10%`；Index 克隆帧 `1202:23122` 内同款）；queue/library 变体内的圆钮（`243:7294`/`243:7307`）仍是旧版白底 `rgba(255,255,255,.8)`+`sandAlpha4` 0.5px——**以 Inbox 变体玻璃规格为准**。在 activeTab4-6 变体中展开为 72 高胶囊输入条（`goldAlpha2` 底 + `sandAlpha4` 描边 + "search | ask anything"）——即搜索与 AI 提问合体的入口。落地：首版做**点击推入 Search 屏**，"ask anything" 输入形态记入待裁定（与 chat 入口合并）。
@@ -178,6 +183,8 @@ v1 的 16 个 colorset（PrimaryColor 0x34D399 系等）**整体退役**，同�
 8. **v2 header**（`624:30831`）：单行 `title + status info + clear 动作`（padding 0 12）取代 v1 大标题渐变 AppBar + 内嵌搜索框（搜索移至 tab 条圆钮）。设置入口（齿轮）随 header 重排。
 
 ## 4. 屏幕映射表（S1–S21 → v2 帧）
+
+> **2026-10-08 改判**：本表"处置"列中涉及 IA 的项（S3 并入 library、S6 → queue tab、S8 Discover 退役）已被 §0 改判取代；视觉帧映射仍有效。
 
 | v1 屏 | v2 帧（nodeId） | 处置 |
 |---|---|---|
