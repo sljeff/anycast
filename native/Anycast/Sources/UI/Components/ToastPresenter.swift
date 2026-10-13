@@ -24,12 +24,13 @@ final class ToastPresenter {
         let label = UILabel()
         label.text = message
         label.font = TypographyV2.bodySmall.font()
-        label.textColor = Theme.onSurface
+        // Inverse pair: readable over any page in both appearances.
+        label.textColor = Theme.surface
         label.textAlignment = .center
         label.numberOfLines = 1
 
         let pill = UIView()
-        pill.backgroundColor = UIColor.black.withAlphaComponent(0.87)
+        pill.backgroundColor = Theme.inverseSurface
         pill.layer.cornerRadius = 16
         pill.layer.cornerCurve = .continuous
         pill.translatesAutoresizingMaskIntoConstraints = false

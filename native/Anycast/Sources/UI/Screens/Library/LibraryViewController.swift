@@ -115,7 +115,7 @@ final class LibraryViewController: UIViewController {
     private func buildMembershipCard() -> UIView {
         let card = UIControl()
         card.backgroundColor = AnycastColor.goldAlpha2
-        card.layer.borderColor = AnycastColor.sandAlpha4.cgColor
+        card.setDynamicBorderColor(AnycastColor.sandAlpha4)
         card.layer.borderWidth = 0.5
         card.layer.cornerRadius = Radius.md
         card.layer.cornerCurve = .continuous

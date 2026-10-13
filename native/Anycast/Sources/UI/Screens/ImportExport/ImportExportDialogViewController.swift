@@ -122,7 +122,7 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         urlField.font = Typography.htmlBody.font()
         urlField.textColor = Theme.onSurface
         urlField.backgroundColor = Theme.surfaceContainer
-        urlField.layer.borderColor = AnycastColor.sandAlpha4.cgColor
+        urlField.setDynamicBorderColor(AnycastColor.sandAlpha4)
         urlField.layer.borderWidth = 1
         urlField.layer.cornerRadius = Radius.sm
         urlField.layer.cornerCurve = .continuous

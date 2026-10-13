@@ -268,13 +268,14 @@ enum SettingsTooltipOverlay {
         let label = UILabel()
         label.text = message
         label.font = TypographyV2.bodySmall.font()
-        label.textColor = Theme.onSurface
+        // Inverse pair: readable over any page in both appearances.
+        label.textColor = Theme.surface
         label.numberOfLines = 0
         label.textAlignment = .natural
         label.adjustsFontForContentSizeCategory = true
 
         let pill = UIView()
-        pill.backgroundColor = UIColor.black.withAlphaComponent(0.87)
+        pill.backgroundColor = Theme.inverseSurface
         pill.layer.cornerRadius = 12
         pill.layer.cornerCurve = .continuous
         pill.alpha = 0

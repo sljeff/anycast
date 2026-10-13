@@ -65,13 +65,14 @@ struct TypographyTests {
         }
     }
 
-    @Test("mainTitle tracking is 4.4pt at 44pt comfortaa bold")
+    @Test("v1 styles render in the theme face, keeping size, weight and tracking")
     func mainTitleAttributes() {
         let attributes = Typography.mainTitle.attributes()
         #expect((attributes[.kern] as? CGFloat) == 4.4)
         let font = attributes[.font] as? UIFont
         #expect(font?.pointSize == 44)
-        #expect(font?.fontName == "Comfortaa-Bold")
+        #expect(font?.fontName == ThemeRegistry.current.typography.font(44, .bold, .text).fontName)
+        #expect(Typography.htmlError.font().fontDescriptor.symbolicTraits.contains(.traitMonoSpace))
     }
 
     @Test("All SF Symbol mappings resolve")

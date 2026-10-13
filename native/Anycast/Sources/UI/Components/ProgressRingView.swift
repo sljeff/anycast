@@ -7,7 +7,7 @@ import UIKit
 final class ProgressRingView: UIView {
 
     var tintColorOverride: UIColor? {
-        didSet { ringLayer.strokeColor = (tintColorOverride ?? Theme.primary).cgColor }
+        didSet { applyStroke() }
     }
 
     private let ringLayer = CAShapeLayer()
@@ -18,11 +18,19 @@ final class ProgressRingView: UIView {
         accessibilityTraits = [.updatesFrequently]
 
         ringLayer.fillColor = UIColor.clear.cgColor
-        ringLayer.strokeColor = Theme.primary.cgColor
         ringLayer.lineWidth = lineWidth
         ringLayer.lineCap = .round
         ringLayer.strokeEnd = 0
         layer.addSublayer(ringLayer)
+        applyStroke()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _) in
+            self.applyStroke()
+        }
+    }
+
+    /// The stroke is a CGColor (frozen at assignment, 09 §9a).
+    private func applyStroke() {
+        ringLayer.strokeColor = (tintColorOverride ?? Theme.primary).resolvedColor(with: traitCollection).cgColor
     }
 
     @available(*, unavailable)

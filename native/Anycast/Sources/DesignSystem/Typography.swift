@@ -24,10 +24,16 @@ nonisolated enum Typography {
         /// display numerals, e.g. the lyric time bar).
         let scalingTextStyle: UIFont.TextStyle?
 
+        /// Renders in the active theme's text face (SF Pro for sand) — the
+        /// bundled v1 family only decides weight and monospacing, so legacy
+        /// call sites share the v2 typeface.
         func font(traits: UITraitCollection? = nil) -> UIFont {
-            guard let base = UIFont(name: postScriptName, size: size) else {
-                assertionFailure("Font \(postScriptName) not registered — check UIAppFonts")
-                return UIFont.systemFont(ofSize: size)
+            let base: UIFont
+            if postScriptName.hasPrefix("RobotoMono") {
+                base = .monospacedSystemFont(ofSize: size, weight: .regular)
+            } else {
+                let weight: UIFont.Weight = postScriptName.hasSuffix("-Bold") ? .bold : .regular
+                base = ThemeRegistry.current.typography.font(size, weight, .text)
             }
             guard let scalingTextStyle else { return base }
             let metrics = UIFontMetrics(forTextStyle: scalingTextStyle)

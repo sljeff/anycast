@@ -57,9 +57,9 @@ final class LoginViewController: UIViewController {
     private var tooltipView: UIView?
     private var tooltipTimer: Timer?
 
-    /// AnycastTheme.dark `error` token — the Dart sign-out/delete copy color
-    /// (0xFFFF8B8B); 03 §5.1 carries no error colorset for it.
-    static let errorColor = UIColor(red: 1.0, green: 0.545, blue: 0.545, alpha: 1)
+    /// Sign-out/delete copy color — the appearance-aware `error` token
+    /// (FF8B8B is its dark value).
+    static let errorColor = Theme.error
 
     init(context: UIContext) {
         self.context = context
@@ -209,10 +209,10 @@ final class LoginViewController: UIViewController {
             }
         }
 
-        // Email: dark 12% surface, no spinner — opens the form sheet directly.
+        // Email: tinted neutral surface, no spinner — opens the form sheet directly.
         let email = Self.authButton(
             title: LoginPageModel.emailButtonTitle,
-            background: UIColor.black.withAlphaComponent(0.12),
+            background: AnycastColor.sandAlpha4,
             foreground: Theme.onSurface,
             icon: { UIImageView(image: AppIcons.email) },
             iconSize: 16
@@ -1032,12 +1032,13 @@ final class LoginViewController: UIViewController {
     // MARK: - Shared helpers
 
     /// Shared Dynamic Type helper for the auth screens (app font tokens carry
-    /// no Material-scale equivalent for these labels).
+    /// no Material-scale equivalent for these labels); renders in the theme
+    /// text face.
     static func font(
         _ size: CGFloat, _ weight: UIFont.Weight, _ style: UIFont.TextStyle
     ) -> UIFont {
         UIFontMetrics(forTextStyle: style).scaledFont(
-            for: UIFont.systemFont(ofSize: size, weight: weight)
+            for: ThemeRegistry.current.typography.font(size, weight, .text)
         )
     }
 
@@ -1051,15 +1052,9 @@ final class LoginViewController: UIViewController {
         return label
     }
 
-    /// Dart `Card` (anycast_theme cardTheme): surface fill, hairline outline,
-    /// 24 pt continuous radius, 15 pt content inset.
+    /// Card: the shared v2 `CardSurfaceView` plate, 15 pt content inset.
     private static func card() -> (container: UIView, contentStack: UIStackView) {
-        let container = UIView()
-        container.backgroundColor = Theme.surface
-        container.layer.borderColor = Theme.outline.cgColor
-        container.layer.borderWidth = 1
-        container.layer.cornerRadius = 24
-        container.layer.cornerCurve = .continuous
+        let container = CardSurfaceView(radius: Radius.card)
         container.translatesAutoresizingMaskIntoConstraints = false
 
         let stack = UIStackView()
@@ -1184,7 +1179,7 @@ final class IntroSlideCell: UICollectionViewCell {
             iconView.image = AppIcons.aiTranscript
         } else {
             gradientLayer.colors = [
-                UIColor(red: 0.85, green: 0.45, blue: 0.05, alpha: 1).cgColor,
+                AnycastColor.orange10.cgColor,
                 Theme.primary.cgColor,
             ]
             iconView.image = AppIcons.newDoc
@@ -1225,10 +1220,13 @@ final class PlanCardView: UIControl {
         self.plan = plan
         super.init(frame: .zero)
 
-        layer.borderColor = Theme.outline.cgColor
         layer.borderWidth = 1
-        layer.cornerRadius = 24
+        layer.cornerRadius = Radius.card
         layer.cornerCurve = .continuous
+        // The border is a CGColor (frozen at assignment, 09 §9a).
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _) in
+            self.applySelection()
+        }
 
         let title = UILabel()
         title.text = plan.title
@@ -1280,7 +1278,7 @@ final class PlanCardView: UIControl {
         backgroundColor = isSelectedPlan
             ? Theme.primary.withAlphaComponent(0.16)
             : Theme.surface
-        layer.borderColor = isSelectedPlan ? Theme.primary.cgColor : Theme.outline.cgColor
+        layer.borderColor = (isSelectedPlan ? Theme.primary : Theme.outline).resolvedColor(with: traitCollection).cgColor
         captionLabel.textColor = isSelectedPlan ? Theme.primary : Theme.onSurfaceVariant
     }
 

@@ -149,3 +149,16 @@ nonisolated enum AnycastColor {
     static let goldAlpha9 = UIColor(named: "GoldAlpha9")!
     static let goldAlpha10 = UIColor(named: "GoldAlpha10")!
 }
+
+extension UIView {
+    /// Sets a layer border from a dynamic token and keeps it in step with
+    /// appearance changes — `layer.borderColor` is a CGColor, frozen at
+    /// assignment (09 §9a). Call once per view, at setup.
+    @MainActor
+    func setDynamicBorderColor(_ color: UIColor) {
+        layer.borderColor = color.resolvedColor(with: traitCollection).cgColor
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: UIView, _) in
+            view.layer.borderColor = color.resolvedColor(with: view.traitCollection).cgColor
+        }
+    }
+}

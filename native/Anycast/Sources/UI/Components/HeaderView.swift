@@ -46,9 +46,7 @@ final class HeaderView: UIView, UITextFieldDelegate {
         titleLabel.accessibilityIdentifier = "header-title"
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        statusLabel.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-            for: .systemFont(ofSize: 13, weight: .regular)
-        )
+        statusLabel.font = TypographyV2.bodySmall.font()
         statusLabel.adjustsFontForContentSizeCategory = true
         statusLabel.textColor = AnycastColor.sand9
         statusLabel.numberOfLines = 1

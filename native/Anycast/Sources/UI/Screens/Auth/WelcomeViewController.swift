@@ -113,7 +113,7 @@ final class WelcomeViewController: UIViewController {
         button.layer.insertSublayer(gradient, at: 0)
         button.layer.cornerRadius = 48
         button.layer.cornerCurve = .continuous
-        button.layer.borderColor = AnycastColor.sandAlpha4.cgColor
+        button.setDynamicBorderColor(AnycastColor.sandAlpha4)
         button.layer.borderWidth = Spacing.hairline
         button.layer.shadowColor = UIColor.black.cgColor
         button.layer.shadowOpacity = 0.1

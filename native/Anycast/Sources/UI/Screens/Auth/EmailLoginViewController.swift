@@ -120,7 +120,7 @@ final class EmailLoginViewController: UIViewController {
         field.adjustsFontForContentSizeCategory = true
         field.textColor = Theme.onSurface
         field.backgroundColor = Theme.surface
-        field.layer.borderColor = Theme.outline.cgColor
+        field.setDynamicBorderColor(Theme.outline)
         field.layer.borderWidth = 1
         field.layer.cornerRadius = 16
         field.layer.cornerCurve = .continuous
