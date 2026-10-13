@@ -64,8 +64,9 @@ enum PlayerProgressClock {
 }
 
 /// The player progress bar (self-drawn widget #4, 07 §2.4; Dart MyProgressBar
-/// over audio_video_progress_bar): 40 pt-tall rounded-caps bar on 0x232830
-/// with a white 5% buffered segment and a white played segment — the
+/// over audio_video_progress_bar), in the Anycast 2.0 scrubber form: a 6 pt
+/// rounded track (white 12%, buffered 24%) that grows to 12 pt
+/// while held, inside a 40 pt touch band, with a white played segment — the
 /// played segment's rounded head IS the position indicator (no separate
 /// thumb: a same-white knob would be invisible against the fill, and the
 /// Dart glow halo read as a dark ring over the track). The head stays a
@@ -79,7 +80,13 @@ final class PlayerProgressBarView: UIControl {
 
     var onSeek: (@MainActor (Int64) -> Void)?
 
+    /// The touch band the bar sits in (unchanged hit area and layout).
     private static let barHeight: CGFloat = 40
+    /// Drawn track thickness while held (Anycast 2.0 UI kit scrubber: the
+    /// track grows under the finger); at rest it is scaled to half,
+    /// `Spacing.playerProgress` (6 pt).
+    private static let trackHeight: CGFloat = 12
+    private static let restScale: CGFloat = Spacing.playerProgress / trackHeight
 
     /// The bar layers live in their own corner-clipped container: the round
     /// head sticks past the track's leading cap at small fractions and must
@@ -107,11 +114,12 @@ final class PlayerProgressBarView: UIControl {
         // warm-dark in both appearances (09 §2.1), and CAShapeLayer fill
         // colors snapshot `.cgColor` at config time — a dynamic color here
         // would freeze whatever trait was ambient.
-        trackLayer.fillColor = Theme.playerBackground.cgColor
-        bufferedLayer.fillColor = UIColor.white.withAlphaComponent(0.05).cgColor
+        trackLayer.fillColor = UIColor.white.withAlphaComponent(0.12).cgColor
+        bufferedLayer.fillColor = UIColor.white.withAlphaComponent(0.24).cgColor
         playedLayer.fillColor = Theme.playerText.cgColor
         barContainer.clipsToBounds = true
-        barContainer.layer.cornerRadius = Self.barHeight / 2
+        barContainer.layer.cornerRadius = Self.trackHeight / 2
+        barContainer.transform = CGAffineTransform(scaleX: 1, y: Self.restScale)
         // The control tracks touches itself; the container is pure chrome.
         barContainer.isUserInteractionEnabled = false
         barContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -122,8 +130,9 @@ final class PlayerProgressBarView: UIControl {
         NSLayoutConstraint.activate([
             barContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
             barContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
-            barContainer.bottomAnchor.constraint(equalTo: bottomAnchor),
-            barContainer.heightAnchor.constraint(equalToConstant: Self.barHeight),
+            // Centered in the bottom touch band.
+            barContainer.centerYAnchor.constraint(equalTo: bottomAnchor, constant: -Self.barHeight / 2),
+            barContainer.heightAnchor.constraint(equalToConstant: Self.trackHeight),
         ])
         layoutBarLayers()
 
@@ -211,11 +220,11 @@ final class PlayerProgressBarView: UIControl {
     private func fillPath(width: CGFloat) -> CGPath? {
         guard width > 0.5 else { return nil }
         let clamped = min(width, bounds.width)
-        let rect = CGRect(x: 0, y: 0, width: clamped, height: Self.barHeight)
-        let path = UIBezierPath(roundedRect: rect, cornerRadius: Self.barHeight / 2)
+        let rect = CGRect(x: 0, y: 0, width: clamped, height: Self.trackHeight)
+        let path = UIBezierPath(roundedRect: rect, cornerRadius: Self.trackHeight / 2)
         path.append(UIBezierPath(ovalIn: CGRect(
-            x: clamped - Self.barHeight, y: 0,
-            width: Self.barHeight, height: Self.barHeight
+            x: clamped - Self.trackHeight, y: 0,
+            width: Self.trackHeight, height: Self.trackHeight
         )))
         return path.cgPath
     }
@@ -227,8 +236,8 @@ final class PlayerProgressBarView: UIControl {
         // All bar geometry is in bar-local (layer) space; the layers sit at
         // barRect via layoutBarLayers.
         trackLayer.path = UIBezierPath(
-            roundedRect: CGRect(x: 0, y: 0, width: bounds.width, height: Self.barHeight),
-            cornerRadius: Self.barHeight / 2
+            roundedRect: CGRect(x: 0, y: 0, width: bounds.width, height: Self.trackHeight),
+            cornerRadius: Self.trackHeight / 2
         ).cgPath
 
         let bufferedFraction = duration > 0
@@ -280,8 +289,23 @@ final class PlayerProgressBarView: UIControl {
         return Int64(Double(fraction) * Double(max(durationMilliseconds, 0)))
     }
 
+    /// Grows the track under the finger and settles it back on release.
+    private func setExpanded(_ expanded: Bool) {
+        let transform = expanded ? .identity : CGAffineTransform(scaleX: 1, y: Self.restScale)
+        guard !Motion.reduceMotion else {
+            barContainer.transform = transform
+            return
+        }
+        UIView.animate(
+            withDuration: Motion.pressRelease, delay: 0,
+            usingSpringWithDamping: 0.75, initialSpringVelocity: 0,
+            options: [.allowUserInteraction, .beginFromCurrentState]
+        ) { self.barContainer.transform = transform }
+    }
+
     override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
         Haptics.scrubberGrab()
+        setExpanded(true)
         isDragging = true
         dragPositionMilliseconds = position(atX: touch.location(in: self).x)
         render()
@@ -295,6 +319,7 @@ final class PlayerProgressBarView: UIControl {
     }
 
     override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
+        setExpanded(false)
         isDragging = false
         let target = touch.map { position(atX: $0.location(in: self).x) } ?? dragPositionMilliseconds
         dragPositionMilliseconds = target
@@ -306,6 +331,7 @@ final class PlayerProgressBarView: UIControl {
     }
 
     override func cancelTracking(with event: UIEvent?) {
+        setExpanded(false)
         isDragging = false
         render()
     }

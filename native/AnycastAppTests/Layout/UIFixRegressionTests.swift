@@ -149,7 +149,7 @@ struct UIFixRegressionTests {
         bar.layoutIfNeeded()
 
         // ~1% in: the fill rect is a few points wide, but the unioned head
-        // circle keeps the path a full 40 pt wide — a plain rounded rect
+        // circle keeps the path a full track-height (12 pt) wide — a plain rounded rect
         // clamps its corner radius to width/2 and rendered a square stub.
         bar.update(positionMilliseconds: 1_200, bufferedMilliseconds: 0, durationMilliseconds: 120_000)
         bar.layoutIfNeeded()
@@ -157,14 +157,14 @@ struct UIFixRegressionTests {
         guard let playedBox = shapes[2].path?.boundingBox else {
             Issue.record("played layer has no path near position zero"); return
         }
-        #expect(abs(playedBox.width - 40) < 0.5,
+        #expect(abs(playedBox.width - 12) < 0.5,
                 "narrow played segment is \(playedBox.width) pt wide — the head is not a full circle")
         #expect(playedBox.minX < 0,
                 "the head circle should extend past the track's leading cap (the container clips it)")
 
         // The container does the clipping (corner radius == half the bar).
         #expect(bar.barContainer.clipsToBounds, "bar container does not clip")
-        #expect(abs(bar.barContainer.layer.cornerRadius - 20) < 0.5,
+        #expect(abs(bar.barContainer.layer.cornerRadius - 6) < 0.5,
                 "bar container corner radius is not a capsule")
     }
 
@@ -204,7 +204,8 @@ struct UIFixRegressionTests {
             return r + g + b > 700
         }
 
-        // Bar occupies view y 20…60; head circle centered at (25, 40).
+        // The resting 6 pt track is centered at y 40 in the 40 pt touch band;
+        // the head ends at x≈25.
         #expect(isWhite(15, 40), "head mid-height not filled: px=\(channels(15, 40))")
         #expect(!isWhite(2, 22), "white reaches the bar's top-left — square stub or clip leak: px=\(channels(2, 22))")
         #expect(!isWhite(2, 59), "white reaches the bar's bottom-left — square stub or clip leak: px=\(channels(2, 59))")
