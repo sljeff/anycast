@@ -61,9 +61,11 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        let field = app.textFields["header-search-field"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5), "page header search field missing")
-        field.tap()
+        let searchButton = app.buttons["header-search"]
+        XCTAssertTrue(searchButton.waitForExistence(timeout: 5), "page header search button missing")
+        searchButton.tap()
+        let field = app.textFields["search-page-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "search sheet did not open")
         guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
             // A connected hardware keyboard suppresses the software one; the
             // typing steps cannot run on such a runner (CI runners are fine).
@@ -76,9 +78,9 @@ final class SmokeFlowsUITests: XCTestCase {
             field.typeText("\n")
         }
 
-        // The results sheet's own copy is the stable marker — do not weaken
+        // The results sheet's tab strip is the stable marker — do not weaken
         // with a collection-view fallback (one is always behind the sheet).
-        let marker = app.staticTexts["You are searching for"]
+        let marker = app.buttons["Channels"]
         XCTAssertTrue(
             marker.waitForExistence(timeout: 8),
             "search sheet did not open after submitting"
@@ -184,9 +186,9 @@ final class SmokeFlowsUITests: XCTestCase {
                 || subscribing.waitForExistence(timeout: 2),
             "channel sheet did not expose the subscription button"
         )
-        // The copy-RSS affordance confirms the header rendered (the old
+        // The share button confirms the header rendered (the old
         // `|| staticTexts.count > 3` fallback was true on almost any screen).
-        XCTAssertTrue(app.buttons["Copy RSS URL"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["Share"].waitForExistence(timeout: 4))
     }
 
     // MARK: - 5. Player: mini player → pages → speed (seeded runs)

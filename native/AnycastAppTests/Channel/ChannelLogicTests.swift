@@ -10,23 +10,29 @@ import AnycastKit
 @MainActor
 struct ChannelLogicTests {
 
-    // MARK: - Fold geometry (channel.dart:248-541)
+    // MARK: - Fold geometry (content scrolls under the compact bar)
 
-    private func makeGeometry(safeTop: CGFloat = 59) -> ChannelFoldGeometry {
-        ChannelFoldGeometry(safeAreaTop: safeTop)
+    private func makeGeometry(safeTop: CGFloat = 59, content: CGFloat = 140) -> ChannelFoldGeometry {
+        ChannelFoldGeometry(safeAreaTop: safeTop, contentHeight: content)
     }
 
-    @Test("Extents: min = safe top + 148, max = safe top + 460, any window")
+    @Test("Extents follow safe top and the measured content height")
     func extents() {
-        let geo = makeGeometry(safeTop: 59)
-        #expect(geo.minExtent == 207)
-        #expect(geo.maxExtent == 519)
-        #expect(geo.maxShrink == 312)
+        let geo = makeGeometry(safeTop: 59, content: 140)
+        #expect(geo.coverTop == 83)                        // 59 + 24
+        #expect(geo.minExtent == 155)                      // coverTop + 60 + 12
+        // coverTop + 120 + 12 + 60 + content + 16
+        let expectedMax: CGFloat = 83 + 120 + 12 + 60 + 140 + 16
+        #expect(geo.maxExtent == expectedMax)
+        #expect(geo.maxShrink == geo.maxExtent - geo.minExtent)
+        #expect(geo.clipLine == geo.coverTop + 64)
 
-        // A different window/safe area moves both extents equally.
-        let taller = makeGeometry(safeTop: 0)
-        #expect(taller.minExtent == 148)
-        #expect(taller.maxExtent == 460)
+        // A different window moves both extents equally; content height
+        // only moves maxExtent.
+        let flat = makeGeometry(safeTop: 0, content: 150)
+        #expect(flat.minExtent == 96)
+        let expectedFlatMax: CGFloat = 24 + 120 + 12 + 60 + 150 + 16
+        #expect(flat.maxExtent == expectedFlatMax)
     }
 
     @Test("Fold at shrink 0: fully expanded")
@@ -34,22 +40,43 @@ struct ChannelLogicTests {
         let geo = makeGeometry()
         #expect(geo.headerHeight(shrink: 0) == geo.maxExtent)
         #expect(geo.coverSize(shrink: 0) == 120)
-        #expect(geo.titleLeadingPadding(shrink: 0) == 0)
-        #expect(geo.secondaryOpacity(shrink: 0) == 1)
         #expect(geo.contentRise(shrink: 0) == 0)
+        #expect(geo.contentTranslation(shrink: 0) == 0)
+        #expect(geo.titleTop(shrink: 0) == geo.coverTop + 120 + 12)
         // Centered cover in a 320pt padded container.
         #expect(geo.coverLeading(shrink: 0, paddedWidth: 320) == 320.0 / 2 - 60)
+        // The title starts where the caller centers it.
+        #expect(geo.titleLeading(shrink: 0, paddedWidth: 320, expandedLeading: 70) == 70)
     }
 
-    @Test("Fold at maxExtent/4: secondary block exactly invisible")
-    func foldAtQuarter() {
+    @Test("Cover size and leading at shrink 60 / 200")
+    func coverInterpolation() {
         let geo = makeGeometry()
-        let quarter = geo.maxExtent / 4
-        #expect(geo.secondaryOpacity(shrink: quarter) == 0)
-        // Beyond the quarter it stays clamped at 0.
-        #expect(geo.secondaryOpacity(shrink: quarter + 100) == 0)
-        // The two spacers are fully collapsed by then (120 + 12 rise).
-        #expect(geo.contentRise(shrink: quarter) == 132)
+        let initial: CGFloat = 320.0 / 2 - 60
+        #expect(geo.coverSize(shrink: 60) == 60)
+        #expect(geo.coverLeading(shrink: 60, paddedWidth: 320) == initial - 60)
+        #expect(geo.coverSize(shrink: 200) == 60)
+        #expect(geo.coverLeading(shrink: 200, paddedWidth: 320) == 16)
+    }
+
+    @Test("Content block translates 1:1 with the scroll and clamps at maxShrink")
+    func contentTranslation() {
+        let geo = makeGeometry()
+        #expect(geo.contentTranslation(shrink: 60) == -60)
+        #expect(geo.contentTranslation(shrink: 200) == -200)
+        #expect(geo.contentTranslation(shrink: geo.maxShrink + 500) == -geo.maxShrink)
+        // Fully folded: the action row's bottom edge is above the clip line.
+        let rowBottom = geo.contentTop + geo.contentHeight + geo.contentTranslation(shrink: geo.maxShrink)
+        #expect(rowBottom <= geo.clipLine)
+    }
+
+    @Test("List first row keeps a constant gap under the content block")
+    func constantGapToList() {
+        let geo = makeGeometry()
+        for s in stride(from: CGFloat(0), through: geo.maxShrink, by: 17) {
+            let rowBottom = geo.contentTop + geo.contentHeight + geo.contentTranslation(shrink: s)
+            #expect(geo.headerHeight(shrink: s) - rowBottom == ChannelFoldGeometry.contentBottomGap)
+        }
     }
 
     @Test("Fold at maxShrink: fully collapsed")
@@ -59,9 +86,25 @@ struct ChannelLogicTests {
         #expect(geo.headerHeight(shrink: s) == geo.minExtent)
         #expect(geo.coverSize(shrink: s) == 60)
         #expect(geo.coverLeading(shrink: s, paddedWidth: 320) == 16)
-        #expect(geo.titleLeadingPadding(shrink: s) == 84)   // min(60 + 24, s)
-        #expect(geo.secondaryOpacity(shrink: s) == 0)
         #expect(geo.contentRise(shrink: s) == 132)
+        // The title box ends level with the 60 pt cover.
+        #expect(geo.titleTop(shrink: s) == geo.coverTop)
+        #expect(ChannelFoldGeometry.titleBoxHeight == ChannelFoldGeometry.collapsedCoverSize)
+        // Compact title: right of the collapsed cover.
+        let compactLeading: CGFloat = 16 + 60 + 12
+        #expect(geo.titleLeading(shrink: s, paddedWidth: 320, expandedLeading: 70) == compactLeading)
+    }
+
+    @Test("Title never overlaps the cover once they share rows")
+    func titleClearsCover() {
+        let geo = makeGeometry()
+        for expandedLeading in [CGFloat(0), 70, 150] {
+            for s in stride(from: CGFloat(60), through: geo.maxShrink, by: 5) {
+                let coverTrailing = geo.coverLeading(shrink: s, paddedWidth: 320) + geo.coverSize(shrink: s)
+                let leading = geo.titleLeading(shrink: s, paddedWidth: 320, expandedLeading: expandedLeading)
+                #expect(leading >= coverTrailing + ChannelFoldGeometry.titleLeadingGap)
+            }
+        }
     }
 
     @Test("Fold clamps negative (bounce) and overshooting offsets")
@@ -69,22 +112,22 @@ struct ChannelLogicTests {
         let geo = makeGeometry()
         #expect(geo.headerHeight(shrink: -50) == geo.maxExtent)
         #expect(geo.coverSize(shrink: -50) == 120)
+        #expect(geo.contentTranslation(shrink: -50) == 0)
         #expect(geo.headerHeight(shrink: geo.maxShrink + 1000) == geo.minExtent)
         #expect(geo.coverSize(shrink: geo.maxShrink + 1000) == 60)
         #expect(geo.coverLeading(shrink: geo.maxShrink + 1000, paddedWidth: 320) == 16)
     }
 
-    @Test("Mid-fold cover motion is linear toward 16/60")
-    func foldMidpoint() {
-        let geo = makeGeometry()
-        let paddedWidth: CGFloat = 320
-        let initial = paddedWidth / 2 - 60
-        // Shrink of 40 moves the cover left by 40 and shrinks it by 40.
-        #expect(geo.coverSize(shrink: 40) == 80)
-        #expect(geo.coverLeading(shrink: 40, paddedWidth: paddedWidth) == initial - 40)
-        // Title padding rides along until the 84 cap.
-        #expect(geo.titleLeadingPadding(shrink: 40) == 40)
-        #expect(geo.titleLeadingPadding(shrink: 90) == 84)
+    // MARK: - Subscribe toggle presentation
+
+    @Test("Subscribe toggle icon and label per display state")
+    func subscribeToggle() {
+        #expect(ChannelSubscriptionDisplay.subscribe.toggleIcon === AppIcons.subscribe)
+        #expect(ChannelSubscriptionDisplay.subscribe.toggleAccessibilityLabel == "Subscribe")
+        #expect(ChannelSubscriptionDisplay.unsubscribe.toggleIcon === AppIcons.subscribed)
+        #expect(ChannelSubscriptionDisplay.unsubscribe.toggleAccessibilityLabel == "Unsubscribe")
+        #expect(ChannelSubscriptionDisplay.loading.toggleIcon === AppIcons.subscribe)
+        #expect(ChannelSubscriptionDisplay.loading.toggleAccessibilityLabel == "Subscribing")
     }
 
     @Test("Gradient top color: dominant at 30% over 0xFF111316")

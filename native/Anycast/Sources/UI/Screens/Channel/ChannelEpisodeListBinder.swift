@@ -122,16 +122,13 @@ final class ChannelEpisodeListBinder {
         )
     }
 
-    /// Card right text: "{duration} • {relative datetime}"
-    /// (card.dart:50-51); nil pubDate degrades to 0 instead of the Dart
-    /// `pubDate!` crash (K4 family).
+    /// Card right text: "{relative date} · {duration}" (shared episode
+    /// meta); a nil pubDate omits the date instead of the Dart `pubDate!`
+    /// crash (K4 family).
     nonisolated static func rightText(for episode: FeedEpisodeRow) -> String {
-        let duration = TimeFormats.formatDuration(episode.duration ?? 0)
-        let date = TimeFormats.formatDatetime(
-            episode.pubDate ?? 0,
-            nowEpochMilliseconds: Int64(Date().timeIntervalSince1970 * 1000)
+        RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: episode.pubDate, durationMilliseconds: episode.duration
         )
-        return "\(duration) • \(date)"
     }
 
     // MARK: - Actions (channel.dart:137-186 / 831-880)

@@ -66,21 +66,6 @@ struct ShellLogicTests {
         #expect(MiniPlayerVisibility.isVisible(queueCount: 1) == true)
         #expect(MiniPlayerVisibility.isVisible(queueCount: 12) == true)
     }
-
-    // MARK: - Mini player time text (getPlayedAndTotalTime parity)
-
-    @Test("Played/total text matches the Dart formatter")
-    func playedAndTotalText() {
-        #expect(PlayerBarView.playedAndTotalText(playedMilliseconds: 0, totalMilliseconds: 0) == "0:00 / 0:00")
-        #expect(
-            PlayerBarView.playedAndTotalText(playedMilliseconds: 75_000, totalMilliseconds: 3_661_000)
-                == "1:15 / 61:01"
-        )
-        #expect(
-            PlayerBarView.playedAndTotalText(playedMilliseconds: 604_999, totalMilliseconds: 605_000)
-                == "10:04 / 10:05"
-        )
-    }
 }
 
 /// URL scheme dispatch (docs/migration/08 §12.2) — the pure classification.

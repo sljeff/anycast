@@ -4,44 +4,63 @@ import AnycastKit
 
 // MARK: - Fold geometry (channel.dart:248-541, pure)
 
-/// Pure interpolation model of the pinned channel header — the exact
-/// arithmetic of `ChannelHeaderDelegate.build` as a function of
+/// Pure interpolation model of the pinned channel header as a function of
 /// `shrinkOffset`, so the scroll-driven fold stays testable and off the
 /// layout engine (07 §2.3: transforms/opacity only, per 08 §11.2).
+///
+/// "Content scrolls under the compact bar": the cover and title collapse into
+/// a 60 pt bar at the top while the author / description / action block
+/// travels up 1:1 with the scroll and is clipped below that bar, so the list's
+/// first row always sits a constant gap under the action block and no empty
+/// band opens between the compact bar and the list.
 struct ChannelFoldGeometry: Equatable {
 
-    static let handlerHeight: CGFloat = 6
-    static let handlerGap: CGFloat = 16
-    static let buttonRowHeight: CGFloat = 40
-    static let coverTopGap: CGFloat = 16
+    /// Cover top below the safe area; clears the system sheet grabber.
+    static let coverTopGap: CGFloat = 24
     static let expandedCoverSize: CGFloat = 120
     static let collapsedCoverSize: CGFloat = 60
     static let collapsedCoverLeading: CGFloat = 16
     static let coverBottomGap: CGFloat = 12
-    static let titleBoxHeight: CGFloat = 58
-    static let maxTitleLeadingPadding: CGFloat = 84   // 60 + 24 (channel.dart:425)
-    static let headerBottomGap: CGFloat = 10
+    static let titleBoxHeight: CGFloat = 60
+    /// Gap between the collapsed cover and the compact title.
+    static let titleLeadingGap: CGFloat = 12
+    /// Gap between the action row and the list's first row.
+    static let contentBottomGap: CGFloat = 16
+    /// Space under the compact cover that stays part of the compact bar.
+    static let collapsedBottomGap: CGFloat = 12
+    /// The clip line sits this far below the compact cover row.
+    static let clipLineInset: CGFloat = 4
+    /// Used until the real content block is measured (default Dynamic Type).
+    static let fallbackContentHeight: CGFloat = 118
 
     /// Top safe-area inset of the sheet's own view — never a fixed status
     /// bar number (07 §4: any window size must survive).
     var safeAreaTop: CGFloat
 
-    /// minExtent = statusBar + 6 + 16 + 40 + 16 + 60 + 10 (channel.dart:258).
-    var minExtent: CGFloat {
-        safeAreaTop + Self.handlerHeight + Self.handlerGap + Self.buttonRowHeight
-            + Self.coverTopGap + Self.collapsedCoverSize + Self.headerBottomGap
+    /// Height of the author / description / action block, measured from the
+    /// real views at the header width.
+    var contentHeight: CGFloat = ChannelFoldGeometry.fallbackContentHeight
+
+    /// Cover top edge inside the header — pinned for every shrink value.
+    var coverTop: CGFloat { safeAreaTop + Self.coverTopGap }
+
+    /// Top of the content block in the expanded state (below the title box).
+    var contentTop: CGFloat {
+        coverTop + Self.expandedCoverSize + Self.coverBottomGap + Self.titleBoxHeight
     }
 
-    /// maxExtent = statusBar + 460 (channel.dart:262).
-    var maxExtent: CGFloat { safeAreaTop + 460 }
+    /// The compact bar: cover row plus a small bottom gap.
+    var minExtent: CGFloat {
+        coverTop + Self.collapsedCoverSize + Self.collapsedBottomGap
+    }
+
+    var maxExtent: CGFloat { contentTop + contentHeight + Self.contentBottomGap }
 
     var maxShrink: CGFloat { maxExtent - minExtent }
 
-    /// Cover top edge inside the header — pinned at 78 + safe area for every
-    /// shrink value (channel.dart:311).
-    var coverTop: CGFloat {
-        safeAreaTop + Self.handlerHeight + Self.handlerGap + Self.buttonRowHeight
-            + Self.coverTopGap
+    /// Header-space y of the line the content block is clipped at.
+    var clipLine: CGFloat {
+        minExtent - Self.collapsedBottomGap + Self.clipLineInset
     }
 
     func clampedShrink(_ shrink: CGFloat) -> CGFloat {
@@ -65,22 +84,39 @@ struct ChannelFoldGeometry: Equatable {
         return max(initial - clampedShrink(shrink), Self.collapsedCoverLeading)
     }
 
-    /// Title container leading padding = min(60 + 24, shrinkOffset).
-    func titleLeadingPadding(shrink: CGFloat) -> CGFloat {
-        min(Self.maxTitleLeadingPadding, clampedShrink(shrink))
-    }
-
-    /// Secondary block opacity = max(1 - shrinkOffset / (maxExtent / 4), 0);
-    /// fully hidden from maxExtent/4 on (channel.dart:437-440).
-    func secondaryOpacity(shrink: CGFloat) -> CGFloat {
-        max(1 - clampedShrink(shrink) / (maxExtent / 4), 0)
-    }
-
-    /// Vertical rise of the title block (and everything below it) while the
-    /// two collapsing spacers above it shrink: min(120, s) + min(12, s).
+    /// Vertical rise of the title box while the two collapsing spacers above
+    /// it shrink: min(120, s) + min(12, s). The box ends level with the cover.
     func contentRise(shrink: CGFloat) -> CGFloat {
         let s = clampedShrink(shrink)
         return min(s, Self.expandedCoverSize) + min(s, Self.coverBottomGap)
+    }
+
+    /// Title box top edge (header space).
+    func titleTop(shrink: CGFloat) -> CGFloat {
+        contentTop - Self.titleBoxHeight - contentRise(shrink: shrink)
+    }
+
+    /// Title leading (padded-content coordinates). The title starts at
+    /// `expandedLeading` (centered under the cover) and, by the shrink at
+    /// which the cover has reached its final size (the title then starts to
+    /// share rows with it), sits right of the cover's trailing edge; from
+    /// there it follows that edge to the compact position. It therefore
+    /// never overlaps the cover.
+    func titleLeading(shrink: CGFloat, paddedWidth: CGFloat, expandedLeading: CGFloat) -> CGFloat {
+        let s = clampedShrink(shrink)
+        func clearOfCover(_ shrink: CGFloat) -> CGFloat {
+            coverLeading(shrink: shrink, paddedWidth: paddedWidth)
+                + coverSize(shrink: shrink) + Self.titleLeadingGap
+        }
+        let handover = Self.expandedCoverSize - Self.collapsedCoverSize
+        if s >= handover { return clearOfCover(s) }
+        let t = s / handover
+        return expandedLeading + (clearOfCover(handover) - expandedLeading) * t
+    }
+
+    /// Content block translation: 1:1 with the scroll.
+    func contentTranslation(shrink: CGFloat) -> CGFloat {
+        -clampedShrink(shrink)
     }
 
     /// Gradient top stop = dominant color at 30% over the page background

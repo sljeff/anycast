@@ -117,8 +117,8 @@ final class SettingsViewController: UIViewController {
         view.addSubview(collectionView)
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -Spacing.pageH),
 
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),

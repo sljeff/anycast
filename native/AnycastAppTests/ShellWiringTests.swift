@@ -16,7 +16,7 @@ struct ShellWiringTests {
     @Test("Mini player play/pause control carries a touch-up action")
     func miniPlayerPlayPauseWired() async {
         guard let context = await Self.liveUIContext() else { return }
-        let bar = context.makePlayerBar()
+        let bar = context.makePlayerBar(style: .capsule)
         bar.frame = CGRect(x: 0, y: 0, width: 390, height: 58)
         bar.layoutIfNeeded()
         guard let control = Self.firstDescendant(of: bar, of: PlayPauseIconControl.self) else {

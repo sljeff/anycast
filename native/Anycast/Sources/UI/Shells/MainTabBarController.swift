@@ -100,14 +100,15 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         delegate = self
         tabBar.tintColor = Theme.primary
 
-        let tabs: [(UIViewController, String, UIImage)] = [
-            (PodcastHomeViewController(context: context), "Podcast", AppIcons.inbox),
-            (PlaylistsPageViewController(context: context), "Playlist", AppIcons.playlist),
-            (DiscoverViewController(context: context), "Discover", AppIcons.discover),
+        let tabs: [(UIViewController, String, UIImage, UIImage)] = [
+            (PodcastHomeViewController(context: context), "Podcast", AppIcons.inbox, AppIcons.inboxSelected),
+            (PlaylistsPageViewController(context: context), "Playlist", AppIcons.playlist, AppIcons.playlistSelected),
+            (DiscoverViewController(context: context), "Discover", AppIcons.discover, AppIcons.discoverSelected),
         ]
         viewControllers = tabs.enumerated().map { index, tab in
-            let (controller, title, icon) = tab
-            controller.tabBarItem = UITabBarItem(title: title, image: icon, tag: index)
+            let (controller, title, icon, selectedIcon) = tab
+            controller.tabBarItem = UITabBarItem(title: title, image: icon, selectedImage: selectedIcon)
+            controller.tabBarItem.tag = index
             controller.tabBarItem.accessibilityIdentifier = "tab-\(index)"
             // Resident pages: their timers and observers start at launch.
             controller.loadViewIfNeeded()

@@ -110,6 +110,17 @@ final class DiscoverPagingContainer: UIViewController, UIScrollViewDelegate {
         page.didMove(toParent: self)
     }
 
+    /// Swaps the page at `index` for a fresh one (a new search rebuilds both
+    /// tabs' pages around a new view model).
+    func replace(_ page: UIViewController, at index: Int) {
+        if let old = installedPages.removeValue(forKey: index) {
+            old.willMove(toParent: nil)
+            old.view.removeFromSuperview()
+            old.removeFromParent()
+        }
+        install(page, at: index)
+    }
+
     func select(_ index: Int, animated: Bool) {
         guard slots.indices.contains(index) else { return }
         selectedIndex = index

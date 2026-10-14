@@ -24,6 +24,32 @@ struct HTMLContentRendererTests {
         #expect(color === Theme.onSurface)
     }
 
+    @Test("Stray markup in a plain (non-'<') payload is decoded")
+    func plainPayloadDecodesStrayMarkup() async {
+        let renderer = HTMLContentRenderer()
+        let result = await renderer.attributedString(
+            for: "Listen to <em>Planet Money</em>", cacheKey: "k-stray"
+        )
+        #expect(result.string == "Listen to Planet Money")
+    }
+
+    @Test("Spacer paragraphs and stacked line breaks collapse to one blank line")
+    func blankLineRunsCollapse() async throws {
+        let renderer = HTMLContentRenderer()
+        let htmls = [
+            "<p>a</p><p><br></p><p><br></p><p>&nbsp;</p><p>b</p>",
+            "<p>a<br><br><br><br>b</p>",
+        ]
+        let newlineRun = try NSRegularExpression(pattern: "[\\n\\r\u{2028}\u{2029}]{3,}")
+        for (index, html) in htmls.enumerated() {
+            let result = await renderer.attributedString(for: html, cacheKey: "episode-gap-\(index)")
+            let text = result.string
+            #expect(newlineRun.firstMatch(in: text, range: NSRange(location: 0, length: text.utf16.count)) == nil)
+            #expect(text.contains("a"))
+            #expect(text.contains("b"))
+        }
+    }
+
     @Test("Sanitization-empty HTML falls back to htmlToText")
     func sanitizeEmptyFallback() async {
         let renderer = HTMLContentRenderer()

@@ -163,13 +163,12 @@ enum PlaylistCardDisplay {
                 playedMilliseconds: played
             )
         }
-        // Unplayed rows keep the generic card meta (card.dart:50-51).
-        let durationText = TimeFormats.formatDuration(duration)
-        let dateText = TimeFormats.formatDatetime(
-            input.pubDateMilliseconds ?? 0,
-            nowEpochMilliseconds: input.nowEpochMilliseconds
+        // Unplayed rows use the shared episode meta, "{relative date} · {duration}".
+        return RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: input.pubDateMilliseconds,
+            durationMilliseconds: duration,
+            now: Date(timeIntervalSince1970: TimeInterval(input.nowEpochMilliseconds) / 1000)
         )
-        return "\(durationText) • \(dateText)"
     }
 
     /// playbackProgress (formatters.dart:80-87): clamped 0…1, 0 for a

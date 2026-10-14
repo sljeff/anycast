@@ -61,7 +61,7 @@ struct PlaylistCardDisplayTests {
         )) == "30m remaining")
     }
 
-    @Test("Unplayed rows keep the generic duration • date meta")
+    @Test("Unplayed rows use the shared date · duration meta")
     func unplayedRightText() {
         // 73-minute duration, pubDate 2 minutes before `now` → "2m ago"
         // via timeago en_short (90 s ≤ elapsed < 45 min).
@@ -69,12 +69,12 @@ struct PlaylistCardDisplayTests {
         let text = PlaylistCardDisplay.rightText(input(
             played: 0, duration: 73 * 60_000, pubDate: now - 120_000, now: now
         ))
-        #expect(text == "73m • 2m ago")
-        // Zero duration degrades to the empty duration segment.
+        #expect(text == "2m ago · 73m")
+        // Zero duration drops the duration segment.
         let zero = PlaylistCardDisplay.rightText(input(
             played: 0, duration: 0, pubDate: now - 120_000, now: now
         ))
-        #expect(zero == " • 2m ago")
+        #expect(zero == "2m ago")
     }
 
     // MARK: - Progress fraction (playbackProgress, formatters.dart:80-87)

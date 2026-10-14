@@ -5,9 +5,9 @@ import UIKit
 final class PodcastSectionBar: UIView {
 
     var onSelect: ((Int) -> Void)?
-    private let items: [(title: String, icon: UIImage)] = [
-        ("Inbox", AppIcons.inbox),
-        ("Subscriptions", AppIcons.subscriptions),
+    private let items: [(title: String, icon: UIImage, selectedIcon: UIImage)] = [
+        ("Inbox", AppIcons.inbox, AppIcons.inboxSelected),
+        ("Subscriptions", AppIcons.subscriptions, AppIcons.subscriptionsSelected),
     ]
     private let selectedSurface = UIView()
     private var buttons: [UIButton] = []
@@ -30,7 +30,8 @@ final class PodcastSectionBar: UIView {
         for (index, item) in items.enumerated() {
             var configuration = UIButton.Configuration.plain()
             configuration.title = item.title
-            configuration.image = item.icon.withRenderingMode(.alwaysTemplate)
+            // selectedIndex starts at 0: filled icon there, outline elsewhere.
+            configuration.image = (index == 0 ? item.selectedIcon : item.icon).withRenderingMode(.alwaysTemplate)
             configuration.imagePlacement = .top
             configuration.imagePadding = 1
             configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16)
@@ -110,7 +111,10 @@ final class PodcastSectionBar: UIView {
             y: 0
         )
         for (index, button) in buttons.enumerated() {
-            button.configuration?.baseForegroundColor = index == selectedIndex ? Theme.primary : Theme.onSurfaceVariant
+            let isSelected = index == selectedIndex
+            button.configuration?.baseForegroundColor = isSelected ? Theme.primary : Theme.onSurfaceVariant
+            button.configuration?.image = (isSelected ? items[index].selectedIcon : items[index].icon)
+                .withRenderingMode(.alwaysTemplate)
             button.accessibilityTraits = index == selectedIndex ? [.button, .selected] : [.button]
         }
     }

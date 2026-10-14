@@ -2,9 +2,10 @@ import UIKit
 import AnycastKit
 
 /// The global search sheet (lib/pages/discover.dart:104-313, 03 §2.6),
-/// presented from the AppBar search submit. Header: grabber whose band
-/// TAPS to close, the "You are searching for" + keyword row, and the
-/// Channels/Episodes tab strip over a swipeable two-page body. Each tab's
+/// presented from the header search button. Header: the system grabber, an
+/// editable search field, and the Channels/Episodes tab strip over a
+/// swipeable two-page body. An empty query opens the entry state (field
+/// focused, no strip or results); submitting runs a fresh search. Each tab's
 /// search runs on its first display AND on every revisit (the Dart
 /// TabBarView children carry no KeepAliveWrapper). The Episodes page renders
 /// episode cards with play / add-to-playlist (UNGATED add — the SearchPage
@@ -16,15 +17,13 @@ import AnycastKit
 final class SearchPageViewController: UIViewController {
 
     private let context: UIContext
-    private let viewModel: SearchPageViewModel
+    private var viewModel: SearchPageViewModel
 
-    private let grabber = SheetGrabberView()
-    private let keywordPrefixLabel = UILabel()
-    private let keywordLabel = UILabel()
+    private let searchField = UITextField()
     private let tabStrip: ChipTabBarView
     private var pagingContainer: DiscoverPagingContainer!
-    private let channelsPage: SearchChannelsPageViewController
-    private let episodesPage: SearchEpisodesPageViewController
+    private var channelsPage: SearchChannelsPageViewController
+    private var episodesPage: SearchEpisodesPageViewController
 
     private let playerBar: PlayerBarView
     private let playerBarHeight: NSLayoutConstraint
@@ -42,7 +41,7 @@ final class SearchPageViewController: UIViewController {
         channelsPage = SearchChannelsPageViewController(context: context, viewModel: viewModel)
         episodesPage = SearchEpisodesPageViewController(context: context, viewModel: viewModel)
 
-        playerBar = context.makePlayerBar()
+        playerBar = context.makePlayerBar(style: .capsule)
         playerBar.translatesAutoresizingMaskIntoConstraints = false
         playerBarHeight = playerBar.heightAnchor.constraint(equalToConstant: 58)
 
@@ -69,8 +68,7 @@ final class SearchPageViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
-        // Custom grabber below; the header band taps to close.
-        sheetPresentationController?.prefersGrabberVisible = false
+        sheetPresentationController?.prefersGrabberVisible = true
 
         buildViewHierarchy()
 
@@ -86,6 +84,39 @@ final class SearchPageViewController: UIViewController {
         // The sheet opens on the Channels tab — its FutureBuilder is the
         // one that builds (discover.dart:169); the Episodes tab's search
         // fires on its first visit (no KeepAliveWrapper on these tabs).
+        // An empty query stays in the entry state and searches nothing.
+        if hasQuery {
+            activateTabIfNeeded(0)
+        } else {
+            setResultsVisible(false)
+        }
+    }
+
+    private var hasQuery: Bool {
+        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func setResultsVisible(_ visible: Bool) {
+        tabStrip.isHidden = !visible
+        pagingContainer.view.isHidden = !visible
+    }
+
+    /// Runs a new search: the view model's text is immutable, so both tabs
+    /// get a fresh model and fresh pages.
+    private func submitSearch() {
+        let query = (searchField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+        searchField.resignFirstResponder()
+
+        viewModel = SearchPageViewModel(searchText: query, api: context.api)
+        channelsPage = SearchChannelsPageViewController(context: context, viewModel: viewModel)
+        episodesPage = SearchEpisodesPageViewController(context: context, viewModel: viewModel)
+        pagingContainer.replace(channelsPage, at: 0)
+        pagingContainer.replace(episodesPage, at: 1)
+        pagingContainer.select(0, animated: false)
+        tabStrip.select(0, animated: false)
+        setResultsVisible(true)
+        lastActivatedTab = -1
         activateTabIfNeeded(0)
     }
 
@@ -100,45 +131,27 @@ final class SearchPageViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         episodesPage.refreshMembership()
+        if !hasQuery, tabStrip.isHidden {
+            searchField.becomeFirstResponder()
+        }
     }
 
     // MARK: - Build
 
     private func buildViewHierarchy() {
-        grabber.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(grabber)
-
-        // Grabber-band tap closes (03 §1.3 #6 — the 0.8-threshold sheet is
-        // the one whose Handler has an explicit tap-to-close).
-        let headerTap = UITapGestureRecognizer(target: self, action: #selector(closeTapped))
-        headerTap.delegate = self
-        view.addGestureRecognizer(headerTap)
-
-        // "You are searching for" (labelMedium 12 w600) + keyword
-        // (titleMedium 16 w500, primary green) — discover.dart:137-150.
-        keywordPrefixLabel.text = "You are searching for"
-        keywordPrefixLabel.font = TypographyV2.labelMedium.font()
-        keywordPrefixLabel.adjustsFontForContentSizeCategory = true
-        keywordPrefixLabel.textColor = Theme.onSurfaceVariant
-        keywordPrefixLabel.textAlignment = .center
-        keywordPrefixLabel.numberOfLines = 1
-
-        keywordLabel.text = viewModel.searchText
-        keywordLabel.font = TypographyV2.headlineSmall.font()
-        keywordLabel.adjustsFontForContentSizeCategory = true
-        keywordLabel.textColor = Theme.onSurface
-        keywordLabel.textAlignment = .center
-        keywordLabel.numberOfLines = 1
-        keywordLabel.lineBreakMode = .byTruncatingMiddle
-        keywordLabel.isAccessibilityElement = true
-        keywordLabel.accessibilityLabel = "Search keyword: \(viewModel.searchText)"
-
-        let keywordRow = UIStackView(arrangedSubviews: [keywordPrefixLabel, keywordLabel])
-        keywordRow.axis = .horizontal
-        keywordRow.alignment = .center
-        keywordRow.spacing = Spacing.md
-        keywordRow.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(keywordRow)
+        // clearButtonMode must be set before the style: the style installs
+        // its right spacer only for `.never`.
+        searchField.clearButtonMode = .whileEditing
+        searchField.applyAnycastStyle(placeholder: "Shows, episodes, and more", icon: AppIcons.search)
+        searchField.text = viewModel.searchText
+        searchField.returnKeyType = .search
+        searchField.autocorrectionType = .no
+        searchField.autocapitalizationType = .none
+        searchField.accessibilityLabel = "Search"
+        searchField.accessibilityIdentifier = "search-page-field"
+        searchField.addAction(UIAction { [weak self] _ in self?.submitSearch() }, for: .primaryActionTriggered)
+        searchField.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(searchField)
 
         tabStrip.translatesAutoresizingMaskIntoConstraints = false
         tabStrip.onSelect = { [weak self] index in
@@ -166,23 +179,23 @@ final class SearchPageViewController: UIViewController {
             self?.activateTabIfNeeded(index)
         }
 
-        // NO bottom-safe wrapper (03 §2.6): the bar hugs the sheet's very
-        // bottom edge, under the home indicator — unlike the Channel pages.
+        // The bar floats as a capsule just above the home indicator, inset
+        // by pageH sideways like the Channel pages; the lists run under it.
         view.addSubview(playerBar)
 
+        // Scrim behind the capsule so rows are not hard-cut by it (G-7).
+        let bottomFade = ScrollEdgeFade(edge: .bottom)
+        view.insertSubview(bottomFade, belowSubview: playerBar)
+
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            grabber.widthAnchor.constraint(equalToConstant: 42),
-            grabber.heightAnchor.constraint(equalToConstant: 6),
-
-            keywordRow.topAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 22
+            searchField.topAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20
             ),
-            keywordRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            keywordRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+            searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            searchField.heightAnchor.constraint(equalToConstant: 48),
 
-            tabStrip.topAnchor.constraint(equalTo: keywordRow.bottomAnchor, constant: 12),
+            tabStrip.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: Spacing.gap),
             tabStrip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tabStrip.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tabStrip.heightAnchor.constraint(equalToConstant: 44),
@@ -190,12 +203,21 @@ final class SearchPageViewController: UIViewController {
             pagingContainer.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             pagingContainer.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             pagingContainer.view.topAnchor.constraint(equalTo: tabStrip.bottomAnchor),
-            pagingContainer.view.bottomAnchor.constraint(equalTo: playerBar.topAnchor),
+            pagingContainer.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            playerBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+            playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            playerBar.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.xs
+            ),
             playerBarHeight,
+
+            bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomFade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomFade.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            bottomFade.topAnchor.constraint(
+                equalTo: playerBar.topAnchor, constant: -ScrollEdgeFade.fadeLength
+            ),
         ])
     }
 
@@ -205,20 +227,6 @@ final class SearchPageViewController: UIViewController {
         let visible = context.playback.currentEpisode != nil
         playerBar.isHidden = !visible
         playerBarHeight.constant = visible ? 58 : 0
-    }
-
-    @objc private func closeTapped() {
-        dismiss(animated: true)
-    }
-}
-
-/// Only the grabber band acts as the close affordance (Detail pattern).
-extension SearchPageViewController: UIGestureRecognizerDelegate {
-    func gestureRecognizer(
-        _ gestureRecognizer: UIGestureRecognizer,
-        shouldReceive touch: UITouch
-    ) -> Bool {
-        touch.location(in: view).y <= view.safeAreaInsets.top + 20
     }
 }
 

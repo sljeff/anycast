@@ -97,8 +97,9 @@ final class HTMLContentRenderer {
         case .empty:
             return NSAttributedString()
         case let .text(plain):
-            // Plain passthrough, with stray markup / entities decoded.
-            return NSAttributedString(string: DisplayText.clean(plain), attributes: baseAttributes(traits: traits))
+            // Plain passthrough, with stray markup / entities decoded and
+            // its own line breaks kept.
+            return NSAttributedString(string: DisplayText.plainText(fromHTML: plain), attributes: baseAttributes(traits: traits))
         case let .html(sanitized):
             return await renderSanitized(sanitized, cacheKey: cacheKey, traits: traits)
         }
@@ -260,6 +261,17 @@ final class HTMLContentRenderer {
         }
         for (range, attributes) in replacements {
             result.setAttributes(attributes, range: range)
+        }
+        // WebKit imports stacked `<br>`s / spacer paragraphs as runs of
+        // newlines ("\n" between paragraphs, U+2028 for `<br>`), which
+        // showed as large gaps (G-9): fold any run of blank lines into a
+        // single blank line.
+        let newline = "[\\n\\r\u{2028}\u{2029}]"
+        let blankRuns = try! NSRegularExpression(
+            pattern: "\(newline)[ \\t\u{00A0}]*(?:\(newline)[ \\t\u{00A0}]*){2,}"
+        )
+        for match in blankRuns.matches(in: result.string, range: NSRange(location: 0, length: result.length)).reversed() {
+            result.replaceCharacters(in: match.range, with: "\n\n")
         }
         return result
     }

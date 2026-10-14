@@ -154,10 +154,10 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             guard let self else { return }
             AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
         }
-        header.onSearch = { [weak self] query in
+        header.onSearch = { [weak self] in
             guard let self else { return }
             SearchPageViewController.present(
-                from: self.topMostPresented(), context: self.context, searchText: query
+                from: self.topMostPresented(), context: self.context, searchText: ""
             )
         }
 
@@ -169,7 +169,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         categoryStrip.accessibilityIdentifier = "inbox-category-strip"
     }
 
-    /// "updated {relative} - {n} unlistened" (Figma header status line).
+    /// "updated {relative} · {n} unlistened" (Figma header status line).
     static func headerStatusText(lastRefresh: Date?, episodeCount: Int, now: Date = Date()) -> String {
         let relative: String
         if let lastRefresh {
@@ -178,7 +178,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         } else {
             relative = "—"
         }
-        return "updated \(relative) - \(episodeCount) unlistened"
+        return "updated \(relative) · \(episodeCount) unlistened"
     }
 
     private func refreshChromeStatus() {
@@ -743,14 +743,11 @@ extension InboxPageViewController: UICollectionViewDataSource {
         }
     }
 
-    /// "Nov 21, 2025 · 45 min" — the card's date with the duration when known.
+    /// "4d ago · 30m" — the card's relative date with the duration when known.
     static func metaText(for episode: FeedEpisodeRow) -> String {
-        let date = TimeFormats.formatDatetime(
-            episode.pubDate ?? 0,
-            nowEpochMilliseconds: Int64(Date().timeIntervalSince1970 * 1000)
+        RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: episode.pubDate, durationMilliseconds: episode.duration
         )
-        guard let duration = episode.duration, duration > 0 else { return date }
-        return "\(date) · \(TimeFormats.formatDuration(duration))"
     }
 
     private func status(for episode: FeedEpisodeRow) -> InboxCardContent.Status {

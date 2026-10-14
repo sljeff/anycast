@@ -33,6 +33,12 @@ struct ChannelVisualSmokeTests {
         let geo = ChannelFoldGeometry(safeAreaTop: channelController?.view.safeAreaInsets.top ?? 59)
 
         await Self.captureWindow(name: "t2-channel-expanded")
+        if let header = collectionView?.visibleSupplementaryViews(
+            ofKind: ChannelViewController.headerElementKind
+        ).first {
+            // The supplementary's absolute height is the measured maxExtent.
+            print("[t2-visual] header maxExtent \(header.bounds.height) safeTop \(geo.safeAreaTop)")
+        }
 
         // Drive the fold: full collapse, clamped to what the content allows
         // (episode count is network-dependent).

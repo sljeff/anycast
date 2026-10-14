@@ -8,7 +8,7 @@ import AnycastKit
 /// Fold architecture (07 §2.3, 08 §11.2): compositional layout with a
 /// `pinToVisibleBounds` boundary supplementary of the EXPANDED height; the
 /// scroll-driven interpolation only touches layer geometry (gradient layer
-/// frame, view transforms, opacity) — never per-tick Auto Layout. The
+/// frame, view frames/transforms, the content clip) — never per-tick Auto Layout. The
 /// supplementary's transparent tail below the current fold height passes
 /// touches through to the cells scrolling beneath it.
 ///
@@ -40,6 +40,9 @@ final class ChannelViewController: UIViewController {
 
     private var headerView: ChannelHeaderView?
     private var appliedSafeAreaTop: CGFloat = -1
+    /// Measured height of the header's content block (see
+    /// `ChannelHeaderView.onContentHeightChange`).
+    private var contentBlockHeight = ChannelFoldGeometry.fallbackContentHeight
     private var lastEpisodeSignature: [String?] = []
 
     private let modelObservation = ObservationLoop()
@@ -90,9 +93,8 @@ final class ChannelViewController: UIViewController {
         }
         collectionView.translatesAutoresizingMaskIntoConstraints = false
 
-        // The v2 capsule mini player (surface 80% pill, round cover, no
-        // time row) — the page previously kept the v1 `.standalone`
-        // full-bleed bar, clashing with the shell's capsule language.
+        // The v2 capsule mini player (sand pill, round cover, single title
+        // line) — the same chrome as the shell's capsule language.
         let playerBar = context.makePlayerBar(style: .capsule)
         playerBar.translatesAutoresizingMaskIntoConstraints = false
         let height = playerBar.heightAnchor.constraint(equalToConstant: 58)
@@ -105,9 +107,7 @@ final class ChannelViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
-        // Custom grabber is drawn inside the header (Detail precedent, A2);
-        // the system sheet grabber would double it.
-        sheetPresentationController?.prefersGrabberVisible = false
+        sheetPresentationController?.prefersGrabberVisible = true
 
         buildViewHierarchy()
         resolveChannel()
@@ -142,6 +142,7 @@ final class ChannelViewController: UIViewController {
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
+        updateListBottomInset()
         rebuildForGeometryChange()
     }
 
@@ -164,6 +165,10 @@ final class ChannelViewController: UIViewController {
         view.addSubview(collectionView)
         view.addSubview(playerBar)
 
+        // Scrim behind the capsule so rows are not hard-cut by it (G-7).
+        let bottomFade = ScrollEdgeFade(edge: .bottom)
+        view.insertSubview(bottomFade, belowSubview: playerBar)
+
         episodeListSpinner.color = Theme.primary
         episodeListSpinner.hidesWhenStopped = true
         episodeListSpinner.translatesAutoresizingMaskIntoConstraints = false
@@ -185,16 +190,25 @@ final class ChannelViewController: UIViewController {
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.topAnchor.constraint(equalTo: view.topAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: playerBar.topAnchor),
+            // Runs under the floating capsule; `updateListBottomInset()`
+            // keeps the last row clear of it.
+            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             // Floating capsule: page-grid side margins, 16 pt clear of the
-            // safe-area bottom (the standalone bar used to run full-bleed).
+            // safe-area bottom.
             playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
             playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
             playerBar.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.pageH
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.xs
             ),
             playerBarHeight,
+
+            bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomFade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomFade.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            bottomFade.topAnchor.constraint(
+                equalTo: playerBar.topAnchor, constant: -ScrollEdgeFade.fadeLength
+            ),
 
             episodeListSpinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             episodeListSpinner.centerYAnchor.constraint(
@@ -269,16 +283,25 @@ final class ChannelViewController: UIViewController {
     // MARK: - Geometry (safe-area driven; any window size)
 
     private var foldGeometry: ChannelFoldGeometry {
-        ChannelFoldGeometry(safeAreaTop: view.safeAreaInsets.top)
+        ChannelFoldGeometry(safeAreaTop: view.safeAreaInsets.top, contentHeight: contentBlockHeight)
     }
 
     /// The pinned supplementary's absolute height tracks the current safe
-    /// area; extents never use fixed status bar numbers.
+    /// area and the measured content block; extents never use fixed status
+    /// bar numbers.
     private func rebuildForGeometryChange() {
         appliedSafeAreaTop = view.safeAreaInsets.top
-        headerView?.updateSafeAreaTop(view.safeAreaInsets.top)
+        headerView?.updateGeometry(foldGeometry)
         collectionView.setCollectionViewLayout(makeLayout(), animated: false)
         applyFold()
+    }
+
+    /// Called from the header's layout pass, so the layout rebuild is
+    /// deferred; a stable measurement stops the loop.
+    private func contentHeightMeasured(_ height: CGFloat) {
+        guard abs(height - contentBlockHeight) > 0.5 else { return }
+        contentBlockHeight = height
+        DispatchQueue.main.async { [weak self] in self?.rebuildForGeometryChange() }
     }
 
     private func makeLayout() -> UICollectionViewCompositionalLayout {
@@ -288,7 +311,7 @@ final class ChannelViewController: UIViewController {
             // ONE section hosts everything: the pinned boundary supplementary
             // only pins while its host section is on screen, so the header
             // must belong to the section that spans the whole list. Item 0 is
-            // the search/order block; the rest are episode cards.
+            // the order/search row; the rest are episode cards.
             let item = NSCollectionLayoutItem(
                 layoutSize: NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1),
@@ -375,6 +398,21 @@ final class ChannelViewController: UIViewController {
         let visible = context.playback.currentEpisode != nil
         playerBar.isHidden = !visible
         playerBarHeight.constant = visible ? 58 : 0
+        updateListBottomInset()
+    }
+
+    /// The list runs under the floating capsule (and the home indicator),
+    /// so the last row needs the bar's footprint as bottom content inset.
+    /// Only the bottom changes — the pinned header and fold geometry key off
+    /// the top.
+    private func updateListBottomInset() {
+        let playerVisible = context.playback.currentEpisode != nil
+        let clearance = playerVisible
+            ? PlayerBarView.barHeight + Spacing.xs + Spacing.pageH
+            : Spacing.pageH
+        let bottom = view.safeAreaInsets.bottom + clearance
+        collectionView.contentInset.bottom = bottom
+        collectionView.verticalScrollIndicatorInsets.bottom = bottom
     }
 
     private func refreshVisibleCards() {
@@ -404,24 +442,32 @@ final class ChannelViewController: UIViewController {
 
     // MARK: - Actions
 
-    fileprivate func backTapped() {
-        // K34: the view model stays cached — no deletion on close.
-        dismiss(animated: true)
-    }
-
-    fileprivate func subscriptionTapped() {
-        guard let viewModel, subscriptionDisplay != .loading else { return }
-        Task {
-            if viewModel.subscribed {
-                await viewModel.unsubscribe()
-            } else {
-                await viewModel.subscribe()
-            }
+    /// Subscribe applies immediately; unsubscribing asks first.
+    fileprivate func subscriptionTapped(_ sender: UIView) {
+        guard let viewModel else { return }
+        switch subscriptionDisplay {
+        case .loading:
+            return
+        case .subscribe:
+            Task { await viewModel.subscribe() }
+        case .unsubscribe:
+            let alert = UIAlertController(
+                title: "Unsubscribe from \(viewModel.channel.title ?? "this show")?",
+                message: nil,
+                preferredStyle: .actionSheet
+            )
+            alert.addAction(UIAlertAction(title: "Unsubscribe", style: .destructive) { _ in
+                Task { await viewModel.unsubscribe() }
+            })
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            alert.popoverPresentationController?.sourceView = sender
+            alert.popoverPresentationController?.sourceRect = sender.bounds
+            present(alert, animated: true)
         }
     }
 
     /// Copy the RSS URL + 1 s toast (channel.dart:454-474).
-    fileprivate func copyDomainTapped() {
+    fileprivate func copyRSSTapped() {
         guard let viewModel else { return }
         UIPasteboard.general.string = viewModel.rssFeedURL
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -487,15 +533,14 @@ extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDel
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: ChannelBodyHeaderCell.reuseIdentifier, for: indexPath
             ) as! ChannelBodyHeaderCell
-            cell.onSubmit = { [weak self] text in
+            cell.onSearch = { [weak self] in
                 guard let self, let viewModel = self.viewModel else { return }
-                // channel.dart:682-690 — the sheet opens on submit (even
-                // with the empty string: contains("") matches everything).
+                // The search sheet owns the query field; it opens empty.
                 ChannelSearchViewController.present(
                     from: self,
                     context: self.context,
                     rssFeedURL: viewModel.rssFeedURL,
-                    searchText: text
+                    searchText: ""
                 )
             }
             cell.onOrderSelect = { [weak self] index in
@@ -533,12 +578,12 @@ extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDel
             for: indexPath
         ) as! ChannelHeaderView
         headerView = view
-        view.updateSafeAreaTop(self.view.safeAreaInsets.top)
+        view.updateGeometry(foldGeometry)
+        view.onContentHeightChange = { [weak self] height in self?.contentHeightMeasured(height) }
         view.actions = .init(
-            onBack: { [weak self] in self?.backTapped() },
             onShare: { [weak self] sender in self?.shareTapped(sender) },
-            onSubscriptionTap: { [weak self] in self?.subscriptionTapped() },
-            onCopyDomain: { [weak self] in self?.copyDomainTapped() },
+            onSubscriptionTap: { [weak self] sender in self?.subscriptionTapped(sender) },
+            onCopyRSS: { [weak self] in self?.copyRSSTapped() },
             onLatestEpisode: { [weak self] in self?.latestEpisodeTapped() }
         )
         if let viewModel {
@@ -560,43 +605,73 @@ extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDel
     }
 }
 
+// MARK: - Subscribe toggle presentation
+
+extension ChannelSubscriptionDisplay {
+
+    /// Outline bookmark = not subscribed, filled = subscribed; the loading
+    /// state keeps the outline (dimmed and disabled by the button).
+    var toggleIcon: UIImage {
+        self == .unsubscribe ? AppIcons.subscribed : AppIcons.subscribe
+    }
+
+    /// "Subscribing" while the state is unknown keeps the loading state
+    /// addressable for UI tests.
+    var toggleAccessibilityLabel: String {
+        switch self {
+        case .loading: "Subscribing"
+        case .subscribe: "Subscribe"
+        case .unsubscribe: "Unsubscribe"
+        }
+    }
+}
+
 // MARK: - Pinned header (channel.dart:248-541)
 
 /// The pinned supplementary: gradient background layer (dominant → page
-/// dark), expanded-state Auto Layout content, and a transform/opacity-only
-/// fold. Below the current fold height the view is transparent and passes
-/// touches through to the list scrolling beneath.
+/// dark), the cover/title that collapse into a compact bar, and the content
+/// block (author, description, action row) that scrolls up under that bar
+/// inside a clipping container. The fold only touches frames, transforms and
+/// the clip — never per-tick Auto Layout. Below the current fold height the
+/// view is transparent and passes touches through to the list scrolling
+/// beneath.
 @MainActor
 final class ChannelHeaderView: UICollectionReusableView {
 
     struct Actions {
-        var onBack: () -> Void
         var onShare: (UIView) -> Void
-        var onSubscriptionTap: () -> Void
-        var onCopyDomain: () -> Void
+        var onSubscriptionTap: (UIView) -> Void
+        var onCopyRSS: () -> Void
         var onLatestEpisode: () -> Void
     }
 
     var actions: Actions?
+    /// Reports the measured height of the content block so the controller
+    /// can size the pinned supplementary to it.
+    var onContentHeightChange: ((CGFloat) -> Void)?
 
     private let gradientLayer = CAGradientLayer()
+    /// Hangs below the gradient's bottom edge so scrolled rows fade in under
+    /// the pinned header instead of being hard-cut (G-7); positioned by a
+    /// transform in `applyFold` like the rest of the fold.
+    private let bottomFade = ScrollEdgeFade(edge: .top)
     /// Dominant color last applied to the header gradient (re-applied on
     /// trait flips).
     private var headerDominant: UIColor = ChannelViewModel.playerWarmColor
-    private let grabber = SheetGrabberView()
-    // 40 pt keeps ChannelFoldGeometry.buttonRowHeight; the row stays tappable.
-    private let backButton = AnycastIconButton(
-        style: .tonal, icon: AppIcons.back, accessibilityLabel: "Close channel", diameter: 40
+    private let subscribeButton = AnycastIconButton(
+        style: .tonal, icon: AppIcons.subscribe, accessibilityLabel: "Subscribe"
     )
     private let shareButton = AnycastIconButton(
-        style: .tonal, icon: AppIcons.share, accessibilityLabel: "Share channel", diameter: 40
+        style: .tonal, icon: AppIcons.share, accessibilityLabel: "Share"
     )
-    private let subscriptionButton = SubscriptionCapsuleButton()
     private let coverView = UIImageView()
     private let titleLabel = UILabel()
-    private let fadeGroup = UIStackView()
+    /// Clips the content block at the compact bar's bottom line; its top
+    /// 16 pt fade out through the mask.
+    private let contentClip = UIView()
+    private let contentFadeMask = CAGradientLayer()
+    private let contentStack = UIStackView()
     private let authorLabel = UILabel()
-    private let domainButton = UIButton(type: .system)
     private let descriptionText = ExpandableText(text: "", style: .defaultText, maxLines: 2)
     private let latestButton = UIButton(type: .custom)
 
@@ -604,6 +679,8 @@ final class ChannelHeaderView: UICollectionReusableView {
     /// Last applied fold inputs — replayed on layout passes.
     private var foldShrink: CGFloat = 0
     private var foldGeometryValue = ChannelFoldGeometry(safeAreaTop: 0)
+    private var measuredContentHeight: CGFloat?
+    private var contentMeasureKey = ""
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -616,18 +693,19 @@ final class ChannelHeaderView: UICollectionReusableView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        measureContentIfNeeded()
         // Keep the gradient layer frame in sync with bounds + safe area
         // without touching constraints.
         applyFold(shrink: foldShrink, geo: foldGeometryValue)
     }
 
-    func updateSafeAreaTop(_ safeAreaTop: CGFloat) {
-        layoutMargins.top = safeAreaTop
-        foldGeometryValue.safeAreaTop = safeAreaTop
+    func updateGeometry(_ geo: ChannelFoldGeometry) {
+        layoutMargins.top = geo.safeAreaTop
+        foldGeometryValue = geo
         applyFold(shrink: foldShrink, geo: foldGeometryValue)
     }
 
-    // MARK: Build (expanded-state constraints; channel.dart:343-547)
+    // MARK: Build (channel.dart:343-547)
 
     private func build() {
         layoutMargins = UIEdgeInsets(top: 0, left: 24, bottom: 0, right: 24)
@@ -637,22 +715,13 @@ final class ChannelHeaderView: UICollectionReusableView {
         gradientLayer.endPoint = CGPoint(x: 0.5, y: 1)
         layer.insertSublayer(gradientLayer, at: 0)
 
-        grabber.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(grabber)
-
-        backButton.addAction(
-            UIAction { [weak self] _ in self?.actions?.onBack() }, for: .touchUpInside
-        )
-        shareButton.addAction(
-            UIAction { [weak self] _ in self?.actions?.onShare(self?.shareButton ?? UIView()) },
-            for: .touchUpInside
-        )
-        addSubview(backButton)
-        addSubview(shareButton)
-
-        subscriptionButton.onToggle = { [weak self] in self?.actions?.onSubscriptionTap() }
-        subscriptionButton.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(subscriptionButton)
+        addSubview(bottomFade)
+        NSLayoutConstraint.activate([
+            bottomFade.leadingAnchor.constraint(equalTo: leadingAnchor),
+            bottomFade.trailingAnchor.constraint(equalTo: trailingAnchor),
+            bottomFade.topAnchor.constraint(equalTo: topAnchor),
+            bottomFade.heightAnchor.constraint(equalToConstant: ScrollEdgeFade.fadeLength),
+        ])
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
@@ -663,29 +732,29 @@ final class ChannelHeaderView: UICollectionReusableView {
         coverView.accessibilityLabel = "Channel artwork"
         coverView.translatesAutoresizingMaskIntoConstraints = false
 
-        // titleLarge, centered, 2 lines (03 §2.7).
+        // titleLarge, 2 lines (03 §2.7). Frame-driven by `applyFold`: it
+        // starts centered under the cover and ends left-aligned beside it.
         titleLabel.font = TypographyV2.titleLarge.font()
         titleLabel.textColor = Theme.onSurface
-        titleLabel.textAlignment = .center
         titleLabel.numberOfLines = 2
         titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
         authorLabel.font = TypographyV2.bodyLarge.font()
         authorLabel.textColor = Theme.onSurface
         authorLabel.textAlignment = .center
         authorLabel.adjustsFontForContentSizeCategory = true
-        authorLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        domainButton.setTitleColor(Theme.primary, for: .normal)
-        domainButton.titleLabel?.font = TypographyV2.labelLarge.font()
-        domainButton.titleLabel?.adjustsFontForContentSizeCategory = true
-        domainButton.translatesAutoresizingMaskIntoConstraints = false
-        domainButton.addAction(
-            UIAction { [weak self] _ in self?.actions?.onCopyDomain() }, for: .touchUpInside
+        // The description sits directly on the header — no tinted plate.
+        descriptionText.showsTruncatedPlate = false
+        descriptionText.layoutMargins = .zero
+
+        subscribeButton.addAction(
+            UIAction { [weak self] _ in
+                guard let self else { return }
+                self.actions?.onSubscriptionTap(self.subscribeButton)
+            },
+            for: .touchUpInside
         )
-        domainButton.isAccessibilityElement = true
-        domainButton.accessibilityLabel = "Copy RSS URL"
 
         latestButton.configuration = latestConfiguration(loading: false)
         latestButton.addPressFeedback(scale: Motion.pressScaleSubtle)
@@ -696,59 +765,67 @@ final class ChannelHeaderView: UICollectionReusableView {
             UIAction { [weak self] _ in self?.actions?.onLatestEpisode() }, for: .touchUpInside
         )
 
-        fadeGroup.axis = .vertical
-        fadeGroup.alignment = .center
-        fadeGroup.spacing = 12
-        fadeGroup.translatesAutoresizingMaskIntoConstraints = false
-        descriptionText.translatesAutoresizingMaskIntoConstraints = false
-        fadeGroup.addArrangedSubview(authorLabel)
-        fadeGroup.addArrangedSubview(domainButton)
-        fadeGroup.addArrangedSubview(descriptionText)
-        fadeGroup.addArrangedSubview(latestButton)
+        shareButton.addAction(
+            UIAction { [weak self] _ in
+                guard let self else { return }
+                self.actions?.onShare(self.shareButton)
+            },
+            for: .touchUpInside
+        )
+        // Long press keeps the old domain button's job: copy the RSS URL.
+        shareButton.menu = UIMenu(children: [
+            UIAction(title: "Copy RSS URL", image: AppIcons.copy) { [weak self] _ in
+                self?.actions?.onCopyRSS()
+            },
+        ])
+        shareButton.showsMenuAsPrimaryAction = false
+        shareButton.accessibilityCustomActions = [
+            UIAccessibilityCustomAction(name: "Copy RSS URL") { [weak self] _ in
+                self?.actions?.onCopyRSS()
+                return true
+            },
+        ]
+
+        let actionRow = UIStackView(arrangedSubviews: [subscribeButton, latestButton, shareButton])
+        actionRow.axis = .horizontal
+        actionRow.alignment = .center
+        actionRow.spacing = Spacing.gap
+        actionRow.translatesAutoresizingMaskIntoConstraints = false
+        let actionHost = UIView()
+        actionHost.addSubview(actionRow)
+
+        contentStack.axis = .vertical
+        contentStack.alignment = .fill
+        contentStack.spacing = 12
+        contentStack.addArrangedSubview(authorLabel)
+        contentStack.addArrangedSubview(descriptionText)
+        contentStack.addArrangedSubview(actionHost)
+
+        contentClip.clipsToBounds = true
+        contentFadeMask.startPoint = CGPoint(x: 0.5, y: 0)
+        contentFadeMask.endPoint = CGPoint(x: 0.5, y: 1)
+        contentFadeMask.colors = [UIColor.clear.cgColor, UIColor.black.cgColor, UIColor.black.cgColor]
+        contentClip.layer.mask = contentFadeMask
+        contentClip.addSubview(contentStack)
 
         addSubview(titleLabel)
-        addSubview(fadeGroup)
+        addSubview(contentClip)
         // Cover LAST — it draws over the title during the fold (the Dart
         // Stack paints the Positioned cover above the column).
         addSubview(coverView)
 
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor),
-            grabber.centerXAnchor.constraint(equalTo: centerXAnchor),
-            grabber.widthAnchor.constraint(equalToConstant: 42),
-            grabber.heightAnchor.constraint(equalToConstant: 6),
-
-            backButton.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor, constant: 22),
-            backButton.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
-
-            shareButton.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor, constant: 22),
-            shareButton.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
-
-            subscriptionButton.centerYAnchor.constraint(equalTo: backButton.centerYAnchor),
-            subscriptionButton.trailingAnchor.constraint(
-                equalTo: shareButton.leadingAnchor, constant: -12
-            ),
-            subscriptionButton.heightAnchor.constraint(equalToConstant: 40),
-
             coverView.topAnchor.constraint(
-                equalTo: layoutMarginsGuide.topAnchor,
-                constant: ChannelFoldGeometry.handlerHeight + ChannelFoldGeometry.handlerGap
-                    + ChannelFoldGeometry.buttonRowHeight + ChannelFoldGeometry.coverTopGap
+                equalTo: layoutMarginsGuide.topAnchor, constant: ChannelFoldGeometry.coverTopGap
             ),
             coverView.centerXAnchor.constraint(equalTo: layoutMarginsGuide.centerXAnchor),
             coverView.widthAnchor.constraint(equalToConstant: ChannelFoldGeometry.expandedCoverSize),
             coverView.heightAnchor.constraint(equalToConstant: ChannelFoldGeometry.expandedCoverSize),
 
-            titleLabel.topAnchor.constraint(
-                equalTo: coverView.bottomAnchor, constant: ChannelFoldGeometry.coverBottomGap
-            ),
-            titleLabel.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
-            titleLabel.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
-            titleLabel.heightAnchor.constraint(equalToConstant: ChannelFoldGeometry.titleBoxHeight),
-
-            fadeGroup.topAnchor.constraint(equalTo: titleLabel.bottomAnchor),
-            fadeGroup.centerXAnchor.constraint(equalTo: layoutMarginsGuide.centerXAnchor),
-            fadeGroup.widthAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.widthAnchor),
+            actionRow.topAnchor.constraint(equalTo: actionHost.topAnchor),
+            actionRow.bottomAnchor.constraint(equalTo: actionHost.bottomAnchor),
+            actionRow.centerXAnchor.constraint(equalTo: actionHost.centerXAnchor),
+            actionRow.leadingAnchor.constraint(greaterThanOrEqualTo: actionHost.leadingAnchor),
 
             latestButton.heightAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.standardDiameter),
         ])
@@ -777,13 +854,39 @@ final class ChannelHeaderView: UICollectionReusableView {
 
         titleLabel.text = channel.title ?? ""
         authorLabel.text = channel.author ?? "Unknown"
-        domainButton.setTitle(TimeFormats.urlToDomain(channel.rssFeedUrl ?? ""), for: .normal)
-        descriptionText.text = (channel.description ?? "No description").dartTrimmed()
+        descriptionText.text = DisplayText.plainText(fromHTML: channel.description ?? "No description")
 
-        subscriptionButton.configure(display: display)
+        subscribeButton.setIcon(display.toggleIcon)
+        subscribeButton.configuration?.baseForegroundColor =
+            display == .unsubscribe ? Theme.primary : Theme.onSurface
+        subscribeButton.accessibilityLabel = display.toggleAccessibilityLabel
+        subscribeButton.isEnabled = display != .loading
+        subscribeButton.alpha = display == .loading ? 0.5 : 1
         latestButton.configuration = latestConfiguration(loading: latestEpisodeLoading)
 
         applyHeaderGradient(dominant: dominant)
+        measureContentIfNeeded()
+        setNeedsLayout()
+    }
+
+    /// Measures the content block at the header width and reports changes;
+    /// the key keeps per-layout-pass calls cheap.
+    private func measureContentIfNeeded() {
+        let width = bounds.width - layoutMargins.left - layoutMargins.right
+        guard width > 0 else { return }
+        let key = "\(width)|\(authorLabel.text ?? "")|\(descriptionText.text)"
+            + "|\(traitCollection.preferredContentSizeCategory.rawValue)"
+        guard key != contentMeasureKey else { return }
+        contentMeasureKey = key
+        let size = contentStack.systemLayoutSizeFitting(
+            CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        )
+        let height = ceil(size.height)
+        guard height != measuredContentHeight else { return }
+        measuredContentHeight = height
+        onContentHeightChange?(height)
     }
 
     /// The pinned-header gradient: 30% artwork tint over the page
@@ -806,7 +909,7 @@ final class ChannelHeaderView: UICollectionReusableView {
         }
     }
 
-    // MARK: Fold (transform/opacity only — 08 §11.2)
+    // MARK: Fold (frames/transforms only — 08 §11.2)
 
     func applyFold(shrink: CGFloat, geo: ChannelFoldGeometry) {
         foldShrink = shrink
@@ -815,6 +918,7 @@ final class ChannelHeaderView: UICollectionReusableView {
         let headerHeight = geo.headerHeight(shrink: shrink)
         gradientLayer.frame = CGRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
         passthroughY = headerHeight
+        bottomFade.transform = CGAffineTransform(translationX: 0, y: headerHeight)
 
         // Cover: scale around its (center-anchored) expanded position, then
         // translate — position stays a transform product, not a constraint.
@@ -836,17 +940,58 @@ final class ChannelHeaderView: UICollectionReusableView {
             y: targetCenter.y - expandedCenter.y
         ).scaledBy(x: scale, y: scale)
 
-        // Title: half the leading padding (the centered label shifts right
-        // as its container narrows from the left), plus the spacer rise.
-        let rise = geo.contentRise(shrink: shrink)
-        let padding = geo.titleLeadingPadding(shrink: shrink)
-        titleLabel.transform = CGAffineTransform(translationX: padding / 2, y: -rise)
+        applyTitle(shrink: shrink, geo: geo, paddedWidth: paddedWidth)
 
-        let opacity = geo.secondaryOpacity(shrink: shrink)
-        fadeGroup.transform = CGAffineTransform(translationX: 0, y: -rise)
-        fadeGroup.alpha = opacity
-        fadeGroup.isUserInteractionEnabled = opacity > 0.01
-        fadeGroup.accessibilityElementsHidden = opacity <= 0.01
+        // Content block: 1:1 with the scroll, clipped at the compact bar.
+        let clipHeight = max(bounds.height - geo.clipLine, 0)
+        contentClip.frame = CGRect(x: 0, y: geo.clipLine, width: bounds.width, height: clipHeight)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        contentFadeMask.frame = contentClip.bounds
+        let fade = clipHeight > 0 ? min(ScrollEdgeFade.fadeLength / clipHeight, 1) : 1
+        contentFadeMask.locations = [0, NSNumber(value: Double(fade)), 1]
+        CATransaction.commit()
+        let contentHeight = measuredContentHeight ?? geo.contentHeight
+        let translation = geo.contentTranslation(shrink: shrink)
+        let contentY = geo.contentTop - geo.clipLine + translation
+        contentStack.frame = CGRect(
+            x: layoutMargins.left, y: contentY, width: max(paddedWidth, 0), height: contentHeight
+        )
+        // Tappable only while the action row is still visible below the
+        // clip line (the content bottom is the action row's bottom edge).
+        let rowVisible = contentY + contentHeight > ScrollEdgeFade.fadeLength
+        contentClip.isUserInteractionEnabled = rowVisible
+        contentClip.accessibilityElementsHidden = !rowVisible
+    }
+
+    /// Title: a frame-driven label — rises with the cover, starts centered
+    /// under it and ends left-aligned beside it, truncating before the
+    /// trailing margin.
+    private func applyTitle(shrink: CGFloat, geo: ChannelFoldGeometry, paddedWidth: CGFloat) {
+        guard paddedWidth > 0 else { return }
+        func tightWidth(in available: CGFloat) -> CGFloat {
+            let fitted = titleLabel.sizeThatFits(
+                CGSize(width: available, height: .greatestFiniteMagnitude)
+            ).width
+            return min(ceil(fitted), available)
+        }
+        let expandedWidth = tightWidth(in: paddedWidth)
+        let leading = geo.titleLeading(
+            shrink: shrink, paddedWidth: paddedWidth,
+            expandedLeading: (paddedWidth - expandedWidth) / 2
+        )
+        let width = tightWidth(in: max(paddedWidth - leading, 0))
+        // Centered while it sits under the cover; left-aligned once it
+        // shares rows with the collapsed cover.
+        titleLabel.textAlignment = geo.clampedShrink(shrink)
+            < ChannelFoldGeometry.expandedCoverSize - ChannelFoldGeometry.collapsedCoverSize
+            ? .center : .left
+        titleLabel.frame = CGRect(
+            x: layoutMargins.left + leading,
+            y: geo.titleTop(shrink: shrink),
+            width: width,
+            height: ChannelFoldGeometry.titleBoxHeight
+        )
     }
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
@@ -857,119 +1002,20 @@ final class ChannelHeaderView: UICollectionReusableView {
     }
 }
 
-// MARK: - Subscription capsule (channel.dart:543-634)
-
-@MainActor
-final class SubscriptionCapsuleButton: UIControl {
-
-    var onToggle: (() -> Void)?
-
-    private let iconView = UIImageView()
-    private let spinner = UIActivityIndicatorView(style: .medium)
-    private let label = UILabel()
-    private let row = UIStackView()
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-
-        // Half the 40 pt height — a true capsule. The Dart literal
-        // BorderRadius.circular(36) clamps in Flutter, but CALayer's
-        // continuous curve does NOT clamp an oversized radius and renders
-        // a pointed lens instead.
-        layer.cornerRadius = 20
-        layer.cornerCurve = .continuous
-        clipsToBounds = true
-        isAccessibilityElement = true
-        accessibilityTraits = [.button]
-
-        iconView.contentMode = .scaleAspectFit
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        spinner.color = Theme.onSurface
-        spinner.hidesWhenStopped = true
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        spinner.isAccessibilityElement = false
-
-        label.font = TypographyV2.labelLarge.font()
-        label.adjustsFontForContentSizeCategory = true
-
-        row.axis = .horizontal
-        row.alignment = .center
-        row.spacing = 8
-        row.isLayoutMarginsRelativeArrangement = true
-        row.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 12)
-        row.translatesAutoresizingMaskIntoConstraints = false
-        row.addArrangedSubview(iconView)
-        row.addArrangedSubview(spinner)
-        row.addArrangedSubview(label)
-        addSubview(row)
-
-        NSLayoutConstraint.activate([
-            row.leadingAnchor.constraint(equalTo: leadingAnchor),
-            row.trailingAnchor.constraint(equalTo: trailingAnchor),
-            row.topAnchor.constraint(equalTo: topAnchor),
-            row.bottomAnchor.constraint(equalTo: bottomAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 24),
-            iconView.heightAnchor.constraint(equalToConstant: 24),
-            spinner.widthAnchor.constraint(equalToConstant: 16),
-            spinner.heightAnchor.constraint(equalToConstant: 16),
-        ])
-
-        addAction(UIAction { [weak self] _ in self?.onToggle?() }, for: .touchUpInside)
-        configure(display: .loading)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    func configure(display: ChannelSubscriptionDisplay) {
-        switch display {
-        case .loading:
-            backgroundColor = AnycastColor.sandAlpha4
-            iconView.isHidden = true
-            spinner.isHidden = false
-            spinner.startAnimating()
-            label.text = "Loading..."
-            label.textColor = Theme.onSurface
-            accessibilityLabel = "Subscribing"
-        case .subscribe:
-            backgroundColor = AnycastColor.sandAlpha4
-            iconView.isHidden = false
-            spinner.isHidden = true
-            spinner.stopAnimating()
-            iconView.image = AppIcons.addCircle
-            iconView.tintColor = Theme.onSurface
-            label.text = "Subscribe"
-            label.textColor = Theme.onSurface
-            accessibilityLabel = "Subscribe"
-        case .unsubscribe:
-            backgroundColor = Theme.onSurface
-            iconView.isHidden = false
-            spinner.isHidden = true
-            spinner.stopAnimating()
-            iconView.image = AppIcons.remove
-            iconView.tintColor = Theme.background
-            label.text = "Unsubscribe"
-            label.textColor = Theme.background
-            accessibilityLabel = "Unsubscribe"
-        }
-    }
-}
-
-// MARK: - Body header (search + Newest/Oldest, channel.dart:62-100 / 636-748)
+// MARK: - Body header (Newest/Oldest + search, channel.dart:62-100 / 636-748)
 
 @MainActor
 final class ChannelBodyHeaderCell: UICollectionViewCell {
 
     static let reuseIdentifier = "ChannelBodyHeaderCell"
-    /// 56 (search bar) + 36 (order strip) + 1 (separator).
-    static let fixedHeight: CGFloat = 93
+    /// 44 (order strip + search button row) + 1 (separator).
+    static let fixedHeight: CGFloat = 45
 
-    var onSubmit: ((String) -> Void)?
+    var onSearch: (() -> Void)?
     var onOrderSelect: ((Int) -> Void)?
 
-    private let searchField = UITextField()
-    private let clearButton = UIButton(type: .system)
     private let orderStrip: ChipTabBarView
+    private let searchButton = UIButton(type: .system)
     private let separator = UIView()
 
     override init(frame: CGRect) {
@@ -984,75 +1030,48 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     private func build() {
-        searchField.applyAnycastStyle(placeholder: "Search episodes", icon: AppIcons.search)
-        searchField.returnKeyType = .search
-        searchField.autocorrectionType = .no
-        searchField.clearButtonMode = .never
-        searchField.isAccessibilityElement = true
-        searchField.accessibilityLabel = "Search episodes"
-        searchField.translatesAutoresizingMaskIntoConstraints = false
-        searchField.heightAnchor.constraint(equalToConstant: Spacing.xxl).isActive = true
-        searchField.addTarget(self, action: #selector(editingChanged), for: .editingChanged)
-        searchField.addTarget(self, action: #selector(submitted), for: .primaryActionTriggered)
-
-        clearButton.setTitle("Clear", for: .normal)
-        clearButton.setTitleColor(Theme.primary, for: .normal)
-        clearButton.titleLabel?.font = TypographyV2.labelLarge.font()
-        clearButton.titleLabel?.adjustsFontForContentSizeCategory = true
-        clearButton.isHidden = true
-        clearButton.addAction(UIAction { [weak self] _ in
-            // channel.dart:727-730 — clear and unfocus.
-            self?.searchField.text = nil
-            self?.editingChanged()
-            self?.searchField.resignFirstResponder()
-        }, for: .touchUpInside)
-
-        let searchRow = UIStackView(arrangedSubviews: [searchField, clearButton])
-        searchRow.axis = .horizontal
-        searchRow.alignment = .center
-        searchRow.spacing = 16
-
         orderStrip.onSelect = { [weak self] index in self?.onOrderSelect?(index) }
+        orderStrip.translatesAutoresizingMaskIntoConstraints = false
+
+        // A plain glyph with the full 44 pt tap target; opens the search sheet.
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = AppIcons.search
+        configuration.baseForegroundColor = Theme.onSurfaceVariant
+        searchButton.configuration = configuration
+        searchButton.accessibilityLabel = "Search episodes"
+        searchButton.translatesAutoresizingMaskIntoConstraints = false
+        searchButton.addAction(UIAction { [weak self] _ in self?.onSearch?() }, for: .touchUpInside)
 
         separator.backgroundColor = Theme.surface
         separator.translatesAutoresizingMaskIntoConstraints = false
 
-        let stack = UIStackView(arrangedSubviews: [searchRow, orderStrip])
-        stack.axis = .vertical
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        // The layout item already insets 16; the Dart page pads this block
-        // by 24 (AnycastSpacing.pageHeader) — the remaining 8 lives here.
-        stack.isLayoutMarginsRelativeArrangement = true
-        stack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
-        contentView.addSubview(stack)
+        contentView.addSubview(orderStrip)
+        contentView.addSubview(searchButton)
         contentView.addSubview(separator)
 
+        // The layout item already insets 16; the Dart page pads this block
+        // by 24 (AnycastSpacing.pageHeader) — the remaining 8 lives here.
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: contentView.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: separator.topAnchor),
+            orderStrip.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            orderStrip.trailingAnchor.constraint(equalTo: searchButton.leadingAnchor),
+            orderStrip.centerYAnchor.constraint(equalTo: searchButton.centerYAnchor),
+            orderStrip.heightAnchor.constraint(equalToConstant: 36),
+
+            searchButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            searchButton.topAnchor.constraint(equalTo: contentView.topAnchor),
+            searchButton.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
+            searchButton.heightAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
 
             separator.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
             separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             separator.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             separator.heightAnchor.constraint(equalToConstant: 1),
-
-            orderStrip.heightAnchor.constraint(equalToConstant: 36),
         ])
-    }
-
-    @objc private func editingChanged() {
-        clearButton.isHidden = (searchField.text ?? "").isEmpty
-    }
-
-    @objc private func submitted() {
-        onSubmit?(searchField.text ?? "")
     }
 
     /// The cell embeds ChipTabBarView's scroll view; self-sizing must
     /// never consult it (a scroll view inside a self-sizing item explodes
-    /// the content size). The height is fixed and the search/order block
+    /// the content size). The height is fixed and the order/search row
     /// owns its own layout.
     override func preferredLayoutAttributesFitting(
         _ layoutAttributes: UICollectionViewLayoutAttributes

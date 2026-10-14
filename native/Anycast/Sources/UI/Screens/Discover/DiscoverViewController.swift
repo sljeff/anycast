@@ -88,7 +88,7 @@ final class DiscoverViewController: UIViewController {
 
     private func buildHeader() {
         header.configure(HeaderView.Configuration(title: "Discover"))
-        header.onSearch = { [weak self] query in self?.openSearch(query) }
+        header.onSearch = { [weak self] in self?.openSearch() }
         header.onSettings = { [weak self] in self?.openSettings() }
         header.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(header)
@@ -100,9 +100,9 @@ final class DiscoverViewController: UIViewController {
         ])
     }
 
-    private func openSearch(_ query: String) {
+    private func openSearch() {
         SearchPageViewController.present(
-            from: topMostPresented(), context: context, searchText: query
+            from: topMostPresented(), context: context, searchText: ""
         )
     }
 

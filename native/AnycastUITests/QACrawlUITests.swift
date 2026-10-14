@@ -883,18 +883,20 @@ final class QACrawlUITests: XCTestCase {
                                || s.app.buttons["Unsubscribe"].waitForExistence(timeout: 3)
                                || s.app.buttons["Subscribing"].waitForExistence(timeout: 3)
                        },
-                       required: ["Copy RSS URL"],
+                       required: ["Share"],
                        probe: true, settle: 3),
 
             Checkpoint(state: "search",
                        action: { s in
                            s.closeSheet()
                            s.currentTab = "tab-0"
-                           let field = s.app.textFields["header-search-field"]
+                           let searchButton = s.app.buttons["header-search"]
+                           guard searchButton.waitForExistence(timeout: 5) else { return false }
+                           s.tapElement(searchButton)
+                           let field = s.app.textFields["search-page-field"]
                            guard field.waitForExistence(timeout: 5) else { return false }
-                           s.tapElement(field)
-                           // The native header field uses the standard
-                           // keyboard submit path into global results.
+                           // The search sheet opens focused; its field uses
+                           // the standard keyboard submit path into results.
                            guard s.audit else {
                                s.markSkipped("search", "keyboard submission",
                                              "reference capture does not drive text input")
@@ -920,10 +922,10 @@ final class QACrawlUITests: XCTestCase {
                            } else {
                                field.typeText("\n")
                            }
-                           return s.app.staticTexts["You are searching for"]
+                           return s.app.buttons["Channels"]
                                .waitForExistence(timeout: 8)
                        },
-                       required: ["You are searching for"],
+                       required: ["Channels"],
                        probe: true, settle: 3),
 
             Checkpoint(state: "playlists",

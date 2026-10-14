@@ -8,9 +8,10 @@ import AnycastKit
 /// sheet on top) with the share shortcut (shortlink → system share sheet)
 /// beside them, the scrubber, and the transport (−10 s / play-pause with
 /// the loading animation / +30 s, play centered) plus the K6 retry
-/// affordance. The whitespace above the artwork and above the scrubber stays
-/// balanced so the page's weight follows the screen height. Background
-/// belongs to the container.
+/// affordance. The column sits on one vertical rhythm (title → scrubber →
+/// transport → page selector) and all slack goes above the artwork, so the
+/// controls stay together near the selector. Background belongs to the
+/// container.
 final class PlayerMainPageViewController: UIViewController {
 
     private let context: UIContext
@@ -36,6 +37,7 @@ final class PlayerMainPageViewController: UIViewController {
         diameter: Layout.transportSlot, glyphSize: IconStyle.playerTransport.pointSize
     )
     private let retryRow = UIStackView()
+    private var bottomStack = UIStackView()
 
     private enum Layout {
         /// UI kit player artwork: 320 pt, inset 36 from the screen edges.
@@ -46,6 +48,19 @@ final class PlayerMainPageViewController: UIViewController {
         /// Gap between the play slot and the skip slots (glyph centers
         /// ~100 pt apart, as in the UI kit).
         static let transportGap = Spacing.sectionGap
+        /// The one vertical rhythm, measured between VISIBLE edges: subtitle
+        /// → scrubber track, time labels → transport glyphs and transport
+        /// glyphs → page selector.
+        static let rhythm: CGFloat = 28
+        /// Frame-to-ink slack hidden inside each block (measured on device),
+        /// subtracted so the rhythm is the gap the eye sees: the scrubber
+        /// track and the show-name text sit well inside their frames, the
+        /// time-label band and the 72 pt transport slot pad the skip glyphs.
+        static let titleToScrubber = rhythm - 24
+        static let scrubberToTransport = rhythm - 28
+        static let transportToSelector = rhythm - 13
+        /// Line height of the scrubber's time labels at the default size.
+        static let timeLabelLine: CGFloat = 16
     }
 
     init(context: UIContext) {
@@ -62,6 +77,9 @@ final class PlayerMainPageViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .clear
         build()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (self: Self, _) in
+            self.updateScrubberSpacing()
+        }
         bind()
         render()
 
@@ -136,26 +154,22 @@ final class PlayerMainPageViewController: UIViewController {
         )
         retryRow.addArrangedSubview(retryButton)
 
-        let bottomStack = UIStackView(arrangedSubviews: [stateMessageLabel, progressBar, buildControls(), retryRow])
+        let controls = buildControls()
+        bottomStack = UIStackView(arrangedSubviews: [stateMessageLabel, progressBar, controls, retryRow])
         bottomStack.axis = .vertical
-        bottomStack.spacing = Spacing.pageH
         bottomStack.setCustomSpacing(Spacing.xs, after: stateMessageLabel)
-        bottomStack.setCustomSpacing(Spacing.cardInner, after: progressBar)
+        updateScrubberSpacing()
+        bottomStack.setCustomSpacing(Spacing.pageH, after: controls)
 
         for block in [coverShadow, titleRow, bottomStack] {
             block.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(block)
         }
 
-        // UI kit balance: the space above the artwork equals the space
-        // between the title and the scrubber, so the page's weight follows
-        // the screen height instead of piling slack in one gap.
+        // All slack lives above the artwork: the title, scrubber and
+        // transport keep fixed gaps and sit toward the page selector.
         let topBalance = UILayoutGuide()
-        let middleBalance = UILayoutGuide()
         view.addLayoutGuide(topBalance)
-        view.addLayoutGuide(middleBalance)
-        let balanced = topBalance.heightAnchor.constraint(equalTo: middleBalance.heightAnchor)
-        balanced.priority = .defaultHigh
 
         // Square artwork at the inset width, capped at 320 pt; on short
         // windows it yields to a share of the page height so the column
@@ -185,18 +199,23 @@ final class PlayerMainPageViewController: UIViewController {
             titleRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
             titleRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
 
-            middleBalance.topAnchor.constraint(equalTo: titleRow.bottomAnchor),
-            middleBalance.bottomAnchor.constraint(equalTo: bottomStack.topAnchor),
-            middleBalance.heightAnchor.constraint(greaterThanOrEqualToConstant: Spacing.gap),
-            balanced,
-
+            bottomStack.topAnchor.constraint(equalTo: titleRow.bottomAnchor, constant: Layout.titleToScrubber),
             bottomStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
             bottomStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
-            bottomStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Spacing.pageH),
+            bottomStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.transportToSelector),
 
             shareSpinner.centerXAnchor.constraint(equalTo: shareButton.centerXAnchor),
             shareSpinner.centerYAnchor.constraint(equalTo: shareButton.centerYAnchor),
         ])
+    }
+
+    /// The scrubber's time labels hang below its fixed-height frame, so the
+    /// gap to the transport grows with the label font to keep the visible
+    /// gap at the rhythm under Dynamic Type.
+    private func updateScrubberSpacing() {
+        let metrics = UIFontMetrics(forTextStyle: .footnote)
+        let growth = metrics.scaledValue(for: Layout.timeLabelLine, compatibleWith: traitCollection) - Layout.timeLabelLine
+        bottomStack.setCustomSpacing(Layout.scrubberToTransport + growth, after: progressBar)
     }
 
     /// replay_10 / play-pause / forward_30 (player.dart:1303-1367); the

@@ -26,10 +26,10 @@ final class PodcastHomeViewController: UIViewController {
         Theme.installPageBase(on: view)
 
         header.configure(HeaderView.Configuration(title: "Podcast"))
-        header.onSearch = { [weak self] query in
+        header.onSearch = { [weak self] in
             guard let self else { return }
             SearchPageViewController.present(
-                from: self.topMostPresented(), context: self.context, searchText: query
+                from: self.topMostPresented(), context: self.context, searchText: ""
             )
         }
         header.onSettings = { [weak self] in self?.openSettings() }
@@ -39,6 +39,11 @@ final class PodcastHomeViewController: UIViewController {
         sectionBar.translatesAutoresizingMaskIntoConstraints = false
         sectionBar.onSelect = { [weak self] index in self?.showSection(index) }
         view.addSubview(sectionBar)
+
+        // Both sections' lists are cut at the same line under the section
+        // bar; one scrim above the child views softens it (G-7).
+        let topFade = ScrollEdgeFade(edge: .top)
+        view.addSubview(topFade)
 
         let inbox = InboxPageViewController(context: context, showsHeader: false)
         inbox.onStatusChange = { [weak self] status in
@@ -75,6 +80,10 @@ final class PodcastHomeViewController: UIViewController {
             sectionBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
             sectionBar.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.xs),
             sectionBar.heightAnchor.constraint(equalToConstant: 60),
+            topFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            topFade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            topFade.topAnchor.constraint(equalTo: sectionBar.bottomAnchor, constant: Spacing.md),
+            topFade.heightAnchor.constraint(equalToConstant: ScrollEdgeFade.fadeLength),
         ])
 
         // Section children fill this view and inherit its safe area, which

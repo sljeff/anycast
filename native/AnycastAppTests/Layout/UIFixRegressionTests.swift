@@ -7,7 +7,7 @@ import AnycastKit
 /// (each test names the user-visible symptom it pins):
 ///
 /// 1. Player main page collapsed at the top with one dead gap above the
-///    page tab (Flutter parity is `MainAxisAlignment.spaceEvenly`).
+///    page tab (now one 28 pt rhythm below the cover with the slack above it).
 /// 2. Player progress thumb/glow halo rendering as a dark ring over the
 ///    track (removed: the played segment's rounded head is the indicator)
 ///    and the square-cornered stub the head became during the first
@@ -37,7 +37,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Player page distribution (1) + thumb height (2)
 
-    @Test("Player main page: square capped cover, balanced whitespace, centered play")
+    @Test("Player main page: square capped cover, 28 pt rhythm, centered play")
     func playerPageDistribution() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -89,15 +89,16 @@ struct UIFixRegressionTests {
         #expect(coverFrame.width <= 320.5, "cover exceeds its 320 pt cap: \(coverFrame.width)")
         #expect(abs(coverFrame.midX - page.bounds.midX) < 1, "cover is off center")
 
-        // The whitespace above the cover equals the gap between the title
-        // and the scrubber block (UI kit balance), unless a floor binds.
+        // One 28 pt VISIBLE rhythm (subtitle → track, labels → transport,
+        // transport → selector); the frames carry the hidden slack, so the
+        // frame gaps are 28 - 24 and 28 - 13 (the page ends at the selector's
+        // top). Slack sits above the cover.
         let topGap = coverFrame.minY
         let middleGap = bottomFrame.minY - titleFrame.maxY
+        let bottomGap = page.bounds.maxY - bottomFrame.maxY
         #expect(topGap >= 24 - 0.5, "content is crammed against the sheet top: \(topGap)")
-        #expect(middleGap >= 12 - 0.5, "title runs into the scrubber: \(middleGap)")
-        if topGap > 24.5 && middleGap > 12.5 {
-            #expect(abs(topGap - middleGap) < 2.0, "unbalanced: top \(topGap) vs middle \(middleGap)")
-        }
+        #expect(abs(middleGap - 4) < 1.0, "title → scrubber frame gap is \(middleGap), expected 4")
+        #expect(abs(bottomGap - 15) < 1.0, "transport → selector frame gap is \(bottomGap), expected 15")
 
         // Play sits exactly on the page's center line.
         #expect(abs(playFrame.midX - page.bounds.midX) < 1, "play is off center: \(playFrame.midX)")
@@ -214,7 +215,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Mini player chrome (7)
 
-    @Test("Mini player: one silhouette — accessory hosts no own chrome, standalone is a capsule")
+    @Test("Mini player: one silhouette — accessory hosts no own chrome, capsule paints opaque sand")
     func miniPlayerSingleChrome() async {
         guard let context = await Self.liveContext() else {
             print("[uifix] shell not ready; skipping"); return
@@ -222,7 +223,7 @@ struct UIFixRegressionTests {
         // (style, expected capsule background alpha, expected side margin)
         let cases: [(PlayerBarView.HostingStyle, CGFloat, CGFloat)] = [
             (.systemAccessory, 0, 0),
-            (.standalone, 0.10, 12),
+            (.capsule, 1, 0),
         ]
         for (style, expectedAlpha, expectedMargin) in cases {
             let bar = context.makePlayerBar(style: style)
@@ -239,9 +240,8 @@ struct UIFixRegressionTests {
                     "\(style): leading margin \(capsule.frame.minX), expected \(expectedMargin)")
             #expect(abs(capsule.frame.maxX - (320 - expectedMargin)) < 0.5,
                     "\(style): trailing edge \(capsule.frame.maxX), expected \(320 - expectedMargin)")
-            // Same capsule contour in both styles — a flatter standalone
-            // radius (the old 16) made the bar read as a different element
-            // on sheet-hosted screens than in the system accessory.
+            // Same capsule contour in both styles, so the bar reads as one
+            // element on sheet-hosted screens and in the system accessory.
             #expect(abs(capsule.layer.cornerRadius - 29) < 0.5,
                     "\(style): corner radius \(capsule.layer.cornerRadius) is not a capsule (29)")
         }
@@ -570,16 +570,6 @@ struct UIFixRegressionTests {
         let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(name).png")
         try? data.write(to: url)
         print("[uifix] wrote \(url.path)")
-    }
-
-    // MARK: - Subscribe capsule shape (8)
-
-    @Test("Subscribe capsule radius cannot exceed half its 40 pt height")
-    func subscribeButtonCapsuleShape() {
-        let button = SubscriptionCapsuleButton()
-        button.frame = CGRect(x: 0, y: 0, width: 160, height: 40)
-        #expect(button.layer.cornerRadius <= button.frame.height / 2 + 0.5,
-                "radius \(button.layer.cornerRadius) exceeds half the height — an oversized continuous radius renders as a pointed lens, not a capsule")
     }
 
 }

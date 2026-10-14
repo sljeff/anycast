@@ -59,8 +59,8 @@ enum ImportInstructionsContent {
 
 /// The import-instructions sheet (import_export.dart:249-343, 03 §2.15 /
 /// §3.4): a DraggableScrollableSheet at 0.7 initial / 0.6 min — custom
-/// fraction detents, scroll-linked shrink — whose grabber has NO
-/// tap-to-close (unlike Detail). The five instruction sections render as
+/// fraction detents, scroll-linked shrink — with the system
+/// grabber. The five instruction sections render as
 /// disclosure rows; several may stay open at once (ExpansionTile keeps no
 /// exclusivity).
 final class ImportInstructionsViewController: UIViewController {
@@ -90,7 +90,7 @@ final class ImportInstructionsViewController: UIViewController {
             }
         }
         sheet?.detents = [fractionDetent(0.7), fractionDetent(0.6)]
-        sheet?.prefersGrabberVisible = false   // custom grabber below
+        sheet?.prefersGrabberVisible = true
         sheet?.preferredCornerRadius = 20
         presenter.present(controller, animated: true)
     }
@@ -126,11 +126,8 @@ final class ImportInstructionsViewController: UIViewController {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
 
-        // Fixed header column (grabber + title) over the scrolling list —
-        // the Dart Column[Handler, title, Expanded(ListView)].
-        let grabber = SheetGrabberView()
-        grabber.translatesAutoresizingMaskIntoConstraints = false
-
+        // Fixed title over the scrolling list — the Dart
+        // Column[Handler, title, Expanded(ListView)].
         let titleLabel = UILabel()
         titleLabel.text = ImportInstructionsContent.headerTitle
         titleLabel.font = TypographyV2.headlineMedium.font()
@@ -151,16 +148,10 @@ final class ImportInstructionsViewController: UIViewController {
         )
 
         view.addSubview(collectionView)
-        view.addSubview(grabber)
         view.addSubview(titleLabel)
 
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            grabber.widthAnchor.constraint(equalToConstant: 42),
-            grabber.heightAnchor.constraint(equalToConstant: 6),
-
-            titleLabel.topAnchor.constraint(equalTo: grabber.bottomAnchor, constant: 32),
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
 

@@ -21,8 +21,8 @@ final class ShellNavigationUITests: XCTestCase {
         XCTAssertTrue(inboxTab.waitForExistence(timeout: 20), "pill tab bar did not install")
         XCTAssertTrue(app.buttons["tab-1"].exists, "Playlist chip missing")
         XCTAssertTrue(app.buttons["tab-2"].exists, "Discover chip missing")
-        let searchField = app.textFields["header-search-field"]
-        XCTAssertTrue(searchField.exists, "header search field missing")
+        let searchButton = app.buttons["header-search"]
+        XCTAssertTrue(searchButton.exists, "header search button missing")
 
         let inboxSection = app.buttons["podcast-section-0"]
         let subscriptionsSection = app.buttons["podcast-section-1"]
@@ -42,18 +42,20 @@ final class ShellNavigationUITests: XCTestCase {
         app.buttons["tab-0"].tap()
         XCTAssertTrue(app.buttons["tab-0"].isSelected, "Inbox chip did not become selected")
 
-        // The Flutter header field accepts input in place; submitting opens
-        // the same global search results sheet.
-        searchField.tap()
+        // The header button opens the search sheet in its entry state with
+        // the field focused; submitting runs the search in the same sheet.
+        searchButton.tap()
+        let sheetField = app.textFields["search-page-field"]
+        XCTAssertTrue(sheetField.waitForExistence(timeout: 8), "search sheet did not open")
         guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
             throw XCTSkip("software keyboard unavailable — skipping search submission")
         }
-        searchField.typeText("news\n")
-        XCTAssertTrue(app.staticTexts["You are searching for"].waitForExistence(timeout: 8))
-        // The grabber band is the sheet's close affordance.
-        app.buttons["Close"].firstMatch.tap()
+        sheetField.typeText("news\n")
+        XCTAssertTrue(app.buttons["Channels"].waitForExistence(timeout: 8), "search results did not appear")
+        // Swipe the sheet down to close it.
+        sheetField.swipeDown(velocity: .fast)
         XCTAssertTrue(
-            app.staticTexts["You are searching for"].waitForNonExistence(timeout: 4),
+            sheetField.waitForNonExistence(timeout: 4),
             "search results sheet did not close"
         )
 

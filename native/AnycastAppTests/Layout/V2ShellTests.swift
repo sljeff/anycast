@@ -14,11 +14,11 @@ struct V2ShellTests {
 
     // MARK: - HeaderView (09 §3.8, Figma 624:30831)
 
-    @Test("Header paints the display title, status, search field, and settings action")
+    @Test("Header paints the display title, status, search and settings actions")
     func headerBasics() {
         let header = HeaderView()
         header.configure(HeaderView.Configuration(
-            title: "Podcast", statusText: "updated just now - 100 unlistened"
+            title: "Podcast", statusText: "updated just now · 100 unlistened"
         ))
         header.frame = CGRect(x: 0, y: 0, width: 440, height: 160)
         header.layoutIfNeeded()
@@ -32,7 +32,7 @@ struct V2ShellTests {
         let status = header.subviews.compactMap { $0 as? UIStackView }.first?
             .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-status" }
-        #expect(status?.text == "updated just now - 100 unlistened")
+        #expect(status?.text == "updated just now · 100 unlistened")
         #expect(status?.isHidden == false)
         #expect(
             status?.textColor.resolvedColor(with: dark)
@@ -40,23 +40,27 @@ struct V2ShellTests {
             "status caption paints sand9"
         )
 
-        let search = header.subviews.compactMap { $0 as? UITextField }
-            .first { $0.accessibilityIdentifier == "header-search-field" }
+        let search = header.subviews.compactMap { $0 as? AnycastIconButton }
+            .first { $0.accessibilityIdentifier == "header-search" }
         let settings = header.subviews.compactMap { $0 as? AnycastIconButton }
             .first { $0.accessibilityIdentifier == "header-settings" }
         #expect(search?.accessibilityLabel == "Search")
-        #expect(search?.placeholder == "Shows, episodes, and more")
+        #expect(search?.isHidden == false)
         #expect(settings?.accessibilityIdentifier == "header-settings")
         #expect(settings?.isHidden == false)
+        #expect(header.subviews.contains { $0 is UITextField } == false, "no inline search field")
+        if let search, let settings {
+            #expect(search.frame.maxX + Spacing.md == settings.frame.minX, "search sits left of settings")
+            #expect(search.frame.midY == settings.frame.midY)
+        }
 
-        var submittedQuery: String?
+        var searchTaps = 0
         var settingsTaps = 0
-        header.onSearch = { submittedQuery = $0 }
+        header.onSearch = { searchTaps += 1 }
         header.onSettings = { settingsTaps += 1 }
-        search?.text = "  news  "
-        if let search { _ = header.textFieldShouldReturn(search) }
+        search?.sendActions(for: .touchUpInside)
         settings?.sendActions(for: .touchUpInside)
-        #expect(submittedQuery == "news")
+        #expect(searchTaps == 1)
         #expect(settingsTaps == 1)
     }
 
@@ -74,9 +78,9 @@ struct V2ShellTests {
             .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-title" }
         let titleColumn = title?.superview
-        let actions = header.subviews.compactMap { $0 as? AnycastIconButton }.first
+        let actionLeft = header.subviews.compactMap { $0 as? AnycastIconButton }
+            .map(\.frame.minX).min() ?? 0
         let titleRight = titleColumn?.frame.maxX ?? .infinity
-        let actionLeft = actions?.frame.minX ?? 0
 
         #expect((title?.font.pointSize ?? 0) > 48)
         #expect(titleRight <= actionLeft)
@@ -93,9 +97,10 @@ struct V2ShellTests {
             .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-status" }
         #expect(status?.isHidden == true)
-        let search = header.subviews.compactMap { $0 as? UITextField }
-            .first { $0.accessibilityIdentifier == "header-search-field" }
-        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }.first
+        let search = header.subviews.compactMap { $0 as? AnycastIconButton }
+            .first { $0.accessibilityIdentifier == "header-search" }
+        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }
+            .first { $0.accessibilityIdentifier == "header-settings" }
         #expect(search?.isHidden == false)
         #expect(settings?.isHidden == true)
     }
@@ -145,10 +150,10 @@ struct V2ShellTests {
         let text = InboxPageViewController.headerStatusText(
             lastRefresh: justNow, episodeCount: 12, now: now
         )
-        #expect(text == "updated just now - 12 unlistened", "got: \(text)")
+        #expect(text == "updated just now · 12 unlistened", "got: \(text)")
 
         let never = InboxPageViewController.headerStatusText(lastRefresh: nil, episodeCount: 0, now: now)
-        #expect(never == "updated — - 0 unlistened", "got: \(never)")
+        #expect(never == "updated — · 0 unlistened", "got: \(never)")
     }
 
     // MARK: - Library status line (09 §3.3)

@@ -15,9 +15,17 @@ nonisolated enum RelativeTimeFormatter {
         return TimeFormats.formatDatetime(timestampMilliseconds, nowEpochMilliseconds: nowMilliseconds)
     }
 
-    /// Plain date for Detail rows (formatDate: `M-d` / `y-M-d`).
-    static func formatDate(_ timestampMilliseconds: Int64, now: Date = Date()) -> String {
-        let nowMilliseconds = Int64(now.timeIntervalSince1970 * 1000)
-        return TimeFormats.formatDate(timestampMilliseconds, nowEpochMilliseconds: nowMilliseconds)
+    /// The shared episode meta line, "{relative date} · {duration}"
+    /// ("4d ago · 30m"). Either part is dropped when unknown: no pubDate →
+    /// duration only, zero/unknown duration → date only.
+    static func dateAndDuration(
+        pubDateMilliseconds: Int64?, durationMilliseconds: Int64?, now: Date = Date()
+    ) -> String {
+        var parts: [String] = []
+        if let pubDateMilliseconds { parts.append(format(pubDateMilliseconds, now: now)) }
+        if let durationMilliseconds, durationMilliseconds > 0 {
+            parts.append(TimeFormats.formatDuration(durationMilliseconds))
+        }
+        return parts.joined(separator: " · ")
     }
 }

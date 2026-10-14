@@ -11,13 +11,15 @@ struct PodcastCardContent {
 }
 
 /// The channel card (lib/widgets/card.dart:323-453, 03 §2.12) in the
-/// Anycast 2.0 card language: `CardSurfaceView` plate, 64×64 artwork-radius
-/// cover (the shared artwork placeholder while loading and on error), titleSmall single-line title, bodySmall two-line description.
+/// Anycast 2.0 card language: `CardSurfaceView` plate, 80×80 rounded cover
+/// (the shared artwork placeholder while loading and on error), cardTitle
+/// single-line title, bodySmall two-line description — the same row
+/// parameters as `EpisodeCardCell`.
 /// Whole-card tap opens the Channel sheet via the injected callback.
 final class PodcastCardCell: UICollectionViewCell {
 
     static let reuseIdentifier = "PodcastCardCell"
-    static let cardHeight: CGFloat = 88   // 64pt cover + 12pt padding ×2
+    static let cardHeight: CGFloat = 112   // 80pt cover + 16pt padding ×2
     static let spacing: CGFloat = 12
 
     /// Whole-card tap → open Channel (card.dart:330-342).
@@ -66,14 +68,14 @@ final class PodcastCardCell: UICollectionViewCell {
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = Radius.artwork
+        coverView.layer.cornerRadius = Radius.md
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = Theme.surfaceContainerHighest
         coverView.translatesAutoresizingMaskIntoConstraints = false
         cardContainer.addSubview(coverView)
 
 
-        titleLabel.font = TypographyV2.titleSmall.font()
+        titleLabel.font = TypographyV2.cardTitle.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 1
         titleLabel.adjustsFontForContentSizeCategory = true
@@ -96,22 +98,22 @@ final class PodcastCardCell: UICollectionViewCell {
             cardContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             cardContainer.topAnchor.constraint(equalTo: contentView.topAnchor),
             cardContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            // 88 pt is the minimum (64pt cover + 12pt padding ×2); the card
+            // 112 pt is the minimum (80pt cover + 16pt padding ×2); the card
             // self-sizes taller when the scaled fonts demand it (hosts use
             // .estimated heights).
             cardContainer.heightAnchor.constraint(
                 greaterThanOrEqualToConstant: Self.cardHeight),
 
-            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.gap),
-            coverView.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.gap),
-            coverView.widthAnchor.constraint(equalToConstant: 64),
-            coverView.heightAnchor.constraint(equalToConstant: 64),
+            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.pageH),
+            coverView.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.pageH),
+            coverView.widthAnchor.constraint(equalToConstant: 80),
+            coverView.heightAnchor.constraint(equalToConstant: 80),
 
 
-            textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
-            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.gap),
-            textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.gap),
-            textColumn.bottomAnchor.constraint(lessThanOrEqualTo: cardContainer.bottomAnchor, constant: -Spacing.gap),
+            textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.pageH),
+            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.pageH),
+            textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.pageH),
+            textColumn.bottomAnchor.constraint(lessThanOrEqualTo: cardContainer.bottomAnchor, constant: -Spacing.pageH),
         ])
     }
 

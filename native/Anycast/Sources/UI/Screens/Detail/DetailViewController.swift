@@ -10,10 +10,9 @@ import AnycastKit
 /// 03 §10.1), the date and duration, the action row — Play, Add to playlist,
 /// and an overflow menu with Share and the remaining actions — and the HTML
 /// show notes. When the action row scrolls away a bottom bar takes over
-/// (only one set of actions is ever live). Preserved v1 behaviors: the
-/// custom grabber whose area TAPS to close (A2), actions auto-dismiss this
-/// sheet after firing (03 §10.1 wrapper quirk), share → shortlink →
-/// UIActivityViewController.
+/// (only one set of actions is ever live). Preserved v1 behaviors: actions
+/// auto-dismiss this sheet after firing (03 §10.1 wrapper quirk), share →
+/// shortlink → UIActivityViewController.
 ///
 /// Presenters inject behavior: `openChannel`, `shortenURL`, the action
 /// closures inside `EpisodeCardAction`, and whether the episode is already
@@ -131,7 +130,7 @@ final class DetailViewController: UIViewController {
             }
         }
         sheet?.detents = [fractionDetent(0.93)]
-        sheet?.prefersGrabberVisible = false
+        sheet?.prefersGrabberVisible = true
         presenter.present(controller, animated: true)
     }
 
@@ -223,24 +222,7 @@ final class DetailViewController: UIViewController {
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(bottomBar)
 
-        // Grabber 36×5 — the tap-to-close band covering it stays ≤32 pt
-        // (A2 adaptation, detail.dart:53-58).
-        let grabber = UIView()
-        grabber.backgroundColor = AnycastColor.sandAlpha4
-        grabber.layer.cornerRadius = 2.5
-        grabber.layer.cornerCurve = .continuous
-        grabber.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(grabber)
-        let headerTap = UITapGestureRecognizer(target: self, action: #selector(closeTapped))
-        view.addGestureRecognizer(headerTap)
-        headerTap.delegate = self
-
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.md),
-            grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            grabber.widthAnchor.constraint(equalToConstant: 36),
-            grabber.heightAnchor.constraint(equalToConstant: 5),
-
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -307,14 +289,12 @@ final class DetailViewController: UIViewController {
         meta.textColor = Theme.onSurfaceVariant
         meta.adjustsFontForContentSizeCategory = true
         meta.numberOfLines = 0
-        var metaParts: [String] = []
-        if let date = episode.pubDateMilliseconds {
-            metaParts.append(RelativeTimeFormatter.formatDate(date, now: now()))
-        }
-        if let duration = episode.durationSeconds, duration > 0 {
-            metaParts.append(TimeFormats.formatDuration(duration))
-        }
-        meta.text = metaParts.joined(separator: "  ·  ")
+        // `durationSeconds` actually holds milliseconds (FeedEpisodeRow.duration).
+        meta.text = RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: episode.pubDateMilliseconds,
+            durationMilliseconds: episode.durationSeconds,
+            now: now()
+        )
 
         buildActionRow()
 
@@ -542,10 +522,6 @@ final class DetailViewController: UIViewController {
         dismiss(animated: true)
     }
 
-    @objc private func closeTapped() {
-        dismiss(animated: true)
-    }
-
     private func channelTapped() {
         // 03 §10.1: present the Channel sheet ON TOP; Detail stays open.
         openChannel?(ChannelReference(rssFeedURL: episode.rssFeedURL, title: episode.channelTitle))
@@ -582,17 +558,6 @@ final class DetailViewController: UIViewController {
 extension DetailViewController: UIScrollViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateScrollMorph(animated: scrollView.isDragging || scrollView.isDecelerating)
-    }
-}
-
-/// The grabber-area tap closes; taps elsewhere scroll normally.
-extension DetailViewController: UIGestureRecognizerDelegate {
-    func gestureRecognizer(
-        _ gestureRecognizer: UIGestureRecognizer,
-        shouldReceive touch: UITouch
-    ) -> Bool {
-        // Only the top grabber band acts as the close affordance.
-        touch.location(in: view).y <= 32
     }
 }
 

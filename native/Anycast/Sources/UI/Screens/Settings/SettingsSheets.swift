@@ -18,7 +18,9 @@ final class SettingsOptionSheetViewController: UIViewController {
     private let collectionView: UICollectionView
     private var dataSource: UICollectionViewDiffableDataSource<Int, Int>?
     private let headerLabel = UILabel()
-    private let closeButton = UIButton(type: .system)
+    private let closeButton = AnycastIconButton(
+        style: .glass, icon: AppIcons.close, accessibilityLabel: "Close"
+    )
 
     init(title: String, options: [(name: String, code: String)], selectedCode: String?) {
         self.titleText = title
@@ -27,6 +29,11 @@ final class SettingsOptionSheetViewController: UIViewController {
 
         var config = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
         config.headerMode = .none
+        // The page paints the sand base; the list default would lay the
+        // system grouped gray over it.
+        config.backgroundColor = .clear
+        // insetGrouped otherwise adds its own gap above the first section.
+        config.headerTopPadding = 0
         let layout = UICollectionViewCompositionalLayout.list(using: config)
         self.collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         super.init(nibName: nil, bundle: nil)
@@ -39,19 +46,16 @@ final class SettingsOptionSheetViewController: UIViewController {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
 
-        // Header row: title + close icon, like the picker dialog's top bar.
+        // Header row: title + glass close button, like the picker dialog's
+        // top bar and the History sheet.
         headerLabel.text = titleText
         headerLabel.font = TypographyV2.headlineMedium.font()
         headerLabel.textColor = Theme.onSurface
         headerLabel.adjustsFontForContentSizeCategory = true
         headerLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        closeButton.setImage(AppIcons.close, for: .normal)
-        closeButton.tintColor = Theme.onSurfaceVariant
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         closeButton.isPointerInteractionEnabled = true
-        closeButton.accessibilityLabel = "Close"
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
 
         let registration = UICollectionView.CellRegistration<UICollectionViewListCell, Int> {
             [options, selectedCode] cell, _, index in
@@ -61,11 +65,12 @@ final class SettingsOptionSheetViewController: UIViewController {
             config.textProperties.color = Theme.onSurface
             config.textProperties.font = TypographyV2.bodyMedium.font()
             cell.contentConfiguration = config
-            cell.accessories = option.code == selectedCode ? [.checkmark()] : []
+            cell.accessories = option.code == selectedCode
+                ? [.checkmark(options: .init(tintColor: Theme.primary))] : []
             // v2 surface token instead of the system insetGrouped gray
             // (09 audit — same treatment as the settings main list).
             var background = UIBackgroundConfiguration.clear()
-            background.backgroundColor = Theme.surfaceContainer
+            background.backgroundColor = Theme.surface
             cell.backgroundConfiguration = background
         }
 
@@ -79,27 +84,25 @@ final class SettingsOptionSheetViewController: UIViewController {
         dataSource.apply(snapshot, animatingDifferences: false)
         self.dataSource = dataSource
 
+        let header = UIStackView(arrangedSubviews: [headerLabel, UIView(), closeButton])
+        header.axis = .horizontal
+        header.alignment = .center
+        header.translatesAutoresizingMaskIntoConstraints = false
+
         collectionView.delegate = self
+        collectionView.backgroundColor = .clear
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(headerLabel)
-        view.addSubview(closeButton)
+        view.addSubview(header)
         view.addSubview(collectionView)
         NSLayoutConstraint.activate([
-            headerLabel.leadingAnchor.constraint(
-                equalTo: view.readableContentGuide.leadingAnchor, constant: 20
-            ),
-            headerLabel.topAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12
-            ),
-            closeButton.centerYAnchor.constraint(equalTo: headerLabel.centerYAnchor),
-            closeButton.trailingAnchor.constraint(
-                equalTo: view.readableContentGuide.trailingAnchor, constant: -20
-            ),
+            header.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            header.heightAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.standardDiameter),
+
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.topAnchor.constraint(
-                equalTo: headerLabel.bottomAnchor, constant: 8
-            ),
+            collectionView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.md),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
     }

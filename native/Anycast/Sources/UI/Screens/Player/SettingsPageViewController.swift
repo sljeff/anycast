@@ -2,9 +2,10 @@ import UIKit
 import AnycastKit
 
 /// Player page 0 (PlayerSettings, player.dart:118-144 + the Settings widget
-/// 1148-1372, 03 §2.10): the episode's HTML description fills a scroll area
-/// (empty payload collapses it), with the settings card pinned at the
-/// bottom in the Anycast 2.0 audio-settings form — playback speed and sleep
+/// 1148-1372, 03 §2.10): the episode's HTML description (empty payload
+/// collapses it) and the settings card scroll together as one column, the
+/// card following the notes directly, in the Anycast 2.0 audio-settings
+/// form — playback speed and sleep
 /// timer rows with − / + steppers over the same stops the Dart sliders had
 /// (SPEED 0.5–2.0 ×0.25, COUNTDOWN 0–60 ×10), and the CONTINUOUS PLAY
 /// switch, its explanation shown as the row subtitle. SKIP SILENCE is
@@ -17,11 +18,26 @@ final class SettingsPageViewController: UIViewController {
     private let descriptionTextView = HTMLContentRenderer.makeTextView(
         linkTarget: HTMLContentRenderer.playerShared
     )
+    private let notesContainer = UIView()
     private let scrollView = UIScrollView()
     private var renderedCacheKey: String?
 
     private static let speedStops = PlayerSliderMath.stops(min: 0.5, max: 2.0, divisions: 6)
     private static let countdownStops = SleepTimerController.sliderMinutes
+
+    private enum Layout {
+        /// Clears the sheet's system grabber.
+        static let contentTop: CGFloat = 36
+        /// Notes → card gap.
+        static let sectionGap: CGFloat = 24
+        /// Last element → page selector when scrolled to the end.
+        static let contentBottom: CGFloat = 28
+        /// Equal vertical padding of every card row.
+        static let rowPadding: CGFloat = 14
+        /// The card's inner text insets; the notes text aligns to them.
+        static let cardLeading = Spacing.cardInner
+        static let cardTrailing = Spacing.pageH
+    }
 
     private let speedValueLabel = UILabel()
     private let countdownValueLabel = UILabel()
@@ -91,32 +107,40 @@ final class SettingsPageViewController: UIViewController {
         descriptionTextView.isAccessibilityElement = true
         descriptionTextView.accessibilityLabel = "Episode description"
 
-        let contentStack = UIStackView(arrangedSubviews: [descriptionTextView])
-        contentStack.axis = .vertical
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(contentStack)
+        // The notes' text edges line up with the text inside the card.
+        descriptionTextView.translatesAutoresizingMaskIntoConstraints = false
+        notesContainer.addSubview(descriptionTextView)
         NSLayoutConstraint.activate([
+            descriptionTextView.topAnchor.constraint(equalTo: notesContainer.topAnchor),
+            descriptionTextView.bottomAnchor.constraint(equalTo: notesContainer.bottomAnchor),
+            descriptionTextView.leadingAnchor.constraint(equalTo: notesContainer.leadingAnchor, constant: Layout.cardLeading),
+            descriptionTextView.trailingAnchor.constraint(equalTo: notesContainer.trailingAnchor, constant: -Layout.cardTrailing),
+        ])
+
+        let contentStack = UIStackView(arrangedSubviews: [notesContainer, buildSettingsCard()])
+        contentStack.axis = .vertical
+        contentStack.spacing = Layout.sectionGap
+        contentStack.isLayoutMarginsRelativeArrangement = true
+        contentStack.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: Layout.contentTop, leading: Spacing.pageHeader,
+            bottom: Layout.contentBottom, trailing: Spacing.pageHeader
+        )
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.contentInsetAdjustmentBehavior = .never
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(contentStack)
+        view.addSubview(scrollView)
+        NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
             contentStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             contentStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
             contentStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             contentStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
-        ])
-
-        let root = UIStackView(arrangedSubviews: [scrollView, buildSettingsCard()])
-        root.axis = .vertical
-        root.spacing = Spacing.pageH
-        root.isLayoutMarginsRelativeArrangement = true
-        root.directionalLayoutMargins = NSDirectionalEdgeInsets(
-            top: Spacing.pageH, leading: Spacing.pageHeader, bottom: Spacing.pageH, trailing: Spacing.pageHeader
-        )
-        root.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(root)
-        NSLayoutConstraint.activate([
-            root.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            root.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            root.topAnchor.constraint(equalTo: view.topAnchor),
-            root.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
     }
 
@@ -146,7 +170,7 @@ final class SettingsPageViewController: UIViewController {
         rows.axis = .vertical
         rows.isLayoutMarginsRelativeArrangement = true
         rows.directionalLayoutMargins = NSDirectionalEdgeInsets(
-            top: Spacing.xs, leading: Spacing.cardInner, bottom: Spacing.xs, trailing: Spacing.pageH
+            top: Spacing.xs, leading: Layout.cardLeading, bottom: Spacing.xs, trailing: Layout.cardTrailing
         )
         rows.backgroundColor = AnycastColor.sandAlpha3
         rows.layer.cornerRadius = Radius.card
@@ -192,6 +216,10 @@ final class SettingsPageViewController: UIViewController {
         row.axis = .horizontal
         row.alignment = .center
         row.spacing = Spacing.gap
+        row.isLayoutMarginsRelativeArrangement = true
+        row.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: Layout.rowPadding, leading: 0, bottom: Layout.rowPadding, trailing: 0
+        )
         texts.setContentHuggingPriority(.defaultLow, for: .horizontal)
         texts.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         row.heightAnchor.constraint(greaterThanOrEqualToConstant: Spacing.rowH - Spacing.md).isActive = true
@@ -267,8 +295,10 @@ final class SettingsPageViewController: UIViewController {
 
         if case .empty = HtmlText.displayPayload(for: html) {
             descriptionTextView.attributedText = nil
+            notesContainer.isHidden = true
             return
         }
+        notesContainer.isHidden = false
         let textView = descriptionTextView
         let key = cacheKey
         Task {

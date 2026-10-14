@@ -86,8 +86,8 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
 
     func configure(_ content: InboxCardContent) {
         titleLabel.text = content.title
-        // The UI kit's quiet lowercase show line; VoiceOver reads the name.
-        showNameLabel.text = content.showName.localizedLowercase
+        // The show line keeps the feed's own casing.
+        showNameLabel.text = content.showName
         showNameLabel.accessibilityLabel = content.showName
         metaLabel.text = content.metaText
         apply(status: content.status)

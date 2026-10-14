@@ -315,9 +315,9 @@ struct LayoutSanityTests {
         let desc = labels.first { $0.accessibilityIdentifier == "episode-card-description" }
         #expect(desc?.text == "A description line that also wraps a little")
         #expect(desc?.bounds.height ?? 0 > 0, "v2 description label collapsed")
-        // Sentence-case title, quiet lowercase show line (UI kit card).
+        // Sentence-case title, show line in the feed's own casing.
         #expect(labels.contains { $0.text == "An episode title that wraps" }, "title recased")
-        #expect(labels.contains { $0.text == "just pod" }, "show name not lowercased")
+        #expect(labels.contains { $0.text == "Just pod" }, "show name was recased")
         // The more button gets its menu from the mirrored payload.
         cell.menuActions = [
             EpisodeCardAction(icon: UIImage(), accessibilityLabel: "Play") {},

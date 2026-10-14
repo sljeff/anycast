@@ -94,8 +94,8 @@ final class HistoryDialogViewController: UIViewController {
 
         NSLayoutConstraint.activate([
             header.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
-            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
             header.heightAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.standardDiameter),
 
             collectionView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.md),
@@ -330,13 +330,13 @@ final class HistoryRowCell: UICollectionViewListCell {
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = Radius.sm
+        coverView.layer.cornerRadius = Radius.md
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(coverView)
 
-        titleLabel.font = TypographyV2.bodyLarge.font()
+        titleLabel.font = TypographyV2.cardTitle.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 2
         titleLabel.adjustsFontForContentSizeCategory = true
@@ -353,14 +353,14 @@ final class HistoryRowCell: UICollectionViewListCell {
         contentView.addSubview(textColumn)
 
         NSLayoutConstraint.activate([
-            coverView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageHeader),
+            coverView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageH),
             coverView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             coverView.widthAnchor.constraint(equalToConstant: 48),
             coverView.heightAnchor.constraint(equalToConstant: 48),
             coverView.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.md),
 
             textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
-            textColumn.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageHeader),
+            textColumn.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageH),
             textColumn.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.md),
             textColumn.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
