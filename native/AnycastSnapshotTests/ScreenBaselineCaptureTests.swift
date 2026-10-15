@@ -16,6 +16,11 @@ import AnycastKit
 /// suite only runs when SNAPSHOT_CAPTURE=1 is set in the test process
 /// (`TEST_RUNNER_SNAPSHOT_CAPTURE=1 xcodebuild … test`, per native/README).
 ///
+/// Output: setting SNAPSHOT_OUTPUT_DIR (`TEST_RUNNER_SNAPSHOT_OUTPUT_DIR` from
+/// xcodebuild) redirects the PNGs to `<dir>/iOS-<major>/` and leaves the
+/// committed baselines untouched — `scripts/ui_check.sh` uses it to diff a
+/// working tree against them.
+///
 /// Data dependence: with the db_smoke fixture seeded (native/README) every
 /// state renders with real content; a data precondition that trips during a
 /// gated re-record records an issue (a silently skipped capture would leave
@@ -56,7 +61,7 @@ struct ScreenBaselineCaptureTests {
             _ = inbox
             list.layoutIfNeeded()
             let visibleCard = list.indexPathsForVisibleItems.sorted().compactMap {
-                list.cellForItem(at: $0) as? EpisodeCardCell
+                list.cellForItem(at: $0) as? InboxEpisodeCardCell
             }.first
             guard let cell = visibleCard else {
                 Self.missingBaselineInput("a visible episode card (S2)")
@@ -183,6 +188,32 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
+    @Test("S16b Country picker sheet over Settings")
+    func captureCountryPicker() async throws {
+        try await Self.withRoot { root in
+            guard let context = await Self.liveContext() else {
+                Self.missingBaselineInput("live UIContext")
+                return
+            }
+            AppSheets.presentExpand(SettingsViewController(context: context), from: root)
+            try await Self.settle(1.5)
+            guard let settingsPage = Self.find(SettingsViewController.self, in: root) else {
+                Self.missingBaselineInput("SettingsViewController (S16b)")
+                return
+            }
+            // Same sheet and presentation as SettingsViewController's
+            // private presentCountrySheet().
+            let sheet = SettingsOptionSheetViewController(
+                title: SettingsPageModel.optionSheetTitle,
+                options: SettingsPageModel.sortedCountries.map { ($0.name, $0.code) },
+                selectedCode: context.settingsBox.current.countryCode
+            )
+            AppSheets.presentForm(sheet, from: settingsPage)
+            try await Self.settle(1.2)
+            try await Self.capture("S16b-country")
+        }
+    }
+
     @Test("S7 History dialog")
     func captureHistoryDialog() async throws {
         try await Self.withRoot { root in
@@ -304,6 +335,27 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
+    @Test("S4c Channel search sheet (empty query)")
+    func captureChannelSearch() async throws {
+        try await Self.withRoot { root in
+            guard let context = await Self.liveContext() else {
+                Self.missingBaselineInput("live UIContext")
+                return
+            }
+            let subscriptions = (try? await context.database.subscriptionRepository().listAll()) ?? []
+            guard let rssURL = subscriptions.first?.rssFeedUrl else {
+                Self.missingBaselineInput("a seeded subscription (S4c)")
+                return
+            }
+            ChannelSearchViewController.present(
+                from: root, context: context, rssFeedURL: rssURL, searchText: ""
+            )
+            await Self.waitForFocusedTextField(in: root)
+            try await Self.settle(1.0)
+            try await Self.capture("S4c-channel-search")
+        }
+    }
+
     @Test("S9 Search sheet (channels/episodes tabs)")
     func captureSearch() async throws {
         try await Self.withRoot { root in
@@ -314,6 +366,20 @@ struct ScreenBaselineCaptureTests {
             SearchPageViewController.present(from: root, context: context, searchText: "news")
             try await Self.settle(4.0)
             try await Self.capture("S9-search")
+        }
+    }
+
+    @Test("S9b Search entry (empty query, focused field)")
+    func captureSearchEntry() async throws {
+        try await Self.withRoot { root in
+            guard let context = await Self.liveContext() else {
+                Self.missingBaselineInput("live UIContext")
+                return
+            }
+            SearchPageViewController.present(from: root, context: context, searchText: "")
+            await Self.waitForFocusedTextField(in: root)
+            try await Self.settle(1.0)
+            try await Self.capture("S9b-search-entry")
         }
     }
 
@@ -437,6 +503,23 @@ struct ScreenBaselineCaptureTests {
         return nil
     }
 
+    /// Polls until a text field under the presented sheet holds first
+    /// responder (the empty-query search pages focus it in viewDidAppear).
+    /// A timeout still captures — the frame then shows the unfocused field.
+    private static func waitForFocusedTextField(
+        in root: UIViewController, timeout: Double = 6
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let sheet = root.presentedViewController,
+               let field = firstTextField(in: sheet.view), field.isFirstResponder {
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        print("[screens] search field did not take focus within \(timeout)s")
+    }
+
     private static func tapButton(_ identifier: String, in view: UIView) -> Bool {
         if let button = view as? UIButton, button.accessibilityIdentifier == identifier {
             button.sendActions(for: .touchUpInside)
@@ -477,6 +560,14 @@ struct ScreenBaselineCaptureTests {
 
     // MARK: - Capture
 
+    /// Where to write instead of the committed `__Snapshots__` directory.
+    private static var outputDirectoryOverride: String? {
+        let environment = ProcessInfo.processInfo.environment
+        let value = environment["SNAPSHOT_OUTPUT_DIR"]
+            ?? environment["TEST_RUNNER_SNAPSHOT_OUTPUT_DIR"]
+        return value?.isEmpty == false ? value : nil
+    }
+
     private static func capture(
         _ name: String, file: StaticString = #filePath
     ) async throws {
@@ -504,11 +595,17 @@ struct ScreenBaselineCaptureTests {
         #expect(!image.isUniformColor, "capture \(name) produced a blank frame")
         let data = try #require(image.pngData())
 
-        let fileURL = URL(fileURLWithPath: file.description)
-        let directory = fileURL.deletingLastPathComponent()
-            .appendingPathComponent("__Snapshots__")
-            .appendingPathComponent(fileURL.deletingPathExtension().lastPathComponent)
-            .appendingPathComponent(SnapshotBaseline.osDirectoryName)
+        let directory: URL
+        if let override = Self.outputDirectoryOverride {
+            directory = URL(fileURLWithPath: override)
+                .appendingPathComponent(SnapshotBaseline.osDirectoryName)
+        } else {
+            let fileURL = URL(fileURLWithPath: file.description)
+            directory = fileURL.deletingLastPathComponent()
+                .appendingPathComponent("__Snapshots__")
+                .appendingPathComponent(fileURL.deletingPathExtension().lastPathComponent)
+                .appendingPathComponent(SnapshotBaseline.osDirectoryName)
+        }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent("\(name).png")
         try data.write(to: url)
@@ -533,6 +630,15 @@ struct ScreenBaselineCaptureTests {
         if let text = view as? UITextView { return text }
         for subview in view.subviews {
             if let match = firstTextView(in: subview) { return match }
+        }
+        return nil
+    }
+
+    private static func firstTextField(in view: UIView?) -> UITextField? {
+        guard let view else { return nil }
+        if let field = view as? UITextField { return field }
+        for subview in view.subviews {
+            if let match = firstTextField(in: subview) { return match }
         }
         return nil
     }
