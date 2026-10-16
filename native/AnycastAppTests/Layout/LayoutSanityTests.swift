@@ -227,12 +227,12 @@ struct LayoutSanityTests {
         try await Self.settleLayout(window)
 
         let views = Self.subviewsRecursive(in: page.view)
-        // imageButton is "Open channel"; channelButton becomes
-        // "Open channel <title>" once a channel name lands.
+        // The show-name button is "Open channel", then "Open channel
+        // <title>" once a channel name lands.
         let channelControls = views.filter {
             $0.accessibilityLabel?.hasPrefix("Open channel") == true
         }
-        #expect(channelControls.count >= 2, "title bar controls missing")
+        #expect(channelControls.count >= 1, "title block show name missing")
         for control in channelControls {
             #expect(control.bounds.width > 0 && control.bounds.height > 0,
                     "title bar child collapsed to \(control.bounds.size)")
@@ -294,20 +294,17 @@ struct LayoutSanityTests {
         #expect(desc?.bounds.height ?? 0 > 0, "description label collapsed")
     }
 
-    /// The v2 inbox card (09 §10 批次1): the description and the 60pt state
-    /// row both resolve real frames off the autolayout height chain — the
-    /// card must be tall enough for text + state row (the ≤ bottom
-    /// constraint is the only height driver, so a broken chain shows up as
-    /// a collapsed description or a card shorter than the state row).
-    @Test("v2 inbox card lays out description and state row")
+    /// The inbox card (UI kit form): the description and the bottom row both
+    /// resolve real frames off the autolayout height chain (a broken chain
+    /// shows up as a collapsed description).
+    @Test("inbox card lays out description and bottom row")
     func inboxV2CardLayout() {
         let cell = InboxEpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 370, height: 200))
         cell.configure(
             InboxCardContent(
                 title: "An episode title that wraps",
                 showName: "Just pod",
-                dateText: "Nov 21, 2025",
-                badgeText: "45 MIN",
+                metaText: "Nov 21, 2025 · 45 min",
                 descriptionHTML: nil,
                 imageURL: nil,
                 descriptionPlainText: "A description line that also wraps a little"
@@ -318,8 +315,9 @@ struct LayoutSanityTests {
         let desc = labels.first { $0.accessibilityIdentifier == "episode-card-description" }
         #expect(desc?.text == "A description line that also wraps a little")
         #expect(desc?.bounds.height ?? 0 > 0, "v2 description label collapsed")
-        // The uppercase display language (component textStyle TITLE).
-        #expect(labels.contains { $0.text == "JUST POD" }, "show name not uppercased")
+        // Sentence-case title, quiet lowercase show line (UI kit card).
+        #expect(labels.contains { $0.text == "An episode title that wraps" }, "title recased")
+        #expect(labels.contains { $0.text == "just pod" }, "show name not lowercased")
         // The more button gets its menu from the mirrored payload.
         cell.menuActions = [
             EpisodeCardAction(icon: UIImage(), accessibilityLabel: "Play") {},

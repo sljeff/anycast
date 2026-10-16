@@ -16,7 +16,7 @@ final class DiscoverViewController: UIViewController {
     private let header = HeaderView()
 
     // Body
-    private var categoryStrip: UnderlineTabBarView?
+    private var categoryStrip: ChipTabBarView?
     private var pagingContainer: DiscoverPagingContainer?
     private let bodySpinner = UIActivityIndicatorView(style: .large)
     private let networkErrorLabel = UILabel()
@@ -121,8 +121,8 @@ final class DiscoverViewController: UIViewController {
         // Centered white "Network Error" for a failed/empty category list
         // (discover.dart:73-78 applied at page level).
         networkErrorLabel.text = "Network Error"
-        networkErrorLabel.textColor = Theme.secondaryText
-        networkErrorLabel.font = Typography.secondaryTitle.font()
+        networkErrorLabel.textColor = Theme.onSurfaceVariant
+        networkErrorLabel.font = TypographyV2.headlineSmall.font()
         networkErrorLabel.adjustsFontForContentSizeCategory = true
         networkErrorLabel.textAlignment = .center
         networkErrorLabel.isHidden = true
@@ -145,11 +145,7 @@ final class DiscoverViewController: UIViewController {
     /// safe-area bottom keeps clear of the shell's floating mini player
     /// through the shell's additionalSafeAreaInsets (iOS 18 fallback).
     private func buildTabsAndPages(names: [String]) {
-        let strip = UnderlineTabBarView(
-            titles: names,
-            selectedFont: Self.categoryFont(),
-            unselectedFont: Self.categoryFont()
-        )
+        let strip = ChipTabBarView(titles: names)
         strip.translatesAutoresizingMaskIntoConstraints = false
         strip.onSelect = { [weak self] index in
             self?.selectCategory(index, animatedPages: true)
@@ -187,15 +183,6 @@ final class DiscoverViewController: UIViewController {
         categoryStrip = strip
         pagingContainer = container
         materializeAround(index: 0)
-    }
-
-    /// Secondary-tab label font — Dart labelLarge: 17 pt w600 system
-    /// (anycast_theme.dart:327-331); the pill-box indicator becomes the
-    /// shared thin underline (07 §2.1 secondary-tab mapping).
-    private static func categoryFont() -> UIFont {
-        UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 17, weight: .semibold)
-        )
     }
 
     private func selectCategory(_ index: Int, animatedPages: Bool) {

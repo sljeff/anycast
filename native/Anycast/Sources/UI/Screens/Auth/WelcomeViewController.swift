@@ -113,7 +113,7 @@ final class WelcomeViewController: UIViewController {
         button.layer.insertSublayer(gradient, at: 0)
         button.layer.cornerRadius = 48
         button.layer.cornerCurve = .continuous
-        button.layer.borderColor = AnycastColor.sandAlpha4.cgColor
+        button.setDynamicBorderColor(AnycastColor.sandAlpha4)
         button.layer.borderWidth = Spacing.hairline
         button.layer.shadowColor = UIColor.black.cgColor
         button.layer.shadowOpacity = 0.1
@@ -196,7 +196,7 @@ final class WelcomeViewController: UIViewController {
 
         let signUpButton = UIButton(type: .system)
         signUpButton.setTitle("Sign up", for: .normal)
-        signUpButton.setTitleColor(AnycastColor.grass9, for: .normal)
+        signUpButton.setTitleColor(Theme.primary, for: .normal)
         signUpButton.titleLabel?.font = TypographyV2.bodySmall.font()
         signUpButton.accessibilityIdentifier = "welcome-signup"
         signUpButton.addAction(

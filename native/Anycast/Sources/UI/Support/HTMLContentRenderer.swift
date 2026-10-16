@@ -63,7 +63,7 @@ final class HTMLContentRenderer {
         textView.isScrollEnabled = false
         textView.textContainerInset = .zero
         textView.textContainer.lineFragmentPadding = 0
-        textView.linkTextAttributes = [.foregroundColor: Theme.tabSelectedGreen]
+        textView.linkTextAttributes = [.foregroundColor: Theme.primary]
         textView.renderer = linkTarget
         return textView
     }
@@ -97,8 +97,8 @@ final class HTMLContentRenderer {
         case .empty:
             return NSAttributedString()
         case let .text(plain):
-            // Synchronous passthrough — no parsing, no cache needed.
-            return NSAttributedString(string: plain, attributes: baseAttributes(traits: traits))
+            // Plain passthrough, with stray markup / entities decoded.
+            return NSAttributedString(string: DisplayText.clean(plain), attributes: baseAttributes(traits: traits))
         case let .html(sanitized):
             return await renderSanitized(sanitized, cacheKey: cacheKey, traits: traits)
         }
@@ -240,7 +240,7 @@ final class HTMLContentRenderer {
             // v2 sheet).
             attributes.removeValue(forKey: .backgroundColor)
             if attrs[.link] != nil {
-                attributes[.foregroundColor] = Theme.tabSelectedGreen
+                attributes[.foregroundColor] = Theme.primary
             } else {
                 let color = attrs[.foregroundColor] as? UIColor
                 if (color == nil || color!.isWebKitDefaultBlack),

@@ -41,13 +41,13 @@ final class SettingsOptionSheetViewController: UIViewController {
 
         // Header row: title + close icon, like the picker dialog's top bar.
         headerLabel.text = titleText
-        headerLabel.font = Typography.secondaryTitle.font()
-        headerLabel.textColor = Theme.primaryLightMax
+        headerLabel.font = TypographyV2.headlineMedium.font()
+        headerLabel.textColor = Theme.onSurface
         headerLabel.adjustsFontForContentSizeCategory = true
         headerLabel.translatesAutoresizingMaskIntoConstraints = false
 
         closeButton.setImage(AppIcons.close, for: .normal)
-        closeButton.tintColor = Theme.secondaryText
+        closeButton.tintColor = Theme.onSurfaceVariant
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         closeButton.isPointerInteractionEnabled = true
         closeButton.accessibilityLabel = "Close"
@@ -58,8 +58,8 @@ final class SettingsOptionSheetViewController: UIViewController {
             let option = options[index]
             var config = cell.defaultContentConfiguration()
             config.text = option.name
-            config.textProperties.color = Theme.primaryLightMax
-            config.textProperties.font = Typography.mainText.font()
+            config.textProperties.color = Theme.onSurface
+            config.textProperties.font = TypographyV2.bodyMedium.font()
             cell.contentConfiguration = config
             cell.accessories = option.code == selectedCode ? [.checkmark()] : []
             // v2 surface token instead of the system insetGrouped gray
@@ -135,14 +135,15 @@ final class SettingsSwitchListCell: UICollectionViewListCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        titleLabel.font = Typography.mainText.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.font = TypographyV2.bodyLarge.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(titleLabel)
 
         switchView.addTarget(self, action: #selector(switchToggled), for: .valueChanged)
+        switchView.onTintColor = Theme.primary
         switchView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(switchView)
         NSLayoutConstraint.activate([
@@ -266,15 +267,16 @@ enum SettingsTooltipOverlay {
 
         let label = UILabel()
         label.text = message
-        label.font = Typography.defaultText.font()
-        label.textColor = Theme.primaryLightMax
+        label.font = TypographyV2.bodySmall.font()
+        // Inverse pair: readable over any page in both appearances.
+        label.textColor = Theme.surface
         label.numberOfLines = 0
         label.textAlignment = .natural
         label.adjustsFontForContentSizeCategory = true
 
         let pill = UIView()
-        pill.backgroundColor = UIColor.black.withAlphaComponent(0.87)
-        pill.layer.cornerRadius = 12
+        pill.backgroundColor = Theme.inverseSurface
+        pill.layer.cornerRadius = Radius.md
         pill.layer.cornerCurve = .continuous
         pill.alpha = 0
         pill.translatesAutoresizingMaskIntoConstraints = false

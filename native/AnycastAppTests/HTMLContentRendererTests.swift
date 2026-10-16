@@ -21,7 +21,7 @@ struct HTMLContentRendererTests {
         let result = await renderer.attributedString(for: "Just a plain description", cacheKey: "k1")
         #expect(result.string == "Just a plain description")
         let color = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
-        #expect(color === Theme.primaryLightMax)
+        #expect(color === Theme.onSurface)
     }
 
     @Test("Sanitization-empty HTML falls back to htmlToText")
@@ -67,7 +67,7 @@ struct HTMLContentRendererTests {
         )
         #expect(result.string.contains("Hello"))
         let color = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
-        #expect(color === Theme.primaryLightMax)
+        #expect(color === Theme.onSurface)
         let font = result.attribute(.font, at: 0, effectiveRange: nil) as? UIFont
         #expect(font?.pointSize == Typography.htmlBody.font().pointSize)
     }
@@ -82,7 +82,7 @@ struct HTMLContentRendererTests {
             if value != nil {
                 let range = (result.string as NSString).range(of: "docs")
                 let color = result.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? UIColor
-                #expect(color === Theme.tabSelectedGreen)
+                #expect(color === Theme.primary)
                 sawLink = true
                 stop.pointee = true
             }

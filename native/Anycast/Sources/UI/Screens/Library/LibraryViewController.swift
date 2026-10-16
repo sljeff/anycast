@@ -89,12 +89,6 @@ final class LibraryViewController: UIViewController {
             MainActor.assumeIsolated { self?.refreshStatus() }
         }
         refreshStatus()
-        subscriptions.additionalSafeAreaInsets.bottom = additionalSafeAreaInsets.bottom
-    }
-
-    override func viewSafeAreaInsetsDidChange() {
-        super.viewSafeAreaInsetsDidChange()
-        subscriptions.additionalSafeAreaInsets.bottom = additionalSafeAreaInsets.bottom
     }
 
     // MARK: - Status line ("100 episodes remain" placeholder → live count)
@@ -121,7 +115,7 @@ final class LibraryViewController: UIViewController {
     private func buildMembershipCard() -> UIView {
         let card = UIControl()
         card.backgroundColor = AnycastColor.goldAlpha2
-        card.layer.borderColor = AnycastColor.sandAlpha4.cgColor
+        card.setDynamicBorderColor(AnycastColor.sandAlpha4)
         card.layer.borderWidth = 0.5
         card.layer.cornerRadius = Radius.md
         card.layer.cornerCurve = .continuous
@@ -207,9 +201,7 @@ final class LibraryViewController: UIViewController {
         )
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-                for: .systemFont(ofSize: 16, weight: .semibold)
-            )
+            outgoing.font = TypographyV2.headlineSmall.font()
             return outgoing
         }
         config.title = "all shows"

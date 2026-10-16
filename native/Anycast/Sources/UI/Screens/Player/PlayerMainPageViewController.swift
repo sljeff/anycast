@@ -1,31 +1,52 @@
 import UIKit
 import Kingfisher
-import MarqueeLabel
 import AnycastKit
 
-/// Player page 1 (PlayerMain, player.dart:146-235, 03 §2.10): centered
-/// square cover with the share shortcut (shortlink → system share sheet),
-/// the TitleBar (channel image / marquee-gated title / palette-safe channel
-/// name — both channel affordances open the Channel sheet on top), the
-/// progress bar with remaining-time labels, and the transport controls
-/// (−10 s / play-pause with loading lottie / +30 s) plus the K6 retry
-/// affordance. Background and palette gradient belong to the container.
+/// Player page 1 (PlayerMain, player.dart:146-235, 03 §2.10) in the Anycast
+/// 2.0 now-playing form: a centered artwork with a soft shadow, the episode
+/// title (wraps to two lines) over the show name (taps open the Channel
+/// sheet on top) with the share shortcut (shortlink → system share sheet)
+/// beside them, the scrubber, and the transport (−10 s / play-pause with
+/// the loading animation / +30 s, play centered) plus the K6 retry
+/// affordance. The whitespace above the artwork and above the scrubber stays
+/// balanced so the page's weight follows the screen height. Background
+/// belongs to the container.
 final class PlayerMainPageViewController: UIViewController {
 
     private let context: UIContext
     private let observation = ObservationLoop()
 
+    private let coverShadow = UIView()
     private let coverView = UIImageView()
-    private let shareButton = UIButton(type: .custom)
+    private let shareButton = AnycastIconButton(
+        style: .plain, icon: AppIcons.share, accessibilityLabel: "Share episode", glyphSize: 20
+    )
     private let shareSpinner = UIActivityIndicatorView(style: .medium)
-    private let titleBar = PlayerTitleBarView()
+    private let titleBlock = PlayerTitleBlockView()
     private let stateMessageLabel = UILabel()
     private let progressBar = PlayerProgressBarView()
-    private let replayButton = UIButton(type: .custom)
+    private let replayButton = AnycastIconButton(
+        style: .plain, icon: AppIcons.replay10, accessibilityLabel: "Seek back 10 seconds",
+        diameter: Layout.transportSlot, glyphSize: IconStyle.playerTransport.pointSize
+    )
     private let playPauseButton = UIButton(type: .custom)
-    private let playPauseIcon = PlayPauseIconControl(size: 48)
-    private let forwardButton = UIButton(type: .custom)
+    private let playPauseIcon = PlayPauseIconControl(size: IconStyle.playerPrimary.pointSize)
+    private let forwardButton = AnycastIconButton(
+        style: .plain, icon: AppIcons.forward30, accessibilityLabel: "Seek forward 30 seconds",
+        diameter: Layout.transportSlot, glyphSize: IconStyle.playerTransport.pointSize
+    )
     private let retryRow = UIStackView()
+
+    private enum Layout {
+        /// UI kit player artwork: 320 pt, inset 36 from the screen edges.
+        static let artworkMaxSide: CGFloat = 320
+        static let artworkInset = Spacing.pageSection
+        /// The transport's touch slots (UI kit `playerControls` container).
+        static let transportSlot: CGFloat = 72
+        /// Gap between the play slot and the skip slots (glyph centers
+        /// ~100 pt apart, as in the UI kit).
+        static let transportGap = Spacing.sectionGap
+    }
 
     init(context: UIContext) {
         self.context = context
@@ -57,72 +78,54 @@ final class PlayerMainPageViewController: UIViewController {
         )
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        coverShadow.layer.shadowPath = UIBezierPath(
+            roundedRect: coverShadow.bounds, cornerRadius: Radius.artwork
+        ).cgPath
+    }
+
     // MARK: - Build
 
     private func build() {
-        // Cover: square at the padded content width (Dart `Get.width - 48`
-        // — bounds-relative here), corner radius 8.
-        let coverContainer = UIView()
-        coverContainer.translatesAutoresizingMaskIntoConstraints = false
+        coverShadow.layer.shadowColor = UIColor.black.cgColor
+        coverShadow.layer.shadowOpacity = 0.13
+        coverShadow.layer.shadowRadius = Spacing.md
+        coverShadow.layer.shadowOffset = CGSize(width: 0, height: Spacing.md)
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = 8
+        coverView.layer.cornerRadius = Radius.artwork
         coverView.layer.cornerCurve = .continuous
-        coverView.backgroundColor = Theme.primaryBackground
+        coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.isAccessibilityElement = true
         coverView.accessibilityLabel = "Episode artwork"
         coverView.translatesAutoresizingMaskIntoConstraints = false
-        coverContainer.addSubview(coverView)
+        coverShadow.addSubview(coverView)
 
-        shareButton.setImage(AppIcons.share, for: .normal)
-        shareButton.setPreferredSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 18), forImageIn: .normal
-        )
-        shareButton.tintColor = UIColor.white.withAlphaComponent(0.5)
-        shareButton.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-        shareButton.layer.cornerRadius = 18
-        shareButton.layer.cornerCurve = .continuous
-        shareButton.isAccessibilityElement = true
-        shareButton.accessibilityLabel = "Share episode"
-        shareButton.translatesAutoresizingMaskIntoConstraints = false
-        coverContainer.addSubview(shareButton)
-        shareSpinner.color = .white
+        shareButton.tintColor = Theme.playerSecondary
+        shareButton.configuration?.baseForegroundColor = Theme.playerSecondary
+        shareSpinner.color = Theme.playerText
         shareSpinner.hidesWhenStopped = true
         shareSpinner.translatesAutoresizingMaskIntoConstraints = false
         shareButton.addSubview(shareSpinner)
 
-        let transport = buildControls()
+        let titleRow = UIStackView(arrangedSubviews: [titleBlock, shareButton])
+        titleRow.axis = .horizontal
+        titleRow.alignment = .top
+        titleRow.spacing = Spacing.gap
 
-        stateMessageLabel.font = Typography.defaultText.font()
-        stateMessageLabel.textColor = Theme.primaryLightMax
+        stateMessageLabel.font = TypographyV2.caption.font()
+        stateMessageLabel.textColor = Theme.playerSecondary
+        stateMessageLabel.textAlignment = .center
         stateMessageLabel.adjustsFontForContentSizeCategory = true
         stateMessageLabel.isHidden = true
 
-        let progressBlock = UIStackView(arrangedSubviews: [stateMessageLabel, progressBar])
-        progressBlock.axis = .vertical
-        progressBlock.spacing = 4
-        progressBlock.alignment = .leading
-        // The bar itself spans the full width; only the labels hug the lead.
-        progressBar.widthAnchor.constraint(equalTo: progressBlock.widthAnchor).isActive = true
-
-        retryRow.axis = .horizontal
+        retryRow.axis = .vertical
         retryRow.alignment = .center
-        retryRow.distribution = .fill
         retryRow.isHidden = true
-        let retryButton = UIButton(type: .custom)
-        var retryConfig = UIButton.Configuration.gray()
-        if let retryIcon = UIImage(systemName: "arrow.clockwise") {
-            retryConfig.image = retryIcon
-            retryConfig.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16)
-        }
-        retryConfig.title = "Retry"
-        retryConfig.baseForegroundColor = Theme.primaryLightMax
-        retryConfig.baseBackgroundColor = Theme.cardBackground
-        retryConfig.cornerStyle = .capsule
-        retryConfig.imagePadding = 8
-        retryConfig.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
-        retryButton.configuration = retryConfig
-        retryButton.isAccessibilityElement = true
+        let retryButton = AnycastButton.make(
+            .secondary, title: "Retry", image: UIImage(systemName: "arrow.clockwise")
+        )
         retryButton.accessibilityLabel = "Retry playback"
         retryButton.addAction(
             UIAction { [weak self] _ in
@@ -133,98 +136,74 @@ final class PlayerMainPageViewController: UIViewController {
         )
         retryRow.addArrangedSubview(retryButton)
 
-        // Dart PlayerMain is a Column(mainAxisAlignment:
-        // .spaceEvenly) (player.dart:219-300): the four blocks share the
-        // page height through EQUAL flexible gaps — grabber at the top,
-        // cover, then spacing before the title/progress group. A plain
-        // pinned `.fill` stack left the fixed-height blocks collapsed at
-        // the top with all slack in one dead gap above the page tab, and
-        // its fill-stretch conflicted with the cover cap, shrinking the
-        // cover below the design width. Five equal spacers (required
-        // equality) reproduce spaceEvenly deterministically; they collapse
-        // together on short windows. The content blocks hug at required so
-        // the stack can never stretch them — only the spacers absorb slack.
-        // retryRow trails transport inside the last gap's span.
-        let gaps = (0..<5).map { _ in UIView() }
-        gaps.forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
-        let root = UIStackView(arrangedSubviews: [
-            gaps[0], coverContainer, gaps[1], titleBar, gaps[2],
-            progressBlock, gaps[3], transport, retryRow, gaps[4],
-        ])
-        root.axis = .vertical
-        root.isLayoutMarginsRelativeArrangement = true
-        root.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 8, leading: 24, bottom: 8, trailing: 24)
-        root.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(root)
-        for pair in zip(gaps, gaps.dropFirst()) {
-            pair.0.heightAnchor.constraint(equalTo: pair.1.heightAnchor).isActive = true
-        }
-        for block in [coverContainer, titleBar, progressBlock, transport, retryRow] {
-            block.setContentHuggingPriority(.required, for: .vertical)
-            block.setContentCompressionResistancePriority(.required, for: .vertical)
+        let bottomStack = UIStackView(arrangedSubviews: [stateMessageLabel, progressBar, buildControls(), retryRow])
+        bottomStack.axis = .vertical
+        bottomStack.spacing = Spacing.pageH
+        bottomStack.setCustomSpacing(Spacing.xs, after: stateMessageLabel)
+        bottomStack.setCustomSpacing(Spacing.cardInner, after: progressBar)
+
+        for block in [coverShadow, titleRow, bottomStack] {
+            block.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(block)
         }
 
-        // Square at the content width; on very short scalable windows the
-        // square yields (priority 999) to a height-share cap so the column
-        // never overflows (07 §4 hard requirement). Equal width/height caps
-        // keep it SQUARE when they bind — the shrunk cover centers instead
-        // of stretching to the full width.
-        let coverAspect = coverView.heightAnchor.constraint(equalTo: coverView.widthAnchor)
-        coverAspect.priority = .init(999)
-        let coverWidth = coverView.widthAnchor.constraint(
-            equalTo: coverContainer.widthAnchor
+        // UI kit balance: the space above the artwork equals the space
+        // between the title and the scrubber, so the page's weight follows
+        // the screen height instead of piling slack in one gap.
+        let topBalance = UILayoutGuide()
+        let middleBalance = UILayoutGuide()
+        view.addLayoutGuide(topBalance)
+        view.addLayoutGuide(middleBalance)
+        let balanced = topBalance.heightAnchor.constraint(equalTo: middleBalance.heightAnchor)
+        balanced.priority = .defaultHigh
+
+        // Square artwork at the inset width, capped at 320 pt; on short
+        // windows it yields to a share of the page height so the column
+        // never overflows (07 §4 hard requirement).
+        let coverWidth = coverShadow.widthAnchor.constraint(
+            equalTo: view.widthAnchor, constant: -Layout.artworkInset * 2
         )
-        coverWidth.priority = .init(999)
-        let coverHeightCap = coverView.heightAnchor.constraint(
-            lessThanOrEqualTo: root.heightAnchor, multiplier: 0.55
-        )
-        let coverWidthCap = coverView.widthAnchor.constraint(
-            lessThanOrEqualTo: root.heightAnchor, multiplier: 0.55
-        )
+        coverWidth.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
-            root.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            root.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            root.topAnchor.constraint(equalTo: view.topAnchor),
-            root.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            topBalance.topAnchor.constraint(equalTo: view.topAnchor),
+            topBalance.bottomAnchor.constraint(equalTo: coverShadow.topAnchor),
+            topBalance.heightAnchor.constraint(greaterThanOrEqualToConstant: Spacing.pageHeader),
 
-            coverView.centerXAnchor.constraint(equalTo: coverContainer.centerXAnchor),
-            coverView.topAnchor.constraint(equalTo: coverContainer.topAnchor),
-            coverView.bottomAnchor.constraint(equalTo: coverContainer.bottomAnchor),
+            coverShadow.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             coverWidth,
-            coverAspect,
-            coverHeightCap,
-            coverWidthCap,
+            coverShadow.widthAnchor.constraint(lessThanOrEqualToConstant: Layout.artworkMaxSide),
+            coverShadow.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -Layout.artworkInset * 2),
+            coverShadow.heightAnchor.constraint(equalTo: coverShadow.widthAnchor),
+            coverShadow.heightAnchor.constraint(lessThanOrEqualTo: view.heightAnchor, multiplier: 0.45),
+            coverView.topAnchor.constraint(equalTo: coverShadow.topAnchor),
+            coverView.bottomAnchor.constraint(equalTo: coverShadow.bottomAnchor),
+            coverView.leadingAnchor.constraint(equalTo: coverShadow.leadingAnchor),
+            coverView.trailingAnchor.constraint(equalTo: coverShadow.trailingAnchor),
 
-            shareButton.trailingAnchor.constraint(equalTo: coverContainer.trailingAnchor, constant: -4),
-            shareButton.bottomAnchor.constraint(equalTo: coverContainer.bottomAnchor, constant: -4),
-            shareButton.widthAnchor.constraint(equalToConstant: 36),
-            shareButton.heightAnchor.constraint(equalToConstant: 36),
+            titleRow.topAnchor.constraint(equalTo: coverShadow.bottomAnchor, constant: Spacing.pageHeader),
+            titleRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
+            titleRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+
+            middleBalance.topAnchor.constraint(equalTo: titleRow.bottomAnchor),
+            middleBalance.bottomAnchor.constraint(equalTo: bottomStack.topAnchor),
+            middleBalance.heightAnchor.constraint(greaterThanOrEqualToConstant: Spacing.gap),
+            balanced,
+
+            bottomStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
+            bottomStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            bottomStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Spacing.pageH),
+
             shareSpinner.centerXAnchor.constraint(equalTo: shareButton.centerXAnchor),
             shareSpinner.centerYAnchor.constraint(equalTo: shareButton.centerYAnchor),
-
-            retryRow.centerXAnchor.constraint(equalTo: root.centerXAnchor),
         ])
     }
 
-    /// replay_10 / 72×72 green play-pause / forward_30 (player.dart:1303-1367);
-    /// the −10 s / +30 s deltas are the Dart Controls' seekByRelative values.
+    /// replay_10 / play-pause / forward_30 (player.dart:1303-1367); the
+    /// −10 s / +30 s deltas are the Dart Controls' seekByRelative values.
+    /// UI kit transport: bare glyphs, play exactly centered with the skips
+    /// placed symmetrically (their glyph widths differ, so no spacers).
     private func buildControls() -> UIView {
-        replayButton.setImage(AppIcons.replay10, for: .normal)
-        replayButton.setPreferredSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 48), forImageIn: .normal
-        )
-        forwardButton.setImage(AppIcons.forward30, for: .normal)
-        forwardButton.setPreferredSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 48), forImageIn: .normal
-        )
-        for button in [replayButton, forwardButton] {
-            button.tintColor = Theme.primaryLightMax
-            button.isAccessibilityElement = true
-        }
-        replayButton.accessibilityLabel = "Seek back 10 seconds"
-        forwardButton.accessibilityLabel = "Seek forward 30 seconds"
-
         replayButton.addAction(
             UIAction { [weak self] _ in self?.context.playback.seekByRelative(-10_000) },
             for: .touchUpInside
@@ -235,15 +214,16 @@ final class PlayerMainPageViewController: UIViewController {
         )
         replayButton.accessibilityIdentifier = "player-replay-10"
         forwardButton.accessibilityIdentifier = "player-forward-30"
+        for button in [replayButton, forwardButton] {
+            button.configuration?.baseForegroundColor = Theme.playerText
+        }
 
-        playPauseButton.backgroundColor = Theme.brandGreen
-        playPauseButton.layer.cornerRadius = 36
-        playPauseButton.layer.cornerCurve = .continuous
         playPauseButton.isAccessibilityElement = true
         playPauseButton.accessibilityLabel = "Play or pause"
         playPauseIcon.isUserInteractionEnabled = false
         playPauseIcon.translatesAutoresizingMaskIntoConstraints = false
         playPauseButton.addSubview(playPauseIcon)
+        playPauseButton.addPressFeedback(scale: Motion.pressScaleStrong)
         playPauseButton.addAction(
             UIAction { [weak self] _ in
                 guard let self else { return }
@@ -252,22 +232,30 @@ final class PlayerMainPageViewController: UIViewController {
             for: .touchUpInside
         )
 
-        let row = UIStackView(arrangedSubviews: [replayButton, playPauseButton, forwardButton])
-        row.axis = .horizontal
-        row.alignment = .center
-        row.distribution = .equalSpacing
-        row.translatesAutoresizingMaskIntoConstraints = false
-
+        let row = UIView()
+        for button in [replayButton, playPauseButton, forwardButton] as [UIView] {
+            button.translatesAutoresizingMaskIntoConstraints = false
+            row.addSubview(button)
+        }
         NSLayoutConstraint.activate([
-            playPauseButton.widthAnchor.constraint(equalToConstant: 72),
-            playPauseButton.heightAnchor.constraint(equalToConstant: 72),
+            playPauseButton.centerXAnchor.constraint(equalTo: row.centerXAnchor),
+            playPauseButton.topAnchor.constraint(equalTo: row.topAnchor),
+            playPauseButton.bottomAnchor.constraint(equalTo: row.bottomAnchor),
+            playPauseButton.widthAnchor.constraint(equalToConstant: Layout.transportSlot),
+            playPauseButton.heightAnchor.constraint(equalToConstant: Layout.transportSlot),
             playPauseIcon.centerXAnchor.constraint(equalTo: playPauseButton.centerXAnchor),
             playPauseIcon.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            // Explicit size: the intrinsicContentSize already declares 48,
-            // but the loading lottie's canvas must never be able to stretch
-            // the control past the 72 pt button (R2).
-            playPauseIcon.widthAnchor.constraint(equalToConstant: 48),
-            playPauseIcon.heightAnchor.constraint(equalToConstant: 48),
+            // Explicit size: the loading lottie's canvas must never be able
+            // to stretch the control past its slot (R2).
+            playPauseIcon.widthAnchor.constraint(equalToConstant: IconStyle.playerPrimary.pointSize),
+            playPauseIcon.heightAnchor.constraint(equalToConstant: IconStyle.playerPrimary.pointSize),
+
+            replayButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
+            replayButton.trailingAnchor.constraint(equalTo: playPauseButton.leadingAnchor, constant: -Layout.transportGap),
+            replayButton.leadingAnchor.constraint(greaterThanOrEqualTo: row.leadingAnchor),
+            forwardButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
+            forwardButton.leadingAnchor.constraint(equalTo: playPauseButton.trailingAnchor, constant: Layout.transportGap),
+            forwardButton.trailingAnchor.constraint(lessThanOrEqualTo: row.trailingAnchor),
         ])
         return row
     }
@@ -277,7 +265,7 @@ final class PlayerMainPageViewController: UIViewController {
             UIAction { [weak self] _ in self?.shareTapped() },
             for: .touchUpInside
         )
-        titleBar.onOpenChannel = { [weak self] in self?.openChannel() }
+        titleBlock.onOpenChannel = { [weak self] in self?.openChannel() }
         progressBar.onSeek = { [weak self] position in
             guard let self else { return }
             Task { await self.context.playback.seek(position) }
@@ -295,15 +283,16 @@ final class PlayerMainPageViewController: UIViewController {
         let episode = context.playback.currentEpisode
         let position = context.playback.positionData
 
-        let coverURL = (episode?.imageUrl.flatMap(URL.init(string:)))
-            ?? URL(string: "https://placehold.co/400/000000/FFF.png?text=No+Episode")
-        if coverURL != renderedCoverURL {
+        // A missing cover shows the shared local placeholder (no remote
+        // "No Episode" image request).
+        let coverURL = episode?.imageUrl.flatMap(URL.init(string:))
+        if coverURL != renderedCoverURL || coverURL == nil {
             renderedCoverURL = coverURL
             coverView.kf.cancelDownloadTask()
-            coverView.kf.setImage(with: coverURL)
+            coverView.setArtwork(coverURL, title: episode?.channelTitle)
         }
 
-        titleBar.update(
+        titleBlock.update(
             title: episode?.title ?? "",
             channelTitle: episode?.channelTitle ?? "",
             rssFeedURL: episode?.rssFeedUrl
@@ -311,7 +300,6 @@ final class PlayerMainPageViewController: UIViewController {
             guard let self else { return }
             Task { await self.fetchChannel(rssFeedURL: rss) }
         }
-        updateChannelNameColor(imageURL: episode?.imageUrl)
 
         let state = PlayerProgressVisualState.resolve(
             hasEpisode: (episode?.enclosureUrl?.isEmpty == false),
@@ -338,12 +326,10 @@ final class PlayerMainPageViewController: UIViewController {
         replayButton.isEnabled = controlsEnabled
         forwardButton.isEnabled = controlsEnabled
         playPauseButton.isEnabled = controlsEnabled
-        let tint: UIColor = controlsEnabled
-            ? Theme.primaryLightMax
-            : Theme.primaryLightMax.withAlphaComponent(0.38)
-        replayButton.tintColor = tint
-        forwardButton.tintColor = tint
-        playPauseButton.alpha = controlsEnabled ? 1 : 0.38
+        let alpha: CGFloat = controlsEnabled ? 1 : 0.38
+        replayButton.alpha = alpha
+        forwardButton.alpha = alpha
+        playPauseButton.alpha = alpha
 
         playPauseIcon.update(
             snapshot: .init(
@@ -352,7 +338,7 @@ final class PlayerMainPageViewController: UIViewController {
                 isPlaying: context.playback.isPlaying,
                 isLoading: context.playback.isLoading
             ),
-            tint: Theme.primaryLightMax
+            tint: Theme.playerText
         )
 
         // K6: error surfaced by the shell toast; this is the manual retry.
@@ -360,7 +346,7 @@ final class PlayerMainPageViewController: UIViewController {
     }
 
     /// The Dart TitleBar reads the subscription row (controller.channel) for
-    /// the channel image; the page owns the async hop off the main actor.
+    /// the show's display name; the page owns the async hop off the main actor.
     private func fetchChannel(rssFeedURL: String) async {
         let subscription: SubscriptionRow?
         do {
@@ -376,34 +362,10 @@ final class PlayerMainPageViewController: UIViewController {
         // response would paint the previous episode's channel title/image
         // onto the new one (same identity guard as
         // SubtitlesPageViewController.updateHeader).
-        guard rssFeedURL == titleBar.channelURLString else { return }
-        titleBar.applyChannel(
-            imageURL: subscription?.imageUrl ?? "",
-            channelTitle: subscription?.title ?? ""
-        )
-    }
-
-    /// Channel-name color = getTextSafeColor(dominant) — the palette rule
-    /// (formatters.dart:139-153; luminance < 0.2 falls back to 0x10B981).
-    private var paletteImageURL: String?
-
-    private func updateChannelNameColor(imageURL: String?) {
-        guard let imageURL, !imageURL.isEmpty else {
-            titleBar.setDominantColor(nil)
-            paletteImageURL = nil
-            return
-        }
-        guard imageURL != paletteImageURL else { return }
-        paletteImageURL = imageURL
-        if let cached = context.palette.cachedDominantColor(for: imageURL) {
-            titleBar.setDominantColor(cached)
-            return
-        }
-        Task { [weak self] in
-            guard let self else { return }
-            let color = await self.context.palette.dominantColor(from: imageURL)
-            guard self.paletteImageURL == imageURL else { return }
-            self.titleBar.setDominantColor(color)
+        guard rssFeedURL == titleBlock.channelURLString else { return }
+        // Unsubscribed shows have no row: keep the episode's own show name.
+        if let title = subscription?.title, !title.isEmpty {
+            titleBlock.setChannelTitle(title)
         }
     }
 
@@ -440,145 +402,80 @@ final class PlayerMainPageViewController: UIViewController {
     }
 }
 
-// MARK: - TitleBar (player.dart:300-399)
+// MARK: - Title block (player.dart:300-399)
 
-/// Channel image (64×64 r12, tap → Channel) + title (24 pt w600; marquee
-/// only when the MEASURED width overflows — K33) + channel name (16 pt w600,
-/// `getTextSafeColor(dominant)` → 0x10B981 when the dominant is too dark;
-/// also taps to Channel).
+/// Episode title (wraps to two lines, then truncates) over the show name;
+/// the show name opens the Channel sheet (Dart TitleBar affordance).
 @MainActor
-private final class PlayerTitleBarView: UIView {
+private final class PlayerTitleBlockView: UIView {
 
     var onOpenChannel: (() -> Void)?
 
-    private let imageButton = UIButton(type: .custom)
-    private let imageView = UIImageView()
-    private let titleContainer = UIView()
-    private var titleLabel = UILabel()
+    private let titleLabel = UILabel()
     private let channelButton = UIButton(type: .system)
-    private var titleIsMarquee = false
-    private var currentTitle = ""
-    private var laidOutWidth: CGFloat = 0
     private(set) var channelURLString = ""
-    private var fetchedImageURL: String?
-    /// The episode-side fallback title last pushed by `update`; render()
-    /// runs every position tick, so the push must be change-driven or it
-    /// would rebuild the button configuration and revert a display name
-    /// already fetched from the subscription row.
+    /// The episode-side show name last pushed by `update`; render() runs
+    /// every position tick, so the push must be change-driven or it would
+    /// revert a display name already fetched from the subscription row.
     private var lastEpisodeChannelTitle = ""
 
     init() {
-        super.init(frame: CGRect(x: 0, y: 0, width: 320, height: 64))
+        super.init(frame: .zero)
 
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 12
-        imageView.layer.cornerCurve = .continuous
-        imageView.backgroundColor = Theme.primaryBackground
-        imageView.image = AppIcons.photo
-        imageView.tintColor = Theme.primaryLightMax
-        imageView.isUserInteractionEnabled = false
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageButton.addSubview(imageView)
-
-        for button in [imageButton, channelButton] {
-            button.addAction(
-                UIAction { [weak self] _ in self?.onOpenChannel?() },
-                for: .touchUpInside
-            )
-        }
-        imageButton.isAccessibilityElement = true
-        imageButton.accessibilityLabel = "Open channel"
-
-        applyTitleFont()
-        titleLabel.textColor = Theme.primaryLightMax
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleContainer.addSubview(titleLabel)
+        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.textColor = Theme.playerText
+        titleLabel.numberOfLines = 2
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
 
         var channelConfig = UIButton.Configuration.plain()
-        channelConfig.baseForegroundColor = Theme.tabSelectedGreen
+        channelConfig.baseForegroundColor = Theme.playerText.withAlphaComponent(0.7)
         channelConfig.contentInsets = .zero
+        channelConfig.titleLineBreakMode = .byTruncatingTail
+        channelConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.bodyMedium.font()
+            return outgoing
+        }
         channelButton.configuration = channelConfig
-        channelButton.titleLabel?.font = UIFontMetrics(forTextStyle: .title3).scaledFont(
-            for: .systemFont(ofSize: 16, weight: .semibold)
-        )
         channelButton.titleLabel?.adjustsFontForContentSizeCategory = true
         channelButton.contentHorizontalAlignment = .leading
-        channelButton.isAccessibilityElement = true
         channelButton.accessibilityLabel = "Open channel"
+        channelButton.addAction(
+            UIAction { [weak self] _ in self?.onOpenChannel?() },
+            for: .touchUpInside
+        )
 
-        imageButton.translatesAutoresizingMaskIntoConstraints = false
-        titleContainer.translatesAutoresizingMaskIntoConstraints = false
-        channelButton.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(imageButton)
-        addSubview(titleContainer)
-        addSubview(channelButton)
-
+        let stack = UIStackView(arrangedSubviews: [titleLabel, channelButton])
+        stack.axis = .vertical
+        stack.alignment = .leading
+        stack.spacing = Spacing.xs
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
         NSLayoutConstraint.activate([
-            imageButton.leadingAnchor.constraint(equalTo: leadingAnchor),
-            imageButton.topAnchor.constraint(equalTo: topAnchor),
-            imageButton.widthAnchor.constraint(equalToConstant: 64),
-            imageButton.heightAnchor.constraint(equalToConstant: 64),
-
-            imageView.leadingAnchor.constraint(equalTo: imageButton.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: imageButton.trailingAnchor),
-            imageView.topAnchor.constraint(equalTo: imageButton.topAnchor),
-            imageView.bottomAnchor.constraint(equalTo: imageButton.bottomAnchor),
-
-            titleContainer.leadingAnchor.constraint(equalTo: imageButton.trailingAnchor, constant: 6),
-            titleContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
-            titleContainer.topAnchor.constraint(equalTo: topAnchor),
-            titleContainer.heightAnchor.constraint(equalToConstant: 34),
-
-            titleLabel.leadingAnchor.constraint(equalTo: titleContainer.leadingAnchor),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: titleContainer.trailingAnchor),
-            titleLabel.topAnchor.constraint(equalTo: titleContainer.topAnchor),
-            titleLabel.bottomAnchor.constraint(lessThanOrEqualTo: titleContainer.bottomAnchor),
-
-            channelButton.leadingAnchor.constraint(equalTo: titleContainer.leadingAnchor),
-            channelButton.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
-            channelButton.topAnchor.constraint(equalTo: titleContainer.bottomAnchor, constant: 6),
-            channelButton.heightAnchor.constraint(equalToConstant: 24),
-
-            heightAnchor.constraint(equalToConstant: 64),
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            channelButton.heightAnchor.constraint(greaterThanOrEqualToConstant: Spacing.pageHeader),
+            channelButton.widthAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.standardDiameter),
         ])
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    private func applyTitleFont() {
-        let font = UIFontMetrics(forTextStyle: .title2).scaledFont(
-            for: .systemFont(ofSize: 24, weight: .semibold)
-        )
-        if titleLabel is MarqueeLabel {
-            (titleLabel as! MarqueeLabel).font = font
-        } else {
-            titleLabel.font = font
-            titleLabel.adjustsFontForContentSizeCategory = true
-        }
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        let width = titleContainer.bounds.width
-        if abs(width - laidOutWidth) > 0.5 {
-            laidOutWidth = width
-            applyTitle()
-        }
-    }
-
     /// Pushes the current episode; `loadChannel` kicks the subscription
-    /// fetch (image + authoritative channel title) once per rss URL.
+    /// fetch (authoritative show name) once per rss URL.
     func update(
         title: String,
         channelTitle: String,
         rssFeedURL: String?,
         loadChannel: @MainActor (String) -> Void
     ) {
-        if title != currentTitle {
-            currentTitle = title
-            applyTitle()
+        if titleLabel.text != title {
+            titleLabel.text = title
         }
         if !channelTitle.isEmpty, channelTitle != lastEpisodeChannelTitle {
             lastEpisodeChannelTitle = channelTitle
@@ -587,7 +484,6 @@ private final class PlayerTitleBarView: UIView {
         if let rssFeedURL {
             guard rssFeedURL != channelURLString else { return }
             channelURLString = rssFeedURL
-            fetchedImageURL = nil
             loadChannel(rssFeedURL)
         } else {
             // No feed URL (no episode / a row without one): skip the fetch
@@ -597,86 +493,8 @@ private final class PlayerTitleBarView: UIView {
         }
     }
 
-    func applyChannel(imageURL: String, channelTitle: String) {
-        if !channelTitle.isEmpty {
-            setChannelTitle(channelTitle)
-        }
-        guard imageURL != fetchedImageURL else { return }
-        fetchedImageURL = imageURL
-        if imageURL.isEmpty {
-            imageView.kf.cancelDownloadTask()
-            imageView.image = AppIcons.photo
-        } else {
-            imageView.kf.setImage(
-                with: URL(string: imageURL),
-                placeholder: AppIcons.photo,
-                options: [.transition(.none)]
-            )
-        }
-    }
-
-    /// Dominant color for the channel-name safe-color rule; nil resets to
-    /// the app link green (the Dart fallback applies to every too-dark
-    /// dominant, including the palette fallback itself).
-    func setDominantColor(_ color: UIColor?) {
-        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-        if let color, color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
-            let rgb = (UInt32(red * 255) << 16) | (UInt32(green * 255) << 8) | UInt32(blue * 255)
-            setChannelColor(PlayerPaletteRules.channelNameColor(dominantRGB: rgb | 0xFF00_0000))
-        } else {
-            // Luminance 0 → the fallback green applies.
-            setChannelColor(PlayerPaletteRules.channelNameColor(dominantRGB: 0))
-        }
-    }
-
-    private func setChannelTitle(_ title: String) {
-        var config = channelButton.configuration ?? UIButton.Configuration.plain()
-        config.title = title
-        channelButton.configuration = config
+    func setChannelTitle(_ title: String) {
+        channelButton.configuration?.title = title
         channelButton.accessibilityLabel = "Open channel \(title)"
-    }
-
-    private func setChannelColor(_ color: UIColor) {
-        var config = channelButton.configuration ?? UIButton.Configuration.plain()
-        config.baseForegroundColor = color
-        channelButton.configuration = config
-    }
-
-    /// The K33 gate: swap UILabel ↔ MarqueeLabel on measured overflow
-    /// (Dart estimated `title.length * 24`; the port measures the real
-    /// width through MarqueeLabelFactory).
-    private func applyTitle() {
-        guard laidOutWidth > 0 else { return }
-        let font = titleLabel.font ?? UIFontMetrics(forTextStyle: .title2).scaledFont(
-            for: .systemFont(ofSize: 24, weight: .semibold)
-        )
-        let needsMarquee = MarqueeLabelFactory.titleNeedsMarquee(
-            currentTitle, font: font, availableWidth: laidOutWidth
-        )
-        if needsMarquee != titleIsMarquee {
-            let textColor = Theme.primaryLightMax
-            titleLabel.removeFromSuperview()
-            if needsMarquee {
-                titleLabel = MarqueeLabelFactory.makePlayerTitle(font: font, textColor: textColor)
-                titleIsMarquee = true
-            } else {
-                titleLabel = UILabel()
-                applyTitleFont()
-                titleLabel.textColor = textColor
-                titleIsMarquee = false
-            }
-            titleLabel.translatesAutoresizingMaskIntoConstraints = false
-            titleContainer.addSubview(titleLabel)
-            NSLayoutConstraint.activate([
-                titleLabel.leadingAnchor.constraint(equalTo: titleContainer.leadingAnchor),
-                titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: titleContainer.trailingAnchor),
-                titleLabel.topAnchor.constraint(equalTo: titleContainer.topAnchor),
-                titleLabel.bottomAnchor.constraint(lessThanOrEqualTo: titleContainer.bottomAnchor),
-            ])
-        }
-        (titleLabel as? MarqueeLabel)?.text = currentTitle
-        if !(titleLabel is MarqueeLabel) {
-            (titleLabel as UILabel).text = currentTitle
-        }
     }
 }

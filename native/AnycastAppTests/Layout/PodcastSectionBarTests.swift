@@ -23,6 +23,8 @@ struct PodcastSectionBarTests {
     @Test("Selected section border follows light and dark appearance")
     func selectedBorderAppearance() {
         let bar = PodcastSectionBar(frame: CGRect(x: 0, y: 0, width: 343, height: 60))
+        let window = TraitHostWindow.attach(bar)
+        defer { TraitHostWindow.detach(window) }
         bar.traitOverrides.userInterfaceStyle = .light
         bar.layoutIfNeeded()
         let selectedSurface = bar.subviews.first

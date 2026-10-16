@@ -13,7 +13,7 @@ import AnycastKit
 ///    and the square-cornered stub the head became during the first
 ///    seconds of playback (the head is now always a full semicircle).
 /// 3. (Retired with the V2 IA flip — Discover left the tab shell, 09
-///    §3.5; the UnderlineTabBarView indicator guard it motivated lives on
+///    §3.5; the ChipTabBarView indicator guard it motivated lives on
 ///    through SearchPage's use.)
 /// 4. Playlist card progress strip running through the card's rounded
 ///    corners.
@@ -37,7 +37,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Player page distribution (1) + thumb height (2)
 
-    @Test("Player main page: square cover and five equal spaceEvenly gaps")
+    @Test("Player main page: square capped cover, balanced whitespace, centered play")
     func playerPageDistribution() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -59,57 +59,48 @@ struct UIFixRegressionTests {
         guard let page = main.view else {
             Issue.record("player main page has no view"); return
         }
-        // Generous settle: the sheet's spaceEvenly distribution is measured
-        // to 2 pt — on a busy simulator a mid-presentation snapshot reads
-        // compressed gaps (flaky under load, not a real regression).
+        // Generous settle: the balance is measured to 2 pt — on a busy
+        // simulator a mid-presentation snapshot reads compressed gaps.
         try await Self.settle(window, seconds: 2.0)
 
         guard let cover = Self.firstView(
             in: page, where: { ($0 as? UIImageView)?.accessibilityLabel == "Episode artwork" }
-        ), let titleBar = Self.firstView(
-            in: page, where: { ($0 as? UIButton)?.accessibilityLabel == "Open channel" }
+        ), let titleRow = Self.firstView(
+            in: page, where: { $0.accessibilityLabel == "Share episode" }
         )?.superview, let progress = Self.firstView(
             in: page, where: { $0 is PlayerProgressBarView }
         ), let playPause = Self.firstView(
             in: page, where: { ($0 as? UIButton)?.accessibilityLabel == "Play or pause" }
-        )?.superview else {
+        ) else {
             Issue.record("player main page blocks not found"); return
         }
-        // The K6 retry row sits BELOW the transport — when a playback
-        // failure surfaced earlier it is the stack's bottom block, and the
-        // below-transport gap must be measured from it.
-        let retryRow = Self.firstView(
-            in: page, where: { ($0 as? UIButton)?.accessibilityLabel == "Retry playback" }
-        )?.superview
-        let bottomBlock = (retryRow?.isHidden == false) ? retryRow! : playPause
-
-        // Cover is square at the content width (the old cap vs stretch
-        // conflict squashed it below the design width).
-        #expect(abs(cover.bounds.width - cover.bounds.height) < 1.5,
-                "cover is not square: \(cover.bounds)")
+        guard let bottomStack = progress.superview else {
+            Issue.record("scrubber has no host stack"); return
+        }
 
         func frameInPage(_ v: UIView) -> CGRect { page.convert(v.bounds, from: v) }
         let coverFrame = frameInPage(cover)
-        let titleFrame = frameInPage(titleBar)
-        let progressFrame = frameInPage(progress)
-        let transportFrame = frameInPage(playPause)
-        let bottomFrame = frameInPage(bottomBlock)
+        let titleFrame = frameInPage(titleRow)
+        let bottomFrame = frameInPage(bottomStack)
+        let playFrame = frameInPage(playPause)
 
-        // The four content blocks + page edges must share the height
-        // through five EQUAL gaps (spaceEvenly).
-        let gap = { (a: CGFloat, b: CGFloat) in b - a }
-        let gaps: [CGFloat] = [
-            gap(8, coverFrame.minY),                       // above the cover (8 pt stack margin)
-            gap(coverFrame.maxY, titleFrame.minY),
-            gap(titleFrame.maxY, progressFrame.minY),
-            gap(progressFrame.maxY, transportFrame.minY),
-            gap(bottomFrame.maxY, page.bounds.height - 8), // below the bottom block (8 pt margin)
-        ]
-        for (index, value) in gaps.enumerated() {
-            #expect(abs(value - gaps[0]) < 2.0,
-                    "gap \(index) (\(value)) is not even with gap 0 (\(gaps[0]))")
+        // Square, capped at the UI kit's 320 pt and horizontally centered.
+        #expect(abs(coverFrame.width - coverFrame.height) < 1.5, "cover is not square: \(coverFrame)")
+        #expect(coverFrame.width <= 320.5, "cover exceeds its 320 pt cap: \(coverFrame.width)")
+        #expect(abs(coverFrame.midX - page.bounds.midX) < 1, "cover is off center")
+
+        // The whitespace above the cover equals the gap between the title
+        // and the scrubber block (UI kit balance), unless a floor binds.
+        let topGap = coverFrame.minY
+        let middleGap = bottomFrame.minY - titleFrame.maxY
+        #expect(topGap >= 24 - 0.5, "content is crammed against the sheet top: \(topGap)")
+        #expect(middleGap >= 12 - 0.5, "title runs into the scrubber: \(middleGap)")
+        if topGap > 24.5 && middleGap > 12.5 {
+            #expect(abs(topGap - middleGap) < 2.0, "unbalanced: top \(topGap) vs middle \(middleGap)")
         }
-        #expect(gaps[0] > 8, "content is crammed against the sheet top: \(gaps[0])")
+
+        // Play sits exactly on the page's center line.
+        #expect(abs(playFrame.midX - page.bounds.midX) < 1, "play is off center: \(playFrame.midX)")
         await Self.capture(window, name: "uifix-player-page")
     }
 
@@ -149,7 +140,7 @@ struct UIFixRegressionTests {
         bar.layoutIfNeeded()
 
         // ~1% in: the fill rect is a few points wide, but the unioned head
-        // circle keeps the path a full 40 pt wide — a plain rounded rect
+        // circle keeps the path a full track-height (12 pt) wide — a plain rounded rect
         // clamps its corner radius to width/2 and rendered a square stub.
         bar.update(positionMilliseconds: 1_200, bufferedMilliseconds: 0, durationMilliseconds: 120_000)
         bar.layoutIfNeeded()
@@ -157,14 +148,14 @@ struct UIFixRegressionTests {
         guard let playedBox = shapes[2].path?.boundingBox else {
             Issue.record("played layer has no path near position zero"); return
         }
-        #expect(abs(playedBox.width - 40) < 0.5,
+        #expect(abs(playedBox.width - 12) < 0.5,
                 "narrow played segment is \(playedBox.width) pt wide — the head is not a full circle")
         #expect(playedBox.minX < 0,
                 "the head circle should extend past the track's leading cap (the container clips it)")
 
         // The container does the clipping (corner radius == half the bar).
         #expect(bar.barContainer.clipsToBounds, "bar container does not clip")
-        #expect(abs(bar.barContainer.layer.cornerRadius - 20) < 0.5,
+        #expect(abs(bar.barContainer.layer.cornerRadius - 6) < 0.5,
                 "bar container corner radius is not a capsule")
     }
 
@@ -204,11 +195,12 @@ struct UIFixRegressionTests {
             return r + g + b > 700
         }
 
-        // Bar occupies view y 20…60; head circle centered at (25, 40).
-        #expect(isWhite(15, 40), "head mid-height not filled: px=\(channels(15, 40))")
-        #expect(!isWhite(2, 22), "white reaches the bar's top-left — square stub or clip leak: px=\(channels(2, 22))")
-        #expect(!isWhite(2, 59), "white reaches the bar's bottom-left — square stub or clip leak: px=\(channels(2, 59))")
-        #expect(!isWhite(35, 40), "white extends past the round head: px=\(channels(35, 40))")
+        // The resting 6 pt track is centered at y 20 in the top 40 pt touch
+        // band (times sit below); the head ends at x≈25.
+        #expect(isWhite(15, 20), "head mid-height not filled: px=\(channels(15, 20))")
+        #expect(!isWhite(2, 2), "white reaches the bar's top-left — square stub or clip leak: px=\(channels(2, 2))")
+        #expect(!isWhite(2, 26), "white reaches the bar's bottom-left — square stub or clip leak: px=\(channels(2, 26))")
+        #expect(!isWhite(35, 20), "white extends past the round head: px=\(channels(35, 20))")
 
         // Diagnostic capture (same convention as capture()): the bar at a
         // start-of-playback fraction, for offline visual inspection.
@@ -356,7 +348,7 @@ struct UIFixRegressionTests {
         guard let play = playButtons.first else {
             Issue.record("detail play button not found"); return
         }
-        let iconSize = play.currentImage?.size ?? .zero
+        let iconSize = (play.configuration?.image ?? play.currentImage)?.size ?? .zero
         #expect(iconSize.width > 1 && iconSize.height > 1,
                 "detail play button icon is blank (\(iconSize))")
         await Self.capture(window, name: "uifix-detail-play-icon")
@@ -373,18 +365,18 @@ struct UIFixRegressionTests {
         context.tabs.select(0)
         try await Self.settle(window, seconds: 1.5)
 
-        // v2 scroll column (09 §10 批次1): cards live in the list section
-        // (index 3) under the header/strip/hint chrome cells.
+        // Locate the first visible card wherever the chrome sections put
+        // it (the embedded Inbox hides its own header).
         guard let inbox = Self.find(InboxPageViewController.self, in: window.rootViewController),
               let collection = Self.firstView(in: inbox.view, where: { $0 is UICollectionView })
                 as? UICollectionView,
-              collection.numberOfSections >= 4,
-              collection.numberOfItems(inSection: 3) >= 1 else {
+              let path = collection.indexPathsForVisibleItems.sorted().first(where: {
+                  collection.cellForItem(at: $0) is InboxEpisodeCardCell
+              }) else {
             print("[uifix] seeded inbox missing; skipping"); return
         }
-        let path = IndexPath(item: 0, section: 3)
         guard let cell = collection.cellForItem(at: path) as? InboxEpisodeCardCell else {
-            Issue.record("inbox card 0 not visible"); return
+            Issue.record("inbox card not visible"); return
         }
 
         // VoiceOver parity: the context-menu payload is mirrored onto the
@@ -404,6 +396,11 @@ struct UIFixRegressionTests {
         let titles = menu.children.compactMap { ($0 as? UIAction)?.title }
         #expect(titles == ["Play", "Add to playlist", "Remove from inbox"],
                 "menu children \(titles)")
+
+        // Leading swipe adds to the playlist (UI kit swipe right).
+        let leading = inbox.leadingSwipeActions(at: path)?.actions ?? []
+        #expect(leading.count == 1 && leading.first?.title == "Add to playlist",
+                "leading swipe actions \(leading.map { $0.title ?? "" })")
 
         // Trailing swipe surface (批次1 list-section half): a single
         // destructive Remove action.
@@ -460,7 +457,9 @@ struct UIFixRegressionTests {
                 at: IndexPath(item: item, section: 0)
             )?.frame.height ?? 0
         }
-        let collapsed = height(at: 0)
+        // Collapsed heights per card (titles wrap to two lines, so cards
+        // differ in height).
+        let collapsedHeights = (0..<min(3, collection.numberOfItems(inSection: 0))).map(height(at:))
 
         // Walk a toggle sequence across three cards — the shipped defect
         // surfaced as a later toggle failing to resize (or to expand at
@@ -479,10 +478,10 @@ struct UIFixRegressionTests {
             try await Self.settle(window, seconds: 0.5)
 
             let expandedHeight = height(at: item)
-            #expect(expandedHeight > collapsed + 40,
-                    "step \(step): item \(item) expanded to \(expandedHeight) (collapsed \(collapsed))")
-            for other in 0..<min(3, collection.numberOfItems(inSection: 0)) where other != item {
-                #expect(abs(height(at: other) - collapsed) < 8,
+            #expect(expandedHeight > collapsedHeights[item] + 40,
+                    "step \(step): item \(item) expanded to \(expandedHeight) (collapsed \(collapsedHeights[item]))")
+            for other in collapsedHeights.indices where other != item {
+                #expect(abs(height(at: other) - collapsedHeights[other]) < 8,
                         "step \(step): item \(other) did not collapse (\(height(at: other)))")
             }
             // The expanded cell's own frame must match its item height —

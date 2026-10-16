@@ -1,9 +1,9 @@
 import UIKit
 import AnycastKit
 
-/// Tab0 Subscriptions page (lib/pages/subscriptions.dart, 03 §2.4): the
-/// PodcastCard list of subscriptions; tapping any card opens the Channel
-/// sheet (card.dart:330-342). No pull-to-refresh (03 §3.3). The four visual
+/// Tab0 Subscriptions page (lib/pages/subscriptions.dart, 03 §2.4) as the
+/// Anycast 2.0 cover grid: three columns of square artwork over the show
+/// title; tapping a cover opens the Channel sheet (card.dart:330-342). No pull-to-refresh (03 §3.3). The four visual
 /// states (loading / error / empty / content) follow the Dart
 /// anycastCollectionVisualState mapping.
 final class SubscriptionsPageViewController: UIViewController {
@@ -28,23 +28,24 @@ final class SubscriptionsPageViewController: UIViewController {
         let layout = UICollectionViewCompositionalLayout { _, _ in
             let item = NSCollectionLayoutItem(
                 layoutSize: NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(1),
-                    heightDimension: .estimated(PodcastCardCell.cardHeight)
+                    widthDimension: .fractionalWidth(1.0 / 3),
+                    heightDimension: .estimated(160)
                 )
             )
-            // v2 page margin (16) — same correction as the Inbox list: the
-            // v1 24 pt inset clashed with the 16 pt grid the header and
-            // membership card use above this embedded list.
-            item.contentInsets = NSDirectionalEdgeInsets(
-                top: 0, leading: Spacing.pageH, bottom: 0, trailing: Spacing.pageH
+            let group = NSCollectionLayoutGroup.horizontal(
+                layoutSize: NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1), heightDimension: .estimated(160)
+                ),
+                repeatingSubitem: item, count: 3
             )
-            let group = NSCollectionLayoutGroup.horizontal(layoutSize: item.layoutSize, subitems: [item])
+            group.interItemSpacing = .fixed(Spacing.gap)
             let section = NSCollectionLayoutSection(group: group)
-            section.interGroupSpacing = PodcastCardCell.spacing
-            // Zero bottom inset (09 §10 决策⑥): same double-counted v1
-            // clearance as the Inbox list — the shell's
-            // additionalSafeAreaInsets owns the chrome avoidance now.
-            section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 0, trailing: 0)
+            section.interGroupSpacing = Spacing.cardInner
+            // Zero bottom inset (09 §10 决策⑥): the shell owns the chrome
+            // avoidance.
+            section.contentInsets = NSDirectionalEdgeInsets(
+                top: Spacing.gap, leading: Spacing.pageH, bottom: 0, trailing: Spacing.pageH
+            )
             return section
         }
         self.collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
@@ -59,6 +60,11 @@ final class SubscriptionsPageViewController: UIViewController {
 
     // MARK: - Lifecycle
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        collectionView.alignBackgroundViewMargins()
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
@@ -66,10 +72,8 @@ final class SubscriptionsPageViewController: UIViewController {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = .clear
         collectionView.dataSource = self
-        collectionView.register(
-            PodcastCardCell.self,
-            forCellWithReuseIdentifier: PodcastCardCell.reuseIdentifier
-        )
+        collectionView.register(ShowCoverCell.self, forCellWithReuseIdentifier: ShowCoverCell.reuseIdentifier)
+        collectionView.delegate = self
         view.addSubview(collectionView)
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -212,28 +216,30 @@ extension SubscriptionsPageViewController: UICollectionViewDataSource {
         _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: PodcastCardCell.reuseIdentifier,
+            withReuseIdentifier: ShowCoverCell.reuseIdentifier,
             for: indexPath
         )
-        if let card = cell as? PodcastCardCell, subscriptions.indices.contains(indexPath.item) {
+        if let cover = cell as? ShowCoverCell, subscriptions.indices.contains(indexPath.item) {
             let subscription = subscriptions[indexPath.item]
-            card.configure(PodcastCardContent(
-                rssFeedURL: subscription.rssFeedUrl ?? "",
-                title: subscription.title ?? "",
-                description: subscription.description ?? "",
-                imageURL: subscription.imageUrl
-            ))
-            card.onTap = { [weak self] content in
-                guard let self else { return }
-                ChannelViewController.present(
-                    from: self,
-                    context: self.context,
-                    rssFeedURL: content.rssFeedURL,
-                    seed: subscription
-                )
-            }
+            cover.configure(title: subscription.title ?? "", imageURL: subscription.imageUrl)
         }
         return cell
+    }
+}
+
+extension SubscriptionsPageViewController: UICollectionViewDelegate {
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+        guard subscriptions.indices.contains(indexPath.item) else { return }
+        let subscription = subscriptions[indexPath.item]
+        Haptics.tap()
+        ChannelViewController.present(
+            from: self,
+            context: context,
+            rssFeedURL: subscription.rssFeedUrl ?? "",
+            seed: subscription
+        )
     }
 }
 
@@ -256,9 +262,9 @@ enum SubscriptionsVisualState: Equatable {
 
 // MARK: - State views (AnycastLoadingState / AnycastEmptyState)
 
-/// The centered spinner-or-empty-state block hosted as the collection
-/// background: 64 pt circle icon + title + message (+ optional action).
-final class CollectionStateView: UIView {
+/// The Subscriptions loading / error / empty block on the shared
+/// `EmptyStateView`, hosted as the collection background.
+final class CollectionStateView: EmptyStateView {
 
     enum Kind {
         case loading
@@ -266,115 +272,32 @@ final class CollectionStateView: UIView {
         case empty
     }
 
-    private let iconCircle = UIView()
-    private let iconView = UIImageView()
-    private let titleLabel = UILabel()
-    private let messageLabel = UILabel()
-    private let actionButton = UIButton(type: .system)
-    private let spinner = UIActivityIndicatorView(style: .medium)
-
-    init() {
-        super.init(frame: .zero)
-        iconCircle.backgroundColor = UIColor.white.withAlphaComponent(0.06)
-        iconCircle.layer.cornerRadius = 32
-        iconCircle.layer.cornerCurve = .continuous
-        iconCircle.translatesAutoresizingMaskIntoConstraints = false
-        iconCircle.addSubview(iconView)
-        iconView.contentMode = .center
-        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 30)
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-
-        spinner.color = Theme.primary
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        spinner.hidesWhenStopped = true
-        iconCircle.addSubview(spinner)
-
-        titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
-        titleLabel.textAlignment = .center
-        titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.numberOfLines = 0
-
-        messageLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: .systemFont(ofSize: 16))
-        messageLabel.textColor = Theme.secondaryText
-        messageLabel.textAlignment = .center
-        messageLabel.adjustsFontForContentSizeCategory = true
-        messageLabel.numberOfLines = 0
-
-        var actionConfiguration = UIButton.Configuration.plain()
-        actionConfiguration.imagePadding = 8
-        actionConfiguration.baseForegroundColor = Theme.primary
-        actionConfiguration.contentInsets = .zero
-        actionButton.configuration = actionConfiguration
-        actionButton.titleLabel?.font = Typography.mainText.font()
-        actionButton.addAction(UIAction { [weak self] _ in self?.onAction?() }, for: .touchUpInside)
-
-        let column = UIStackView(arrangedSubviews: [iconCircle, titleLabel, messageLabel, actionButton])
-        column.axis = .vertical
-        column.alignment = .center
-        column.spacing = 8
-        column.setCustomSpacing(20, after: iconCircle)
-        column.setCustomSpacing(24, after: messageLabel)
-        column.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(column)
-
-        NSLayoutConstraint.activate([
-            iconCircle.widthAnchor.constraint(equalToConstant: 64),
-            iconCircle.heightAnchor.constraint(equalToConstant: 64),
-            iconView.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
-            iconView.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
-            spinner.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
-
-            column.leadingAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.leadingAnchor),
-            column.trailingAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.trailingAnchor),
-            column.topAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.topAnchor),
-            column.bottomAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.bottomAnchor),
-            column.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
-            column.centerXAnchor.constraint(equalTo: centerXAnchor),
-            column.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
     private var onAction: (() -> Void)?
 
     func configure(kind: Kind, action: (() -> Void)? = nil) {
         onAction = action
         switch kind {
         case .loading:
-            iconView.isHidden = true
-            spinner.isHidden = false
-            spinner.startAnimating()
-            titleLabel.text = nil
-            messageLabel.text = "Loading subscriptions…"
-            actionButton.isHidden = true
+            configure(Content(showsSpinner: true, message: "Loading subscriptions…"))
         case .error:
-            iconView.isHidden = false
-            spinner.stopAnimating()
-            iconView.tintColor = Theme.primary
-            iconView.image = UIImage(systemName: "icloud.slash")
-            titleLabel.text = "Couldn’t load subscriptions"
-            messageLabel.text = "Check the local library and try again."
+            var actions: [UIView] = []
             if action != nil {
-                actionButton.isHidden = false
-                actionButton.setImage(
-                    UIImage(systemName: "arrow.clockwise"), for: .normal
-                )
-                actionButton.setTitle("Try again", for: .normal)
-            } else {
-                actionButton.isHidden = true
+                let retry = AnycastButton.make(.secondary, title: "Try again", image: UIImage(systemName: "arrow.clockwise"))
+                retry.addAction(UIAction { [weak self] _ in self?.onAction?() }, for: .touchUpInside)
+                actions.append(retry)
             }
+            configure(Content(
+                icon: UIImage(systemName: "icloud.slash"),
+                title: "Couldn’t load subscriptions",
+                message: "Check the local library and try again.",
+                actions: actions
+            ))
         case .empty:
-            iconView.isHidden = false
-            spinner.stopAnimating()
-            iconView.tintColor = Theme.primary
-            iconView.image = UIImage(systemName: "music.note.list")
-            titleLabel.text = "No subscriptions yet"
-            messageLabel.text = "Follow a podcast to keep it close at hand."
-            actionButton.isHidden = true
+            configure(Content(
+                icon: UIImage(systemName: "music.note.list"),
+                title: "No subscriptions yet",
+                message: "Follow a podcast to keep it close at hand."
+            ))
         }
     }
 }

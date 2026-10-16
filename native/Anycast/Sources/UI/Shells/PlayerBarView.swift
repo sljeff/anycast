@@ -26,6 +26,8 @@ final class PlayerBarView: UIView {
     /// source for the view itself and for hosts that must avoid the
     /// floating fallback's frame (MainTabBarController.FallbackMetrics).
     static let barHeight: CGFloat = 58
+    /// The capsule's progress line.
+    static let capsuleProgressHeight: CGFloat = 3
 
     /// How the host surfaces the bar. ONE component, ONE silhouette: every
     /// style is a full capsule (radius == half the 58 pt height) — the bar
@@ -99,18 +101,19 @@ final class PlayerBarView: UIView {
         case .systemAccessory:
             capsule.backgroundColor = .clear
         case .capsule:
-            // The v2 chrome family is STATIC light (09 §3.6 literal
-            // rgba(255,255,255,.8) — same ruling as the pill bar; the dark
-            // design frame renders the mini player card bright too).
-            capsule.backgroundColor = UIColor(white: 1, alpha: 0.8)
+            // The v2 chrome family is STATIC light (09 §3.6 — same ruling as
+            // the pill bar; the dark design frame renders the card bright).
+            // Opaque sand1 rather than the spec's white 80%: list text no
+            // longer shows through the capsule (2.0 unification round).
+            capsule.backgroundColor = AnycastColor.sand1
             capsule.layer.borderColor = AnycastColor.sandAlpha4.resolvedColor(
                 with: UITraitCollection(userInterfaceStyle: .light)
             ).cgColor
             capsule.layer.borderWidth = 1
             capsule.layer.shadowColor = UIColor.black.cgColor
-            capsule.layer.shadowOpacity = 0.05
+            capsule.layer.shadowOpacity = 0.08
             capsule.layer.shadowOffset = CGSize(width: 0, height: 8)
-            capsule.layer.shadowRadius = 5
+            capsule.layer.shadowRadius = 10
         }
         // Half the bar height in ALL styles — one capsule silhouette
         // everywhere (the clip shape for the progress fill; in the
@@ -125,38 +128,49 @@ final class PlayerBarView: UIView {
         capsule.translatesAutoresizingMaskIntoConstraints = false
         addSubview(capsule)
 
-        backdrop.fillColor = style == .capsule
-            ? AnycastColor.sandAlpha4.resolvedColor(
-                with: UITraitCollection(userInterfaceStyle: .light)
-            )
-            : UIColor.white.withAlphaComponent(0.2)
+        // Capsule and accessory share the compact content (UI kit mini
+        // player): a thin gold progress line on a sand track along the
+        // inner bottom edge, a round cover, one title line, small glyphs.
+        // The standalone sheet bar keeps the full-height fill (03 §2.9).
+        let compact = style != .standalone
+        if style == .systemAccessory {
+            backdrop.trackColor = AnycastColor.sandAlpha3
+            backdrop.fillColor = Theme.primary
+            backdrop.layer.cornerRadius = Self.capsuleProgressHeight / 2
+            backdrop.clipsToBounds = true
+        } else if style == .capsule {
+            backdrop.trackColor = AnycastColor.sandAlpha3.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+            backdrop.fillColor = Theme.primary.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+            backdrop.layer.cornerRadius = Self.capsuleProgressHeight / 2
+            backdrop.clipsToBounds = true
+        } else {
+            backdrop.fillColor = UIColor.white.withAlphaComponent(0.2)
+        }
         backdrop.translatesAutoresizingMaskIntoConstraints = false
         capsule.addSubview(backdrop)
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
         // v2 capsule: circular 36 pt cover (Figma 83:2562).
-        coverView.layer.cornerRadius = style == .capsule ? 18 : 8
+        coverView.layer.cornerRadius = compact ? 18 : 8
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = style == .capsule
             ? AnycastColor.sandAlpha2.resolvedColor(
                 with: UITraitCollection(userInterfaceStyle: .light)
             )
-            : Theme.primaryBackground
+            : Theme.surfaceContainerHigh
         coverView.isAccessibilityElement = true
         coverView.accessibilityLabel = "Episode artwork"
         coverView.translatesAutoresizingMaskIntoConstraints = false
         capsule.addSubview(coverView)
 
-        titleLabel.font = UIFontMetrics(forTextStyle: .headline).scaledFont(
-            for: .systemFont(ofSize: 16, weight: .medium)
-        )
+        titleLabel.font = TypographyV2.titleMedium.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         // The capsule floats on the static white-80 surface — light-variant
         // ink; the player-hosted styles keep the legacy chrome colors.
         titleLabel.textColor = style == .capsule
             ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-            : Theme.primaryLightMax
+            : Theme.onSurface
         titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
         // XCUITest hook: the tap target for "tap the mini player".
@@ -165,17 +179,21 @@ final class PlayerBarView: UIView {
         capsule.addSubview(titleLabel)
 
         timeLabel.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-            for: .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+            for: ThemeRegistry.current.typography.font(11, .regular, .text).monospacedDigits()
         )
         timeLabel.adjustsFontForContentSizeCategory = true
         timeLabel.textColor = style == .capsule
             ? Theme.onSurfaceVariant.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-            : Theme.secondaryText
+            : Theme.onSurfaceVariant
         timeLabel.numberOfLines = 1
         timeLabel.translatesAutoresizingMaskIntoConstraints = false
         capsule.addSubview(timeLabel)
 
         playPauseControl.accessibilityLabel = "Play or pause"
+        if compact {
+            // 24 pt glyph in the 44 pt slot, level with the 22 pt skip glyph.
+            playPauseControl.glyphInset = 10
+        }
         // The control itself only renders (PlayPauseIconControl contract);
         // the tap toggles through the service like every other host.
         // Explicit target-action (not addAction): legacy registration is
@@ -188,12 +206,13 @@ final class PlayerBarView: UIView {
 
         forwardButton.setImage(AppIcons.forward30, for: .normal)
         forwardButton.setPreferredSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 32),
+            UIImage.SymbolConfiguration(pointSize: compact ? 22 : 32),
             forImageIn: .normal
         )
+        forwardButton.addPressFeedback()
         forwardButton.tintColor = style == .capsule
             ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-            : Theme.primaryLightMax
+            : Theme.onSurface
         forwardButton.isAccessibilityElement = true
         forwardButton.accessibilityLabel = "Forward 30 seconds"
         forwardButton.addAction(
@@ -220,10 +239,6 @@ final class PlayerBarView: UIView {
             capsule.topAnchor.constraint(equalTo: topAnchor),
             capsule.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            backdrop.leadingAnchor.constraint(equalTo: capsule.leadingAnchor),
-            backdrop.trailingAnchor.constraint(equalTo: capsule.trailingAnchor),
-            backdrop.topAnchor.constraint(equalTo: capsule.topAnchor),
-            backdrop.bottomAnchor.constraint(equalTo: capsule.bottomAnchor),
 
             coverView.leadingAnchor.constraint(equalTo: capsule.leadingAnchor, constant: 8),
             coverView.centerYAnchor.constraint(equalTo: capsule.centerYAnchor),
@@ -249,7 +264,25 @@ final class PlayerBarView: UIView {
             timeLabel.topAnchor.constraint(equalTo: capsule.centerYAnchor, constant: 1),
         ])
 
-        if style == .capsule {
+        if compact {
+            // Inset by the cap radius so the line stays inside the rounded ends.
+            let inset = Self.barHeight / 2
+            NSLayoutConstraint.activate([
+                backdrop.leadingAnchor.constraint(equalTo: capsule.leadingAnchor, constant: inset),
+                backdrop.trailingAnchor.constraint(equalTo: capsule.trailingAnchor, constant: -inset),
+                backdrop.bottomAnchor.constraint(equalTo: capsule.bottomAnchor, constant: -Spacing.xs),
+                backdrop.heightAnchor.constraint(equalToConstant: Self.capsuleProgressHeight),
+            ])
+        } else {
+            NSLayoutConstraint.activate([
+                backdrop.leadingAnchor.constraint(equalTo: capsule.leadingAnchor),
+                backdrop.trailingAnchor.constraint(equalTo: capsule.trailingAnchor),
+                backdrop.topAnchor.constraint(equalTo: capsule.topAnchor),
+                backdrop.bottomAnchor.constraint(equalTo: capsule.bottomAnchor),
+            ])
+        }
+
+        if compact {
             // v2 capsule: single centered title line, no time label
             // (Figma 83:2562 carries only the title). Replacing the
             // bottom pin with a center pin avoids fighting constraints.
@@ -280,7 +313,8 @@ final class PlayerBarView: UIView {
         super.traitCollectionDidChange(previousTraitCollection)
         if previousTraitCollection?.hasDifferentColorAppearance(comparedTo: traitCollection) ?? false,
            capsule.layer.borderWidth > 0 {
-            capsule.layer.borderColor = AnycastColor.sandAlpha4.cgColor
+            // The capsule chrome is static light (see init).
+            capsule.layer.borderColor = AnycastColor.sandAlpha4.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light)).cgColor
         }
     }
 
@@ -317,11 +351,7 @@ final class PlayerBarView: UIView {
         if coverURL != renderedCoverURL {
             renderedCoverURL = coverURL
             coverView.kf.cancelDownloadTask()
-            coverView.kf.setImage(
-                with: coverURL,
-                placeholder: nil,
-                options: [.transition(.none)]
-            )
+            coverView.setArtwork(coverURL, title: episode?.channelTitle)
         }
 
         playPauseControl.update(
@@ -333,7 +363,7 @@ final class PlayerBarView: UIView {
             ),
             tint: style == .capsule
                 ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-                : Theme.primaryLightMax
+                : Theme.onSurface
         )
     }
 

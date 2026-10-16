@@ -7,67 +7,67 @@ import UIKit
 /// trait-dynamic with no code-side branching. Values are byte-identical to
 /// `lib/design_system/anycast_theme.dart` (the Flutter-side port of the same
 /// Figma source of truth). `Theme.x` stays the only sanctioned color access
-/// — never `UIColor(red:…)` literals in screens.
+/// — never `UIColor(red:…)` literals in screens. Token values come from the
+/// active `ThemeSpec` (ThemeSpec.swift); restyle there, not here.
 ///
 /// Screen surfaces follow the system appearance. The player keeps its
 /// intentionally dark presentation in `installPlayerBase`.
 nonisolated enum Theme {
 
+    /// The active theme's palette (`ThemeSpec`); tokens below are its stable names.
+    private static let palette = ThemeRegistry.current.palette
+
     // MARK: - Semantic tokens (anycast_theme.dart `_build(brightness)`)
 
     /// Page background — sand2 / sandDark2.
-    static let background = UIColor(named: "Background")!
+    static let background = palette.background
     /// Card / sheet fill — sand1 / sandDark1.
-    static let surface = UIColor(named: "Surface")!
+    static let surface = palette.surface
     /// Inset fills, input fields — sand3 / sandDark3.
-    static let surfaceContainer = UIColor(named: "SurfaceContainer")!
+    static let surfaceContainer = palette.surfaceContainer
     /// Elevated inset fills — sand4 / sandDark4.
-    static let surfaceContainerHigh = UIColor(named: "SurfaceContainerHigh")!
+    static let surfaceContainerHigh = palette.surfaceContainerHigh
     /// Highest elevation fills — sand6 / sandDark6.
-    static let surfaceContainerHighest = UIColor(named: "SurfaceContainerHighest")!
+    static let surfaceContainerHighest = palette.surfaceContainerHighest
     /// Strokes / hairlines — sand6 / sandDark6.
-    static let outline = UIColor(named: "Outline")!
+    static let outline = palette.outline
     /// Card borders — sandAlpha4 pair.
-    static let outlineVariant = UIColor(named: "OutlineVariant")!
+    static let outlineVariant = palette.outlineVariant
     /// Primary text — sand12 / sandDark12.
-    static let onSurface = UIColor(named: "OnSurface")!
+    static let onSurface = palette.onSurface
     /// Secondary text — sand11 / sandDark11.
-    static let onSurfaceVariant = UIColor(named: "OnSurfaceVariant")!
+    static let onSurfaceVariant = palette.onSurfaceVariant
     /// Brand accent (gold) — gold9 / goldDark9.
-    static let primary = UIColor(named: "Primary")!
+    static let primary = palette.primary
     /// Content on gold — sand1 / sand12.
-    static let onPrimary = UIColor(named: "OnPrimary")!
+    static let onPrimary = palette.onPrimary
     /// Gold-tinted container — sandAlpha4 pair.
-    static let primaryContainer = UIColor(named: "PrimaryContainer")!
-    static let onPrimaryContainer = UIColor(named: "OnPrimaryContainer")!
+    static let primaryContainer = palette.primaryContainer
+    static let onPrimaryContainer = palette.onPrimaryContainer
     /// Inset group container — sand3 / sandDark3.
-    static let secondaryContainer = UIColor(named: "SecondaryContainer")!
+    static let secondaryContainer = palette.secondaryContainer
     /// Orange accent — orange10 / FF8B3E.
-    static let tertiary = UIColor(named: "Tertiary")!
+    static let tertiary = palette.tertiary
     /// Error — BA1A1A / FF8B8B.
-    static let error = UIColor(named: "Error")!
+    static let error = palette.error
     /// Inverse surfaces (toasts) — onSurface inverted.
-    static let inverseSurface = UIColor(named: "InverseSurface")!
-    static let inversePrimary = UIColor(named: "InversePrimary")!
+    static let inverseSurface = palette.inverseSurface
+    static let inversePrimary = palette.inversePrimary
 
     // MARK: - Player (fixed warm-dark, trait-independent — 09 §2.1)
 
-    static let playerWarm = UIColor(named: "PlayerWarm")!             // 0x867D75
-    static let playerBackground = UIColor(named: "PlayerBackground")! // 0x222221
-    static let playerText = UIColor(named: "PlayerText")!             // 0xEEEEEC
-    static let playerSecondary = UIColor(named: "PlayerSecondary")!   // 0xD2D0CA
-    static let playerArtworkScrim = UIColor(named: "PlayerArtworkScrim")!
-    static let transcriptSurface = UIColor(named: "TranscriptSurface")!
+    static let playerWarm = palette.playerWarm             // 0x867D75
+    static let playerBackground = palette.playerBackground // 0x222221
+    static let playerText = palette.playerText             // 0xEEEEEC
+    static let playerSecondary = palette.playerSecondary   // 0xD2D0CA
+    static let playerArtworkScrim = palette.playerArtworkScrim
+    static let transcriptSurface = palette.transcriptSurface
 
     /// Artwork scrim gradient over `playerWarm` (anycast_theme.dart
     /// `playerGradientOverlayColors`, alpha-blended over the warm base).
     static var playerGradientStops: [UIColor] {
         [0.20, 0.25, 0.376, 0.40, 0.50].map { playerWarm.withAlphaComponent($0) }
     }
-
-    /// The palette fallback when a cover yields no dominant color. v2 keys
-    /// artwork gradients to the player's warm base.
-    static let paletteFallback = playerBackground
 
     // MARK: - Chrome
 
@@ -87,42 +87,8 @@ nonisolated enum Theme {
 
     // MARK: - Legacy v1 bridge
     //
-    // Transitional v1 accessor names re-pointed at v2 semantics so the
-    // not-yet-migrated screens keep compiling during the per-screen audit.
-    // Each accessor is deleted together with its last consumer during the
-    // V3 per-screen migration (09 §10); do not add new uses.
-
-    /// Was the near-white main text → onSurface.
-    static let primaryLightMax = onSurface
-    static let primaryLightPlus1 = primary
-    static let primaryDark = onSurfaceVariant
-    /// Was 0x30444E panels → elevated container.
-    static let primaryBackground = surfaceContainerHigh
-    /// Was 0x111316 page background → background.
-    static let primaryBackgroundDark = background
-    /// Was 0xFFBC25 yellow accent → orange tertiary.
-    static let accent = tertiary
-    /// Was 0x96A7AF secondary text → onSurfaceVariant.
-    static let secondaryText = onSurfaceVariant
-    /// Was 0x232830 card fill → surface.
-    static let cardBackground = surface
-    /// Was 0x6EE7B7 tab tint → gold accent.
-    static let tabSelectedGreen = primary
-    /// Was 0x10B981 brand green → grass.
-    static let brandGreen = AnycastColor.grass9
-    /// Was 0x6B7280 → onSurfaceVariant.
-    static let secondaryLabelGray = onSurfaceVariant
-    /// Placeholder and subdued ink → appearance-aware secondary text.
-    static let hintGray = onSurfaceVariant
-    /// Was 0x1E1E1E login card → container.
-    static let loginCardBackground = surfaceContainer
-    /// Was 0x424242 card border → outline.
-    static let cardOutline = outline
-
-    /// Lyric line colors pinned to the v1 rendering; the transcript screen
-    /// owns them and re-baselines in V3 batch 3 (09 §4 S13/S14).
-    static let lyricGrey200 = UIColor(red: 0.937, green: 0.961, blue: 0.965, alpha: 1)
-    static let lyricGreenAccent = UIColor(red: 0.412, green: 0.941, blue: 0.678, alpha: 1)
+    // The v1 color aliases are retired; only the gradient wordmark pair
+    // remains for `GradientTextLabel` (specimen snapshot only).
 
     /// AppBar gradient title — the v2 header drops the gradient wordmark;
     /// `GradientTextLabel` retires with the PodcastsTabContainer rework
@@ -178,4 +144,17 @@ nonisolated enum AnycastColor {
     static let goldAlpha7 = UIColor(named: "GoldAlpha7")!
     static let goldAlpha9 = UIColor(named: "GoldAlpha9")!
     static let goldAlpha10 = UIColor(named: "GoldAlpha10")!
+}
+
+extension UIView {
+    /// Sets a layer border from a dynamic token and keeps it in step with
+    /// appearance changes — `layer.borderColor` is a CGColor, frozen at
+    /// assignment (09 §9a). Call once per view, at setup.
+    @MainActor
+    func setDynamicBorderColor(_ color: UIColor) {
+        layer.borderColor = color.resolvedColor(with: traitCollection).cgColor
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: UIView, _) in
+            view.layer.borderColor = color.resolvedColor(with: view.traitCollection).cgColor
+        }
+    }
 }

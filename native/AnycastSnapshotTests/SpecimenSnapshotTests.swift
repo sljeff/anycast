@@ -3,7 +3,7 @@ import Testing
 @testable import Anycast
 
 /// One specimen snapshot proving the L4 baseline infrastructure (05 §6.1):
-/// a dark-theme composition of an EpisodeCardCell + UnderlineTabBarView +
+/// a dark-theme composition of an EpisodeCardCell + ChipTabBarView +
 /// GradientTextLabel, recorded per iOS major version. Later M3 tasks grow
 /// this suite screen by screen (S1–S21).
 @MainActor
@@ -19,7 +19,7 @@ struct SpecimenSnapshotTests {
         title.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(title)
 
-        let tabBar = UnderlineTabBarView(titles: ["Inbox", "Subscriptions"])
+        let tabBar = ChipTabBarView(titles: ["Inbox", "Subscriptions"])
         tabBar.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(tabBar)
         NSLayoutConstraint.activate([

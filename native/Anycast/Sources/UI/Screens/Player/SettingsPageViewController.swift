@@ -3,10 +3,12 @@ import AnycastKit
 
 /// Player page 0 (PlayerSettings, player.dart:118-144 + the Settings widget
 /// 1148-1372, 03 §2.10): the episode's HTML description fills a scroll area
-/// (empty payload collapses it), with the settings block pinned at the
-/// bottom — SPEED and COUNTDOWN thumb-value sliders (widget #5) and the
-/// CONTINUOUS PLAY switch with its tap tooltip. SKIP SILENCE is deliberately
-/// absent (decision K2 — no iOS public API; only CONTINUOUS PLAY remains).
+/// (empty payload collapses it), with the settings card pinned at the
+/// bottom in the Anycast 2.0 audio-settings form — playback speed and sleep
+/// timer rows with − / + steppers over the same stops the Dart sliders had
+/// (SPEED 0.5–2.0 ×0.25, COUNTDOWN 0–60 ×10), and the CONTINUOUS PLAY
+/// switch, its explanation shown as the row subtitle. SKIP SILENCE is
+/// deliberately absent (decision K2 — no iOS public API).
 final class SettingsPageViewController: UIViewController {
 
     private let context: UIContext
@@ -18,25 +20,22 @@ final class SettingsPageViewController: UIViewController {
     private let scrollView = UIScrollView()
     private var renderedCacheKey: String?
 
-    private let speedSlider = PlayerValueSlider(
-        spec: .init(
-            values: PlayerSliderMath.stops(min: 0.5, max: 2.0, divisions: 6),
-            tickStyle: .allWhite
-        ),
-        initialIndex: 0,
-        thumbText: PlayerSliderMath.speedThumbText
+    private static let speedStops = PlayerSliderMath.stops(min: 0.5, max: 2.0, divisions: 6)
+    private static let countdownStops = SleepTimerController.sliderMinutes
+
+    private let speedValueLabel = UILabel()
+    private let countdownValueLabel = UILabel()
+    private lazy var speedStepper = Self.makeStepper(
+        minusLabel: "Decrease playback speed", plusLabel: "Increase playback speed",
+        onMinus: { [weak self] in self?.stepSpeed(by: -1) },
+        onPlus: { [weak self] in self?.stepSpeed(by: 1) }
     )
-    private let countdownSlider = PlayerValueSlider(
-        spec: .init(
-            values: SleepTimerController.sliderMinutes.map(Double.init),
-            tickStyle: .whiteUpToActive
-        ),
-        initialIndex: 0,
-        thumbText: { PlayerSliderMath.countdownThumbText(remainingMilliseconds: Int64($0)) }
+    private lazy var countdownStepper = Self.makeStepper(
+        minusLabel: "Shorten sleep timer", plusLabel: "Extend sleep timer",
+        onMinus: { [weak self] in self?.stepCountdown(by: -1) },
+        onPlus: { [weak self] in self?.stepCountdown(by: 1) }
     )
     private let continuousSwitch = UISwitch()
-    private let tooltipButton = UIButton(type: .custom)
-    private var tooltip: InlineTooltip?
     private var countdownTicker: Timer?
 
     init(context: UIContext) {
@@ -81,7 +80,6 @@ final class SettingsPageViewController: UIViewController {
         super.viewDidDisappear(animated)
         countdownTicker?.invalidate()
         countdownTicker = nil
-        tooltip?.dismiss()
     }
 
     // MARK: - Build
@@ -105,11 +103,13 @@ final class SettingsPageViewController: UIViewController {
             contentStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
         ])
 
-        let root = UIStackView(arrangedSubviews: [scrollView, buildSettingsBlock()])
+        let root = UIStackView(arrangedSubviews: [scrollView, buildSettingsCard()])
         root.axis = .vertical
-        root.spacing = 16
+        root.spacing = Spacing.pageH
         root.isLayoutMarginsRelativeArrangement = true
-        root.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 16, leading: 24, bottom: 16, trailing: 24)
+        root.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: Spacing.pageH, leading: Spacing.pageHeader, bottom: Spacing.pageH, trailing: Spacing.pageHeader
+        )
         root.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(root)
         NSLayoutConstraint.activate([
@@ -120,62 +120,92 @@ final class SettingsPageViewController: UIViewController {
         ])
     }
 
-    /// Section labels are 12 pt comfortaa w700 white (player.dart:1156-1162);
-    /// sliders get 8 pt vertical padding like the Dart Padding wrappers.
-    private func buildSettingsBlock() -> UIView {
-        func sectionLabel(_ text: String) -> UILabel {
-            let label = UILabel()
-            label.text = text
-            label.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-                for: UIFont(name: "Comfortaa-Bold", size: 12) ?? .systemFont(ofSize: 12, weight: .bold)
-            )
-            label.textColor = Theme.primaryLightMax
+    /// UI kit audio-settings rows on a tinted card, hairline-divided.
+    private func buildSettingsCard() -> UIView {
+        for label in [speedValueLabel, countdownValueLabel] {
+            label.font = TypographyV2.bodyLarge.font().monospacedDigits()
+            label.textColor = Theme.playerSecondary
             label.adjustsFontForContentSizeCategory = true
-            return label
+            label.setContentHuggingPriority(.required, for: .horizontal)
         }
 
-        let speedBlock = UIStackView(arrangedSubviews: [sectionLabel("SPEED"), speedSlider])
-        speedBlock.axis = .vertical
-        speedBlock.spacing = 8
-
-        let countdownBlock = UIStackView(arrangedSubviews: [sectionLabel("COUNTDOWN"), countdownSlider])
-        countdownBlock.axis = .vertical
-        countdownBlock.spacing = 8
-
-        tooltipButton.setImage(AppIcons.info, for: .normal)
-        tooltipButton.tintColor = Theme.secondaryLabelGray
-        tooltipButton.isAccessibilityElement = true
-        tooltipButton.accessibilityLabel = "About continuous play"
-
-        continuousSwitch.onTintColor = Theme.brandGreen
-        continuousSwitch.isAccessibilityElement = true
+        continuousSwitch.onTintColor = Theme.primary
         continuousSwitch.accessibilityLabel = "Continuous play"
 
-        let continuousBlock = UIStackView(arrangedSubviews: [sectionLabel("CONTINUOUS PLAY"), continuousSwitch])
-        continuousBlock.axis = .vertical
-        continuousBlock.spacing = 8
+        let rows = UIStackView(arrangedSubviews: [
+            Self.makeRow(title: "Playback speed", subtitle: nil, trailing: [speedValueLabel, speedStepper]),
+            Self.makeDivider(),
+            Self.makeRow(title: "Sleep timer", subtitle: nil, trailing: [countdownValueLabel, countdownStepper]),
+            Self.makeDivider(),
+            Self.makeRow(
+                title: "Continuous play",
+                subtitle: "Auto play next episode after the current one ends.",
+                trailing: [continuousSwitch]
+            ),
+        ])
+        rows.axis = .vertical
+        rows.isLayoutMarginsRelativeArrangement = true
+        rows.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: Spacing.xs, leading: Spacing.cardInner, bottom: Spacing.xs, trailing: Spacing.pageH
+        )
+        rows.backgroundColor = AnycastColor.sandAlpha3
+        rows.layer.cornerRadius = Radius.card
+        rows.layer.cornerCurve = .continuous
+        return rows
+    }
 
-        let switchRow = UIStackView(arrangedSubviews: [continuousBlock, tooltipButton])
-        switchRow.axis = .horizontal
-        switchRow.alignment = .top
-        switchRow.distribution = .equalSpacing
+    private static func makeStepper(
+        minusLabel: String, plusLabel: String, onMinus: @escaping () -> Void, onPlus: @escaping () -> Void
+    ) -> AnycastStepperView {
+        AnycastStepperView(
+            background: AnycastColor.sandAlpha4,
+            tint: Theme.playerText,
+            minusLabel: minusLabel,
+            plusLabel: plusLabel,
+            onMinus: onMinus,
+            onPlus: onPlus
+        )
+    }
 
-        let settings = UIStackView(arrangedSubviews: [speedBlock, countdownBlock, switchRow])
-        settings.axis = .vertical
-        settings.spacing = 16
-        return settings
+    private static func makeRow(title: String, subtitle: String?, trailing: [UIView]) -> UIView {
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = TypographyV2.bodyLarge.font()
+        titleLabel.textColor = Theme.playerText
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.numberOfLines = 0
+
+        let texts = UIStackView(arrangedSubviews: [titleLabel])
+        texts.axis = .vertical
+        texts.spacing = Spacing.xxs
+        if let subtitle {
+            let subtitleLabel = UILabel()
+            subtitleLabel.text = subtitle
+            subtitleLabel.font = TypographyV2.caption.font()
+            subtitleLabel.textColor = Theme.playerSecondary
+            subtitleLabel.adjustsFontForContentSizeCategory = true
+            subtitleLabel.numberOfLines = 0
+            texts.addArrangedSubview(subtitleLabel)
+        }
+
+        let row = UIStackView(arrangedSubviews: [texts] + trailing)
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = Spacing.gap
+        texts.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        texts.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        row.heightAnchor.constraint(greaterThanOrEqualToConstant: Spacing.rowH - Spacing.md).isActive = true
+        return row
+    }
+
+    private static func makeDivider() -> UIView {
+        let divider = UIView()
+        divider.backgroundColor = AnycastColor.sandAlpha3
+        divider.heightAnchor.constraint(equalToConstant: Spacing.hairline).isActive = true
+        return divider
     }
 
     private func bindActions() {
-        speedSlider.onValueChanged = { [weak self] _, value in
-            self?.context.playback.setSpeed(Float(value))
-        }
-        // K38 semantics live in the controller: index 0 (OFF) clears the
-        // countdown without touching playback; any other index restarts it.
-        countdownSlider.onValueChanged = { [weak self] index, _ in
-            self?.context.sleepTimer.selectSliderIndex(index)
-            self?.renderCountdown()
-        }
         continuousSwitch.addAction(
             UIAction { [weak self] action in
                 guard let self else { return }
@@ -184,10 +214,43 @@ final class SettingsPageViewController: UIViewController {
             },
             for: .valueChanged
         )
-        tooltipButton.addAction(
-            UIAction { [weak self] _ in self?.showTooltip() },
-            for: .touchUpInside
-        )
+    }
+
+    // MARK: - Steps
+
+    private var speedIndex: Int {
+        PlayerSliderMath.nearestIndex(for: Double(context.playback.speed), in: Self.speedStops)
+    }
+
+    private func stepSpeed(by delta: Int) {
+        let target = speedIndex + delta
+        guard Self.speedStops.indices.contains(target) else { return }
+        context.playback.setSpeed(Float(Self.speedStops[target]))
+        renderSpeed()
+    }
+
+    /// Dart parity (player.dart:1526-1537): the countdown stop is the
+    /// NEAREST stop to the remaining minutes — not floor(ceil(minutes) / 10),
+    /// which sits a full stop low through the back half of every window.
+    private var countdownIndex: Int {
+        let remainingMinutes: Double
+        if let remaining = context.sleepTimer.remainingMilliseconds, remaining > 0 {
+            remainingMinutes = Double(remaining) / 60_000
+        } else {
+            remainingMinutes = 0
+        }
+        let nearest = Int((remainingMinutes / 10).rounded())
+        return min(max(nearest, 0), Self.countdownStops.count - 1)
+    }
+
+    /// K38 semantics live in the controller: index 0 (OFF) clears the
+    /// countdown without touching playback; any other index restarts it.
+    private func stepCountdown(by delta: Int) {
+        let target = countdownIndex + delta
+        guard Self.countdownStops.indices.contains(target) else { return }
+        context.sleepTimer.selectSliderIndex(target)
+        Haptics.timerSet()
+        renderCountdown()
     }
 
     // MARK: - Rendering
@@ -214,36 +277,18 @@ final class SettingsPageViewController: UIViewController {
     }
 
     private func renderSpeed() {
-        let index = PlayerSliderMath.nearestIndex(
-            for: Double(context.playback.speed), in: speedSlider.spec.values
-        )
-        speedSlider.select(index: index)
-        speedSlider.refreshThumbText(remainingValue: speedSlider.value(at: index) ?? 1.0)
-        speedSlider.accessibilityLabel = "Playback speed"
+        let index = speedIndex
+        speedValueLabel.text = PlayerSliderMath.speedText(Self.speedStops[index])
+        speedStepper.setEnabled(minus: index > 0, plus: index < Self.speedStops.count - 1)
     }
 
-    /// Slider position from the live countdown; thumb text shows the
-    /// remaining time ("40:00" / "1h" / "OFF"), refreshed every second by
-    /// the ticker.
+    /// The remaining time ("40:00" / "1h"), refreshed every second by the
+    /// ticker; "Off" when no countdown runs.
     private func renderCountdown() {
-        // Dart parity (player.dart:1526-1537): the Slider's value is
-        // `countdownDuration.inMinutes` (a floor of the remaining time) and
-        // the divisioned thumb snaps that to the NEAREST stop — not
-        // floor(ceil(minutes) / 10), which sits a full stop low through the
-        // back half of every window.
-        let remainingMinutes: Double
-        if let remaining = context.sleepTimer.remainingMilliseconds, remaining > 0 {
-            remainingMinutes = Double(remaining) / 60_000
-        } else {
-            remainingMinutes = 0
-        }
-        let nearestIndex = Int((remainingMinutes / 10).rounded())
-        let index = min(max(nearestIndex, 0), SleepTimerController.sliderMinutes.count - 1)
-        countdownSlider.select(index: index)
-        countdownSlider.refreshThumbText(
-            remainingValue: Double(context.sleepTimer.remainingMilliseconds ?? -1)
-        )
-        countdownSlider.accessibilityLabel = "Sleep timer"
+        let remaining = context.sleepTimer.remainingMilliseconds ?? -1
+        countdownValueLabel.text = remaining > 0 ? TimeFormats.formatCountdown(remaining) : "Off"
+        let index = countdownIndex
+        countdownStepper.setEnabled(minus: remaining > 0, plus: index < Self.countdownStops.count - 1)
     }
 
     private func renderContinuous() {
@@ -252,75 +297,49 @@ final class SettingsPageViewController: UIViewController {
 
     /// The Dart 1 s Timer.periodic that decrements the countdown only while
     /// playing lives in SleepTimerController; this ticker just re-reads it
-    /// so the thumb label ticks down live (player.dart:1542-1543).
+    /// so the value label ticks down live (player.dart:1542-1543).
     private func startCountdownTicker() {
         guard countdownTicker == nil else { return }
         countdownTicker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.renderCountdown() }
         }
     }
-
-    // MARK: - Tooltip (tap-triggered, 2 s — player.dart:1628-1636)
-
-    private func showTooltip() {
-        tooltip?.dismiss()
-        let tip = InlineTooltip(text: "Auto play next episode after the current one ends.")
-        tooltip = tip
-        tip.show(above: tooltipButton, in: view, duration: 2.0) { [weak self] in
-            self?.tooltip = nil
-        }
-    }
 }
 
-/// Minimal tap-tooltip: dark rounded bubble anchored above its trigger,
-/// auto-dismissed after `duration` (the Dart Tooltip default dark surface).
-@MainActor
-private final class InlineTooltip {
+/// Stop math for the speed and sleep-timer steppers (the Dart sliders'
+/// SPEED 0.5–2.0 ×0.25 and COUNTDOWN 0–60 ×10 — `Slider(min:max:divisions:
+/// 6)`, seven stops each). Kept free of UIKit so the AnycastAppTests suite
+/// can pin the arithmetic.
+enum PlayerSliderMath {
 
-    private let bubble = UIView()
-    private let label = UILabel()
-    private var dismissalTask: Task<Void, Never>?
-
-    init(text: String) {
-        label.text = text
-        label.font = Typography.defaultText.font()
-        label.textColor = Theme.primaryLightMax
-        label.numberOfLines = 0
-        label.textAlignment = .center
-        label.adjustsFontForContentSizeCategory = true
-
-        bubble.backgroundColor = .black.withAlphaComponent(0.87)
-        bubble.layer.cornerRadius = 8
-        bubble.layer.cornerCurve = .continuous
-        bubble.addSubview(label)
-        label.translatesAutoresizingMaskIntoConstraints = false
+    /// `divisions` splits the range into divisions+1 stops
+    /// (divisions 6 → 7 stops).
+    static func stops(min: Double, max: Double, divisions: Int) -> [Double] {
+        guard divisions > 0, max > min else { return [min] }
+        return (0...divisions).map { min + (max - min) * Double($0) / Double(divisions) }
     }
 
-    func show(above anchor: UIView, in container: UIView, duration: TimeInterval, onDismiss: @escaping () -> Void) {
-        container.addSubview(bubble)
-        bubble.translatesAutoresizingMaskIntoConstraints = false
-        bubble.alpha = 0
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: bubble.leadingAnchor, constant: 8),
-            label.trailingAnchor.constraint(equalTo: bubble.trailingAnchor, constant: -8),
-            label.topAnchor.constraint(equalTo: bubble.topAnchor, constant: 6),
-            label.bottomAnchor.constraint(equalTo: bubble.bottomAnchor, constant: -6),
-            bubble.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -24),
-            bubble.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: 24),
-            bubble.centerXAnchor.constraint(equalTo: anchor.centerXAnchor),
-            bubble.bottomAnchor.constraint(equalTo: anchor.topAnchor, constant: -8),
-        ])
-        UIView.animate(withDuration: 0.15) { self.bubble.alpha = 1 }
-        dismissalTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
-            guard let self, !Task.isCancelled else { return }
-            self.dismiss()
-            onDismiss()
+    /// The stop a raw value snaps to (Material slider snap; ties go to the
+    /// nearer lower-middle by distance compare).
+    static func nearestIndex(for value: Double, in stops: [Double]) -> Int {
+        guard stops.count > 1 else { return 0 }
+        var best = 0
+        var bestDistance = abs(value - stops[0])
+        for (index, stop) in stops.enumerated().dropFirst() {
+            let distance = abs(value - stop)
+            if distance < bestDistance {
+                best = index
+                bestDistance = distance
+            }
         }
+        return best
     }
 
-    func dismiss() {
-        dismissalTask?.cancel()
-        bubble.removeFromSuperview()
+    /// Speed value text: "1×", "1.25×", "0.5×" (trailing zeros dropped).
+    static func speedText(_ value: Double) -> String {
+        var text = String(format: "%.2f", value)
+        while text.hasSuffix("0") { text.removeLast() }
+        if text.hasSuffix(".") { text.removeLast() }
+        return "\(text)×"
     }
 }

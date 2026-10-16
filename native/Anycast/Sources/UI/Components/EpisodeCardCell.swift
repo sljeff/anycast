@@ -63,13 +63,13 @@ struct EpisodeCardContent {
     var descriptionPlainText: String?
 }
 
-/// The generic episode card (lib/widgets/card.dart:30-297, 03 §2.11; v2
-/// geometry per 09 §5: surface card, radius16, 16pt padding/gap): an
-/// 112pt row with an 80×80 rounded-18 cover (tap → Detail), single-line
-/// title, channel name (max 114pt) + duration/relative time, and a 2-line
-/// htmlToText description. Whole-card tap toggles the 0↔60 action strip
-/// (200 ms easeInOut); playlist cards add the progress backdrop and the
-/// download indicator. Lists that took the native-first path (09 §7a-C1,
+/// The generic episode card (lib/widgets/card.dart:30-297, 03 §2.11) in the
+/// Anycast 2.0 UI kit row form (`QueueRowCell`): the shared card plate
+/// (radius 32, hairline), an 80 pt rounded cover (tap → Detail), a two-line
+/// 20 pt title, channel name (max 114pt) + duration/relative time, and a
+/// 2-line description. Whole-card tap toggles the action drawer — a split
+/// capsule of equal segments (UI kit `QueueSplitCapsuleButtonGroup`);
+/// playlist cards add the progress backdrop and the download indicator. Lists that took the native-first path (09 §7a-C1,
 /// Inbox) render no strip and surface the same actions through the list's
 /// context menu, passing them here as `menuActions` for VoiceOver.
 ///
@@ -91,6 +91,8 @@ final class EpisodeCardCell: UICollectionViewCell {
     static let reuseIdentifier = "EpisodeCardCell"
     static let cardRowHeight: CGFloat = 112   // 80pt cover + 16pt padding ×2 (09 §5)
     static let stripHeight: CGFloat = 60
+    /// The drawer capsule inside the strip (12 pt above it, then 48 pt).
+    static let drawerHeight: CGFloat = 48
     static let spacing: CGFloat = Spacing.pageH // list row gap (09 §5 gap16)
 
     /// Card cover tap → open the Detail sheet.
@@ -119,8 +121,14 @@ final class EpisodeCardCell: UICollectionViewCell {
     private let downloadIcon = UIImageView()
     private let downloadRing = ProgressRingView(lineWidth: 3)
     private let downloadDoneIcon = UIImageView()
+    /// The meta row's trailing slot the download indicator centers on.
+    private let downloadSlot = UIView()
 
     private let stripContainer = UIView()
+    /// A tonal capsule, not glass: the cell clips (strip-race guard), and a
+    /// clipped glass shadow reads as a hard rectangle.
+    private let drawer = CapsuleView()
+    private let drawerRow = UIStackView()
     private var stripHeightConstraint: NSLayoutConstraint!
     private var actionButtons: [UIButton] = []
     private var actions: [EpisodeCardAction] = []
@@ -174,7 +182,9 @@ final class EpisodeCardCell: UICollectionViewCell {
                 // UILabel's intrinsic-size invalidation does not reach the
                 // stack's layout pass (the label could sit at its
                 // zero-height frame forever — silently dropping the
-                // description). Schedule the relayout explicitly.
+                // description). Re-run self-sizing so the card grows to
+                // the wrapped text instead of clipping it.
+                self.invalidateIntrinsicContentSize()
                 self.setNeedsLayout()
             }
         } else {
@@ -185,7 +195,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         if url != renderedCoverURL {
             renderedCoverURL = url
             coverView.kf.cancelDownloadTask()
-            coverView.kf.setImage(with: url, placeholder: nil, options: [.transition(.none)])
+            coverView.setArtwork(url, title: content.channelTitle)
         }
 
         progressBackdrop.isHidden = !content.showsProgressBackdrop
@@ -223,6 +233,11 @@ final class EpisodeCardCell: UICollectionViewCell {
 
     // MARK: - Build
 
+    /// The hairline is a CGColor (frozen at assignment, 09 §9a).
+    private func updateCardStroke() {
+        cardContainer.layer.borderColor = AnycastColor.sandAlpha3.resolvedColor(with: traitCollection).cgColor
+    }
+
     private func build() {
         contentView.backgroundColor = .clear
         // Any content that outruns its item height must clip instead of
@@ -237,12 +252,15 @@ final class EpisodeCardCell: UICollectionViewCell {
         stack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stack)
 
-        // Card row (v2: surface card, radius16, hairline outline; 16pt inner
-        // padding — 09 §5 inbox card spec).
-        cardContainer.backgroundColor = Theme.cardBackground
-        cardContainer.layer.borderColor = Theme.cardOutline.cgColor
-        cardContainer.layer.borderWidth = 1
-        cardContainer.layer.cornerRadius = Radius.md
+        // Card row (UI kit: surface plate, radius 32, sandAlpha3 hairline;
+        // 16pt inner padding).
+        cardContainer.backgroundColor = Theme.surface
+        cardContainer.layer.borderWidth = Spacing.hairline
+        updateCardStroke()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _) in
+            self.updateCardStroke()
+        }
+        cardContainer.layer.cornerRadius = Radius.largeCard
         cardContainer.layer.cornerCurve = .continuous
         // The 4pt progress backdrop spans the card's full width with
         // square corners; without clipping it runs straight through the
@@ -261,9 +279,9 @@ final class EpisodeCardCell: UICollectionViewCell {
         coverView.isUserInteractionEnabled = true
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = Radius.artwork
+        coverView.layer.cornerRadius = Radius.md
         coverView.layer.cornerCurve = .continuous
-        coverView.backgroundColor = Theme.primaryBackground
+        coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.translatesAutoresizingMaskIntoConstraints = false
         coverView.isAccessibilityElement = true
         coverView.accessibilityTraits = [.button]
@@ -271,11 +289,10 @@ final class EpisodeCardCell: UICollectionViewCell {
         cardContainer.addSubview(coverView)
         coverView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(coverTapped)))
 
-        // 16pt system (PingFang on the Chinese stack) single line — 03 §2.11.
-        let titleMetrics = UIFontMetrics(forTextStyle: .headline)
-        titleLabel.font = titleMetrics.scaledFont(for: .systemFont(ofSize: 16, weight: .semibold))
-        titleLabel.textColor = Theme.primaryLightMax
-        titleLabel.numberOfLines = 1
+        // UI kit row title: 20 pt regular, wraps to two lines.
+        titleLabel.font = TypographyV2.cardTitle.font()
+        titleLabel.textColor = Theme.onSurface
+        titleLabel.numberOfLines = 2
         titleLabel.adjustsFontForContentSizeCategory = true
         // The card action for VoiceOver (sighted users tap the whole card);
         // strip-less lists also hang the menu actions off it below.
@@ -284,22 +301,22 @@ final class EpisodeCardCell: UICollectionViewCell {
         titleLabel.onActivate = { [weak self] in self?.onCardTap?() }
 
         let metaMetrics = UIFontMetrics(forTextStyle: .caption1)
-        channelLabel.font = metaMetrics.scaledFont(for: .systemFont(ofSize: 12, weight: .semibold))
-        channelLabel.textColor = Theme.secondaryText
+        channelLabel.font = TypographyV2.caption.font()
+        channelLabel.textColor = Theme.onSurfaceVariant
         channelLabel.numberOfLines = 1
         channelLabel.adjustsFontForContentSizeCategory = true
 
         // Tabular figures (FontFeature.tabularFigures in the Dart row).
         rightTextLabel.font = metaMetrics.scaledFont(
-            for: .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+            for: ThemeRegistry.current.typography.font(12, .regular, .text).monospacedDigits()
         )
-        rightTextLabel.textColor = Theme.secondaryText
+        rightTextLabel.textColor = Theme.onSurfaceVariant
         rightTextLabel.numberOfLines = 1
         rightTextLabel.adjustsFontForContentSizeCategory = true
         rightTextLabel.textAlignment = .right
 
-        descriptionLabel.font = Typography.cardDescription.font()
-        descriptionLabel.textColor = Typography.cardDescription.color
+        descriptionLabel.font = TypographyV2.bodyCompact.font()
+        descriptionLabel.textColor = Theme.onSurfaceVariant
         descriptionLabel.numberOfLines = 2
         descriptionLabel.adjustsFontForContentSizeCategory = true
         // Layout-regression hook (the description is resolved async — tests
@@ -309,6 +326,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         let textColumn = UIStackView(arrangedSubviews: [titleLabel])
         textColumn.axis = .vertical
         textColumn.alignment = .fill
+        textColumn.spacing = Spacing.xs
         textColumn.translatesAutoresizingMaskIntoConstraints = false
         cardContainer.addSubview(textColumn)
 
@@ -318,6 +336,8 @@ final class EpisodeCardCell: UICollectionViewCell {
         metaRow.alignment = .center
         metaRow.spacing = 8
         metaRow.addArrangedSubview(rightTextLabel)
+        downloadSlot.isHidden = true
+        metaRow.addArrangedSubview(downloadSlot)
         textColumn.addArrangedSubview(metaRow)
         textColumn.addArrangedSubview(descriptionLabel)
 
@@ -326,18 +346,18 @@ final class EpisodeCardCell: UICollectionViewCell {
         channelMaxWidth = channelLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 114)
 
         // Progress backdrop: 4pt strip along the card bottom edge.
-        progressBackdrop.trackColor = UIColor.white.withAlphaComponent(0.12)
+        progressBackdrop.trackColor = AnycastColor.sandAlpha3
         progressBackdrop.fillColor = Theme.primary
         progressBackdrop.translatesAutoresizingMaskIntoConstraints = false
         cardContainer.addSubview(progressBackdrop)
 
-        // Download indicator (16×16, right gap 12 / bottom 16).
-        downloadCircle.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.7)
+        // Download indicator (16×16) in the meta row's trailing slot.
+        downloadCircle.backgroundColor = Theme.primary
         downloadCircle.layer.cornerRadius = 8
         downloadCircle.translatesAutoresizingMaskIntoConstraints = false
         downloadCircle.isHidden = true
         downloadIcon.image = AppIcons.download
-        downloadIcon.tintColor = .white
+        downloadIcon.tintColor = Theme.onPrimary
         downloadIcon.contentMode = .scaleAspectFit
         downloadIcon.translatesAutoresizingMaskIntoConstraints = false
         downloadCircle.addSubview(downloadIcon)
@@ -347,15 +367,15 @@ final class EpisodeCardCell: UICollectionViewCell {
         downloadCircle.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(downloadTapped)))
         cardContainer.addSubview(downloadCircle)
 
-        downloadRing.tintColorOverride = UIColor.systemBlue
+        downloadRing.tintColorOverride = Theme.primary
         downloadRing.translatesAutoresizingMaskIntoConstraints = false
         downloadRing.isHidden = true
         downloadRing.isAccessibilityElement = false
         cardContainer.addSubview(downloadRing)
 
         downloadDoneIcon.image = AppIcons.downloadDone
-        // grass9 dark (AnycastColor.grass9(Brightness.dark), 03 §2.11).
-        downloadDoneIcon.tintColor = UIColor(red: 0x63 / 255, green: 0xC1 / 255, blue: 0x74 / 255, alpha: 1)
+        // grass9 (03 §2.11), appearance-aware.
+        downloadDoneIcon.tintColor = AnycastColor.grass9
         downloadDoneIcon.contentMode = .scaleAspectFit
         downloadDoneIcon.translatesAutoresizingMaskIntoConstraints = false
         downloadDoneIcon.isHidden = true
@@ -363,15 +383,16 @@ final class EpisodeCardCell: UICollectionViewCell {
         downloadDoneIcon.accessibilityLabel = "Downloaded"
         cardContainer.addSubview(downloadDoneIcon)
 
-        // Action strip below the card (height animated 0↔60).
+        // Action drawer below the card (strip height animated 0↔60).
         stripContainer.translatesAutoresizingMaskIntoConstraints = false
         stripContainer.isHidden = true
-        let stripRow = UIStackView()
-        stripRow.axis = .horizontal
-        stripRow.distribution = .equalSpacing
-        stripRow.alignment = .center
-        stripRow.translatesAutoresizingMaskIntoConstraints = false
-        stripContainer.addSubview(stripRow)
+        drawer.backgroundColor = AnycastColor.sandAlpha3
+        drawer.translatesAutoresizingMaskIntoConstraints = false
+        stripContainer.addSubview(drawer)
+        drawerRow.axis = .horizontal
+        drawerRow.alignment = .fill
+        drawerRow.translatesAutoresizingMaskIntoConstraints = false
+        drawer.addSubview(drawerRow)
         stripContainer.isUserInteractionEnabled = true
         stack.addArrangedSubview(stripContainer)
         stripHeightConstraint = stripContainer.heightAnchor.constraint(equalToConstant: 0)
@@ -414,8 +435,10 @@ final class EpisodeCardCell: UICollectionViewCell {
             progressBackdrop.bottomAnchor.constraint(equalTo: cardContainer.bottomAnchor),
             progressBackdrop.heightAnchor.constraint(equalToConstant: 4),
 
-            downloadCircle.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -12),
-            downloadCircle.bottomAnchor.constraint(equalTo: cardContainer.bottomAnchor, constant: -16),
+            downloadSlot.widthAnchor.constraint(equalToConstant: 16),
+            downloadSlot.heightAnchor.constraint(equalToConstant: 16),
+            downloadCircle.centerXAnchor.constraint(equalTo: downloadSlot.centerXAnchor),
+            downloadCircle.centerYAnchor.constraint(equalTo: downloadSlot.centerYAnchor),
             downloadCircle.widthAnchor.constraint(equalToConstant: 16),
             downloadCircle.heightAnchor.constraint(equalToConstant: 16),
             downloadIcon.centerXAnchor.constraint(equalTo: downloadCircle.centerXAnchor),
@@ -433,16 +456,16 @@ final class EpisodeCardCell: UICollectionViewCell {
             downloadDoneIcon.widthAnchor.constraint(equalToConstant: 16),
             downloadDoneIcon.heightAnchor.constraint(equalToConstant: 16),
 
-            // Row spans the FULL strip width: Dart's AnimatedContainer child
-            // is a full-width Row(mainAxisAlignment: spaceEvenly) — equal
-            // spacing needs a definite width, and the previous centerX +
-            // inequality pair left it ambiguous (buttons could collapse
-            // onto each other). Height 48 = 60 strip − 12 top padding, so
-            // the 40 pt buttons center exactly like the Dart row.
-            stripRow.leadingAnchor.constraint(equalTo: stripContainer.leadingAnchor),
-            stripRow.trailingAnchor.constraint(equalTo: stripContainer.trailingAnchor),
-            stripRow.topAnchor.constraint(equalTo: stripContainer.topAnchor, constant: 12),
-            stripRow.heightAnchor.constraint(equalToConstant: 48),
+            // The drawer spans the full strip width, 12 pt under the card;
+            // its segments split the width equally.
+            drawer.leadingAnchor.constraint(equalTo: stripContainer.leadingAnchor),
+            drawer.trailingAnchor.constraint(equalTo: stripContainer.trailingAnchor),
+            drawer.topAnchor.constraint(equalTo: stripContainer.topAnchor, constant: Spacing.gap),
+            drawer.heightAnchor.constraint(equalToConstant: Self.drawerHeight),
+            drawerRow.leadingAnchor.constraint(equalTo: drawer.leadingAnchor, constant: Spacing.xs),
+            drawerRow.trailingAnchor.constraint(equalTo: drawer.trailingAnchor, constant: -Spacing.xs),
+            drawerRow.topAnchor.constraint(equalTo: drawer.topAnchor),
+            drawerRow.bottomAnchor.constraint(equalTo: drawer.bottomAnchor),
             stripHeightConstraint,
         ])
     }
@@ -479,6 +502,7 @@ final class EpisodeCardCell: UICollectionViewCell {
     }
 
     private func configureDownload(_ display: DownloadDisplay) {
+        downloadSlot.isHidden = display == .hidden
         downloadCircle.isHidden = display != .notDownloaded
         downloadRing.isHidden = true
         downloadDoneIcon.isHidden = true
@@ -495,26 +519,55 @@ final class EpisodeCardCell: UICollectionViewCell {
         }
     }
 
+    /// Equal segments split by hairlines; destructive (remove) actions in
+    /// the error ink.
     private func rebuildActionButtons() {
-        actionButtons.forEach { $0.removeFromSuperview() }
+        drawerRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
         actionButtons = []
         guard !actions.isEmpty else { return }
+        var firstButton: UIButton?
         for (index, action) in actions.enumerated() {
-            let button = UIButton(type: .custom)
-            button.setImage(action.icon, for: .normal)
-            button.tintColor = Theme.primaryBackgroundDark
-            button.backgroundColor = Theme.primaryLightMax
-            button.layer.cornerRadius = 20
-            button.layer.cornerCurve = .continuous
+            if index > 0 {
+                let divider = UIView()
+                divider.backgroundColor = AnycastColor.sandAlpha3
+                divider.widthAnchor.constraint(equalToConstant: Spacing.hairline).isActive = true
+                let dividerHost = UIView()
+                dividerHost.addSubview(divider)
+                divider.translatesAutoresizingMaskIntoConstraints = false
+                NSLayoutConstraint.activate([
+                    divider.centerXAnchor.constraint(equalTo: dividerHost.centerXAnchor),
+                    divider.centerYAnchor.constraint(equalTo: dividerHost.centerYAnchor),
+                    divider.heightAnchor.constraint(equalToConstant: Spacing.pageHeader),
+                    dividerHost.widthAnchor.constraint(equalToConstant: Spacing.hairline),
+                ])
+                drawerRow.addArrangedSubview(dividerHost)
+            }
+            let button = UIButton(type: .system)
+            var configuration = UIButton.Configuration.plain()
+            configuration.image = action.icon.withRenderingMode(.alwaysTemplate)
+            configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+            configuration.baseForegroundColor = action.accessibilityLabel.hasPrefix("Remove") ? Theme.error : Theme.onSurface
+            button.configuration = configuration
             button.accessibilityLabel = action.accessibilityLabel
             button.tag = index
             button.addTarget(self, action: #selector(actionTapped(_:)), for: .touchUpInside)
-            button.widthAnchor.constraint(equalToConstant: 40).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 40).isActive = true
-            if let stripRow = stripContainer.subviews.first as? UIStackView {
-                stripRow.addArrangedSubview(button)
+            button.addPressFeedback()
+            drawerRow.addArrangedSubview(button)
+            if let firstButton {
+                button.widthAnchor.constraint(equalTo: firstButton.widthAnchor).isActive = true
+            } else {
+                firstButton = button
             }
             actionButtons.append(button)
         }
+    }
+}
+
+/// A view whose corners always make a capsule of its current height.
+final class CapsuleView: UIView {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.cornerRadius = bounds.height / 2
+        layer.cornerCurve = .continuous
     }
 }

@@ -3,8 +3,8 @@ import os
 import AnycastKit
 
 /// Tab0 Inbox page (lib/pages/feeds.dart, 03 §2.3; v2 per 09 §3.2/§3.8 and
-/// the batch-1 Inbox redesign): the v2 header, category strip, and hint
-/// card scroll WITH the card list (Figma 1787:7899 scroll column) over the
+/// the Anycast 2.0 UI kit Inbox): the header and category strip scroll WITH
+/// the card list (Figma 1787:7899 scroll column) over the
 /// feedEpisode table, with the full refresh trigger set — pull-to-refresh
 /// (UIRefreshControl, A4 adaptation), refreshOnStart, a 2 s-after-creation
 /// auto fetch, a periodic auto fetch every `autoRefreshInterval` seconds
@@ -14,8 +14,9 @@ import AnycastKit
 /// InboxEpisodeCardCell; actions follow `InboxActionPlanner` exactly
 /// (play / add-with-fly-in / remove) through the native-first surfaces:
 /// whole-card tap opens Detail, long-press opens the context menu, the
-/// card's `more` button pulls the same menu down, and a trailing swipe
-/// removes (09 §7a-C1; 05 §6.3 P0).
+/// card's `more` button pulls the same menu down, a leading swipe adds to
+/// the playlist and a trailing swipe removes (09 §7a-C1; 05 §6.3 P0). Card
+/// badges follow the playing episode and the playlist.
 final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     /// Scroll-column sections (Figma column order); the whole set collapses
@@ -24,10 +25,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     private enum Section {
         static let header = 0
         static let strip = 1
-        static let hint = 2
-        static let cards = 3
-        static let tail = 4
-        static let count = 5
+        static let cards = 2
+        static let tail = 3
+        static let count = 4
     }
 
     private let context: UIContext
@@ -44,7 +44,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     private let header = HeaderView()
     private let categoryStrip = CategoryStripView()
-    private lazy var categoryHintCard: UIView = buildCategoryHintCard()
+    private let playbackObservation = ObservationLoop()
     private let collectionView: UICollectionView
     private let refreshControl = UIRefreshControl()
     private let emptyStateView = InboxEmptyStateView()
@@ -81,7 +81,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         let collection = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
         self.collectionView = collection
         super.init(nibName: nil, bundle: nil)
-        // Scroll-flow chrome (09 §10 批次1): header/strip/hint are list
+        // Scroll-flow chrome (09 §10 批次1): header/strip are list
         // cells now, the card section is a list section so it can carry
         // native swipe actions, and the history pill closes the column.
         collection.collectionViewLayout = UICollectionViewCompositionalLayout { [weak self] index, environment in
@@ -101,6 +101,11 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     // MARK: - Lifecycle
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        collectionView.alignBackgroundViewMargins()
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
@@ -117,6 +122,16 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         startTrimTimer()
         observeSettingsLimits()
 
+        // Card badges follow the playing episode and the playlist.
+        playbackObservation.track(
+            read: { [weak self] in
+                guard let self else { return }
+                _ = self.context.playback.currentEpisode?.enclosureUrl
+                _ = self.context.playback.queue.count
+            },
+            onChange: { [weak self] in self?.refreshVisibleCardStatus() }
+        )
+
         // refreshOnStart: true — one automatic refresh on first build
         // (feeds.dart:39); the 2 s delayed auto fetch follows
         // (feed_episode.dart:34-37).
@@ -129,8 +144,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     // MARK: - v2 chrome (09 §3.2/§3.8; scroll-flow hosting since 批次1)
 
-    /// The header/strip/hint views are configured here and HOSTED by the
-    /// first three list cells (Figma scrolls them with the column) — the
+    /// The header/strip views are configured here and HOSTED by the
+    /// first two list cells (Figma scrolls them with the column) — the
     /// cells re-parent the shared views on dequeue, so exactly one
     /// materialized host exists at a time.
     private func configureChrome() {
@@ -152,42 +167,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             self.renderList()
         }
         categoryStrip.accessibilityIdentifier = "inbox-category-strip"
-    }
-
-    /// The "see all podcast" hint card under the strip (Figma 599:30354:
-    /// sandAlpha2 fill, radius 16).
-    private func buildCategoryHintCard() -> UIView {
-        let card = UIView()
-        card.backgroundColor = AnycastColor.sandAlpha2
-        card.layer.cornerRadius = Radius.md
-        card.layer.cornerCurve = .continuous
-
-        let titleLabel = UILabel()
-        titleLabel.text = "see all podcast"
-        titleLabel.font = TypographyV2.titleSmall.font()
-        titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.textColor = Theme.onSurface
-
-        let messageLabel = UILabel()
-        messageLabel.text =
-            "show messages from every category listed together for a quick glance at your inbox."
-        messageLabel.font = TypographyV2.bodySmall.font()
-        messageLabel.adjustsFontForContentSizeCategory = true
-        messageLabel.textColor = Theme.onSurfaceVariant
-        messageLabel.numberOfLines = 0
-
-        let column = UIStackView(arrangedSubviews: [titleLabel, messageLabel])
-        column.axis = .vertical
-        column.spacing = Spacing.xxs
-        column.translatesAutoresizingMaskIntoConstraints = false
-        card.addSubview(column)
-        NSLayoutConstraint.activate([
-            column.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: Spacing.pageH),
-            column.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -Spacing.pageH),
-            column.topAnchor.constraint(equalTo: card.topAnchor, constant: Spacing.chip),
-            column.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -Spacing.chip),
-        ])
-        return card
     }
 
     /// "updated {relative} - {n} unlistened" (Figma header status line).
@@ -216,8 +195,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     // chrome, 09 §10 决策⑥)
 
     /// Figma scroll column (1787:7899): padding 0/16, vertical gap 12 —
-    /// the header/strip/hint sections carry the gap as their bottom
-    /// insets, the cards bake half the gap into the cell.
+    /// the header section carries the gap as its bottom inset, the strip
+    /// half of it, and the cards bake the other half into the cell.
     private func makeSection(
         index: Int, environment: NSCollectionLayoutEnvironment
     ) -> NSCollectionLayoutSection? {
@@ -226,8 +205,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         case Section.header:
             return chromeSection(bottomInset: Spacing.gap)
         case Section.strip:
-            return chromeSection(bottomInset: Spacing.gap)
-        case Section.hint:
             // 6 here + the card cell's 6pt top inset = the 12pt column gap.
             return chromeSection(bottomInset: InboxEpisodeCardCell.verticalGap)
         case Section.cards:
@@ -238,6 +215,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             // method) — measured on iOS 27 the delegate selector never
             // fires for a list section nested in a compositional section
             // provider, the swipe surface never engages.
+            config.leadingSwipeActionsConfigurationProvider = { [weak self] indexPath in
+                self?.leadingSwipeActions(at: indexPath)
+            }
             config.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
                 self?.trailingSwipeActions(at: indexPath)
             }
@@ -249,7 +229,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
     }
 
-    /// One self-sizing chrome row (header / strip / hint / history pill).
+    /// One self-sizing chrome row (header / strip / history pill).
     private func chromeSection(bottomInset: CGFloat) -> NSCollectionLayoutSection {
         let size = NSCollectionLayoutSize(
             widthDimension: .fractionalWidth(1), heightDimension: .estimated(120)
@@ -534,6 +514,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
                 case .skipInsertCurrentlyPlaying:
                     break
                 case .removeFromInbox:
+                    if steps == [.removeFromInbox] { Haptics.queueRemoved() }
                     await self.removeFromInbox(urls: [enclosureURL])
                 case .playInsertedEpisode:
                     await self.context.playback.playByEpisode(insertedRow)
@@ -574,12 +555,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     private func presentDetail(episode: FeedEpisodeRow) {
         guard let enclosureURL = episode.enclosureUrl else { return }
-        // Status tag pills (v2 tag row): the inbox source plus live queue
-        // membership ("queued" when the playback queue carries this episode).
-        var tags = ["inbox"]
-        if context.playback.queue.contains(where: { $0.enclosureUrl == enclosureURL }) {
-            tags.append("queued")
-        }
         let detailEpisode = DetailViewController.Episode(
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? "",
@@ -612,7 +587,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             shortenURL: { [weak self] url in
                 await self?.context.api.getShortURL(for: url) ?? url
             },
-            tags: tags
+            isInPlaylist: context.playback.queue.contains(where: { $0.enclosureUrl == enclosureURL })
         )
     }
 
@@ -699,7 +674,7 @@ extension InboxPageViewController: UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         switch showsHeader ? section : section + 1 {
-        case Section.header, Section.strip, Section.hint, Section.tail:
+        case Section.header, Section.strip, Section.tail:
             return 1
         case Section.cards:
             return displayedEpisodes.count
@@ -723,12 +698,6 @@ extension InboxPageViewController: UICollectionViewDataSource {
                 withReuseIdentifier: ChromeHostingCell.reuseIdentifier, for: indexPath
             )
             (cell as? ChromeHostingCell)?.host(categoryStrip)
-            return cell
-        case Section.hint:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: ChromeHostingCell.reuseIdentifier, for: indexPath
-            )
-            (cell as? ChromeHostingCell)?.host(categoryHintCard, horizontalInset: Spacing.pageH)
             return cell
         case Section.cards:
             let cell = collectionView.dequeueReusableCell(
@@ -760,10 +729,10 @@ extension InboxPageViewController: UICollectionViewDataSource {
         let content = InboxCardContent(
             title: episode.title ?? "",
             showName: episode.channelTitle ?? "",
-            dateText: Self.dateText(for: episode),
-            badgeText: Self.badgeText(for: episode),
+            metaText: Self.metaText(for: episode),
             descriptionHTML: episode.description,
-            imageURL: episode.imageUrl
+            imageURL: episode.imageUrl,
+            status: status(for: episode)
         )
         card.configure(content)
         // The same payload feeds the long-press context menu, the card's
@@ -774,19 +743,31 @@ extension InboxPageViewController: UICollectionViewDataSource {
         }
     }
 
-    /// "Nov 21, 2025"-style date (card.dart date part, v2 state row).
-    private static func dateText(for episode: FeedEpisodeRow) -> String {
-        TimeFormats.formatDatetime(
+    /// "Nov 21, 2025 · 45 min" — the card's date with the duration when known.
+    static func metaText(for episode: FeedEpisodeRow) -> String {
+        let date = TimeFormats.formatDatetime(
             episode.pubDate ?? 0,
             nowEpochMilliseconds: Int64(Date().timeIntervalSince1970 * 1000)
         )
+        guard let duration = episode.duration, duration > 0 else { return date }
+        return "\(date) · \(TimeFormats.formatDuration(duration))"
     }
 
-    /// The gold count pill. The Figma "episode count" property's semantics
-    /// are unconfirmed (frames show a fixed 99+); duration text stands in
-    /// pending design review (03 §2.3 v2 裁定).
-    private static func badgeText(for episode: FeedEpisodeRow) -> String {
-        TimeFormats.formatDuration(episode.duration ?? 0).uppercased()
+    private func status(for episode: FeedEpisodeRow) -> InboxCardContent.Status {
+        guard let url = episode.enclosureUrl else { return .none }
+        if context.playback.currentEpisode?.enclosureUrl == url { return .playing }
+        if context.playback.queue.contains(where: { $0.enclosureUrl == url }) { return .queued }
+        return .none
+    }
+
+    private func refreshVisibleCardStatus() {
+        for indexPath in collectionView.indexPathsForVisibleItems
+        where (showsHeader ? indexPath.section : indexPath.section + 1) == Section.cards {
+            guard displayedEpisodes.indices.contains(indexPath.item),
+                  let card = collectionView.cellForItem(at: indexPath) as? InboxEpisodeCardCell
+            else { continue }
+            card.apply(status: status(for: displayedEpisodes[indexPath.item]))
+        }
     }
 
     private func actions(for episode: FeedEpisodeRow, at indexPath: IndexPath) -> [EpisodeCardAction] {
@@ -834,6 +815,24 @@ extension InboxPageViewController: UICollectionViewDelegate {
         })
     }
 
+    /// The leading swipe surface (UI kit Inbox: swipe right to queue): Add
+    /// to playlist through the same planner path as the menu entry.
+    func leadingSwipeActions(at indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        guard (showsHeader ? indexPath.section : indexPath.section + 1) == Section.cards,
+              displayedEpisodes.indices.contains(indexPath.item) else { return nil }
+        let episode = displayedEpisodes[indexPath.item]
+        let add = UIContextualAction(
+            style: .normal, title: "Add to playlist",
+            handler: { [weak self] _, _, completion in
+                self?.perform(.addToPlaylist, episode: episode, at: indexPath)
+                completion(true)
+            }
+        )
+        add.image = AppIcons.addToList
+        add.backgroundColor = AnycastColor.grass9
+        return UISwipeActionsConfiguration(actions: [add])
+    }
+
     /// The trailing swipe surface (09 §7a-C1 批次1): a single destructive
     /// Remove running the same planner path as the menu entry. Internal so
     /// the in-app regression suite can assert the wiring directly.
@@ -855,7 +854,7 @@ extension InboxPageViewController: UICollectionViewDelegate {
 
 // MARK: - Scroll-flow chrome hosting (批次1: the Figma column scrolls)
 
-/// Hosts one of the shared chrome views (header / strip / hint card) inside
+/// Hosts one of the shared chrome views (header / strip) inside
 /// a self-sizing list cell. Exactly one cell per section is ever alive, so
 /// re-parenting the shared view on (re)dequeue is safe.
 final class ChromeHostingCell: UICollectionViewCell {
@@ -900,10 +899,13 @@ final class HistoryTailCell: UICollectionViewCell {
             top: 0, leading: 4, bottom: 0, trailing: 4
         )
         configuration.cornerStyle = .capsule
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.bodySmall.font()
+            return outgoing
+        }
         button.configuration = configuration
         button.contentHorizontalAlignment = .leading
-        button.titleLabel?.font = UIFontMetrics(forTextStyle: .subheadline)
-            .scaledFont(for: .systemFont(ofSize: 13, weight: .regular))
         button.tintColor = Theme.onSurfaceVariant
         button.translatesAutoresizingMaskIntoConstraints = false
         button.accessibilityIdentifier = "inbox-history-tail"
@@ -927,127 +929,46 @@ final class HistoryTailCell: UICollectionViewCell {
 // MARK: - Empty state (ImportBlock, feeds.dart:147-197)
 
 
-/// AnycastEmptyState + the ImportBlock action column: 64 pt circle icon,
-/// big title, message, then Explore (filled green) over a row with the
-/// outlined Import OPML button and the round help button. Hosted as the
+/// AnycastEmptyState + the ImportBlock action column on the shared
+/// `EmptyStateView`: Explore (primary) over a row with the secondary
+/// Import OPML button and the round help button. Hosted as the
 /// collection background so the page stays pull-to-refreshable.
-final class InboxEmptyStateView: UIView {
+final class InboxEmptyStateView: EmptyStateView {
 
     var onExplore: (() -> Void)?
     var onImportOPML: (() -> Void)?
     var onHelp: (() -> Void)?
 
-    init() {
-        super.init(frame: .zero)
-
-        let iconCircle = UIView()
-        iconCircle.backgroundColor = UIColor.white.withAlphaComponent(0.06)
-        iconCircle.layer.cornerRadius = 32
-        iconCircle.layer.cornerCurve = .continuous
-        iconCircle.translatesAutoresizingMaskIntoConstraints = false
-        let icon = UIImageView(image: UIImage(systemName: "tray"))
-        icon.tintColor = Theme.primary
-        icon.contentMode = .center
-        icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 30)
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        iconCircle.addSubview(icon)
-
-        let titleLabel = UILabel()
-        titleLabel.text = "It’s empty here."
-        titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
-        titleLabel.textAlignment = .center
-        titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.numberOfLines = 0
-
-        let messageLabel = UILabel()
-        messageLabel.text = "Let's change that!"
-        messageLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: .systemFont(ofSize: 16))
-        messageLabel.textColor = Theme.secondaryText
-        messageLabel.textAlignment = .center
-        messageLabel.adjustsFontForContentSizeCategory = true
-        messageLabel.numberOfLines = 0
-
-        let explore = UIButton(type: .system)
-        var exploreConfiguration = UIButton.Configuration.filled()
-        exploreConfiguration.image = AppIcons.explore
-        exploreConfiguration.imagePadding = 8
-        exploreConfiguration.title = "Explore"
-        exploreConfiguration.baseBackgroundColor = Theme.brandGreen
-        exploreConfiguration.baseForegroundColor = .white
-        exploreConfiguration.cornerStyle = .capsule
-        exploreConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 12, leading: 20, bottom: 12, trailing: 20
-        )
-        explore.configuration = exploreConfiguration
-        explore.titleLabel?.font = Typography.mainText.font()
+    override init() {
+        super.init()
+        let explore = AnycastButton.make(.primary, title: "Explore", image: AppIcons.explore)
         explore.addAction(UIAction { [weak self] _ in self?.onExplore?() }, for: .touchUpInside)
 
-        let importButton = UIButton(type: .system)
-        var importConfiguration = UIButton.Configuration.plain()
-        importConfiguration.image = UIImage(systemName: "arrow.down.doc")
-        importConfiguration.imagePadding = 8
-        importConfiguration.title = "Import OPML"
-        importConfiguration.baseForegroundColor = Theme.primaryLightMax
-        importConfiguration.background.strokeColor = Theme.primaryLightMax
-        importConfiguration.background.strokeWidth = 1
-        importConfiguration.cornerStyle = .capsule
-        importConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 12, leading: 20, bottom: 12, trailing: 20
-        )
-        importButton.configuration = importConfiguration
-        importButton.titleLabel?.font = Typography.mainText.font()
+        let importButton = AnycastButton.make(.secondary, title: "Import OPML", image: UIImage(systemName: "arrow.down.doc"))
         importButton.addAction(UIAction { [weak self] _ in self?.onImportOPML?() }, for: .touchUpInside)
 
-        let help = UIButton(type: .system)
-        help.setImage(UIImage(systemName: "questionmark.circle"), for: .normal)
-        help.tintColor = Theme.secondaryText
-        help.backgroundColor = UIColor.white.withAlphaComponent(0.06)
-        help.layer.cornerRadius = 24
-        help.layer.cornerCurve = .continuous
-        help.isAccessibilityElement = true
-        help.accessibilityLabel = "Import help"
+        let help = AnycastIconButton(
+            style: .tonal,
+            icon: UIImage(systemName: "questionmark"),
+            accessibilityLabel: "Import help",
+            diameter: AnycastIconButton.largeDiameter
+        )
         help.addAction(UIAction { [weak self] _ in self?.onHelp?() }, for: .touchUpInside)
-        help.widthAnchor.constraint(equalToConstant: 48).isActive = true
-        help.heightAnchor.constraint(equalToConstant: 48).isActive = true
 
         let buttonRow = UIStackView(arrangedSubviews: [importButton, help])
         buttonRow.axis = .horizontal
         buttonRow.alignment = .center
-        buttonRow.spacing = 8
-
-        let actionColumn = UIStackView(arrangedSubviews: [explore, buttonRow])
-        actionColumn.axis = .vertical
-        actionColumn.alignment = .center
-        actionColumn.spacing = 8
-
-        let column = UIStackView(arrangedSubviews: [iconCircle, titleLabel, messageLabel, actionColumn])
-        column.axis = .vertical
-        column.alignment = .center
-        column.spacing = 8
-        column.setCustomSpacing(20, after: iconCircle)
-        column.setCustomSpacing(24, after: messageLabel)
-        column.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(column)
+        buttonRow.spacing = Spacing.md
 
         NSLayoutConstraint.activate([
-            iconCircle.widthAnchor.constraint(equalToConstant: 64),
-            iconCircle.heightAnchor.constraint(equalToConstant: 64),
-            icon.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
-            explore.heightAnchor.constraint(equalToConstant: 48),
-            importButton.heightAnchor.constraint(equalToConstant: 48),
-
-            column.leadingAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.leadingAnchor),
-            column.trailingAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.trailingAnchor),
-            column.topAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.topAnchor),
-            column.bottomAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.bottomAnchor),
-            column.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
-            column.centerXAnchor.constraint(equalTo: centerXAnchor),
-            column.centerYAnchor.constraint(equalTo: centerYAnchor),
+            explore.heightAnchor.constraint(equalToConstant: AnycastIconButton.largeDiameter),
+            importButton.heightAnchor.constraint(equalToConstant: AnycastIconButton.largeDiameter),
         ])
+        configure(Content(
+            icon: UIImage(systemName: "tray"),
+            title: "It’s empty here.",
+            message: "Let's change that!",
+            actions: [explore, buttonRow]
+        ))
     }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
