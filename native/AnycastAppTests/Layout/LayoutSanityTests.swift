@@ -343,7 +343,10 @@ struct LayoutSanityTests {
                     list.bounds.height > 0,
                     "\(name) list has zero height at \(context)"
                 )
-                if list.numberOfItems(inSection: 0) > 0 {
+                // A legitimately empty column (fresh-install Inbox collapses
+                // to zero sections; its empty state is the background view)
+                // aborts on numberOfItems(inSection:) — skip those.
+                if list.numberOfSections > 0, list.numberOfItems(inSection: 0) > 0 {
                     #expect(
                         !list.isHidden,
                         "\(name) list has items but is hidden at \(context)"

@@ -1,25 +1,37 @@
 import UIKit
 
-/// Canonical sheet presentations (03 §1.3, 07 §1.2 A2/A3): the ten
-/// full-screen "expand" modal sheets of the Flutter line map to a
-/// full-height page sheet with the system grabber; the sticky 90%/80%
-/// close thresholds are an accepted adaptation (A3 — system default).
-/// Screens call these helpers instead of configuring their own
-/// presentation controllers.
+/// Canonical sheet presentations (03 §1.3, 07 §1.2 A2/A3): the
+/// full-screen "expand" modal sheets of the Flutter line map to page
+/// sheets with the system grabber; the sticky 90%/80% close thresholds
+/// are an accepted adaptation (A3 — system default). Most expand sheets
+/// are full-height `.large()`; list sheets that need a drag-to-resize
+/// affordance (SearchPage) pass extra detents. Screens call these helpers
+/// instead of configuring their own presentation controllers.
 enum AppSheets {
 
-    /// Full-height expand sheet (modal_bottom_sheet `expand: true`):
-    /// Settings, SearchPage, Channel, ChannelSearch, ChatPage, LoginPage,
-    /// PlayerPage (03 §1.3 rows 1-9).
+    /// Expand sheet (modal_bottom_sheet `expand: true`): Settings,
+    /// SearchPage, Channel, ChannelSearch, ChatPage, LoginPage, PlayerPage
+    /// (03 §1.3 rows 1-9).
+    ///
+    /// `detents` defaults to a single `.large()` (the full-height expand).
+    /// A multi-detent caller (SearchPage passes `[.medium(), .large()]`)
+    /// additionally gets `prefersScrollingExpandsWhenScrolledToEdge = false`
+    /// so the sheet's own drag owns the top edge — at the default, an
+    /// embedded scroll view at its top swallows the pull-down and shows
+    /// elastic blank space instead of resizing the sheet.
     static func presentExpand(
         _ controller: UIViewController,
         from presenter: UIViewController,
-        animated: Bool = true
+        animated: Bool = true,
+        detents: [UISheetPresentationController.Detent] = [.large()]
     ) {
         controller.modalPresentationStyle = .pageSheet
         if let sheet = controller.sheetPresentationController {
-            sheet.detents = [.large()]
+            sheet.detents = detents
             sheet.prefersGrabberVisible = true
+            if detents.count > 1 {
+                sheet.prefersScrollingExpandsWhenScrolledToEdge = false
+            }
         }
         presenter.present(controller, animated: animated)
     }

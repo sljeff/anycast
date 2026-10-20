@@ -154,7 +154,8 @@ final class ChannelSearchViewController: UIViewController {
         view.addSubview(playerBar)
 
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // 8 pt of breathing room below the sheet's top edge.
+            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
             grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             grabber.widthAnchor.constraint(equalToConstant: 42),
             grabber.heightAnchor.constraint(equalToConstant: 6),

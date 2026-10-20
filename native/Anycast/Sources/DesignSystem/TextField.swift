@@ -28,8 +28,21 @@ extension UITextField {
             iconView.tintColor = Theme.onSurfaceVariant
             iconView.contentMode = .center
             iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(textStyle: .body)
-            iconView.frame = CGRect(x: 0, y: 0, width: AnycastIconButton.standardDiameter, height: AnycastIconButton.standardDiameter)
-            leftView = iconView
+
+            // Wrap the glyph in a frame-laid-out container with controlled
+            // spacers: ~14 pt of visual gap on each side of the glyph. A
+            // bare leftView leaves the inset from the field border and the
+            // gap to the text to whatever the centered glyph happens to
+            // spare inside its box. The 28 pt box is a close fit for the
+            // body-size symbol (center content mode never clips — the
+            // glyph draws at its natural size even if Dynamic Type grows
+            // it past the box).
+            let inset: CGFloat = 12
+            let box: CGFloat = 28
+            let container = UIView(frame: CGRect(x: 0, y: 0, width: inset + box + inset, height: box))
+            iconView.frame = CGRect(x: inset, y: 0, width: box, height: box)
+            container.addSubview(iconView)
+            leftView = container
         } else {
             leftView = UIView(frame: CGRect(x: 0, y: 0, width: Spacing.pageH, height: 1))
         }

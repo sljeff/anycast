@@ -84,9 +84,11 @@ struct UIFixRegressionTests {
         let bottomFrame = frameInPage(bottomStack)
         let playFrame = frameInPage(playPause)
 
-        // Square, capped at the UI kit's 320 pt and horizontally centered.
+        // Square, capped at 356 pt (the v2 content-rail width) and
+        // horizontally centered; on a 402 pt screen the cover fills the
+        // full 24 pt-inset rail and aligns with the title/progress rows.
         #expect(abs(coverFrame.width - coverFrame.height) < 1.5, "cover is not square: \(coverFrame)")
-        #expect(coverFrame.width <= 320.5, "cover exceeds its 320 pt cap: \(coverFrame.width)")
+        #expect(coverFrame.width <= 356.5, "cover exceeds its 356 pt cap: \(coverFrame.width)")
         #expect(abs(coverFrame.midX - page.bounds.midX) < 1, "cover is off center")
 
         // The whitespace above the cover equals the gap between the title
@@ -495,6 +497,43 @@ struct UIFixRegressionTests {
                 await Self.capture(window, name: "uifix-playlist-expanded")
             }
         }
+    }
+
+    // MARK: - 7, sheet chrome safe area
+
+    /// The search sheet was the one screen whose player bar pinned to the
+    /// RAW bottom edge (under the home indicator) — every other page
+    /// anchors to the safe area. Guards the anchor itself, because the bar
+    /// hides when nothing plays and its frame cannot be asserted.
+    @Test("Search sheet player bar anchors to the safe area, not the raw bottom")
+    func searchSheetPlayerBarRespectsSafeArea() async throws {
+        guard let context = await Self.liveContext(),
+              let window = Self.keyWindow() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        let sheet = SearchPageViewController(context: context, searchText: "safe-area")
+        sheet.modalPresentationStyle = .pageSheet
+        let presenter = await Self.settledTopPresenter(in: window) ?? window.rootViewController
+        presenter?.present(sheet, animated: false)
+        defer { presenter?.dismiss(animated: false) }
+        try await Self.settle(window, seconds: 0.6)
+
+        guard let bar = Self.firstView(in: sheet.view, where: { $0 is PlayerBarView }),
+              let host = bar.superview as? UIView else {
+            Issue.record("player bar not found in the search sheet"); return
+        }
+        let bottomAnchor = host.constraints.first {
+            ($0.firstItem as? UIView) === bar && $0.firstAttribute == .bottom
+        }
+        guard let bottomAnchor else {
+            Issue.record("player bar has no bottom constraint on its host"); return
+        }
+        let target = bottomAnchor.secondItem
+        #expect(
+            target is UILayoutGuide
+                && (target as? UILayoutGuide)?.identifier == "UIViewSafeAreaLayoutGuide",
+            "player bar bottom must anchor to the safe area guide, got: \(String(describing: target))"
+        )
     }
 
     // MARK: - Helpers

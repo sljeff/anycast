@@ -713,7 +713,10 @@ final class ChannelHeaderView: UICollectionReusableView {
         addSubview(coverView)
 
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor),
+            // 8 pt of breathing room below the sheet's top edge (the same
+            // inset the SearchPage and Import grabbers carry) — pinned at
+            // the very top it reads as glued to the sheet edge.
+            grabber.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor, constant: 8),
             grabber.centerXAnchor.constraint(equalTo: centerXAnchor),
             grabber.widthAnchor.constraint(equalToConstant: 42),
             grabber.heightAnchor.constraint(equalToConstant: 6),

@@ -38,9 +38,11 @@ final class PlayerMainPageViewController: UIViewController {
     private let retryRow = UIStackView()
 
     private enum Layout {
-        /// UI kit player artwork: 320 pt, inset 36 from the screen edges.
-        static let artworkMaxSide: CGFloat = 320
-        static let artworkInset = Spacing.pageSection
+        /// UI kit player artwork, v2: aligned to the 24 pt content rails,
+        /// capped 356, still yielding to the 45% height guard on short
+        /// windows (the 320/36 spec was the pre-v2 form).
+        static let artworkMaxSide: CGFloat = 356
+        static let artworkInset = Spacing.pageHeader
         /// The transport's touch slots (UI kit `playerControls` container).
         static let transportSlot: CGFloat = 72
         /// Gap between the play slot and the skip slots (glyph centers
@@ -157,9 +159,10 @@ final class PlayerMainPageViewController: UIViewController {
         let balanced = topBalance.heightAnchor.constraint(equalTo: middleBalance.heightAnchor)
         balanced.priority = .defaultHigh
 
-        // Square artwork at the inset width, capped at 320 pt; on short
-        // windows it yields to a share of the page height so the column
-        // never overflows (07 §4 hard requirement).
+        // Square artwork spanning the 24 pt content rails, capped at 356 pt
+        // (on a 402 pt screen it fills the full 354 pt row width, aligned
+        // with the title row); on short windows it yields to a share of the
+        // page height so the column never overflows (07 §4 hard requirement).
         let coverWidth = coverShadow.widthAnchor.constraint(
             equalTo: view.widthAnchor, constant: -Layout.artworkInset * 2
         )
@@ -183,7 +186,9 @@ final class PlayerMainPageViewController: UIViewController {
 
             titleRow.topAnchor.constraint(equalTo: coverShadow.bottomAnchor, constant: Spacing.pageHeader),
             titleRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            titleRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            // Symmetric with the leading rail and the artwork's rails, so
+            // the title row and the cover share the same content column.
+            titleRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
 
             middleBalance.topAnchor.constraint(equalTo: titleRow.bottomAnchor),
             middleBalance.bottomAnchor.constraint(equalTo: bottomStack.topAnchor),

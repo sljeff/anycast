@@ -222,8 +222,11 @@ final class HTMLContentRenderer {
     /// 12pt Times in pure black, which is invisible on the dark surface and
     /// is NOT an author choice (the Dart `textStyle` colors it onSurface).
     /// So: pure-black colors and the default-size Times face are treated as
-    /// "unstyled" and rebased; authored colors and sized/emphasized fonts
-    /// keep their intent (size scales relative to the 12pt default).
+    /// "unstyled" and rebased; authored colors keep their intent, while
+    /// font sizes are NORMALIZED, not preserved — show notes are machine
+    /// generated and get no typographic respect, so the parsed size maps
+    /// into [0.5, 1.3] of the body size and every above-body run collapses
+    /// into one heading tier (see `rebasedFont`).
     nonisolated private static func postProcess(
         _ source: NSAttributedString,
         base: [NSAttributedString.Key: Any]
@@ -247,9 +250,12 @@ final class HTMLContentRenderer {
                    let baseColor = base[.foregroundColor] {
                     attributes[.foregroundColor] = baseColor
                 }
-                if let baseFont = base[.font] as? UIFont {
-                    attributes[.font] = rebasedFont(attrs[.font] as? UIFont, onto: baseFont)
-                }
+            }
+            // Font rebase applies to link runs too: an <h1><a>…</a></h1>
+            // heading would otherwise keep its unbounded WebKit size and
+            // family while its non-link neighbors are normalized.
+            if let baseFont = base[.font] as? UIFont {
+                attributes[.font] = rebasedFont(attrs[.font] as? UIFont, onto: baseFont)
             }
             let paragraph = (attrs[.paragraphStyle] as? NSParagraphStyle).map {
                 $0.mutableCopy() as! NSMutableParagraphStyle
@@ -264,19 +270,34 @@ final class HTMLContentRenderer {
         return result
     }
 
-    /// Rebase a WebKit-imported font onto the app body font: family and size
-    /// switch to the base, the parsed size ratio is preserved (h1 ≈ 2× the
-    /// 12pt default), and symbolic emphasis traits (bold/italic) carry over
-    /// when the family has them.
+    /// Rebase a WebKit-imported font onto the app body font: family switches
+    /// to the base and the size is NORMALIZED, not preserved — show notes
+    /// are machine generated and get no typographic respect. The parsed
+    /// size maps into [0.5, 1.3] of the body size, and every run above body
+    /// size (h1-h6, oversized font tags) collapses into a single "1.3×
+    /// semibold" heading tier (weight trait, not full bold). Symbolic
+    /// emphasis traits (bold/italic/mono) carry over when the family has them.
     nonisolated private static func rebasedFont(_ parsed: UIFont?, onto base: UIFont) -> UIFont {
         guard let parsed else { return base }
-        let scale = max(parsed.pointSize / 12.0, 0.5)
+        var scale = min(max(parsed.pointSize / 12.0, 0.5), 1.3)
+        let isHeadingTier = scale > 1.0
+        if isHeadingTier {
+            // One heading tier: uniform 1.3× size.
+            scale = 1.3
+        }
         let traits = parsed.fontDescriptor.symbolicTraits
             .intersection([.traitBold, .traitItalic, .traitMonoSpace])
         var descriptor = base.fontDescriptor
         if !traits.isEmpty,
            let withTraits = descriptor.withSymbolicTraits(traits) {
             descriptor = withTraits
+        }
+        if isHeadingTier {
+            // Semibold via the weight trait (symbolic .traitBold is full
+            // bold, one step heavier than the intended heading weight).
+            descriptor = descriptor.addingAttributes([
+                .traits: [UIFontDescriptor.TraitKey.weight: UIFont.Weight.semibold]
+            ])
         }
         return UIFont(descriptor: descriptor, size: base.pointSize * scale)
     }

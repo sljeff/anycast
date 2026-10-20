@@ -400,6 +400,13 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
         NSLayoutConstraint.activate([
             overlay.centerXAnchor.constraint(equalTo: button.centerXAnchor),
             overlay.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            // Explicit size is mandatory: with only the center pins the
+            // loading lottie's animation canvas (edge-pinned to the control
+            // by PlayPauseIconControl.ensureLottie) blew the overlay up to
+            // hundreds of points and covered the whole row on device (PR #9
+            // regression; the mini player / player page pin explicit sizes).
+            overlay.widthAnchor.constraint(equalToConstant: overlay.size),
+            overlay.heightAnchor.constraint(equalToConstant: overlay.size),
         ])
         button.setImage(UIImage(), for: .normal)
         button.isAccessibilityElement = true
@@ -449,6 +456,11 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
                     robot.centerXAnchor.constraint(equalTo: button.centerXAnchor),
                     robot.centerYAnchor.constraint(equalTo: button.centerYAnchor),
                     robot.heightAnchor.constraint(equalToConstant: 24),
+                    // Width too: a lottie pinned only by center + height lets
+                    // its animation canvas stretch the view horizontally —
+                    // the same class of blow-up as the play overlay (PR #9
+                    // device regression).
+                    robot.widthAnchor.constraint(equalToConstant: 24),
                 ])
                 robot.play()
             }

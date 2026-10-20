@@ -1,5 +1,7 @@
 import UIKit
 import SafariServices
+import AuthenticationServices
+import GoogleSignIn
 import AnycastKit
 
 /// Login sheet (lib/pages/login.dart, 03 §2.14 / §1.3 row 7): presented as
@@ -288,9 +290,23 @@ final class LoginViewController: UIViewController {
         row.isUserInteractionEnabled = false
         row.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(row)
+        // Two one-sided insets alone leave the row's horizontal position
+        // ambiguous (it drifted against the trailing edge on device), so pin
+        // the center at required priority; the insets drop to 999 so that
+        // over-wide Dynamic Type content can bleed past them instead of
+        // conflicting with the centering.
+        let leadingInset = row.leadingAnchor.constraint(
+            greaterThanOrEqualTo: button.leadingAnchor, constant: 16
+        )
+        leadingInset.priority = UILayoutPriority(999)
+        let trailingInset = row.trailingAnchor.constraint(
+            lessThanOrEqualTo: button.trailingAnchor, constant: -16
+        )
+        trailingInset.priority = UILayoutPriority(999)
         NSLayoutConstraint.activate([
-            row.leadingAnchor.constraint(greaterThanOrEqualTo: button.leadingAnchor, constant: 16),
-            row.trailingAnchor.constraint(lessThanOrEqualTo: button.trailingAnchor, constant: -16),
+            row.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+            leadingInset,
+            trailingInset,
             row.centerYAnchor.constraint(equalTo: button.centerYAnchor),
             iconView.widthAnchor.constraint(equalToConstant: iconSize),
             iconView.heightAnchor.constraint(equalToConstant: iconSize),
@@ -1013,13 +1029,43 @@ final class LoginViewController: UIViewController {
     private func runWithSpinner(_ flow: @escaping (UIViewController) async throws -> Void) {
         let spinner = FullScreenSpinnerViewController.present(over: self)
         Task { @MainActor [weak self] in
-            defer { spinner.dismissSpinner { [weak self] in self?.refreshState() } }
+            // Dart prints and stays signed out (states/user.dart:130-138); the
+            // native port also surfaces the failure as an alert. The alert is
+            // presented from the spinner-dismissal completion — presenting
+            // while the spinner is still up would be swallowed by the ongoing
+            // dismissal.
+            var failure: Error?
+            defer {
+                spinner.dismissSpinner { [weak self] in
+                    guard let self else { return }
+                    if let failure {
+                        self.presentAlert(
+                            title: "Sign in failed",
+                            message: failure.localizedDescription
+                        )
+                    }
+                    self.refreshState()
+                }
+            }
             do {
                 try await flow(spinner)
             } catch {
-                // Dart prints and stays signed out (states/user.dart:130-138).
+                // The user backing out of the Apple/Google system sheet is a
+                // cancel, not a failure — no alert (the purchase flow folds
+                // the same case in PaywallStore).
+                if !Self.isUserCancellation(error) {
+                    failure = error
+                }
             }
         }
+    }
+
+    /// Apple and Google sign-in both surface "user tapped cancel" as an
+    /// error; those must not read as "Sign in failed".
+    private static func isUserCancellation(_ error: Error) -> Bool {
+        if let apple = error as? ASAuthorizationError, apple.code == .canceled { return true }
+        if let google = error as? GIDSignInError, google.code == GIDSignInError.Code.canceled { return true }
+        return false
     }
 
     // MARK: - Shared helpers

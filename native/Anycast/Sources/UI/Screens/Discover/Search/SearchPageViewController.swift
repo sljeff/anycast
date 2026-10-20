@@ -58,9 +58,13 @@ final class SearchPageViewController: UIViewController {
         context: UIContext,
         searchText: String
     ) {
+        // Medium→large detents give the header's pull-down somewhere to go;
+        // AppSheets also stops multi-detent expand sheets' scroll views from
+        // swallowing the top-edge drag (the elastic-blank symptom).
         AppSheets.presentExpand(
             SearchPageViewController(context: context, searchText: searchText),
-            from: presenter
+            from: presenter,
+            detents: [.medium(), .large()]
         )
     }
 
@@ -132,6 +136,12 @@ final class SearchPageViewController: UIViewController {
         keywordLabel.lineBreakMode = .byTruncatingMiddle
         keywordLabel.isAccessibilityElement = true
         keywordLabel.accessibilityLabel = "Search keyword: \(viewModel.searchText)"
+        // Required horizontal hugging keeps the row's default .fill
+        // distribution from stretching a label across the row — a stretched
+        // label's centered text then drifted to one side. Compression stays
+        // at the label default so an over-wide keyword still truncates.
+        keywordPrefixLabel.setContentHuggingPriority(.required, for: .horizontal)
+        keywordLabel.setContentHuggingPriority(.required, for: .horizontal)
 
         let keywordRow = UIStackView(arrangedSubviews: [keywordPrefixLabel, keywordLabel])
         keywordRow.axis = .horizontal
@@ -166,21 +176,41 @@ final class SearchPageViewController: UIViewController {
             self?.activateTabIfNeeded(index)
         }
 
-        // NO bottom-safe wrapper (03 §2.6): the bar hugs the sheet's very
-        // bottom edge, under the home indicator — unlike the Channel pages.
+        // The bar respects the bottom safe area (a deliberate v2 departure
+        // from the Dart 03 §2.6 bottom-edge pin, which drew the bar under
+        // the home indicator).
         view.addSubview(playerBar)
 
+        // The keyword pair centers as one unit (required centerX); the old
+        // required edge pins are kept at 999 as an over-wide guard — they
+        // yield to the centering until the content would overflow, then
+        // force the truncating compression.
+        let keywordLeading = keywordRow.leadingAnchor.constraint(
+            equalTo: view.leadingAnchor, constant: 16
+        )
+        keywordLeading.priority = UILayoutPriority(999)
+        let keywordTrailing = keywordRow.trailingAnchor.constraint(
+            equalTo: view.trailingAnchor, constant: -16
+        )
+        keywordTrailing.priority = UILayoutPriority(999)
+
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // 8pt of breathing room below the sheet's top edge.
+            grabber.topAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8
+            ),
             grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             grabber.widthAnchor.constraint(equalToConstant: 42),
             grabber.heightAnchor.constraint(equalToConstant: 6),
 
+            // +8 with the grabber's move so the original 16pt gap below the
+            // grabber band (14 = 8 + 6 tall) is preserved.
             keywordRow.topAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 22
+                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 30
             ),
-            keywordRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            keywordRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            keywordRow.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            keywordLeading,
+            keywordTrailing,
 
             tabStrip.topAnchor.constraint(equalTo: keywordRow.bottomAnchor, constant: 12),
             tabStrip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -194,7 +224,7 @@ final class SearchPageViewController: UIViewController {
 
             playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            playerBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            playerBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             playerBarHeight,
         ])
     }

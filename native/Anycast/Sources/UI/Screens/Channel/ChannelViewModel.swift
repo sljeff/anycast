@@ -70,10 +70,17 @@ struct ChannelFoldGeometry: Equatable {
         min(Self.maxTitleLeadingPadding, clampedShrink(shrink))
     }
 
-    /// Secondary block opacity = max(1 - shrinkOffset / (maxExtent / 4), 0);
-    /// fully hidden from maxExtent/4 on (channel.dart:437-440).
+    /// Secondary block opacity: solid 1 through the first 40% of the shrink
+    /// travel, then a linear fade to 0 across 40%–85%, and 0 from 85% on.
+    /// Keyed to `maxShrink` — the same travel the header geometry collapses
+    /// over — so the fade keeps pace with the collapsing header instead of
+    /// cutting out early and leaving an empty gradient band mid-fold.
+    /// Deliberate divergence from channel.dart:437-440 (maxExtent/4 cut).
     func secondaryOpacity(shrink: CGFloat) -> CGFloat {
-        max(1 - clampedShrink(shrink) / (maxExtent / 4), 0)
+        let s = clampedShrink(shrink)
+        let start = maxShrink * 0.4
+        let end = maxShrink * 0.85
+        return s <= start ? 1 : max(0, 1 - (s - start) / (end - start))
     }
 
     /// Vertical rise of the title block (and everything below it) while the

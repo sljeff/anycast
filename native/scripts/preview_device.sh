@@ -10,11 +10,11 @@
 #   ANYCAST_PREVIEW_BUNDLE_ID  default com.qy9albh92w.anycast.dev
 #   ANYCAST_PREVIEW_DEVICE     devicectl device id/name (default: first iPhone)
 #
-# The preview build drops the Sign in with Apple and App Group entitlements
-# (a Personal Team cannot provision them), so Apple sign-in and the share
-# extension hand-off are unavailable. It is a fresh install: existing app
-# data is not visible. project.yml is untouched; the overrides live in a
-# generated spec under build/preview that includes it.
+# The preview build keeps Sign in with Apple (the paid team provisions the
+# explicit App ID automatically) but still drops the App Group entitlement,
+# so the share extension hand-off is unavailable. It is a fresh install:
+# existing app data is not visible. project.yml is untouched; the overrides
+# live in a generated spec under build/preview that includes it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -46,7 +46,11 @@ targets:
   Anycast:
     entitlements:REPLACE:
       path: Anycast.preview.entitlements
-      properties: {}
+      properties:
+        # Sign in with Apple needs an explicit (non-wildcard) App ID with
+        # the capability; automatic signing registers it. Without this
+        # entitlement ASAuthorization fails immediately with error 1000.
+        com.apple.developer.applesignin: [Default]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $bundle_id

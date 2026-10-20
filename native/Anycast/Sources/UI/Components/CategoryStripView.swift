@@ -50,8 +50,15 @@ final class CategoryStripView: UIView {
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
             heightAnchor.constraint(equalToConstant: Self.chipHeight),
 
-            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            // Symmetric page margins: an overflowing strip gets 16 pt of
+            // scroll padding at both ends, and the first chip never hugs
+            // the screen edge (same edge treatment as ChipTabBarView).
+            stack.leadingAnchor.constraint(
+                equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Spacing.pageH
+            ),
+            stack.trailingAnchor.constraint(
+                equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Spacing.pageH
+            ),
             stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             stack.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
@@ -100,6 +107,11 @@ final class CategoryStripView: UIView {
     }
 
     var currentSelection: String? { selectedValue }
+
+    /// The number of chips currently configured, the "All" chip included.
+    /// Below 2 the strip is nothing but the lone "All" chip — hosts hide
+    /// the whole row in that case (dead UI).
+    var chipsCount: Int { chips.count }
 
     /// Silent selection update (programmatic moves).
     func select(_ value: String?, animated: Bool) {
