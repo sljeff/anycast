@@ -177,20 +177,16 @@ public enum HtmlText {
         }
     }
 
-    /// https/http/mailto/schemeless allowed (Dart `_validLink`).
+    /// https/http/mailto/schemeless allowed (Dart `_validLink`). The scheme
+    /// rules live in `ShowNotesURLPolicy` (shared with the show-notes IR
+    /// pipeline); behavior here is unchanged.
     static func isPermittedLink(_ url: String) -> Bool {
-        permittedSchemes(url, allowed: ["https", "http", "mailto"])
+        ShowNotesURLPolicy.isPermittedLink(url)
     }
 
     /// https/http/schemeless allowed (Dart `_validUrl`).
     static func isPermittedURL(_ url: String) -> Bool {
-        permittedSchemes(url, allowed: ["https", "http"])
-    }
-
-    private static func permittedSchemes(_ url: String, allowed: [String]) -> Bool {
-        guard let parsed = URL(string: url) else { return false }
-        guard let scheme = parsed.scheme?.lowercased() else { return true } // no scheme
-        return allowed.contains(scheme)
+        ShowNotesURLPolicy.isPermittedImageURL(url)
     }
 
     // MARK: - renderHtml decision (formatters.dart:152-180)

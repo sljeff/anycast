@@ -1,4 +1,5 @@
 import UIKit
+import SafariServices
 import AnycastKit
 
 /// Player page 0 (PlayerSettings, player.dart:118-144 + the Settings widget
@@ -14,9 +15,7 @@ final class SettingsPageViewController: UIViewController {
     private let context: UIContext
     private let observation = ObservationLoop()
 
-    private let descriptionTextView = HTMLContentRenderer.makeTextView(
-        linkTarget: HTMLContentRenderer.playerShared
-    )
+    private let descriptionTextView = ShowNotesTextView()
     private let scrollView = UIScrollView()
     private var renderedCacheKey: String?
 
@@ -85,11 +84,43 @@ final class SettingsPageViewController: UIViewController {
     // MARK: - Build
 
     private func build() {
-        descriptionTextView.font = Typography.htmlBody.font()
-        descriptionTextView.textColor = Typography.htmlBody.color
-        descriptionTextView.adjustsFontForContentSizeCategory = true
-        descriptionTextView.isAccessibilityElement = true
-        descriptionTextView.accessibilityLabel = "Episode description"
+        // Show-notes pipeline wiring. The document arrives pre-styled from
+        // ShowNotesStore (ShowNotesStyle owns fonts/colors), so the view
+        // gets no manual typography here, and it must NOT be one a11y
+        // element — that would swallow the links' and images' own
+        // accessibility. Links keep the K7 in-app behavior the retired
+        // HTMLContentRenderer.playerShared wiring had (SFSafariViewController
+        // above the top-most live sheet).
+        descriptionTextView.onLinkTap = { url in
+            // SFSafariViewController throws for non-http(s) schemes; the
+            // normalizer's policy keeps mailto:, so route it to the system.
+            if url.scheme?.lowercased() == "mailto" {
+                UIApplication.shared.open(url)
+                return
+            }
+            let safari = SFSafariViewController(url: url)
+            safari.preferredBarTintColor = Theme.background
+            safari.preferredControlTintColor = Theme.onSurface
+            Self.topPresentingViewController()?.present(safari, animated: true)
+        }
+        // Images zoom above whatever sheet stack is live; weak self breaks
+        // the view-owns-closure-owns-self cycle.
+        descriptionTextView.presentImage = { [weak self] image, thumbnail in
+            guard let self else { return }
+            ZoomingImageViewController.present(
+                thumbnail: thumbnail,
+                imageURL: image.url,
+                alt: image.alt,
+                from: self.topMostPresented()
+            )
+        }
+        // Image loads and dynamic-type/appearance changes resize the
+        // document; re-render through the same signature-guarded path
+        // (see renderDescription) so layout stays valid without an echo
+        // loop.
+        descriptionTextView.onMetricsChange = { [weak self] in
+            self?.renderDescription()
+        }
 
         let contentStack = UIStackView(arrangedSubviews: [descriptionTextView])
         contentStack.axis = .vertical
@@ -256,24 +287,74 @@ final class SettingsPageViewController: UIViewController {
     // MARK: - Rendering
 
     /// renderHtml semantics (formatters.dart:152-180): empty payload → the
-    /// scroll area collapses; plain strings render as text; HTML routes
-    /// through the shared renderer with the enclosure-URL cache key.
+    /// scroll area collapses; anything else routes through the shared
+    /// show-notes store with the enclosure-URL key. The key pairs the
+    /// episode with the style metrics, so repeated playback ticks and the
+    /// metrics echoes that setDocument itself trigger collapse here (the
+    /// re-entrancy guard), while a real dynamic-type/appearance change
+    /// re-renders — no render → metrics → render loop.
     private func renderDescription() {
         let episode = context.playback.currentEpisode
         let html = episode?.description ?? ""
         let cacheKey = episode?.enclosureUrl ?? "player-settings-none"
-        guard cacheKey != renderedCacheKey else { return }
-        renderedCacheKey = cacheKey
+        let signature = cacheKey + "#"
+            + ShowNotesStyle.metricSignature(traitCollection: traitCollection)
+        guard signature != renderedCacheKey else { return }
+        renderedCacheKey = signature
 
-        if case .empty = HtmlText.displayPayload(for: html) {
-            descriptionTextView.attributedText = nil
+        // Plain-string payloads (no leading '<') keep their newlines — the
+        // normalizer collapses ALL whitespace, which would fuse a plain
+        // multi-line description into one paragraph.
+        let payload = HtmlText.displayPayload(for: html)
+        if case .empty = payload {
+            descriptionTextView.setDocument(
+                NSAttributedString(), imageLoader: KingfisherShowNotesImageLoader.shared
+            )
             return
         }
-        let textView = descriptionTextView
-        let key = cacheKey
-        Task {
-            await HTMLContentRenderer.playerShared.render(html, cacheKey: key, into: textView)
+        if case .text(let plain) = payload {
+            descriptionTextView.setDocument(
+                ShowNotesStore.shared.attributedFallback(
+                    plain: plain, style: ShowNotesStyle(), traits: traitCollection
+                ),
+                imageLoader: KingfisherShowNotesImageLoader.shared
+            )
+            return
         }
+        let traits = traitCollection
+        Task { [weak self] in
+            guard let self else { return }
+            var attributed = await ShowNotesStore.shared.attributedString(
+                html: html, style: ShowNotesStyle(), traits: traits
+            )
+            if attributed.length == 0 {
+                // Empty rich document (sanitized-away or failed payload):
+                // degrade to the same plain text the cards render.
+                let plain = await PlainTextHTMLCache.shared.plainText(for: html)
+                attributed = ShowNotesStore.shared.attributedFallback(
+                    plain: plain, style: ShowNotesStyle(), traits: traits
+                )
+            }
+            // A newer render (episode or trait change) superseded this one.
+            guard self.renderedCacheKey == signature else { return }
+            self.descriptionTextView.setDocument(
+                attributed, imageLoader: KingfisherShowNotesImageLoader.shared
+            )
+        }
+    }
+
+    /// The presentation anchor the retired playerShared renderer used: the
+    /// top-most view controller over the app's first FOREGROUND-ACTIVE
+    /// window scene (same walk as PlayerSharedResources, whose helper
+    /// stays private to that file — sheets stack, 03 §1.2, so presentation
+    /// must always walk up).
+    private static func topPresentingViewController() -> UIViewController? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .filter { $0.activationState == .foregroundActive }
+            .compactMap(\.keyWindow?.rootViewController)
+            .first?
+            .topMostPresented()
     }
 
     private func renderSpeed() {
