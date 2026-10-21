@@ -425,6 +425,9 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     private let playbackObservation = ObservationLoop()
     private let modelObservation = ObservationLoop()
     private var lastEpisodeSignature: [String?] = []
+    /// Set when a new result list replaces the old one; the entrance plays
+    /// once it can (`CardEntranceAnimator`). Pagination is not a new list.
+    private var needsEntrance = false
 
     init(context: UIContext, viewModel: SearchPageViewModel) {
         self.context = context
@@ -472,6 +475,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         refreshMembership()
+        playEntranceIfNeeded()
     }
 
     func refreshMembership() {
@@ -538,7 +542,18 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
                 collectionView.reloadData()
             }
             refreshMembership()
+            needsEntrance = !signature.isEmpty
+            playEntranceIfNeeded()
         }
+    }
+
+    /// Plays the entrance right after the new results were applied. A page
+    /// that is not in a window yet has no layout to animate, so that case is
+    /// retried from `viewDidAppear`.
+    private func playEntranceIfNeeded() {
+        guard needsEntrance, view.window != nil else { return }
+        needsEntrance = false
+        CardEntranceAnimator.play(in: collectionView)
     }
 
     private func refreshVisibleCards() {

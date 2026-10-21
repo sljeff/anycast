@@ -45,9 +45,6 @@ final class ChannelEpisodeListBinder {
         self.viewModel = viewModel
         self.htmlRenderer = htmlRenderer
         self.expandCoordinator = expandCoordinator
-        self.expandCoordinator.onChange = { [weak self] _ in
-            self?.onListContentChanged?()
-        }
     }
 
     func startObservingPlayback() {

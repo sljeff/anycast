@@ -58,6 +58,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     private var notificationObservers: [NSObjectProtocol] = []
     /// EasyRefresh single-flight: no second concurrent refresh.
     private var isRefreshing = false
+    /// The first non-empty card list rises in once per instance
+    /// (`CardEntranceAnimator`); later reloads never replay it.
+    private var didPlayEntrance = false
 
     /// The category-filtered projection the list renders.
     private var displayedEpisodes: [FeedEpisodeRow] {
@@ -104,6 +107,11 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         collectionView.alignBackgroundViewMargins()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        playEntranceIfNeeded()
     }
 
     override func viewDidLoad() {
@@ -333,6 +341,16 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
         collectionView.backgroundView = displayed.isEmpty ? emptyStateView : nil
         refreshChromeStatus()
+        playEntranceIfNeeded()
+    }
+
+    /// Plays the entrance right after the list was applied. A prewarmed page
+    /// can apply its data before it is in a window (no layout, nothing to
+    /// animate), so that case is retried from `viewDidAppear`.
+    private func playEntranceIfNeeded() {
+        guard !didPlayEntrance, view.window != nil, !displayedEpisodes.isEmpty else { return }
+        didPlayEntrance = true
+        CardEntranceAnimator.play(in: collectionView)
     }
 
     // MARK: - Refresh (feeds.dart:229-249 fetchNewEpisodes)

@@ -102,6 +102,10 @@ final class ChannelViewController: UIViewController {
         return (collectionView, playerBar, height)
     }
 
+    /// The first non-empty episode list rises in once per instance
+    /// (`CardEntranceAnimator`); later reloads never replay it.
+    private var didPlayEntrance = false
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -157,6 +161,7 @@ final class ChannelViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         binder?.refreshPlaylistMembership()
+        playEntranceIfNeeded()
     }
 
     // MARK: - Build
@@ -367,6 +372,7 @@ final class ChannelViewController: UIViewController {
                 collectionView.reloadData()
             }
             refreshVisibleCards()
+            playEntranceIfNeeded()
         }
 
         // Dart gates the whole page on the title (channel.dart:47-49): while
@@ -381,6 +387,16 @@ final class ChannelViewController: UIViewController {
         }
 
         renderPlayerBar()
+    }
+
+    /// Plays the entrance right after the list was applied. A sheet applies
+    /// cached data in `viewDidLoad`, before it is in a window (no layout,
+    /// nothing to animate), so that case is retried from `viewDidAppear`.
+    private func playEntranceIfNeeded() {
+        guard !didPlayEntrance, view.window != nil,
+              let viewModel, !viewModel.showEpisodes.isEmpty else { return }
+        didPlayEntrance = true
+        CardEntranceAnimator.play(in: collectionView)
     }
 
     private var subscriptionDisplay: ChannelSubscriptionDisplay {

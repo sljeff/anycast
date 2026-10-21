@@ -32,9 +32,6 @@ final class SearchEpisodeBinder {
         self.context = context
         self.htmlRenderer = htmlRenderer
         self.expandCoordinator = expandCoordinator
-        self.expandCoordinator.onChange = { [weak self] _ in
-            self?.onListContentChanged?()
-        }
     }
 
     /// The page observes playback and calls this with the CURRENT episode

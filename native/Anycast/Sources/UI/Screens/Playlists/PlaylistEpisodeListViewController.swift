@@ -30,6 +30,9 @@ final class PlaylistEpisodeListViewController: UIViewController {
 
     private(set) var episodes: [PlaylistEpisodeRow] = []
     private var isLoading = true
+    /// The first non-empty list rises in once per instance
+    /// (`CardEntranceAnimator`); later reloads and reorders never replay it.
+    private var didPlayEntrance = false
 
     private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
     private(set) var binder: PlaylistEpisodeListBinder!
@@ -89,6 +92,11 @@ final class PlaylistEpisodeListViewController: UIViewController {
         // Cross-screen mutations (adds from Channel/Feeds, K3 completions)
         // are picked up on appear — the repository is not observable.
         Task { await reloadEpisodes() }
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        playEntranceIfNeeded()
     }
 
     // MARK: - Build
@@ -220,6 +228,16 @@ final class PlaylistEpisodeListViewController: UIViewController {
         snapshot.appendItems(episodes.compactMap(\.enclosureUrl))
         dataSource.apply(snapshot, animatingDifferences: false)
         renderLoadingState()
+        playEntranceIfNeeded()
+    }
+
+    /// Plays the entrance right after the list was applied. The first load
+    /// can land before the view is in a window (no layout, nothing to
+    /// animate), so that case is retried from `viewDidAppear`.
+    private func playEntranceIfNeeded() {
+        guard !didPlayEntrance, view.window != nil, !isLoading, !episodes.isEmpty else { return }
+        didPlayEntrance = true
+        CardEntranceAnimator.play(in: collectionView)
     }
 
     private func renderLoadingState() {

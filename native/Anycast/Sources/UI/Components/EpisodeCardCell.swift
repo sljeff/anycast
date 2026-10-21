@@ -133,6 +133,9 @@ final class EpisodeCardCell: UICollectionViewCell {
     private var actionButtons: [UIButton] = []
     private var actions: [EpisodeCardAction] = []
     private var descriptionTask: Task<Void, Never>?
+    /// Guards the description resolve: a reconfigure with the same HTML must
+    /// not blank the text and restart the async parse each time.
+    private var renderedDescriptionHTML: String?
     /// Guards the cover load: visible cards reconfigure on every playback
     /// tick and card expand, and an unconditional cancel+setImage would
     /// restart an in-flight cover download from zero each time.
@@ -151,10 +154,15 @@ final class EpisodeCardCell: UICollectionViewCell {
         super.prepareForReuse()
         descriptionTask?.cancel()
         descriptionTask = nil
+        renderedDescriptionHTML = nil
         onCoverTap = nil
         onCardTap = nil
         onDownloadTap = nil
         menuActions = []
+        // A reused cell must never inherit a card-entrance pose.
+        contentView.layer.removeAllAnimations()
+        contentView.alpha = 1
+        contentView.transform = .identity
     }
 
     // MARK: - Configure
@@ -167,27 +175,32 @@ final class EpisodeCardCell: UICollectionViewCell {
         rightTextLabel.text = content.rightText
 
         if let plain = content.descriptionPlainText {
+            renderedDescriptionHTML = nil
             descriptionLabel.text = plain
         } else if let html = content.descriptionHTML {
-            // Cancel the prior episode's in-flight resolve and clear the
-            // reused text — a stale description must never linger while the
-            // new one is parsed.
-            descriptionTask?.cancel()
-            descriptionLabel.text = ""
-            descriptionTask = Task { [weak self] in
-                let text = await PlainTextHTMLCache.shared.plainText(for: html)
-                guard let self, !Task.isCancelled else { return }
-                self.descriptionLabel.text = text
-                // The text lands after the card's first layout, and a
-                // UILabel's intrinsic-size invalidation does not reach the
-                // stack's layout pass (the label could sit at its
-                // zero-height frame forever — silently dropping the
-                // description). Re-run self-sizing so the card grows to
-                // the wrapped text instead of clipping it.
-                self.invalidateIntrinsicContentSize()
-                self.setNeedsLayout()
+            if html != renderedDescriptionHTML {
+                renderedDescriptionHTML = html
+                // Cancel the prior episode's in-flight resolve and clear the
+                // reused text — a stale description must never linger while
+                // the new one is parsed.
+                descriptionTask?.cancel()
+                descriptionLabel.text = ""
+                descriptionTask = Task { [weak self] in
+                    let text = await PlainTextHTMLCache.shared.plainText(for: html)
+                    guard let self, !Task.isCancelled else { return }
+                    self.descriptionLabel.text = text
+                    // The text lands after the card's first layout, and a
+                    // UILabel's intrinsic-size invalidation does not reach
+                    // the stack's layout pass (the label could sit at its
+                    // zero-height frame forever — silently dropping the
+                    // description). Re-run self-sizing so the card grows to
+                    // the wrapped text instead of clipping it.
+                    self.invalidateIntrinsicContentSize()
+                    self.setNeedsLayout()
+                }
             }
         } else {
+            renderedDescriptionHTML = nil
             descriptionLabel.text = ""
         }
 
@@ -225,10 +238,74 @@ final class EpisodeCardCell: UICollectionViewCell {
     /// layout. The cell must NOT run its own animate block — a self-run
     /// reveal raced the list's layout pass, and a height update that lost
     /// the race left the strip overflowing the un-resized item.
+    ///
+    /// Always lands on the SETTLED pose: the drawer at alpha 1 / identity
+    /// with any reveal or fade cancelled, so a reconfigure never leaves a
+    /// half-faded strip behind and the next reveal starts from a known state.
     func setExpanded(_ expanded: Bool) {
+        drawer.layer.removeAllAnimations()
+        drawer.alpha = 1
+        drawer.transform = .identity
         stripHeightConstraint.constant = expanded ? Self.stripHeight : 0
         stripContainer.isHidden = !expanded
         layoutIfNeeded()
+    }
+
+    /// Whether the strip is open as a layout target (a fade-out in flight
+    /// still counts as open until `setExpanded(false)` closes it).
+    var isStripExpanded: Bool { !stripContainer.isHidden }
+
+    /// Parks the just-opened drawer in its pre-reveal pose (invisible, one
+    /// `stripRevealOffset` up under the card). Call right after
+    /// `setExpanded(true)`, without animation, then run `revealStrip()`.
+    func prepareStripReveal() {
+        drawer.alpha = 0
+        if !Motion.reduceMotion {
+            drawer.transform = CGAffineTransform(translationX: 0, y: -Motion.stripRevealOffset)
+        }
+    }
+
+    /// The drawer slides down out of the card while fading in. Only the
+    /// strip moves — the card's own content never does. Reduce Motion
+    /// fades only.
+    func revealStrip() {
+        let settle = {
+            self.drawer.alpha = 1
+            self.drawer.transform = .identity
+        }
+        if Motion.reduceMotion {
+            UIView.animate(
+                withDuration: Motion.standard, delay: 0,
+                options: [.curveEaseOut, .allowUserInteraction], animations: settle
+            )
+        } else {
+            UIView.animate(
+                withDuration: Motion.standard, delay: 0,
+                usingSpringWithDamping: 0.9, initialSpringVelocity: 0,
+                options: [.allowUserInteraction], animations: settle
+            )
+        }
+    }
+
+    /// Brings a half-faded drawer back to the settled open pose — a strip
+    /// that is re-targeted open while its fade-out is still running. A
+    /// reveal in flight is left alone (its model values are already final).
+    func cancelStripFade() {
+        guard drawer.alpha < 1 else { return }
+        drawer.layer.removeAllAnimations()
+        drawer.alpha = 1
+        drawer.transform = .identity
+    }
+
+    /// Fades the drawer out ahead of the height close; `completion` runs
+    /// when the fade ends or is superseded, and must tolerate both.
+    func fadeOutStrip(completion: @escaping () -> Void) {
+        UIView.animate(
+            withDuration: Motion.stripFadeOut, delay: 0,
+            options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState],
+            animations: { self.drawer.alpha = 0 },
+            completion: { _ in completion() }
+        )
     }
 
     // MARK: - Build
@@ -395,14 +472,32 @@ final class EpisodeCardCell: UICollectionViewCell {
         drawer.addSubview(drawerRow)
         stripContainer.isUserInteractionEnabled = true
         stack.addArrangedSubview(stripContainer)
+        // While the item height animates, the cell frame lags the strip's
+        // height target by a few frames. The tail absorbs a taller frame and
+        // the soft bottom pin gives way to a shorter one, so the card plate
+        // keeps its size and position and only the strip area grows/closes.
+        let tail = UIView()
+        tail.setContentHuggingPriority(UILayoutPriority(1), for: .vertical)
+        tail.setContentCompressionResistancePriority(UILayoutPriority(1), for: .vertical)
+        stack.addArrangedSubview(tail)
         stripHeightConstraint = stripContainer.heightAnchor.constraint(equalToConstant: 0)
         rightTextLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+        // The strip target is set before the item resizes, so the stack and
+        // the cell briefly disagree on height. The bottom pin is breakable
+        // (the stack overflows into the clipped area) and the plate holds
+        // its own height, so only the strip moves while the cell catches up.
+        let stackBottomPin = stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+        stackBottomPin.priority = .defaultHigh
+        let plateHeight = cardContainer.heightAnchor.constraint(equalToConstant: Self.cardRowHeight)
+        plateHeight.priority = UILayoutPriority(UILayoutPriority.defaultHigh.rawValue + 1)
 
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             stack.topAnchor.constraint(equalTo: contentView.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            stackBottomPin,
+            plateHeight,
 
             // 112 pt is the minimum (80pt cover + 16pt padding ×2); the card
             // self-sizes taller when the scaled fonts demand it (hosts use
