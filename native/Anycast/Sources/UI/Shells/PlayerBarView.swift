@@ -12,9 +12,11 @@ import AnycastKit
 /// size this view to the full available width. In `.systemAccessory` the
 /// system glass capsule IS the surface — this view draws no background of
 /// its own (one chrome, not two nested layers), keeping only a clip shape
-/// for the progress fill. Under either style runs a full-height
-/// `EpisodeProgressBackdrop` fill (white 20%, width driven by
-/// position/duration against OWN bounds — never screen math).
+/// for the progress fill. The progress fill is a full-height
+/// `EpisodeProgressBackdrop` (white 20%) in `.standalone`; the compact
+/// styles carry a thin line under the button cluster instead. Either way
+/// the width is driven by position/duration against OWN bounds — never
+/// screen math.
 ///
 /// Gestures (03 §3.1): whole-bar tap opens the full-screen player; ANY
 /// vertical drag — up or down, no threshold, the shipped quirk — also opens
@@ -129,9 +131,10 @@ final class PlayerBarView: UIView {
         addSubview(capsule)
 
         // Capsule and accessory share the compact content (UI kit mini
-        // player): a thin gold progress line on a sand track along the
-        // inner bottom edge, a round cover, one title line, small glyphs.
-        // The standalone sheet bar keeps the full-height fill (03 §2.9).
+        // player): a round cover, one title line, small glyphs, and a
+        // thin gold progress line on a sand track along the bottom edge
+        // spanning title through controls. The standalone sheet bar
+        // keeps the full-height fill (03 §2.9).
         let compact = style != .standalone
         if style == .systemAccessory {
             backdrop.trackColor = AnycastColor.sandAlpha3
@@ -265,11 +268,19 @@ final class PlayerBarView: UIView {
         ])
 
         if compact {
-            // Inset by the cap radius so the line stays inside the rounded ends.
-            let inset = Self.barHeight / 2
+            // The line spans the whole content strip: leading at the
+            // title's leading edge (one artwork-gap clear of the cover),
+            // trailing at the play/pause GLYPH's trailing edge — the
+            // 44 pt slot is an invisible hit area; anchoring to its edge
+            // made the line outrun the visible glyph and poke into the
+            // rounded cap. glyphInset is the glyph's padding inside the
+            // slot, so slot edge − inset is the glyph's visible edge.
             NSLayoutConstraint.activate([
-                backdrop.leadingAnchor.constraint(equalTo: capsule.leadingAnchor, constant: inset),
-                backdrop.trailingAnchor.constraint(equalTo: capsule.trailingAnchor, constant: -inset),
+                backdrop.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+                backdrop.trailingAnchor.constraint(
+                    equalTo: playPauseControl.trailingAnchor,
+                    constant: -playPauseControl.glyphInset
+                ),
                 backdrop.bottomAnchor.constraint(equalTo: capsule.bottomAnchor, constant: -Spacing.xs),
                 backdrop.heightAnchor.constraint(equalToConstant: Self.capsuleProgressHeight),
             ])

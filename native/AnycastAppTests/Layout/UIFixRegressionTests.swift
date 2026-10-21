@@ -41,6 +41,12 @@ import AnycastKit
 ///     list (illogical order) and removing the row through a full
 ///     reloadData() that re-estimated every self-sizing card (neighbor
 ///     snap). The row now animates away first, then the ball flies.
+/// 12. Mini player compact progress line starting under the artwork and
+///     ending mid-air (inset by the capsule's cap radius, aligned to
+///     nothing). The line now spans the whole content strip — leading at
+///     the title's leading edge (one artwork-gap clear of the cover),
+///     trailing at the play/pause glyph's VISIBLE trailing edge (the 44 pt
+///     hit slot's edge would outrun the glyph and break the rounded cap).
 ///
 /// Runs against the live shell with the seeded fixture; skips when the
 /// shell or the seed is absent. Serialized: the suite drives the SHARED
@@ -260,6 +266,59 @@ struct UIFixRegressionTests {
             // on sheet-hosted screens than in the system accessory.
             #expect(abs(capsule.layer.cornerRadius - 29) < 0.5,
                     "\(style): corner radius \(capsule.layer.cornerRadius) is not a capsule (29)")
+        }
+    }
+
+    // MARK: - Mini player compact progress line (12)
+
+    /// The compact styles' thin progress line spans the whole content
+    /// strip: leading at the title's leading edge (one artwork-gap clear
+    /// of the cover), trailing at the play/pause slot's trailing edge.
+    /// The standalone style keeps its full-height fill.
+    @Test("Mini player progress line runs from the title's leading to the play/pause trailing edge")
+    func miniPlayerProgressLineAnchoredToControls() async {
+        guard let context = await Self.liveContext() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        for style: PlayerBarView.HostingStyle in [.systemAccessory, .capsule] {
+            let bar = context.makePlayerBar(style: style)
+            bar.frame = CGRect(x: 0, y: 0, width: 320, height: PlayerBarView.barHeight)
+            bar.layoutIfNeeded()
+            guard let capsule = bar.subviews.first,
+                  let backdrop = capsule.subviews.compactMap({ $0 as? EpisodeProgressBackdrop }).first,
+                  let cover = capsule.subviews.compactMap({ $0 as? UIImageView }).first,
+                  let title = capsule.subviews
+                    .compactMap({ $0 as? UILabel })
+                    .first(where: { $0.accessibilityIdentifier == "mini-player-title" }),
+                  let playPause = capsule.subviews.compactMap({ $0 as? PlayPauseIconControl }).first else {
+                Issue.record("\(style): mini player subviews missing"); continue
+            }
+            #expect(abs(backdrop.frame.minX - title.frame.minX) < 0.5,
+                    "\(style): line leading \(backdrop.frame.minX) ≠ title leading \(title.frame.minX)")
+            #expect(abs(backdrop.frame.maxX - (playPause.frame.maxX - playPause.glyphInset)) < 0.5,
+                    "\(style): line trailing \(backdrop.frame.maxX) ≠ play/pause glyph trailing \(playPause.frame.maxX - playPause.glyphInset)")
+            #expect(backdrop.frame.minX > cover.frame.maxX,
+                    "\(style): line leading \(backdrop.frame.minX) reaches under the artwork (ends \(cover.frame.maxX))")
+            // Inside the capsule's straight-walled region: at the line's
+            // height the rounded cap has already curved inward past
+            // bounds.maxX - 10, so the end must clear that contour.
+            #expect(backdrop.frame.maxX <= capsule.bounds.maxX - 10,
+                    "\(style): line trailing \(backdrop.frame.maxX) breaks into the rounded cap (\(capsule.bounds.maxX))")
+        }
+
+        // Standalone keeps the full-height fill (sheet bars, 03 §2.9).
+        let standalone = context.makePlayerBar(style: .standalone)
+        standalone.frame = CGRect(x: 0, y: 0, width: 320, height: PlayerBarView.barHeight)
+        standalone.layoutIfNeeded()
+        if let capsule = standalone.subviews.first,
+           let fill = capsule.subviews.compactMap({ $0 as? EpisodeProgressBackdrop }).first {
+            // fill.frame is capsule-local; compare against the capsule's
+            // own bounds (capsule.frame carries the 12 pt host margin).
+            #expect(abs(fill.frame.minX - capsule.bounds.minX) < 0.5
+                    && abs(fill.frame.maxX - capsule.bounds.maxX) < 0.5,
+                    "standalone fill must still span the capsule")
+        } else {
+            Issue.record("standalone: fill backdrop missing")
         }
     }
 
