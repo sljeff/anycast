@@ -7,7 +7,8 @@
 #
 # Settings come from the environment or native/.preview.env (gitignored):
 #   ANYCAST_PREVIEW_TEAM       Apple Developer team id (required)
-#   ANYCAST_PREVIEW_BUNDLE_ID  default com.qy9albh92w.anycast.dev
+#   ANYCAST_PREVIEW_BUNDLE_ID  default com.kindjeff.anycast.dev (the shipped
+#                              app's bundle with a .dev seed — see below)
 #   ANYCAST_PREVIEW_DEVICE     devicectl device id/name (default: first iPhone)
 #
 # The preview build keeps Sign in with Apple (the paid team provisions the
@@ -23,7 +24,13 @@ if [[ -f .preview.env ]]; then
   source .preview.env
 fi
 team="${ANYCAST_PREVIEW_TEAM:-}"
-bundle_id="${ANYCAST_PREVIEW_BUNDLE_ID:-com.qy9albh92w.anycast.dev}"
+# The production bundle id is com.kindjeff.anycast (ios/Runner and
+# native/project.yml agree); the backend validates the Sign in with Apple
+# ID token audience against it, so testing login requires overriding
+# ANYCAST_PREVIEW_BUNDLE_ID=com.kindjeff.anycast. The default below keeps
+# a .dev seed so a day-to-day preview never collides with a real store
+# install of the shipped app.
+bundle_id="${ANYCAST_PREVIEW_BUNDLE_ID:-com.kindjeff.anycast.dev}"
 device="${ANYCAST_PREVIEW_DEVICE:-}"
 
 if [[ -z "$team" ]]; then
