@@ -1,17 +1,14 @@
 import UIKit
 import Kingfisher
-import MarqueeLabel
 import AnycastKit
 
-/// The history dialog (playlists.dart:240-421 `HistoryBlock`, opened from
-/// Settings via Get.dialog): a centered 300×400 dark card over a dimmed
-/// barrier. Rows carry a 48×48 cover, an ALWAYS-scrolling marquee title
-/// (startAfter 1 s — K33's always-scroll ruling for the history list), a
-/// green channel name, and a white circular delete button; the bottom is a
-/// red "Clear All" (the Dart source has NO confirmation step). Empty state
-/// is the "No history" alert-style card; loading is a centered spinner.
-/// The Settings screen presents this controller BY NAME via
-/// `HistoryDialogViewController(context:)`.
+/// History (playlists.dart:240-421 `HistoryBlock`, opened from Settings and
+/// the Inbox tail) as a system page sheet in the Anycast 2.0 list language
+/// (09 §7a-C4: the Get.dialog card becomes a sheet): a "History" header
+/// with Clear All (now behind a confirmation), and flat rows — 48 pt cover,
+/// two-line title, show name — that swipe to delete; tap opens Detail.
+/// Empty state is the shared empty block; loading a spinner. Settings
+/// presents this controller BY NAME via `HistoryDialogViewController(context:)`.
 @MainActor
 final class HistoryDialogViewController: UIViewController {
 
@@ -22,22 +19,18 @@ final class HistoryDialogViewController: UIViewController {
 
     private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
 
-    private let dimmingView = UIControl()
-    private let cardView = UIView()
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
     private let spinner = UIActivityIndicatorView(style: .medium)
-    private let emptyLabel = UILabel()
+    private let emptyView = EmptyStateView()
     private let clearAllButton = UIButton(type: .system)
 
-    private var cardHeightConstraint: NSLayoutConstraint!
-    private var cardWidthConstraint: NSLayoutConstraint!
-
-    /// Get.dialog presentation: dimmed over-current-context, centered card.
     static func present(from presenter: UIViewController, context: UIContext) {
         let controller = HistoryDialogViewController(context: context)
-        controller.modalPresentationStyle = .overCurrentContext
-        controller.modalTransitionStyle = .crossDissolve
-        controller.modalPresentationCapturesStatusBarAppearance = false
+        controller.modalPresentationStyle = .pageSheet
+        if let sheet = controller.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+        }
         presenter.present(controller, animated: true)
     }
 
@@ -54,100 +47,69 @@ final class HistoryDialogViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
-        buildDialog()
+        buildSheet()
         configureDataSource()
         Task { await reload() }
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // 300×400 scaled to survive any window geometry (07 §4: bounds
-        // math, never screen-width calculations). Floor at 0: a transient
-        // layout pass with bounds < 32 must not produce negative
-        // constraints.
-        let width = max(0, min(300, view.bounds.width - 32))
-        let height = max(0, min(400, view.bounds.height - 32))
-        cardWidthConstraint.constant = width
-        cardHeightConstraint.constant = height
-    }
-
     // MARK: - Build
 
-    private func buildDialog() {
-        dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.54)
-        dimmingView.addTarget(self, action: #selector(dismissDialog), for: .touchUpInside)
-        dimmingView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(dimmingView)
+    private func buildSheet() {
+        let titleLabel = UILabel()
+        titleLabel.text = "History"
+        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.textColor = Theme.onSurface
+        titleLabel.adjustsFontForContentSizeCategory = true
 
-        cardView.backgroundColor = Theme.primaryBackgroundDark
-        cardView.layer.cornerRadius = 12
-        cardView.layer.cornerCurve = .continuous
-        cardView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(cardView)
+        var clearConfiguration = UIButton.Configuration.plain()
+        clearConfiguration.title = "Clear All"
+        clearConfiguration.baseForegroundColor = Theme.error
+        clearConfiguration.contentInsets = .zero
+        clearAllButton.configuration = clearConfiguration
+        clearAllButton.addTarget(self, action: #selector(clearAllTapped), for: .touchUpInside)
+
+        let header = UIStackView(arrangedSubviews: [titleLabel, UIView(), clearAllButton])
+        header.axis = .horizontal
+        header.alignment = .center
+        header.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(header)
 
         spinner.color = Theme.primary
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
-        cardView.addSubview(spinner)
+        view.addSubview(spinner)
 
-        // The empty branch is the Dart `AlertDialog(title: Text('No history'))`.
-        emptyLabel.text = "No history"
-        emptyLabel.font = Typography.secondaryTitle.font()
-        emptyLabel.textColor = Theme.primary
-        emptyLabel.textAlignment = .center
-        emptyLabel.numberOfLines = 1
-        emptyLabel.adjustsFontForContentSizeCategory = true
-        emptyLabel.isHidden = true
-        emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-        cardView.addSubview(emptyLabel)
+        emptyView.configure(.init(
+            icon: UIImage(systemName: "clock.arrow.circlepath"),
+            title: "No history",
+            message: "Episodes you play show up here."
+        ))
+        emptyView.isHidden = true
+        emptyView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(emptyView)
 
         collectionView.backgroundColor = .clear
-        collectionView.contentInsetAdjustmentBehavior = .never
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        cardView.addSubview(collectionView)
-
-        var clearConfiguration = UIButton.Configuration.filled()
-        clearConfiguration.attributedTitle = AttributedString(
-            "Clear All", attributes: AttributeContainer([
-                .font: Typography.defaultText.font(),
-                .foregroundColor: UIColor.white,
-            ])
-        )
-        clearConfiguration.baseBackgroundColor = UIColor(red: 0xEF / 255, green: 0x53 / 255, blue: 0x50 / 255, alpha: 1)
-        clearConfiguration.background.cornerRadius = 12
-        clearAllButton.configuration = clearConfiguration
-        clearAllButton.addTarget(self, action: #selector(clearAllTapped), for: .touchUpInside)
-        clearAllButton.translatesAutoresizingMaskIntoConstraints = false
-        cardView.addSubview(clearAllButton)
-
-        cardWidthConstraint = cardView.widthAnchor.constraint(equalToConstant: 300)
-        cardHeightConstraint = cardView.heightAnchor.constraint(equalToConstant: 400)
+        view.addSubview(collectionView)
 
         NSLayoutConstraint.activate([
-            dimmingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            dimmingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            dimmingView.topAnchor.constraint(equalTo: view.topAnchor),
-            dimmingView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            header.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            header.heightAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.standardDiameter),
 
-            cardView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            cardView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            cardWidthConstraint,
-            cardHeightConstraint,
+            collectionView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.md),
+            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            collectionView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 12),
-            collectionView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -12),
-            collectionView.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 12),
-            collectionView.bottomAnchor.constraint(equalTo: clearAllButton.topAnchor, constant: -12),
+            emptyView.topAnchor.constraint(equalTo: header.bottomAnchor),
+            emptyView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            emptyView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            emptyView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
 
-            clearAllButton.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 12),
-            clearAllButton.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -12),
-            clearAllButton.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -12),
-            clearAllButton.heightAnchor.constraint(equalToConstant: 40),
-
-            spinner.centerXAnchor.constraint(equalTo: cardView.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
-            emptyLabel.centerXAnchor.constraint(equalTo: cardView.centerXAnchor),
-            emptyLabel.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
+            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
     }
 
@@ -168,7 +130,7 @@ final class HistoryDialogViewController: UIViewController {
                 return HistoryRowCell()
             }
             cell.configure(episode)
-            cell.onDeleteTap = { [weak self] in
+            cell.onDelete = { [weak self] in
                 self?.delete(url: enclosureURL)
             }
             cell.onTap = { [weak self] in
@@ -178,21 +140,21 @@ final class HistoryDialogViewController: UIViewController {
         }
     }
 
+    /// A plain list section: rows swipe to delete.
     private func makeLayout() -> UICollectionViewCompositionalLayout {
-        UICollectionViewCompositionalLayout { _, _ in
-            let item = NSCollectionLayoutItem(
-                layoutSize: NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(1),
-                    heightDimension: .estimated(HistoryRowCell.rowHeight)
-                )
-            )
-            let group = NSCollectionLayoutGroup.horizontal(
-                layoutSize: item.layoutSize, subitems: [item]
-            )
-            let section = NSCollectionLayoutSection(group: group)
-            section.interGroupSpacing = 12
-            return section
+        var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
+        configuration.showsSeparators = false
+        configuration.backgroundColor = .clear
+        configuration.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
+            guard let self, let url = self.dataSource.itemIdentifier(for: indexPath) else { return nil }
+            let delete = UIContextualAction(style: .destructive, title: "Delete") { [weak self] _, _, completion in
+                self?.delete(url: url)
+                completion(true)
+            }
+            delete.image = AppIcons.delete
+            return UISwipeActionsConfiguration(actions: [delete])
         }
+        return UICollectionViewCompositionalLayout.list(using: configuration)
     }
 
     private func applySnapshot() {
@@ -207,7 +169,7 @@ final class HistoryDialogViewController: UIViewController {
         spinner.isHidden = !isLoading
         if isLoading { spinner.startAnimating() } else { spinner.stopAnimating() }
         let isEmpty = !isLoading && episodes.isEmpty
-        emptyLabel.isHidden = !isEmpty
+        emptyView.isHidden = !isEmpty
         collectionView.isHidden = isLoading || isEmpty
         clearAllButton.isHidden = isLoading || isEmpty
     }
@@ -236,15 +198,25 @@ final class HistoryDialogViewController: UIViewController {
 
     // MARK: - Actions
 
-    @objc private func dismissDialog() {
-        dismiss(animated: true)
+    /// Clear All asks first (destructive account-level action; the Dart
+    /// source cleared without asking).
+    @objc private func clearAllTapped() {
+        let alert = UIAlertController(
+            title: "Clear all history?", message: "This removes every episode from your history.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Clear All", style: .destructive) { [weak self] _ in
+            self?.clearAll()
+        })
+        present(alert, animated: true)
     }
 
-    /// The Dart source clears with NO confirmation (controller.deleteAll()).
-    @objc private func clearAllTapped() {
+    private func clearAll() {
         let urls = episodes.compactMap(\.enclosureUrl)
         episodes = []
         applySnapshot()
+        Haptics.queueRemoved()
         Task { [weak self] in
             do {
                 try await self?.context.database.historyRepository().deleteMany(urls)
@@ -326,23 +298,17 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
 
 // MARK: - Row cell (playlists.dart:248-355)
 
-/// One history row: 48×48 rounded-8 cover, always-scrolling marquee title,
-/// green channel name, white circular delete.
-final class HistoryRowCell: UICollectionViewCell {
+/// One history row: 48 pt rounded cover, two-line title, show name.
+final class HistoryRowCell: UICollectionViewListCell {
 
     static let reuseIdentifier = "HistoryRowCell"
-    static let rowHeight: CGFloat = 72   // 48pt cover + 12pt padding ×2
 
-    var onDeleteTap: (() -> Void)?
+    var onDelete: (() -> Void)?
     var onTap: (() -> Void)?
 
-    private let container = UIView()
     private let coverView = UIImageView()
-    private let titleLabel = MarqueeLabelFactory.makeHistoryTitle(
-        font: Typography.cardTitleBold.font(), textColor: Theme.primaryLightMax
-    )
+    private let titleLabel = UILabel()
     private let channelLabel = UILabel()
-    private let deleteButton = UIButton(type: .custom)
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -354,94 +320,65 @@ final class HistoryRowCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        onDeleteTap = nil
+        onDelete = nil
         onTap = nil
         coverView.kf.cancelDownloadTask()
     }
 
     private func build() {
-        contentView.backgroundColor = .clear
-
-        container.backgroundColor = Theme.cardBackground
-        container.layer.borderColor = Theme.cardOutline.cgColor
-        container.layer.borderWidth = 1
-        container.layer.cornerRadius = 12
-        container.layer.cornerCurve = .continuous
-        container.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(container)
+        backgroundConfiguration = .clear()
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = 8
+        coverView.layer.cornerRadius = Radius.sm
         coverView.layer.cornerCurve = .continuous
-        coverView.backgroundColor = Theme.primaryBackground
+        coverView.backgroundColor = Theme.surfaceContainerHigh
         coverView.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(coverView)
+        contentView.addSubview(coverView)
 
-        channelLabel.font = Typography.defaultText.font()
-        channelLabel.textColor = Theme.primary
+        titleLabel.font = TypographyV2.bodyLarge.font()
+        titleLabel.textColor = Theme.onSurface
+        titleLabel.numberOfLines = 2
+        titleLabel.adjustsFontForContentSizeCategory = true
+
+        channelLabel.font = TypographyV2.caption.font()
+        channelLabel.textColor = Theme.onSurfaceVariant
         channelLabel.numberOfLines = 1
         channelLabel.adjustsFontForContentSizeCategory = true
 
         let textColumn = UIStackView(arrangedSubviews: [titleLabel, channelLabel])
         textColumn.axis = .vertical
-        textColumn.alignment = .fill
-        textColumn.spacing = 4
+        textColumn.spacing = Spacing.xs
         textColumn.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(textColumn)
-
-        deleteButton.setImage(AppIcons.close, for: .normal)
-        deleteButton.tintColor = Theme.primaryBackgroundDark
-        deleteButton.backgroundColor = Theme.primaryLightMax
-        deleteButton.layer.cornerRadius = 20
-        deleteButton.layer.cornerCurve = .continuous
-        deleteButton.isAccessibilityElement = true
-        deleteButton.accessibilityLabel = "Delete"
-        deleteButton.addAction(
-            UIAction { [weak self] _ in self?.onDeleteTap?() },
-            for: .touchUpInside
-        )
-        deleteButton.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(deleteButton)
+        contentView.addSubview(textColumn)
 
         NSLayoutConstraint.activate([
-            container.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            container.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            container.topAnchor.constraint(equalTo: contentView.topAnchor),
-            container.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-
-            coverView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
-            coverView.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
-            coverView.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12),
+            coverView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageHeader),
+            coverView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             coverView.widthAnchor.constraint(equalToConstant: 48),
             coverView.heightAnchor.constraint(equalToConstant: 48),
+            coverView.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.md),
 
-            textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: 12),
-            textColumn.trailingAnchor.constraint(equalTo: deleteButton.leadingAnchor, constant: -12),
-            textColumn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-
-            deleteButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
-            deleteButton.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            deleteButton.widthAnchor.constraint(equalToConstant: 40),
-            deleteButton.heightAnchor.constraint(equalToConstant: 40),
+            textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
+            textColumn.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageHeader),
+            textColumn.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.md),
+            textColumn.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
         ])
     }
 
     func configure(_ episode: HistoryEpisodeRow) {
         let url = episode.imageUrl.flatMap(URL.init(string:))
-        coverView.kf.setImage(with: url, options: [.transition(.none)])
+        coverView.setArtwork(url, title: episode.channelTitle)
         titleLabel.text = episode.title ?? ""
         channelLabel.text = episode.channelTitle ?? ""
         isAccessibilityElement = true
         accessibilityTraits = [.button]
         accessibilityLabel = "\(episode.title ?? ""), \(episode.channelTitle ?? "")"
-        // The cell is the row's single accessibility element, so the
-        // 40 pt delete button folded into it is unreachable by VoiceOver —
-        // expose it as a custom action (the reorder rows use the same
-        // pattern).
+        // Swipe-to-delete has a VoiceOver twin.
         accessibilityCustomActions = [
             UIAccessibilityCustomAction(name: "Delete") { [weak self] _ in
-                self?.onDeleteTap?()
+                self?.onDelete?()
                 return true
             }
         ]

@@ -36,102 +36,56 @@ enum MiniPlayerVisibility {
     }
 }
 
-/// Derives the fly-in animation endpoint from the LIVE pill bar layout
-/// (07 §3 widget #11): the Playlist chip's center in the current geometry —
-/// it remains the middle destination —
-/// degrading to the visible bar's area center, then to the window bottom
-/// center (A1-accepted adaptation). The shell attaches itself through
-/// `pillBarProvider` at install time.
+/// Derives the fly-in animation endpoint from the LIVE tab bar (07 §3
+/// widget #11): Playlist is the middle destination, so the endpoint is the
+/// bar's center — degrading to the window bottom center when the bar is not
+/// on screen (A1-accepted adaptation). The shell attaches itself through
+/// `tabBarProvider` at install time.
 @MainActor
 final class TabBarFlyInEndpointProvider: PlaylistFlyInEndpointProvider {
 
-    var pillBarProvider: (() -> BottomTabBarView?)?
+    var tabBarProvider: (() -> UITabBar?)?
 
     private let fallback = WindowCenterBottomEndpointProvider()
 
     func playlistFlyInEndpoint(in window: UIWindow) -> CGPoint {
-        guard let pillBar = pillBarProvider?(), pillBar.window != nil else {
+        guard let tabBar = tabBarProvider?(), tabBar.window != nil, !tabBar.isHidden else {
             return fallback.playlistFlyInEndpoint(in: window)
         }
-        let buttons = pillBar.pillButtons
-        if !buttons.isEmpty {
-            // With 3 chips Playlist is the middle one; clamp the
-            // index so a degenerate hierarchy cannot over-read.
-            let index = min(1, buttons.count - 1)
-            let button = buttons[index]
-            let host = button.superview ?? pillBar
-            guard host.window != nil else {
-                return fallback.playlistFlyInEndpoint(in: window)
-            }
-            return window.convert(button.center, from: host)
-        }
-        return window.convert(
-            CGPoint(x: pillBar.bounds.midX, y: pillBar.bounds.midY), from: pillBar
-        )
+        return window.convert(CGPoint(x: tabBar.bounds.midX, y: tabBar.bounds.midY), from: tabBar)
     }
 }
 
-/// The three-tab Flutter destination shell: Podcast / Playlist / Discover,
-/// with the mini player floating above the glass pill on every OS —
-/// with the custom pill bar there is no UITabBarController left to host a
-/// UITabAccessory, so the former iOS 26 accessory path folds into the same
-/// floating capsule (09 §3.6, V2 note).
+/// The three-tab Flutter destination shell — Podcast / Playlist / Discover —
+/// on the system tab bar (Anycast 2.0 UI kit shell): Liquid Glass on
+/// iOS 26, where the bar minimizes while content scrolls down and the mini
+/// player rides in the bar's bottom accessory; on iOS 18 the classic bar
+/// with the mini player floating above it as a capsule. Unselected tabs
+/// stay resident (prewarmed) like the Flutter IndexedStack (03 §1.1).
 @MainActor
-final class MainTabBarController: UIViewController {
+final class MainTabBarController: UITabBarController, UITabBarControllerDelegate {
 
     private let context: UIContext
 
     private let errorObservation = ObservationLoop()
     private let visibilityObservation = ObservationLoop()
 
-    private var tabChildren: [UIViewController] = []
-    /// The full-bleed pins per child — a detached view's constraints are
-    /// auto-deactivated by UIKit, so `show` re-activates them on attach.
-    private var childPins: [[NSLayoutConstraint]] = []
-    private(set) var selectedIndex = 0
-
-    /// The pill bar (BottomTabBarView owns the scrim and destination chips).
-    private(set) var tabBarView: BottomTabBarView!
-    /// The v2 mini player capsule, floating above the pill.
     private let playerBar: PlayerBarView
+    /// iOS 18 floating capsule placement (above the tab bar).
+    private var floatingBottomConstraint: NSLayoutConstraint?
 
-    /// Chrome constraints re-fitted when the bottom safe-area inset arrives.
-    private var tabBarHeightConstraint: NSLayoutConstraint!
-    private var playerBarBottomConstraint: NSLayoutConstraint!
-
-    /// Chrome geometry. The pill sits `bottomGutter` above the bottom
-    /// SAFE-AREA edge (the home-indicator zone — the Figma clone keeps the
-    /// pill clear of the indicator), so every derived metric depends on the
-    /// current bottom inset. `safeBottom: 0` reproduces the pre-indicator
-    /// layout (unit tests host the shell without safe-area insets).
-    private enum ChromeMetrics {
-        // The Figma scrim (Buttom Tab component 243:7288) pads 24 above the
-        // pill before fading from transparent — the fade zone, not a tall
-        // frosted band.
-        static let scrimAbovePill: CGFloat = 24
-        // The dark design frame (76:2614 render): the mini player card's
-        // bottom sits 14 pt above the pill's top edge. The first v2 build
-        // anchored the capsule above the whole scrim band (32 pt gap), which
-        // read as a floating blank strip between the two.
-        static let capsuleGap: CGFloat = 14
-        static func pillTopInset(safeBottom: CGFloat) -> CGFloat {
-            safeBottom + BottomTabBarView.bottomGutter + BottomTabBarView.pillHeight
-        }
-        static func barOverlayHeight(safeBottom: CGFloat) -> CGFloat {
-            scrimAbovePill + pillTopInset(safeBottom: safeBottom)
-        }
-        /// The mini player floats above the PILL TOP (not the scrim band).
-        static func restingClearance(safeBottom: CGFloat) -> CGFloat {
-            pillTopInset(safeBottom: safeBottom) + capsuleGap
-        }
-        static func capsuleClearance(safeBottom: CGFloat) -> CGFloat {
-            restingClearance(safeBottom: safeBottom) + PlayerBarView.barHeight + capsuleGap
-        }
+    private enum FloatingMetrics {
+        /// Gap between the floating capsule and the tab bar / content.
+        static let gap: CGFloat = Spacing.md
     }
 
     init(context: UIContext) {
         self.context = context
-        self.playerBar = context.makePlayerBar(style: .capsule)
+        if #available(iOS 26.0, *) {
+            self.playerBar = context.makePlayerBar(style: .systemAccessory)
+        } else {
+            self.playerBar = context.makePlayerBar(style: .capsule)
+        }
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -143,68 +97,28 @@ final class MainTabBarController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
+        delegate = self
+        tabBar.tintColor = Theme.primary
 
-        tabChildren = [
-            PodcastHomeViewController(context: context),
-            PlaylistsPageViewController(context: context),
-            DiscoverViewController(context: context),
+        let tabs: [(UIViewController, String, UIImage)] = [
+            (PodcastHomeViewController(context: context), "Podcast", AppIcons.inbox),
+            (PlaylistsPageViewController(context: context), "Playlist", AppIcons.playlist),
+            (DiscoverViewController(context: context), "Discover", AppIcons.discover),
         ]
-
-        for child in tabChildren {
-            addChild(child)
-            child.view.translatesAutoresizingMaskIntoConstraints = false
-            // Full-bleed pins, activated on attach in `show` — only the
-            // SELECTED child's view stays in the hierarchy (the
-            // UITabBarController semantics: unselected children remain
-            // resident but windowless, so walk-based QA sweeps and layout
-            // passes do not run over hidden tabs).
-            childPins.append([
-                child.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-                child.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-                child.view.topAnchor.constraint(equalTo: view.topAnchor),
-                child.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            ])
-            child.didMove(toParent: self)
-            child.loadViewIfNeeded()
+        viewControllers = tabs.enumerated().map { index, tab in
+            let (controller, title, icon) = tab
+            controller.tabBarItem = UITabBarItem(title: title, image: icon, tag: index)
+            controller.tabBarItem.accessibilityIdentifier = "tab-\(index)"
+            // Resident pages: their timers and observers start at launch.
+            controller.loadViewIfNeeded()
+            return controller
         }
 
-        tabBarView = BottomTabBarView(items: [
-            .init(title: "Podcast", icon: AppIcons.inbox),
-            .init(title: "Playlist", icon: AppIcons.playlist),
-            .init(title: "Discover", icon: AppIcons.discover),
-        ])
-        tabBarView.translatesAutoresizingMaskIntoConstraints = false
-        tabBarView.onTabTap = { [weak self] index, isRetap in
-            self?.handleTabTap(index: index, isRetap: isRetap)
+        if #available(iOS 26.0, *) {
+            tabBarMinimizeBehavior = .onScrollDown
+        } else {
+            installFloatingPlayerBar()
         }
-        view.addSubview(tabBarView)
-        tabBarHeightConstraint = tabBarView.heightAnchor.constraint(
-            equalToConstant: ChromeMetrics.barOverlayHeight(safeBottom: view.safeAreaInsets.bottom)
-        )
-        NSLayoutConstraint.activate([
-            tabBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tabBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tabBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            tabBarHeightConstraint,
-        ])
-
-        playerBar.translatesAutoresizingMaskIntoConstraints = false
-        view.insertSubview(playerBar, belowSubview: tabBarView)
-        playerBarBottomConstraint = playerBar.bottomAnchor.constraint(
-            equalTo: view.bottomAnchor,
-            constant: -ChromeMetrics.restingClearance(safeBottom: view.safeAreaInsets.bottom)
-        )
-        NSLayoutConstraint.activate([
-            playerBar.leadingAnchor.constraint(
-                equalTo: view.leadingAnchor, constant: BottomTabBarView.horizontalInset
-            ),
-            playerBar.trailingAnchor.constraint(
-                equalTo: view.trailingAnchor, constant: -BottomTabBarView.horizontalInset
-            ),
-            playerBarBottomConstraint,
-        ])
-
-        show(index: 0)
 
         observePlaybackError()
         updateMiniPlayerVisibility(animated: false)
@@ -214,65 +128,26 @@ final class MainTabBarController: UIViewController {
         )
     }
 
-    override func viewSafeAreaInsetsDidChange() {
-        super.viewSafeAreaInsetsDidChange()
-        // The pill clears the home-indicator zone (BottomTabBarView pins
-        // itself to the safe-area edge), so the scrim height, the mini
-        // player's resting spot, and the children's content avoidance all
-        // shift with the bottom inset.
-        let safeBottom = view.safeAreaInsets.bottom
-        tabBarHeightConstraint.constant = ChromeMetrics.barOverlayHeight(safeBottom: safeBottom)
-        playerBarBottomConstraint.constant = -ChromeMetrics.restingClearance(safeBottom: safeBottom)
-        updateMiniPlayerVisibility(animated: false)
-    }
-
     // MARK: - Selection
 
-    private func handleTabTap(index: Int, isRetap: Bool) {
-        show(index: index)
-        // The tab-0 re-tap rule (03 §1.1) rides the pill now; the Feeds
-        // screen owns the scroll-vs-refresh decision via TabZeroRetap.
-        if isRetap, index == 0 {
+    /// The tab-0 re-tap rule (03 §1.1): the Feeds screen owns the
+    /// scroll-vs-refresh decision via TabZeroRetap.
+    func tabBarController(
+        _ tabBarController: UITabBarController, shouldSelect viewController: UIViewController
+    ) -> Bool {
+        if viewController === selectedViewController, viewControllers?.firstIndex(of: viewController) == 0 {
             context.tabs.handleTabZeroReTap()
         }
-    }
-
-    /// Resident-page switch: attach/detach the child views (the
-    /// IndexedStack equivalent — 03 §1.1). Appearance transitions are
-    /// driven MANUALLY once the shell is in a window — the resident pages'
-    /// viewWillAppear quiet-refresh paths (Subscriptions, playlist lists)
-    /// relied on UITabBarController firing them per switch.
-    private func show(index: Int) {
-        guard tabChildren.indices.contains(index) else { return }
-        selectedIndex = index
-        let inWindow = view.window != nil
-        for (position, child) in tabChildren.enumerated() {
-            if position == index {
-                if child.view.superview == nil {
-                    view.insertSubview(child.view, at: 0)
-                    NSLayoutConstraint.activate(childPins[position])
-                    if inWindow {
-                        child.beginAppearanceTransition(true, animated: false)
-                        child.endAppearanceTransition()
-                    }
-                }
-            } else if child.view.superview != nil {
-                if inWindow {
-                    child.beginAppearanceTransition(false, animated: false)
-                }
-                NSLayoutConstraint.deactivate(childPins[position])
-                child.view.removeFromSuperview()
-                if inWindow {
-                    child.endAppearanceTransition()
-                }
-            }
+        if viewController !== selectedViewController {
+            Haptics.selection()
         }
-        tabBarView.select(index, animated: false)
+        return true
     }
 
     /// Programmatic selection (UIContext.tabs.select).
     func selectTab(_ index: Int) {
-        show(index: index)
+        guard let controllers = viewControllers, controllers.indices.contains(index) else { return }
+        selectedIndex = index
     }
 
     // MARK: - K6: playback failure toast
@@ -292,10 +167,33 @@ final class MainTabBarController: UIViewController {
         )
     }
 
-    // MARK: - Mini player hosting (v2 floating capsule, 09 §3.6)
+    // MARK: - Mini player hosting
 
+    private func installFloatingPlayerBar() {
+        playerBar.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(playerBar, belowSubview: tabBar)
+        let bottom = playerBar.bottomAnchor.constraint(equalTo: tabBar.topAnchor, constant: -FloatingMetrics.gap)
+        floatingBottomConstraint = bottom
+        NSLayoutConstraint.activate([
+            playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+            playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            bottom,
+        ])
+    }
+
+    /// The mini player shows while the queue has episodes (03 §2.9). On
+    /// iOS 26 the system accessory carries it and adjusts content insets
+    /// itself; the iOS 18 capsule makes the pages avoid it explicitly.
     private func updateMiniPlayerVisibility(animated: Bool) {
         let visible = MiniPlayerVisibility.isVisible(queueCount: context.playback.queue.count)
+        if #available(iOS 26.0, *) {
+            if visible, bottomAccessory == nil {
+                setBottomAccessory(UITabAccessory(contentView: playerBar), animated: animated)
+            } else if !visible, bottomAccessory != nil {
+                setBottomAccessory(nil, animated: animated)
+            }
+            return
+        }
         let changes = { [weak self] in
             guard let self else { return }
             self.playerBar.isHidden = !visible
@@ -305,10 +203,8 @@ final class MainTabBarController: UIViewController {
         } else {
             changes()
         }
-        let avoidance = visible
-            ? ChromeMetrics.capsuleClearance(safeBottom: view.safeAreaInsets.bottom)
-            : ChromeMetrics.restingClearance(safeBottom: view.safeAreaInsets.bottom)
-        for child in tabChildren {
+        let avoidance = visible ? PlayerBarView.barHeight + FloatingMetrics.gap * 2 : 0
+        for child in viewControllers ?? [] {
             child.additionalSafeAreaInsets.bottom = avoidance
         }
     }

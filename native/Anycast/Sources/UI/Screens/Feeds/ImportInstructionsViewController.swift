@@ -133,8 +133,8 @@ final class ImportInstructionsViewController: UIViewController {
 
         let titleLabel = UILabel()
         titleLabel.text = ImportInstructionsContent.headerTitle
-        titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -239,8 +239,8 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        titleLabel.font = Typography.cardTitleBold.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.font = TypographyV2.headlineSmall.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(titleLabel)
@@ -280,7 +280,7 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
         titleLabel.text = title
         accessibilityLabel = title
         accessibilityValue = expanded ? "expanded" : "collapsed"
-        chevron.tintColor = expanded ? Theme.primary : Theme.secondaryText
+        chevron.tintColor = expanded ? Theme.primary : Theme.onSurfaceVariant
         let transform = CGAffineTransform(rotationAngle: expanded ? .pi : 0)
         UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseInOut]) {
             self.chevron.transform = transform
@@ -300,8 +300,8 @@ final class ImportSectionStepsCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        stepsLabel.font = Typography.cardDescription.font()
-        stepsLabel.textColor = Typography.cardDescription.color
+        stepsLabel.font = TypographyV2.bodySmall.font()
+        stepsLabel.textColor = Theme.onSurfaceVariant
         stepsLabel.numberOfLines = 0
         stepsLabel.adjustsFontForContentSizeCategory = true
         stepsLabel.translatesAutoresizingMaskIntoConstraints = false

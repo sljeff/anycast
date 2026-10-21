@@ -91,6 +91,17 @@ Query the live shell from tests with `UIContext`
 (`(UIApplication.shared.delegate as? AppDelegate)?.environment.uiContext`) —
 that is how the snapshot, layout and smoke suites reach the real screens.
 
+### Personal-device preview
+
+`scripts/preview_device.sh` builds a separately installed development copy
+under your own Apple Developer team and bundle id (default
+`com.qy9albh92w.anycast.dev`), then installs and launches it on a connected
+iPhone. Put `ANYCAST_PREVIEW_TEAM=<team id>` in `native/.preview.env`
+(gitignored). The preview drops the Sign in with Apple and App Group
+entitlements, so Apple sign-in and the share-extension hand-off are
+unavailable, and it starts without the store app's data. It never touches
+`project.yml`, signing scripts, or store state.
+
 ## Conventions
 
 - Architecture rules from migration docs 06 §4 / 08 §1-§3 are lint-grade:

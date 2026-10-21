@@ -2,32 +2,30 @@ import UIKit
 import Kingfisher
 import AnycastKit
 
-/// The episode Detail sheet — v2 form (09 §10 批次1, Figma `507:14681` set,
-/// open state `1784:7538` re-measured 2026-10-02): a near-full sheet
-/// (`.large` + `.medium`, corner radius 48) with a full-bleed hero artwork
-/// that fades into a frosted content panel — 32pt semibold title, metadata
-/// row, status tag pills, channel host, HTML description — and a pinned
-/// bottom blur bar carrying the two v2 actions: a gold "ADD TO QUEUE" pill
-/// and a dark play button. The v1 remove action retired from the bar (the
-/// lists own removal through swipe/context menu now, 09 §7a-C1); the other
-/// v1 behaviors are preserved: custom grabber whose area TAPS to close
-/// (A2), channel tap presenting the Channel sheet ON TOP (03 §10.1),
-/// actions auto-dismiss this sheet after firing (03 §10.1 wrapper quirk),
-/// share → shortlink → UIActivityViewController with a spinner.
+/// The episode Detail sheet in the Anycast 2.0 UI kit form
+/// (`EpisodeDetailViewController`): the artwork opens large under the
+/// grabber and, as the notes scroll, shrinks along one continuous track into
+/// a small sticky tile (its corners tightening with it) over a frosted top
+/// edge; below it the title, the show (opens the Channel sheet ON TOP —
+/// 03 §10.1), the date and duration, the action row — Play, Add to playlist,
+/// and an overflow menu with Share and the remaining actions — and the HTML
+/// show notes. When the action row scrolls away a bottom bar takes over
+/// (only one set of actions is ever live). Preserved v1 behaviors: the
+/// custom grabber whose area TAPS to close (A2), actions auto-dismiss this
+/// sheet after firing (03 §10.1 wrapper quirk), share → shortlink →
+/// UIActivityViewController.
 ///
 /// Presenters inject behavior: `openChannel`, `shortenURL`, the action
-/// closures inside `EpisodeCardAction`, and optional status tags.
+/// closures inside `EpisodeCardAction`, and whether the episode is already
+/// in the playlist.
 @MainActor
 final class DetailViewController: UIViewController {
 
-    /// The minimal episode facts Detail renders (03 §1.3); screens map from
-    /// their own row types.
     struct Episode {
         var title: String
         var channelTitle: String
         var pubDateMilliseconds: Int64?
-        /// Enclosure duration for the metadata row (the v2 "164minutes"
-        /// slot); nil or zero hides the term.
+        /// Enclosure duration for the metadata line; nil or zero hides it.
         var durationSeconds: Int64?
         var imageURL: String?
         var rssFeedURL: String
@@ -68,25 +66,36 @@ final class DetailViewController: UIViewController {
     var shortenURL: ((URL) async -> URL?)?
 
     private let episode: Episode
-    /// Status tag pills ("inbox" / "queued", Figma tag row); empty hides
-    /// the row.
-    private let tags: [String]
+    /// The episode already sits in the playlist: the add control shows a
+    /// check and does nothing.
+    private let isInPlaylist: Bool
     private let actions: [EpisodeCardAction]
+    /// LEGACY parameter, kept in the init/present signatures so existing
+    /// call sites stay untouched: the show notes no longer route through
+    /// HTMLContentRenderer. The notes render through ShowNotesStore into
+    /// the ShowNotesTextView below; this instance is stored but unused.
     private let htmlRenderer: HTMLContentRenderer
     private let now: () -> Date
 
     private let scrollView = UIScrollView()
-    private let descriptionTextView: UITextView
-    private let shareSpinner = UIActivityIndicatorView(style: .medium)
-    private let playButton = UIButton(type: .custom)
-    private let addButton = UIButton(type: .custom)
+    private let descriptionTextView: ShowNotesTextView
+    private let artwork = UIImageView()
+    private let artworkPlaceholder = UIView()
+    private var artworkPlaceholderHeight: NSLayoutConstraint!
+    private var contentTop: NSLayoutConstraint!
+    private let topScrim = GradientFadeLayerView()
+    private let actionRow = UIStackView()
+    private let bottomBar = UIStackView()
+    private let bottomScrim = GradientFadeLayerView()
+    private var bottomBarVisible = false
 
-    /// CAGradientLayers have no autolayout — frames sync in
-    /// viewDidLayoutSubviews and colors re-resolve per trait (§9a
-    /// CGColor-freeze discipline).
-    private var heroFadeLayer: CAGradientLayer!
-    private var panelGradientLayer: CAGradientLayer!
-    private var barGradientLayer: CAGradientLayer!
+    private enum Layout {
+        /// UI kit `detailArtworkDefault`: the open artwork never exceeds
+        /// 256 pt, the inset width, or the upper half of the sheet.
+        static let artworkDefaultMax: CGFloat = 256
+        static let artworkSticky: CGFloat = 56
+        static let actionHeight: CGFloat = 52
+    }
 
     /// Present factory. v2 detents (09 §10 批次1): `.large` reproduces the
     /// design's open frame (modal top y62 ≈ system large on the design
@@ -98,7 +107,7 @@ final class DetailViewController: UIViewController {
         htmlRenderer: HTMLContentRenderer,
         openChannel: ((ChannelReference) -> Void)? = nil,
         shortenURL: ((URL) async -> URL?)? = nil,
-        tags: [String] = [],
+        isInPlaylist: Bool = false,
         now: @escaping () -> Date = { Date() }
     ) {
         let controller = DetailViewController(
@@ -107,7 +116,7 @@ final class DetailViewController: UIViewController {
             htmlRenderer: htmlRenderer,
             openChannel: openChannel,
             shortenURL: shortenURL,
-            tags: tags,
+            isInPlaylist: isInPlaylist,
             now: now
         )
         controller.modalPresentationStyle = .pageSheet
@@ -136,7 +145,7 @@ final class DetailViewController: UIViewController {
         htmlRenderer: HTMLContentRenderer,
         openChannel: ((ChannelReference) -> Void)? = nil,
         shortenURL: ((URL) async -> URL?)? = nil,
-        tags: [String] = [],
+        isInPlaylist: Bool = false,
         now: @escaping () -> Date = { Date() }
     ) {
         self.episode = episode
@@ -144,13 +153,10 @@ final class DetailViewController: UIViewController {
         self.htmlRenderer = htmlRenderer
         self.openChannel = openChannel
         self.shortenURL = shortenURL
-        self.tags = tags
+        self.isInPlaylist = isInPlaylist
         self.now = now
-        self.descriptionTextView = HTMLContentRenderer.makeTextView()
+        self.descriptionTextView = ShowNotesTextView()
         super.init(nibName: nil, bundle: nil)
-        // VC-level: the sheet's system chrome (plate, corner treatment)
-        // is created before viewDidLoad's view-level override lands.
-        overrideUserInterfaceStyle = .dark
     }
 
     @available(*, unavailable)
@@ -167,25 +173,14 @@ final class DetailViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // Hero fade: bottom 140pt of the artwork. Panel tint: the frosted
-        // gradient spans the whole panel. Bar tint: the full play bar.
-        heroFadeLayer.frame = CGRect(
-            x: 0, y: (heroFadeLayer.superlayer?.bounds.height ?? 140) - 140,
-            width: heroFadeLayer.superlayer?.bounds.width ?? 0, height: 140
-        )
-        panelGradientLayer.frame = panelGradientLayer.superlayer?.bounds ?? .zero
-        barGradientLayer.frame = barGradientLayer.superlayer?.bounds ?? .zero
-        // Resolve HERE, not at build time: the dark override lives on the
-        // view, so the VC's traitCollection is still light during
-        // viewDidLoad and build()-time cgColors froze light values (§9a).
-        applyGradientColors()
-    }
-
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-        if previousTraitCollection?.hasDifferentColorAppearance(comparedTo: traitCollection) == true {
-            applyGradientColors()
+        let side = defaultArtworkSide
+        if artworkPlaceholderHeight.constant != side {
+            artworkPlaceholderHeight.constant = side
         }
+        if contentTop.constant != artworkOriginY {
+            contentTop.constant = artworkOriginY
+        }
+        updateScrollMorph(animated: false)
     }
 
     // MARK: - Build
@@ -193,8 +188,47 @@ final class DetailViewController: UIViewController {
     private func build() {
         view.backgroundColor = Theme.surface
 
-        // Grabber 36×5 sandAlpha4 (Figma 1784:7561) — the tap-to-close
-        // band covering it stays ≤32pt (A2 adaptation, detail.dart:53-58).
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.alwaysBounceVertical = true
+        scrollView.contentInsetAdjustmentBehavior = .never
+        scrollView.delegate = self
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scrollView)
+
+        let content = buildContent()
+        content.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(content)
+
+        // The one artwork view: the scroll content only reserves its open
+        // footprint; the view itself moves along default → sticky.
+        artwork.contentMode = .scaleAspectFill
+        artwork.clipsToBounds = true
+        artwork.layer.cornerCurve = .continuous
+        artwork.backgroundColor = Theme.surfaceContainerHighest
+        artwork.setArtwork(episode.imageURL.flatMap(URL.init(string:)), title: episode.channelTitle)
+        artwork.isAccessibilityElement = true
+        artwork.accessibilityLabel = "Episode artwork"
+
+        // Frosted top edge under the sticky tile, and the bottom bar's
+        // backing — opacity-ramped surface gradients (a masked blur view
+        // renders nothing, 09 §9a).
+        topScrim.configure(color: Theme.surface, fromTop: true)
+        topScrim.alpha = 0
+        bottomScrim.configure(color: Theme.surface, fromTop: false)
+        bottomScrim.alpha = 0
+        for chrome in [topScrim, bottomScrim] as [UIView] {
+            chrome.isUserInteractionEnabled = false
+            chrome.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(chrome)
+        }
+        view.addSubview(artwork)
+
+        buildBottomBar()
+        bottomBar.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(bottomBar)
+
+        // Grabber 36×5 — the tap-to-close band covering it stays ≤32 pt
+        // (A2 adaptation, detail.dart:53-58).
         let grabber = UIView()
         grabber.backgroundColor = AnycastColor.sandAlpha4
         grabber.layer.cornerRadius = 2.5
@@ -205,163 +239,8 @@ final class DetailViewController: UIViewController {
         view.addGestureRecognizer(headerTap)
         headerTap.delegate = self
 
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(scrollView)
-
-        // Hero: full-bleed artwork (≈ half the sheet, Figma 440×440 on a
-        // 894-tall modal) fading out at the bottom into the panel.
-        let hero = UIImageView()
-        hero.contentMode = .scaleAspectFill
-        hero.clipsToBounds = true
-        hero.backgroundColor = Theme.surfaceContainerHighest
-        hero.kf.setImage(with: episode.imageURL.flatMap(URL.init(string:)))
-        hero.isAccessibilityElement = true
-        hero.accessibilityLabel = "Episode artwork"
-        hero.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(hero)
-
-        heroFadeLayer = CAGradientLayer()
-        hero.layer.addSublayer(heroFadeLayer)
-
-        // Frosted content panel (Figma: backdrop blur 50 + sand1 gradient
-        // 0→50%→100%). NO UIVisualEffectView: blur materials ignore
-        // overrideUserInterfaceStyle, so under the app's forced dark the
-        // frost renders light (measured white block, §9a). The gradient
-        // scrim alone carries the design until the V4 trait flip restores
-        // real blur.
-        let panel = UIView()
-        panel.translatesAutoresizingMaskIntoConstraints = false
-        panelGradientLayer = CAGradientLayer()
-        panel.layer.addSublayer(panelGradientLayer)
-        scrollView.addSubview(panel)
-
-        let titleMetrics = UIFontMetrics(forTextStyle: .title2)
-        let titleLabel = UILabel()
-        // 32pt Semibold 590 (open-state header, 1784:7542). The frame paints
-        // it white over the dark hero tail; without the design's 50pt blur
-        // the panel is translucent there, so onSurface keeps it readable
-        // (deviation noted in 09 §10).
-        titleLabel.font = titleMetrics.scaledFont(
-            for: .systemFont(ofSize: 32, weight: .semibold)
-        )
-        titleLabel.text = episode.title
-        titleLabel.textColor = Theme.onSurface
-        titleLabel.numberOfLines = 3
-        titleLabel.adjustsFontForContentSizeCategory = true
-
-        let metaMetrics = UIFontMetrics(forTextStyle: .subheadline)
-        func metaLabel(_ text: String) -> UILabel {
-            let label = UILabel()
-            label.text = text
-            label.font = metaMetrics.scaledFont(for: .systemFont(ofSize: 14, weight: .regular))
-            label.textColor = Theme.onSurface
-            label.adjustsFontForContentSizeCategory = true
-            return label
-        }
-        let dateText = episode.pubDateMilliseconds.map {
-            RelativeTimeFormatter.formatDate($0, now: now())
-        } ?? ""
-        var metaLabels = [metaLabel(dateText)]
-        if let duration = episode.durationSeconds, duration > 0 {
-            metaLabels.append(metaLabel("\(TimeFormats.formatDuration(duration)) MIN"))
-        }
-        let metaRow = UIStackView(arrangedSubviews: metaLabels)
-        metaRow.axis = .horizontal
-        metaRow.spacing = 16
-
-        // Status tag pills (Figma tag row: h22, padding 2/12, sandAlpha4,
-        // 12/18 TITLE).
-        let tagRow = UIStackView()
-        tagRow.axis = .horizontal
-        tagRow.spacing = 8
-        tagRow.isHidden = tags.isEmpty
-        for tag in tags {
-            let pill = UILabel()
-            pill.text = tag.localizedUppercase
-            pill.font = UIFontMetrics(forTextStyle: .caption1)
-                .scaledFont(for: .systemFont(ofSize: 12, weight: .regular))
-            pill.textColor = Theme.onSurface
-            pill.backgroundColor = AnycastColor.sandAlpha4
-            pill.layer.cornerRadius = 11
-            pill.layer.cornerCurve = .continuous
-            pill.layer.masksToBounds = true
-            pill.textAlignment = .center
-            pill.translatesAutoresizingMaskIntoConstraints = false
-            pill.heightAnchor.constraint(equalToConstant: 22).isActive = true
-            pill.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
-            tagRow.addArrangedSubview(pill)
-        }
-
-        // Channel host (16/28) — tap opens the Channel sheet ON TOP.
-        let hostButton = UIButton(type: .system)
-        var hostConfig = UIButton.Configuration.plain()
-        hostConfig.baseForegroundColor = Theme.onSurface
-        hostConfig.title = episode.channelTitle
-        hostConfig.contentInsets = .zero
-        hostButton.configuration = hostConfig
-        hostButton.titleLabel?.font = UIFontMetrics(forTextStyle: .callout)
-            .scaledFont(for: .systemFont(ofSize: 16, weight: .regular))
-        hostButton.contentHorizontalAlignment = .leading
-        hostButton.accessibilityLabel = "Open channel \(episode.channelTitle)"
-        hostButton.addAction(
-            UIAction { [weak self] _ in self?.channelTapped() },
-            for: .touchUpInside
-        )
-
-        descriptionTextView.font = UIFontMetrics(forTextStyle: .subheadline)
-            .scaledFont(for: .systemFont(ofSize: 14, weight: .regular))
-        descriptionTextView.textColor = Theme.onSurface
-        descriptionTextView.adjustsFontForContentSizeCategory = true
-
-        let contentStack = UIStackView(arrangedSubviews: [
-            titleLabel, metaRow, tagRow, hostButton, descriptionTextView,
-        ])
-        contentStack.axis = .vertical
-        contentStack.spacing = 16
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
-        contentStack.isLayoutMarginsRelativeArrangement = true
-        contentStack.directionalLayoutMargins = NSDirectionalEdgeInsets(
-            top: 12, leading: 24, bottom: 24, trailing: 24
-        )
-        panel.addSubview(contentStack)
-
-        // Pinned bottom bar (Figma play zone: blur 25 + bottom-radius 56;
-        // flattened to the surface-gradient band — same blur/override
-        // caveat as the panel): gold ADD TO QUEUE pill (fills) + dark
-        // play pill.
-        let playBar = UIView()
-        playBar.translatesAutoresizingMaskIntoConstraints = false
-        barGradientLayer = CAGradientLayer()
-        playBar.layer.addSublayer(barGradientLayer)
-        view.addSubview(playBar)
-
-        buildActionButtons(into: playBar)
-
-        // Share: 44×44 floating circle pinned over the hero's top right
-        // (the Figma header share slot, kept reachable at rest).
-        let shareButton = UIButton(type: .custom)
-        shareButton.setImage(AppIcons.share, for: .normal)
-        shareButton.tintColor = Theme.onSurface
-        shareButton.backgroundColor = Theme.surface
-        shareButton.layer.cornerRadius = 22
-        shareButton.layer.cornerCurve = .continuous
-        shareButton.layer.shadowColor = UIColor.black.cgColor
-        shareButton.layer.shadowOpacity = 0.1
-        shareButton.layer.shadowOffset = CGSize(width: 0, height: 4)
-        shareButton.layer.shadowRadius = 10
-        shareButton.isAccessibilityElement = true
-        shareButton.accessibilityLabel = "Share episode"
-        shareButton.addAction(UIAction { [weak self] _ in self?.shareTapped() }, for: .touchUpInside)
-        shareButton.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(shareButton)
-
-        shareSpinner.color = Theme.onSurface
-        shareSpinner.hidesWhenStopped = true
-        shareSpinner.translatesAutoresizingMaskIntoConstraints = false
-        shareButton.addSubview(shareSpinner)
-
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            grabber.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.md),
             grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             grabber.widthAnchor.constraint(equalToConstant: 36),
             grabber.heightAnchor.constraint(equalToConstant: 5),
@@ -371,132 +250,361 @@ final class DetailViewController: UIViewController {
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            hero.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            hero.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            hero.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            hero.heightAnchor.constraint(
-                equalTo: scrollView.frameLayoutGuide.heightAnchor, multiplier: 0.5
-            ),
+            content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            content.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            // Vertical-only scrolling: content is exactly as wide as the
+            // visible sheet (long text otherwise ran past inset sheets).
+            content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
 
-            // The panel starts 24pt inside the hero tail (Figma content
-            // column y416 vs artwork bottom 440) and closes the scroll
-            // content (plus the play-bar clearance inset below).
-            panel.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            panel.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            panel.topAnchor.constraint(equalTo: hero.bottomAnchor, constant: -24),
-            panel.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            topScrim.topAnchor.constraint(equalTo: view.topAnchor),
+            topScrim.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            topScrim.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            topScrim.heightAnchor.constraint(equalToConstant: Spacing.pageHeader * 2 + Layout.artworkSticky + Spacing.xl),
 
-            contentStack.leadingAnchor.constraint(equalTo: panel.leadingAnchor),
-            contentStack.trailingAnchor.constraint(equalTo: panel.trailingAnchor),
-            contentStack.topAnchor.constraint(equalTo: panel.topAnchor),
-            contentStack.bottomAnchor.constraint(equalTo: panel.bottomAnchor),
+            bottomBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
+            bottomBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            bottomBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.gap),
+            bottomBar.heightAnchor.constraint(equalToConstant: Layout.actionHeight),
 
-            playBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            playBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            playBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            playBar.heightAnchor.constraint(equalToConstant: 132),
-
-            shareButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 24),
-            shareButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            shareButton.widthAnchor.constraint(equalToConstant: 44),
-            shareButton.heightAnchor.constraint(equalToConstant: 44),
-            shareSpinner.centerXAnchor.constraint(equalTo: shareButton.centerXAnchor),
-            shareSpinner.centerYAnchor.constraint(equalTo: shareButton.centerYAnchor),
+            bottomScrim.topAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -Spacing.xl),
+            bottomScrim.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomScrim.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomScrim.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
-        // The scroll content clears the pinned play bar.
-        scrollView.contentInset.bottom = 140
-        applyGradientColors()
+        // The notes clear the bottom bar when it takes over.
+        scrollView.contentInset.bottom = Layout.actionHeight + Spacing.sectionGap + Spacing.xl
+        applyBottomBarVisibility()
     }
 
-    /// Gold "ADD TO QUEUE" (fills) + dark play pill, mapped from the
-    /// injected action payload by accessibility label (09 §10 批次1: remove
-    /// retired from the bar — the lists own it via swipe/context menu).
-    private func buildActionButtons(into playBar: UIView) {
-        let addAction = actions.first { $0.accessibilityLabel == "Add to playlist" }
-        let playAction = actions.first { $0.accessibilityLabel == "Play" }
+    private func buildContent() -> UIView {
+        let container = UIView()
 
-        var addConfig = UIButton.Configuration.filled()
-        if addAction != nil {
-            addConfig.title = "add to queue".localizedUppercase
+        let titleLabel = UILabel()
+        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.text = episode.title
+        titleLabel.textColor = Theme.onSurface
+        titleLabel.numberOfLines = 0
+        titleLabel.adjustsFontForContentSizeCategory = true
+
+        // The show: a quiet gold text link (UI kit host entry), 44 pt tall.
+        let hostButton = UIButton(type: .system)
+        var hostConfig = UIButton.Configuration.plain()
+        hostConfig.title = episode.channelTitle
+        hostConfig.baseForegroundColor = AnycastColor.gold10
+        hostConfig.contentInsets = .zero
+        hostConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.titleSmall.font()
+            return outgoing
         }
-        addConfig.baseBackgroundColor = AnycastColor.gold9
-        addConfig.baseForegroundColor = AnycastColor.sand1
-        addConfig.cornerStyle = .capsule
-        addButton.configuration = addConfig
-        addButton.accessibilityLabel = "Add to playlist"
-        addButton.translatesAutoresizingMaskIntoConstraints = false
-        playBar.addSubview(addButton)
-        if let addAction {
-            addButton.addAction(
-                UIAction { [weak self] _ in self?.fire(addAction) }, for: .touchUpInside
+        hostButton.configuration = hostConfig
+        hostButton.contentHorizontalAlignment = .leading
+        hostButton.accessibilityLabel = "Open channel \(episode.channelTitle)"
+        hostButton.heightAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.standardDiameter).isActive = true
+        hostButton.addAction(UIAction { [weak self] _ in self?.channelTapped() }, for: .touchUpInside)
+
+        let meta = UILabel()
+        meta.font = TypographyV2.bodySmall.font()
+        meta.textColor = Theme.onSurfaceVariant
+        meta.adjustsFontForContentSizeCategory = true
+        meta.numberOfLines = 0
+        var metaParts: [String] = []
+        if let date = episode.pubDateMilliseconds {
+            metaParts.append(RelativeTimeFormatter.formatDate(date, now: now()))
+        }
+        if let duration = episode.durationSeconds, duration > 0 {
+            metaParts.append(TimeFormats.formatDuration(duration))
+        }
+        meta.text = metaParts.joined(separator: "  ·  ")
+
+        buildActionRow()
+
+        // Show-notes pipeline wiring. The document arrives pre-styled from
+        // ShowNotesStore (ShowNotesStyle owns fonts/colors), so the view
+        // gets no manual typography here. Links keep the system default
+        // action — Detail never routed taps through a handler before.
+        // Images zoom above whatever sheet stack is live; weak self breaks
+        // the view-owns-closure-owns-self cycle.
+        descriptionTextView.presentImage = { [weak self] image, thumbnail in
+            guard let self else { return }
+            ZoomingImageViewController.present(
+                thumbnail: thumbnail,
+                imageURL: image.url,
+                alt: image.alt,
+                from: self.topMostPresented()
             )
         }
-
-        playButton.setImage(AppIcons.play, for: .normal)
-        playButton.tintColor = AnycastColor.sand1
-        playButton.backgroundColor = AnycastColor.sand12
-        playButton.layer.cornerRadius = 28
-        playButton.layer.cornerCurve = .continuous
-        playButton.accessibilityLabel = "Play"
-        playButton.translatesAutoresizingMaskIntoConstraints = false
-        playBar.addSubview(playButton)
-        if let playAction {
-            playButton.addAction(
-                UIAction { [weak self] _ in self?.fire(playAction) }, for: .touchUpInside
-            )
+        // Image loads and dynamic-type/appearance changes resize the
+        // document; re-render through the same signature-guarded path
+        // (see renderDescription) so layout stays valid without an echo
+        // loop.
+        descriptionTextView.onMetricsChange = { [weak self] in
+            self?.renderDescription()
         }
 
-        let barRow = UIStackView(arrangedSubviews: [addButton, playButton])
-        barRow.axis = .horizontal
-        barRow.spacing = 12
-        barRow.alignment = .center
-        barRow.translatesAutoresizingMaskIntoConstraints = false
-        playBar.addSubview(barRow)
+        let info = UIStackView(arrangedSubviews: [titleLabel, hostButton, meta])
+        info.axis = .vertical
+        info.alignment = .leading
+        info.spacing = Spacing.xs
 
+        let stack = UIStackView(arrangedSubviews: [artworkPlaceholder, info, actionRow, descriptionTextView])
+        stack.axis = .vertical
+        stack.alignment = .fill
+        stack.spacing = Spacing.pageHeader
+        stack.setCustomSpacing(Spacing.sectionGap, after: actionRow)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(stack)
+
+        artworkPlaceholderHeight = artworkPlaceholder.heightAnchor.constraint(equalToConstant: Layout.artworkDefaultMax)
+        contentTop = stack.topAnchor.constraint(equalTo: container.topAnchor, constant: Spacing.pageHeader)
         NSLayoutConstraint.activate([
-            barRow.leadingAnchor.constraint(equalTo: playBar.leadingAnchor, constant: 24),
-            barRow.trailingAnchor.constraint(equalTo: playBar.trailingAnchor, constant: -24),
-            barRow.bottomAnchor.constraint(
-                equalTo: playBar.safeAreaLayoutGuide.bottomAnchor, constant: -16
-            ),
-            barRow.heightAnchor.constraint(equalToConstant: 56),
-            addButton.heightAnchor.constraint(equalToConstant: 56),
-            playButton.widthAnchor.constraint(equalToConstant: 56),
-            playButton.heightAnchor.constraint(equalToConstant: 56),
+            contentTop,
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: Spacing.pageHeader),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -Spacing.pageHeader),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Spacing.pageHeader),
+            artworkPlaceholderHeight,
         ])
+        return container
     }
 
-    // MARK: - Gradients (§9a: re-resolve on trait change)
+    // MARK: - Actions (UI kit: Play primary, add as a tonal disc, the rest
+    // behind the overflow menu; mirrored by the bottom bar)
 
-    private func applyGradientColors() {
-        // view.traitCollection — carries the dark override (self's does not
-        // until the view joins the window).
-        let surface = Theme.surface.resolvedColor(with: view.traitCollection)
-        heroFadeLayer.colors = [
-            UIColor.black.withAlphaComponent(0).cgColor,
-            UIColor.black.withAlphaComponent(0.55).cgColor,
-        ]
-        panelGradientLayer.locations = [0, 0.35, 0.7]
-        panelGradientLayer.colors = [
-            surface.withAlphaComponent(0).cgColor,
-            surface.withAlphaComponent(0.55).cgColor,
-            surface.withAlphaComponent(1).cgColor,
-        ]
-        barGradientLayer.colors = [
-            surface.withAlphaComponent(0).cgColor,
-            surface.withAlphaComponent(0.92).cgColor,
-        ]
+    private var playAction: EpisodeCardAction? {
+        actions.first { $0.accessibilityLabel == "Play" }
+    }
+
+    private var addAction: EpisodeCardAction? {
+        actions.first { $0.accessibilityLabel == "Add to playlist" }
+    }
+
+    private var otherActions: [EpisodeCardAction] {
+        actions.filter { $0.accessibilityLabel != "Play" && $0.accessibilityLabel != "Add to playlist" }
+    }
+
+    private func buildActionRow() {
+        actionRow.axis = .horizontal
+        actionRow.alignment = .center
+        actionRow.spacing = Spacing.gap
+
+        let play = AnycastButton.make(.primary, title: "Play", image: AppIcons.play)
+        play.accessibilityLabel = "Play"
+        if let playAction {
+            play.addAction(UIAction { [weak self] _ in self?.fire(playAction) }, for: .touchUpInside)
+        }
+        actionRow.addArrangedSubview(play)
+
+        if addAction != nil {
+            actionRow.addArrangedSubview(makeAddDisc())
+        }
+
+        let more = AnycastIconButton(style: .tonal, icon: AppIcons.more, accessibilityLabel: "More episode actions")
+        more.menu = UIMenu(children: overflowMenuChildren())
+        more.showsMenuAsPrimaryAction = true
+        actionRow.addArrangedSubview(more)
+        actionRow.addArrangedSubview(UIView())
+    }
+
+    private func makeAddDisc() -> UIButton {
+        let disc = AnycastIconButton(
+            style: .tonal,
+            icon: isInPlaylist ? AppIcons.check : UIImage(systemName: "plus"),
+            accessibilityLabel: isInPlaylist ? "In playlist" : "Add to playlist"
+        )
+        disc.isEnabled = !isInPlaylist
+        if let addAction, !isInPlaylist {
+            disc.addAction(UIAction { [weak self] _ in self?.fire(addAction) }, for: .touchUpInside)
+        }
+        return disc
+    }
+
+    private func overflowMenuChildren() -> [UIMenuElement] {
+        let share = UIAction(title: "Share episode", image: AppIcons.share) { [weak self] _ in
+            self?.shareTapped()
+        }
+        let others = otherActions.map { action in
+            UIAction(
+                title: action.accessibilityLabel,
+                image: action.icon,
+                attributes: action.accessibilityLabel.hasPrefix("Remove") ? .destructive : []
+            ) { [weak self] _ in self?.fire(action) }
+        }
+        return [share] + others
+    }
+
+    /// The bottom bar (UI kit idle state): Add to playlist capsule + Play
+    /// disc, or a single Play capsule when the presenter offers no add.
+    private func buildBottomBar() {
+        bottomBar.axis = .horizontal
+        bottomBar.alignment = .fill
+        bottomBar.spacing = Spacing.gap
+        if let addAction {
+            let add = AnycastButton.make(
+                .secondary,
+                title: isInPlaylist ? "In playlist" : "Add to playlist",
+                image: isInPlaylist ? AppIcons.check : UIImage(systemName: "plus")
+            )
+            add.isEnabled = !isInPlaylist
+            add.addAction(UIAction { [weak self] _ in self?.fire(addAction) }, for: .touchUpInside)
+            let play = AnycastIconButton(
+                style: .inverse, icon: AppIcons.play, accessibilityLabel: "Play", diameter: Layout.actionHeight
+            )
+            if let playAction {
+                play.addAction(UIAction { [weak self] _ in self?.fire(playAction) }, for: .touchUpInside)
+            }
+            bottomBar.addArrangedSubview(add)
+            bottomBar.addArrangedSubview(play)
+        } else {
+            let play = AnycastButton.make(.primary, title: "Play", image: AppIcons.play)
+            play.accessibilityLabel = "Play"
+            if let playAction {
+                play.addAction(UIAction { [weak self] _ in self?.fire(playAction) }, for: .touchUpInside)
+            }
+            bottomBar.addArrangedSubview(play)
+        }
+    }
+
+    // MARK: - Scroll morph (UI kit `DetailArtworkMotion` / `DetailActionHandoff`)
+
+    private var artworkOriginY: CGFloat { view.safeAreaInsets.top + Spacing.pageHeader }
+
+    private var defaultArtworkSide: CGFloat {
+        max(0, min(
+            Layout.artworkDefaultMax,
+            view.bounds.width - Spacing.pageHeader * 2,
+            view.bounds.height / 2 - artworkOriginY
+        ))
+    }
+
+    /// One scroll progress drives the artwork's position, size and corner
+    /// radius together along a monotonic track, so scrolling back and forth
+    /// retraces the same path; pulling down past the top moves it with the
+    /// content instead.
+    private func updateScrollMorph(animated: Bool) {
+        guard view.bounds.width > 0 else { return }
+        let defaultSide = defaultArtworkSide
+        // The open artwork is horizontally centered; when the inset width
+        // binds, centering degenerates to the leading inset (same x as
+        // before). The sticky tile stays leading-anchored, so the shrink
+        // track additionally slides inward along x — still one linear,
+        // monotonic path per frame component.
+        let defaultFrame = CGRect(
+            x: (view.bounds.width - defaultSide) / 2,
+            y: artworkOriginY,
+            width: defaultSide,
+            height: defaultSide
+        )
+        let stickyFrame = CGRect(
+            x: Spacing.pageHeader, y: artworkOriginY, width: Layout.artworkSticky, height: Layout.artworkSticky
+        )
+        let offset = scrollView.contentOffset.y
+        let travel = max(defaultSide - Layout.artworkSticky, Spacing.xs)
+        let progress = min(max(offset / travel, 0), 1)
+
+        if offset < 0 || Motion.reduceMotion {
+            artwork.frame = defaultFrame.offsetBy(dx: 0, dy: -offset)
+            artwork.layer.cornerRadius = Radius.artwork
+        } else {
+            artwork.frame = CGRect(
+                x: defaultFrame.minX + (stickyFrame.minX - defaultFrame.minX) * progress,
+                y: defaultFrame.minY + (stickyFrame.minY - defaultFrame.minY) * progress,
+                width: defaultFrame.width + (stickyFrame.width - defaultFrame.width) * progress,
+                height: defaultFrame.height + (stickyFrame.height - defaultFrame.height) * progress
+            )
+            artwork.layer.cornerRadius = Radius.artwork + (Radius.sm - Radius.artwork) * progress
+        }
+        topScrim.alpha = Motion.reduceMotion ? 0 : progress
+
+        // The bottom bar takes over only once the action row has fully left
+        // under the sticky tile — never both, never neither.
+        let rowFrame = actionRow.convert(actionRow.bounds, to: view)
+        let handoffLine = stickyFrame.maxY
+        let usesBottom = rowFrame.height > 0 && rowFrame.maxY <= handoffLine
+        setBottomBar(visible: usesBottom, animated: animated)
+    }
+
+    private func setBottomBar(visible: Bool, animated: Bool) {
+        guard visible != bottomBarVisible else { return }
+        bottomBarVisible = visible
+        actionRow.alpha = visible ? 0 : 1
+        actionRow.isUserInteractionEnabled = !visible
+        actionRow.accessibilityElementsHidden = visible
+        guard animated, !Motion.reduceMotion else {
+            applyBottomBarVisibility()
+            return
+        }
+        UIView.animate(
+            withDuration: Motion.standard, delay: 0,
+            usingSpringWithDamping: 1, initialSpringVelocity: 0,
+            options: [.allowUserInteraction, .beginFromCurrentState],
+            animations: applyBottomBarVisibility
+        )
+    }
+
+    private func applyBottomBarVisibility() {
+        bottomScrim.alpha = bottomBarVisible ? 1 : 0
+        bottomBar.isUserInteractionEnabled = bottomBarVisible
+        bottomBar.accessibilityElementsHidden = !bottomBarVisible
+        bottomBar.alpha = bottomBarVisible ? 1 : 0
+        if Motion.reduceMotion {
+            bottomBar.transform = .identity
+        } else {
+            let hiddenOffset = Layout.actionHeight + view.safeAreaInsets.bottom + Spacing.gap
+            bottomBar.transform = CGAffineTransform(translationX: 0, y: bottomBarVisible ? 0 : hiddenOffset)
+        }
     }
 
     // MARK: - Behavior
 
+    /// Signature of the last notes render (enclosure + style metrics).
+    /// Doubles as the renderDescription re-entrancy guard: repeated ticks
+    /// and the metrics echoes that setDocument itself triggers collapse
+    /// here, while a real dynamic-type/appearance change produces a new
+    /// signature and re-renders — no render → metrics → render loop.
+    private var renderedNotesSignature: String?
+
+    /// Renders the notes through the shared show-notes store: rich HTML →
+    /// pre-styled attributed document; an empty rich document (empty,
+    /// sanitized-away, or failed payload) degrades to the same plain text
+    /// the cards render via PlainTextHTMLCache.
     private func renderDescription() {
-        Task {
-            await htmlRenderer.render(
-                episode.descriptionHTML,
-                cacheKey: episode.enclosureURL,
-                into: descriptionTextView
+        let signature = episode.enclosureURL + "#"
+            + ShowNotesStyle.metricSignature(traitCollection: traitCollection)
+        guard signature != renderedNotesSignature else { return }
+        renderedNotesSignature = signature
+
+        let html = episode.descriptionHTML
+        let traits = traitCollection
+        // Plain-string payloads (no leading '<') keep their newlines — the
+        // normalizer collapses ALL whitespace, which would fuse a plain
+        // multi-line description into one paragraph.
+        if case .text(let plain) = HtmlText.displayPayload(for: html) {
+            descriptionTextView.setDocument(
+                ShowNotesStore.shared.attributedFallback(
+                    plain: plain, style: ShowNotesStyle(), traits: traits
+                ),
+                imageLoader: KingfisherShowNotesImageLoader.shared
+            )
+            return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            var attributed = await ShowNotesStore.shared.attributedString(
+                html: html, style: ShowNotesStyle(), traits: traits
+            )
+            if attributed.length == 0 {
+                let plain = await PlainTextHTMLCache.shared.plainText(for: html)
+                attributed = ShowNotesStore.shared.attributedFallback(
+                    plain: plain, style: ShowNotesStyle(), traits: traits
+                )
+            }
+            // A newer render (trait change) superseded this one: drop it.
+            guard self.renderedNotesSignature == signature else { return }
+            self.descriptionTextView.setDocument(
+                attributed, imageLoader: KingfisherShowNotesImageLoader.shared
             )
         }
     }
@@ -528,11 +636,9 @@ final class DetailViewController: UIViewController {
         ]
         guard let url = components.url else { return }
 
-        shareSpinner.startAnimating()
         Task { [weak self] in
             guard let self else { return }
             let short = await self.shortenURL?(url) ?? url
-            self.shareSpinner.stopAnimating()
             let activity = UIActivityViewController(
                 activityItems: ["\(self.episode.title)\n\n\(short.absoluteString)"],
                 applicationActivities: nil
@@ -546,6 +652,12 @@ final class DetailViewController: UIViewController {
     }
 }
 
+extension DetailViewController: UIScrollViewDelegate {
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateScrollMorph(animated: scrollView.isDragging || scrollView.isDecelerating)
+    }
+}
+
 /// The grabber-area tap closes; taps elsewhere scroll normally.
 extension DetailViewController: UIGestureRecognizerDelegate {
     func gestureRecognizer(
@@ -554,5 +666,34 @@ extension DetailViewController: UIGestureRecognizerDelegate {
     ) -> Bool {
         // Only the top grabber band acts as the close affordance.
         touch.location(in: view).y <= 32
+    }
+}
+
+/// A vertical surface-color fade (opaque at one edge, clear at the other)
+/// for chrome that needs a soft edge without a blur view. The color is
+/// re-resolved on appearance changes (09 §9a).
+final class GradientFadeLayerView: UIView {
+
+    override class var layerClass: AnyClass { CAGradientLayer.self }
+
+    private var color: UIColor = .clear
+    private var fromTop = true
+
+    func configure(color: UIColor, fromTop: Bool) {
+        self.color = color
+        self.fromTop = fromTop
+        applyColors()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _) in
+            self.applyColors()
+        }
+    }
+
+    private func applyColors() {
+        guard let gradient = layer as? CAGradientLayer else { return }
+        let resolved = color.resolvedColor(with: traitCollection)
+        let opaque = resolved.withAlphaComponent(0.96).cgColor
+        let clear = resolved.withAlphaComponent(0).cgColor
+        gradient.colors = fromTop ? [opaque, opaque, clear] : [clear, opaque, opaque]
+        gradient.locations = fromTop ? [0, 0.6, 1] : [0, 0.4, 1]
     }
 }

@@ -26,7 +26,7 @@ final class PlayPauseIconControl: UIControl {
     private let iconView = UIImageView()
     private var lottieView: LottieAnimationView?
     private var lottieVariantIsWhite = true
-    private var tintColorValue: UIColor = Theme.primaryLightMax
+    private var tintColorValue: UIColor = Theme.onSurface
 
     /// Icon point size (24 default, 32 mini player, 72 player center).
     private(set) var size: CGFloat
@@ -42,18 +42,31 @@ final class PlayPauseIconControl: UIControl {
         iconView.tintColor = tintColorValue
         iconView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(iconView)
-        NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            iconView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            iconView.topAnchor.constraint(equalTo: topAnchor),
-            iconView.bottomAnchor.constraint(equalTo: bottomAnchor),
-        ])
+        NSLayoutConstraint.activate(glyphConstraints)
 
         render(snapshot: .idle)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Insets the glyph inside a larger hit area (e.g. a 24 pt glyph in a
+    /// 44 pt slot); 0 fills the control.
+    var glyphInset: CGFloat = 0 {
+        didSet {
+            glyphConstraints[0].constant = glyphInset
+            glyphConstraints[1].constant = -glyphInset
+            glyphConstraints[2].constant = glyphInset
+            glyphConstraints[3].constant = -glyphInset
+        }
+    }
+
+    private lazy var glyphConstraints: [NSLayoutConstraint] = [
+        iconView.leadingAnchor.constraint(equalTo: leadingAnchor),
+        iconView.trailingAnchor.constraint(equalTo: trailingAnchor),
+        iconView.topAnchor.constraint(equalTo: topAnchor),
+        iconView.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ]
 
     /// The control's declared size. With translatesAutoresizingMaskInto
     /// Constraints = false the init frame is ignored, and without an

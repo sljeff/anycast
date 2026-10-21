@@ -23,7 +23,7 @@ actor PlainTextHTMLCache {
         if let cached = storage[key] {
             return cached
         }
-        let text = HtmlText.htmlToText(html)
+        let text = DisplayText.clean(HtmlText.htmlToText(html))
         if storage.count >= limit {
             storage.removeAll(keepingCapacity: true)   // cache, safe to drop
         }
@@ -39,5 +39,30 @@ actor PlainTextHTMLCache {
         SHA256.hash(data: Data(html.utf8))
             .map { String(format: "%02x", $0) }
             .joined()
+    }
+}
+
+/// Feeds often ship escaped or partial markup inside plain-text fields
+/// (`&nbsp;`, a mid-string `<br/>`), which the Dart-parity `HtmlText` path
+/// passes through verbatim. Display surfaces decode it so readers never see
+/// raw markup; line breaks survive as newlines.
+///
+/// Lossless by construction: `<br>` variants are the ONLY sequences honored
+/// as markup — every other `<` is escaped before the string reaches the
+/// entity decoder, so the decoder cannot swallow prose. A naive re-parse
+/// drops everything a tag-like span would consume (`x<y values` → `x`);
+/// other partial markup (`<b>`) stays literal because nothing short of a
+/// real parser can distinguish it from angle-bracketed prose, and the
+/// show-notes pipeline owns that job.
+nonisolated enum DisplayText {
+
+    static func clean(_ text: String) -> String {
+        guard text.contains("&") || text.contains("<") else { return text }
+        let breaks = text.replacingOccurrences(
+            of: "<br\\s*/?>", with: "\n", options: [.regularExpression, .caseInsensitive]
+        )
+        let escaped = breaks.replacingOccurrences(of: "<", with: "&lt;")
+        let decoded = HtmlText.htmlToText("<p>\(escaped)</p>")
+        return decoded.isEmpty ? text : decoded
     }
 }

@@ -181,6 +181,24 @@ public final class SubtitlePollController {
         statuses[url] = nil
         try? await subtitles.delete(byEnclosureURL: url)
     }
+
+    /// Login-cancel rollback for pending generates. While signed out,
+    /// every `processing` entry is unpollable local state — its requests
+    /// 401 — so the rollback always restores a truthful UI: the Generate
+    /// button on every page observing `statuses`, and a URL set that the
+    /// 15 s poller no longer touches (no more re-401 → re-present login
+    /// rounds). Clearing a genuinely server-accepted in-flight entry from
+    /// a pre-sign-out tap is deliberate: the endpoint is idempotent by
+    /// enclosure_url, so Generate can be tapped again once signed in.
+    /// (`start()` reseeds `statuses` from the DB when the app returns to
+    /// the foreground, and shipped releases persist only `succeeded`
+    /// rows.) Iteration is safe — Dictionary for-in enumerates a
+    /// snapshot, so clearing inside the loop cannot trap.
+    public func cancelLoginGatedProcessing() {
+        for (url, status) in statuses where status == "processing" {
+            statuses[url] = nil
+        }
+    }
 }
 
 // MARK: - Translation polling (states/translation.dart)

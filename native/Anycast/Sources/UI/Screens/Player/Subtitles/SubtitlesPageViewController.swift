@@ -1,14 +1,13 @@
 import UIKit
 import AnycastKit
-import Kingfisher
-import Lottie
 
-/// Player page 2 (PlayerAI/Subtitles, 03 §2.10): a bordered rounded
-/// container — 60 pt header (channel artwork + 12 pt comfortaa w700
-/// two-line episode title) + divider + the transcript five-state content
-/// (unavailable / prompt / processing / failed / ready), the ready state
-/// being the bilingual lyrics view with the drag time bar, the AI-chat /
-/// export overlay and the play-pause morph.
+/// Player page 2 (PlayerAI/Subtitles, 03 §2.10) in the Anycast 2.0
+/// transcript form: a centered "Transcript" header over the episode title,
+/// then the transcript five-state content (unavailable / prompt /
+/// processing / failed / ready) directly on the player backdrop — the
+/// status states use the shared empty-state block, the ready state is the
+/// bilingual lyrics view with the drag time bar, the AI-chat / export
+/// overlay and the play-pause morph.
 ///
 /// Row state is derived from the poll controllers plus async row fetches;
 /// polling cadence, K27 error policy and the K9 5-strike rule all live in
@@ -20,10 +19,8 @@ final class SubtitlesPageViewController: UIViewController {
 
     // MARK: Chrome
 
-    private let container = UIView()
-    private let artworkView = UIImageView()
+    private let headerTitleLabel = UILabel()
     private let titleLabel = UILabel()
-    private let divider = UIView()
     private let contentHost = UIView()
 
     // MARK: Observed state
@@ -35,8 +32,6 @@ final class SubtitlesPageViewController: UIViewController {
     private var translationRow: TranslationRow?
     private var renderedState: TranscriptVisualState?
 
-    private var loadedRSSFeedURL: String?
-
     // MARK: Ready-state views (kept alive across state swaps so scroll and
     // follow position survive)
 
@@ -44,10 +39,6 @@ final class SubtitlesPageViewController: UIViewController {
     private var lyricsBottomConstraint: NSLayoutConstraint?
     private var inlineStatus: UIView?
     private var overlay: GlassContainerView?
-
-    /// The prompt-state question tooltip (10 s transient, 03 §2.10).
-    private var infoTooltip: UIView?
-    private var infoTooltipTimer: Timer?
 
     private let stateLoop = ObservationLoop()
     private let progressLoop = ObservationLoop()
@@ -136,7 +127,6 @@ final class SubtitlesPageViewController: UIViewController {
         // UI teardown runs on the main thread; the observer token is not
         // Sendable so the access goes through an isolated assertion.
         MainActor.assumeIsolated {
-            infoTooltipTimer?.invalidate()
             #if DEBUG
             // The demo position driver would otherwise keep firing (and
             // retaining the closure) after the page is gone.
@@ -151,65 +141,35 @@ final class SubtitlesPageViewController: UIViewController {
     // MARK: - Chrome construction
 
     private func buildChrome() {
-        container.backgroundColor = Theme.transcriptSurface
-        container.layer.borderColor = Theme.primaryLightMax.withAlphaComponent(0.12).cgColor
-        container.layer.borderWidth = 1
-        container.layer.cornerRadius = 8
-        container.layer.cornerCurve = .continuous
-        container.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(container)
-
-        artworkView.contentMode = .scaleAspectFill
-        artworkView.clipsToBounds = true
-        artworkView.layer.cornerRadius = 8
-        artworkView.layer.cornerCurve = .continuous
-        artworkView.backgroundColor = Theme.cardBackground
-        artworkView.tintColor = Theme.secondaryText
-        artworkView.image = AppIcons.playerMain.withTintColor(
-            Theme.secondaryText, renderingMode: .alwaysOriginal
-        )
-        artworkView.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(artworkView)
-
-        titleLabel.font = UIFont(name: "Comfortaa-Bold", size: 12)
-        titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.textColor = Theme.primaryLightMax
-        titleLabel.numberOfLines = 2
+        headerTitleLabel.text = "Transcript"
+        headerTitleLabel.font = TypographyV2.headlineSmall.font()
+        headerTitleLabel.textColor = Theme.playerText
+        titleLabel.font = TypographyV2.bodyMedium.font()
+        titleLabel.textColor = Theme.playerSecondary
         titleLabel.lineBreakMode = .byTruncatingTail
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(titleLabel)
+        for label in [headerTitleLabel, titleLabel] {
+            label.adjustsFontForContentSizeCategory = true
+            label.textAlignment = .center
+        }
 
-        divider.backgroundColor = Theme.primaryLightMax.withAlphaComponent(0.12)
-        divider.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(divider)
+        let header = UIStackView(arrangedSubviews: [headerTitleLabel, titleLabel])
+        header.axis = .vertical
+        header.spacing = Spacing.xs
+        header.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(header)
 
         contentHost.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(contentHost)
+        view.addSubview(contentHost)
 
         NSLayoutConstraint.activate([
-            container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            container.topAnchor.constraint(equalTo: view.topAnchor, constant: 24),
-            container.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -24),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            header.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
 
-            artworkView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
-            artworkView.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
-            artworkView.widthAnchor.constraint(equalToConstant: 36),
-            artworkView.heightAnchor.constraint(equalToConstant: 36),
-
-            titleLabel.leadingAnchor.constraint(equalTo: artworkView.trailingAnchor, constant: 12),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -12),
-            titleLabel.centerYAnchor.constraint(equalTo: artworkView.centerYAnchor),
-
-            divider.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            divider.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            divider.topAnchor.constraint(equalTo: container.topAnchor, constant: 60),
-            divider.heightAnchor.constraint(equalToConstant: 1),
-
-            contentHost.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
-            contentHost.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
-            contentHost.topAnchor.constraint(equalTo: divider.bottomAnchor),
-            contentHost.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            contentHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
+            contentHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            contentHost.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.gap),
+            contentHost.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Spacing.pageH),
         ])
     }
 
@@ -301,29 +261,6 @@ final class SubtitlesPageViewController: UIViewController {
 
     private func updateHeader(episode: PlaylistEpisodeRow?) {
         titleLabel.text = episode?.title ?? ""
-        guard let rssFeedURL = episode?.rssFeedUrl, !rssFeedURL.isEmpty else {
-            loadedRSSFeedURL = nil
-            applyArtwork(imageURL: nil)
-            return
-        }
-        guard rssFeedURL != loadedRSSFeedURL else { return }
-        loadedRSSFeedURL = rssFeedURL
-        Task { @MainActor in
-            let subscription = try? await self.context.database.subscriptionRepository()
-                .get(byRSSFeedURL: rssFeedURL)
-            guard self.loadedRSSFeedURL == rssFeedURL else { return }
-            self.applyArtwork(imageURL: subscription?.imageUrl)
-        }
-    }
-
-    private func applyArtwork(imageURL: String?) {
-        if let imageURL, let url = URL(string: imageURL) {
-            artworkView.kf.setImage(with: url, options: [.transition(.none)])
-        } else {
-            artworkView.image = AppIcons.playerMain.withTintColor(
-                Theme.secondaryText, renderingMode: .alwaysOriginal
-            )
-        }
     }
 
     // MARK: - Rendering
@@ -345,7 +282,6 @@ final class SubtitlesPageViewController: UIViewController {
         let state = currentState()
         guard state != renderedState else { return }
         renderedState = state
-        dismissInfoTooltip()
         contentHost.subviews.forEach { $0.removeFromSuperview() }
         lyricsBottomConstraint?.isActive = false
         lyricsBottomConstraint = nil
@@ -381,7 +317,8 @@ final class SubtitlesPageViewController: UIViewController {
         contentHost.setNeedsLayout()
     }
 
-    // MARK: - Status panels (released baseline 1.2.1+38, 03 §2.10)
+    // MARK: - Status panels (released baseline 1.2.1+38, 03 §2.10, on the
+    // shared empty-state block)
 
     private func embedFilling(_ child: UIView) {
         child.translatesAutoresizingMaskIntoConstraints = false
@@ -394,305 +331,90 @@ final class SubtitlesPageViewController: UIViewController {
         ])
     }
 
-    /// Centers a vertical column inside the content host (Dart `Center`).
-    private func embedCentered(_ column: UIStackView) {
-        column.axis = .vertical
-        column.alignment = .center
-        column.translatesAutoresizingMaskIntoConstraints = false
-        let wrapper = UIView()
-        wrapper.translatesAutoresizingMaskIntoConstraints = false
-        wrapper.addSubview(column)
-        NSLayoutConstraint.activate([
-            column.centerXAnchor.constraint(equalTo: wrapper.centerXAnchor),
-            column.centerYAnchor.constraint(equalTo: wrapper.centerYAnchor),
-            column.leadingAnchor.constraint(greaterThanOrEqualTo: wrapper.leadingAnchor),
-            column.trailingAnchor.constraint(lessThanOrEqualTo: wrapper.trailingAnchor),
-            column.topAnchor.constraint(greaterThanOrEqualTo: wrapper.topAnchor),
-            column.bottomAnchor.constraint(lessThanOrEqualTo: wrapper.bottomAnchor),
-        ])
-        embedFilling(wrapper)
+    private func embedStatus(_ content: EmptyStateView.Content) {
+        let panel = EmptyStateView()
+        panel.configure(content)
+        embedFilling(panel)
     }
 
-    /// Ungenerated (player.dart 1.2.1+38): "Generate transcript with AI
-    /// (Beta)" + green 20×20 question dot with a 10 s tap tooltip + the big
-    /// green newDoc capsule that triggers `subtitles.add(url)`.
+    private func makeButton(
+        _ kind: AnycastButton.Kind, title: String, image: UIImage?, action: @escaping () -> Void
+    ) -> UIButton {
+        let button = AnycastButton.make(kind, title: title, image: image)
+        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+        return button
+    }
+
+    /// Ungenerated (player.dart 1.2.1+38): the AI transcript offer; the
+    /// Dart tap tooltip's text is the message, the newDoc capsule the
+    /// primary action triggering `subtitles.add(url)`.
     private func makePromptPanel() {
-        let title = UILabel()
-        title.text = "Generate transcript with AI (Beta)"
-        title.font = SubtitlesPageViewController.systemFont(size: 16, weight: .regular)
-        title.textColor = Theme.primaryLightMax
-        title.textAlignment = .center
-        title.numberOfLines = 0
-        title.adjustsFontForContentSizeCategory = true
-
-        let questionDot = UIButton(type: .custom)
-        questionDot.backgroundColor = Theme.brandGreen
-        questionDot.layer.cornerRadius = 10
-        questionDot.layer.cornerCurve = .continuous
-        questionDot.setTitle("?", for: .normal)
-        questionDot.setTitleColor(Theme.primaryBackgroundDark, for: .normal)
-        questionDot.titleLabel?.font = SubtitlesPageViewController.systemFont(size: 12, weight: .regular)
-        questionDot.isAccessibilityElement = true
-        questionDot.accessibilityLabel = "About AI transcripts"
-        questionDot.addAction(
-            UIAction { [weak self] _ in
-                self?.toggleInfoTooltip(anchor: questionDot)
-            },
-            for: .touchUpInside
-        )
-
-        let headline = UIStackView(arrangedSubviews: [title, questionDot])
-        headline.axis = .vertical
-        headline.alignment = .center
-        headline.spacing = 8
-
-        let generateButton = UIButton(type: .custom)
-        generateButton.backgroundColor = Theme.brandGreen
-        generateButton.layer.cornerRadius = 24
-        generateButton.layer.cornerCurve = .continuous
-        generateButton.setImage(AppIcons.newDoc, for: .normal)
-        generateButton.tintColor = .white
-        generateButton.isAccessibilityElement = true
-        generateButton.accessibilityLabel = "Generate transcript"
-        generateButton.accessibilityTraits = .button
-        generateButton.addAction(
-            UIAction { [weak self] _ in self?.generateTranscript() },
-            for: .touchUpInside
-        )
-
-        let column = UIStackView(arrangedSubviews: [headline, generateButton])
-        embedCentered(column)
-        column.setCustomSpacing(32, after: headline)
-        NSLayoutConstraint.activate([
-            questionDot.widthAnchor.constraint(equalToConstant: 20),
-            questionDot.heightAnchor.constraint(equalToConstant: 20),
-
-            generateButton.widthAnchor.constraint(equalToConstant: 96),
-            generateButton.heightAnchor.constraint(equalToConstant: 72),
-        ])
-    }
-
-    /// Processing: robot_loading + the three baseline lines (player.dart
-    /// 1.2.1+38).
-    private func makeProcessingPanel() {
-        let animation = LottieAnimationView(name: "robot_loading")
-        animation.contentMode = .scaleAspectFit
-        animation.loopMode = .loop
-        animation.play()
-        animation.translatesAutoresizingMaskIntoConstraints = false
-
-        func line(_ text: String, size: CGFloat, weight: UIFont.Weight) -> UILabel {
-            let label = UILabel()
-            label.text = text
-            label.font = SubtitlesPageViewController.systemFont(size: size, weight: weight)
-            label.textColor = Theme.primaryLightMax
-            label.textAlignment = .center
-            label.numberOfLines = 0
-            label.adjustsFontForContentSizeCategory = true
-            return label
+        let generate = makeButton(.primary, title: "Generate transcript", image: AppIcons.newDoc) { [weak self] in
+            self?.generateTranscript()
         }
-
-        let column = UIStackView(arrangedSubviews: [
-            animation,
-            line("Generating with AI ...", size: 14, weight: .semibold),
-            line("It may take 2 ~ 5 minutes ...", size: 14, weight: .semibold),
-            line("Feel free to explore or come back later.", size: 12, weight: .regular),
-        ])
-        embedCentered(column)
-        column.spacing = 8
-        column.setCustomSpacing(24, after: animation)
-        column.setCustomSpacing(24, after: column.arrangedSubviews[2])
-        NSLayoutConstraint.activate([
-            animation.widthAnchor.constraint(equalToConstant: 112),
-            animation.heightAnchor.constraint(equalToConstant: 112),
-        ])
+        embedStatus(.init(
+            icon: UIImage(systemName: "sparkles"),
+            title: "Generate transcript with AI (Beta)",
+            message: "AI transcript may take about 2 ~ 5 minutes",
+            actions: [generate]
+        ))
     }
 
-    /// Failed: a single accent Retry capsule (03 §2.10 "Retry"; baseline
-    /// code uses the accent fill, the doc's "blue" describes an older
-    /// release line).
+    /// Processing: the baseline lines under a spinner (player.dart 1.2.1+38).
+    private func makeProcessingPanel() {
+        embedStatus(.init(
+            showsSpinner: true,
+            title: "Generating with AI …",
+            message: "It may take 2 ~ 5 minutes. Feel free to explore or come back later."
+        ))
+    }
+
+    /// Failed: the Retry capsule (03 §2.10 "Retry").
     private func makeFailedPanel() {
-        let retry = UIButton(type: .system)
-        var configuration = UIButton.Configuration.filled()
-        configuration.title = "Retry"
-        configuration.baseBackgroundColor = Theme.accent
-        configuration.baseForegroundColor = Theme.primaryBackgroundDark
-        configuration.cornerStyle = .capsule
-        configuration.contentInsets = NSDirectionalEdgeInsets(
-            top: 10, leading: 24, bottom: 10, trailing: 24
-        )
-        retry.configuration = configuration
-        retry.addAction(
-            UIAction { [weak self] _ in self?.generateTranscript() },
-            for: .touchUpInside
-        )
-        let column = UIStackView(arrangedSubviews: [retry])
-        embedCentered(column)
-    }
-
-    // MARK: - Wrapper-state status panels (_TranscriptStatusPanel,
-    // player.dart:420-490: 64×64 tinted circle + 30pt icon, centered
-    // title/message, optional action)
-
-    private func makeStatusLine(_ text: String, size: CGFloat, weight: UIFont.Weight,
-                                color: UIColor) -> UILabel {
-        let label = UILabel()
-        label.text = text
-        label.font = SubtitlesPageViewController.systemFont(size: size, weight: weight)
-        label.textColor = color
-        label.textAlignment = .center
-        label.numberOfLines = 0
-        label.adjustsFontForContentSizeCategory = true
-        return label
-    }
-
-    private func makeStatusIcon(_ systemName: String, tintColor: UIColor) -> UIView {
-        let circle = UIView()
-        circle.backgroundColor = UIColor.white.withAlphaComponent(0.10)
-        circle.layer.cornerRadius = 32
-        circle.layer.cornerCurve = .continuous
-        let icon = UIImageView(image: UIImage(systemName: systemName))
-        icon.tintColor = tintColor
-        icon.contentMode = .center
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        circle.addSubview(icon)
-        NSLayoutConstraint.activate([
-            circle.widthAnchor.constraint(equalToConstant: 64),
-            circle.heightAnchor.constraint(equalToConstant: 64),
-            icon.centerXAnchor.constraint(equalTo: circle.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: circle.centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 30),
-            icon.heightAnchor.constraint(equalToConstant: 30),
-        ])
-        return circle
+        let retry = makeButton(.primary, title: "Retry", image: nil) { [weak self] in
+            self?.generateTranscript()
+        }
+        embedStatus(.init(
+            icon: UIImage(systemName: "exclamationmark.triangle"),
+            title: "Transcript generation failed",
+            actions: [retry]
+        ))
     }
 
     /// Unavailable (no episode): "Transcript unavailable" — player.dart:701-710.
     private func makeUnavailablePanel() {
-        let column = UIStackView(arrangedSubviews: [
-            makeStatusIcon("doc.text", tintColor: Theme.primaryLightMax),
-            makeStatusLine("Transcript unavailable", size: 16, weight: .semibold,
-                           color: Theme.primaryLightMax),
-            makeStatusLine(
-                "Choose an episode to view or generate its transcript.",
-                size: 14, weight: .regular, color: Theme.secondaryText
-            ),
-        ])
-        embedCentered(column)
-        column.spacing = 12
-        column.setCustomSpacing(20, after: column.arrangedSubviews[0])
+        embedStatus(.init(
+            icon: UIImage(systemName: "doc.text"),
+            title: "Transcript unavailable",
+            message: "Choose an episode to view or generate its transcript."
+        ))
     }
 
     /// Row fetch in flight: spinner + "Loading transcript…" —
     /// player.dart:806-815.
     private func makeLoadingPanel() {
-        let spinner = UIActivityIndicatorView(style: .medium)
-        spinner.color = Theme.accent
-        spinner.startAnimating()
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            spinner.widthAnchor.constraint(equalToConstant: 32),
-            spinner.heightAnchor.constraint(equalToConstant: 32),
-        ])
-        let column = UIStackView(arrangedSubviews: [
-            spinner,
-            makeStatusLine("Loading transcript…", size: 16, weight: .semibold,
-                           color: Theme.primaryLightMax),
-            makeStatusLine(
-                "Preparing the saved transcript for playback.",
-                size: 14, weight: .regular, color: Theme.secondaryText
-            ),
-        ])
-        embedCentered(column)
-        column.spacing = 12
-        column.setCustomSpacing(20, after: spinner)
+        embedStatus(.init(
+            showsSpinner: true,
+            title: "Loading transcript…",
+            message: "Preparing the saved transcript for playback."
+        ))
     }
 
-    /// Row fetch failed: error icon + "Couldn't load transcript" + a
-    /// Try-again action that re-runs the row load — player.dart:789-805.
+    /// Row fetch failed: "Couldn't load transcript" + a Try-again action
+    /// that re-runs the row load — player.dart:789-805.
     private func makeLoadFailedPanel() {
-        let retry = UIButton(type: .system)
-        var configuration = UIButton.Configuration.filled()
-        configuration.title = "Try again"
-        configuration.image = UIImage(systemName: "arrow.triangle.2.circlepath")
-        configuration.baseBackgroundColor = Theme.accent
-        configuration.baseForegroundColor = Theme.primaryBackgroundDark
-        configuration.cornerStyle = .capsule
-        configuration.contentInsets = NSDirectionalEdgeInsets(
-            top: 10, leading: 24, bottom: 10, trailing: 24
-        )
-        retry.configuration = configuration
-        retry.addAction(
-            UIAction { [weak self] _ in
-                guard let self, let url = self.loadedURL, !url.isEmpty else { return }
-                self.loadTranscriptRow(url: url)
-            },
-            for: .touchUpInside
-        )
-        let column = UIStackView(arrangedSubviews: [
-            makeStatusIcon("arrow.triangle.2.circlepath", tintColor: .systemRed),
-            makeStatusLine("Couldn't load transcript", size: 16, weight: .semibold,
-                           color: Theme.primaryLightMax),
-            makeStatusLine(
-                "The saved transcript is temporarily unavailable.",
-                size: 14, weight: .regular, color: Theme.secondaryText
-            ),
-            retry,
-        ])
-        embedCentered(column)
-        column.spacing = 12
-        column.setCustomSpacing(20, after: column.arrangedSubviews[0])
-        column.setCustomSpacing(24, after: column.arrangedSubviews[2])
-    }
-
-    /// The 10 s tap tooltip of the question dot (Dart `Tooltip(showDuration:
-    /// 10s, triggerMode: tap)`).
-    private func toggleInfoTooltip(anchor: UIView) {
-        if infoTooltip != nil {
-            dismissInfoTooltip()
-            return
+        let retry = makeButton(
+            .secondary, title: "Try again", image: UIImage(systemName: "arrow.triangle.2.circlepath")
+        ) { [weak self] in
+            guard let self, let url = self.loadedURL, !url.isEmpty else { return }
+            self.loadTranscriptRow(url: url)
         }
-        let label = UILabel()
-        label.text = "AI transcript may take about 2 ~ 5 minutes"
-        label.font = SubtitlesPageViewController.systemFont(size: 12, weight: .regular)
-        label.textColor = Theme.primaryLightMax
-        label.numberOfLines = 0
-        label.textAlignment = .center
-        label.adjustsFontForContentSizeCategory = true
-
-        let pill = UIView()
-        pill.backgroundColor = UIColor.black.withAlphaComponent(0.87)
-        pill.layer.cornerRadius = 8
-        pill.layer.cornerCurve = .continuous
-        pill.translatesAutoresizingMaskIntoConstraints = false
-        label.translatesAutoresizingMaskIntoConstraints = false
-        pill.addSubview(label)
-        contentHost.addSubview(pill)
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 10),
-            label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -10),
-            label.topAnchor.constraint(equalTo: pill.topAnchor, constant: 6),
-            label.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -6),
-
-            pill.centerXAnchor.constraint(equalTo: contentHost.centerXAnchor),
-            pill.topAnchor.constraint(equalTo: anchor.bottomAnchor, constant: 8),
-            pill.widthAnchor.constraint(lessThanOrEqualToConstant: 260),
-        ])
-        infoTooltip = pill
-        infoTooltipTimer = Timer.scheduledTimer(
-            withTimeInterval: 10, repeats: false
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.dismissInfoTooltip()
-            }
-        }
-    }
-
-    private func dismissInfoTooltip() {
-        infoTooltipTimer?.invalidate()
-        infoTooltipTimer = nil
-        infoTooltip?.removeFromSuperview()
-        infoTooltip = nil
+        embedStatus(.init(
+            icon: UIImage(systemName: "arrow.triangle.2.circlepath"),
+            title: "Couldn't load transcript",
+            message: "The saved transcript is temporarily unavailable.",
+            actions: [retry]
+        ))
     }
 
     /// `controller.add(url)` with the K27 user-trigger surface: the error
@@ -789,7 +511,7 @@ final class SubtitlesPageViewController: UIViewController {
         overlay = glass
 
         let chatIcon = UIImageView(image: AppIcons.aiChat)
-        chatIcon.tintColor = Theme.brandGreen
+        chatIcon.tintColor = Theme.primary
         chatIcon.contentMode = .scaleAspectFit
         chatIcon.isUserInteractionEnabled = true
         chatIcon.isAccessibilityElement = true
@@ -800,7 +522,7 @@ final class SubtitlesPageViewController: UIViewController {
 
         let moreButton = UIButton(type: .system)
         moreButton.setImage(AppIcons.more, for: .normal)
-        moreButton.tintColor = Theme.secondaryText
+        moreButton.tintColor = Theme.onSurfaceVariant
         moreButton.isAccessibilityElement = true
         moreButton.accessibilityLabel = "More transcript actions"
         moreButton.showsMenuAsPrimaryAction = true
@@ -837,7 +559,7 @@ final class SubtitlesPageViewController: UIViewController {
         var elements: [UIView] = []
         if spinner {
             let indicator = UIActivityIndicatorView(style: .medium)
-            indicator.color = Theme.accent
+            indicator.color = Theme.primary
             indicator.startAnimating()
             indicator.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
@@ -848,8 +570,8 @@ final class SubtitlesPageViewController: UIViewController {
         }
         let label = UILabel()
         label.text = message
-        label.font = SubtitlesPageViewController.systemFont(size: 15, weight: .semibold)
-        label.textColor = Theme.secondaryText
+        label.font = TypographyV2.titleSmall.font()
+        label.textColor = Theme.playerSecondary
         label.adjustsFontForContentSizeCategory = true
         elements.append(label)
 
@@ -907,14 +629,6 @@ final class SubtitlesPageViewController: UIViewController {
 
         let activity = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
         topMostPresented().present(activity, animated: true)
-    }
-
-    // MARK: - Helpers
-
-    /// Base system fonts; Dynamic Type scaling comes from the label's
-    /// `adjustsFontForContentSizeCategory` (single scaling source).
-    private static func systemFont(size: CGFloat, weight: UIFont.Weight) -> UIFont {
-        UIFont.systemFont(ofSize: size, weight: weight)
     }
 
     // MARK: - DEBUG rendering demo

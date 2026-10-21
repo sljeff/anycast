@@ -40,6 +40,7 @@ final class PlaylistFlyInAnimator {
     /// removed (the Dart onAnimationComplete — the actual list insertion
     /// happens there at the call sites).
     func fly(from startPoint: CGPoint, in window: UIWindow, completion: (() -> Void)? = nil) {
+        Haptics.queueAdded()
         let endpoint = endpointProvider.playlistFlyInEndpoint(in: window)
 
         let startSize = CGSize(width: 200, height: 48)

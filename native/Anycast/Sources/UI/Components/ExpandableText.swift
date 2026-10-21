@@ -94,7 +94,7 @@ final class ExpandableText: UIView {
         if isTruncated {
             // Dart truncated surface: goldAlpha3 dark — warm translucent.
             backgroundColor = UIColor(red: 248 / 255, green: 236 / 255, blue: 187 / 255, alpha: 0.14)
-            layer.cornerRadius = 8
+            layer.cornerRadius = Radius.sm
             layer.cornerCurve = .continuous
             // Collapse blank lines in the truncated copy only (Dart
             // replaceAll('\n\n', '\n')).

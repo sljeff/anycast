@@ -38,8 +38,8 @@ final class ShareDialogViewController: DialogBaseViewController {
 
         let titleLabel = UILabel()
         titleLabel.text = "Import Podcasts"
-        titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         cardView.addSubview(titleLabel)
@@ -55,7 +55,7 @@ final class ShareDialogViewController: DialogBaseViewController {
             let message = UILabel()
             message.text = "Oh no! Seems like there is no valid links in the file."
             message.font = Typography.htmlBody.font()
-            message.textColor = Theme.primaryLightMax
+            message.textColor = Theme.onSurface
             message.adjustsFontForContentSizeCategory = true
             message.numberOfLines = 0
 
@@ -64,7 +64,7 @@ final class ShareDialogViewController: DialogBaseViewController {
             configuration.title = "OK"
             configuration.baseForegroundColor = Theme.primary
             ok.configuration = configuration
-            ok.titleLabel?.font = Typography.mainText.font()
+            ok.titleLabel?.font = TypographyV2.bodyMedium.font()
             ok.addAction(
                 UIAction { [weak self] _ in self?.dismiss(animated: true) },
                 for: .touchUpInside
@@ -99,7 +99,7 @@ final class ShareDialogViewController: DialogBaseViewController {
         listView.dataSource = self
         listView.delegate = self
         listView.backgroundColor = .clear
-        listView.separatorColor = Theme.cardOutline
+        listView.separatorColor = Theme.outline
         listView.rowHeight = UITableView.automaticDimension
         listView.estimatedRowHeight = 56
         listView.isAccessibilityElement = true
@@ -114,9 +114,9 @@ final class ShareDialogViewController: DialogBaseViewController {
         let close = UIButton(type: .system)
         var closeConfiguration = UIButton.Configuration.plain()
         closeConfiguration.title = "Close"
-        closeConfiguration.baseForegroundColor = Theme.secondaryText
+        closeConfiguration.baseForegroundColor = Theme.onSurfaceVariant
         close.configuration = closeConfiguration
-        close.titleLabel?.font = Typography.mainText.font()
+        close.titleLabel?.font = TypographyV2.bodyMedium.font()
         close.addAction(
             UIAction { [weak self] _ in self?.dismiss(animated: true) },
             for: .touchUpInside
@@ -125,13 +125,13 @@ final class ShareDialogViewController: DialogBaseViewController {
         let confirm = UIButton(type: .system)
         var confirmConfiguration = UIButton.Configuration.filled()
         confirmConfiguration.title = "Import"
-        confirmConfiguration.baseBackgroundColor = Theme.primaryLightMax
-        confirmConfiguration.baseForegroundColor = Theme.primaryBackgroundDark
+        confirmConfiguration.baseBackgroundColor = Theme.onSurface
+        confirmConfiguration.baseForegroundColor = Theme.background
         confirmConfiguration.contentInsets = NSDirectionalEdgeInsets(
             top: 10, leading: 24, bottom: 10, trailing: 24
         )
         confirm.configuration = confirmConfiguration
-        confirm.titleLabel?.font = Typography.mainText.font()
+        confirm.titleLabel?.font = TypographyV2.bodyMedium.font()
         confirm.addAction(
             UIAction { [weak self] _ in self?.startImport() },
             for: .touchUpInside
@@ -219,14 +219,14 @@ final class ShareEntryCell: UITableViewCell {
         selectionStyle = .none
         backgroundColor = .clear
 
-        card.backgroundColor = Theme.loginCardBackground
-        card.layer.cornerRadius = 8
+        card.backgroundColor = Theme.surfaceContainer
+        card.layer.cornerRadius = Radius.md
         card.layer.cornerCurve = .continuous
         card.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(card)
 
-        titleLabel.font = Typography.cardTitleBold.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.font = TypographyV2.headlineSmall.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail

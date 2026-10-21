@@ -12,13 +12,13 @@ final class EpisodeProgressBackdrop: UIView {
     /// Optional unfilled-track surface behind the fill (nil → transparent;
     /// the card's own background shows through, as in the Dart card).
     var trackColor: UIColor? {
-        didSet { trackLayer.backgroundColor = trackColor?.cgColor }
+        didSet { applyColors() }
     }
 
     /// Fill color: white 20% on the mini player (03 §2.9); cards use the
     /// same translucent white by default.
     var fillColor: UIColor = UIColor.white.withAlphaComponent(0.2) {
-        didSet { fillLayer.backgroundColor = fillColor.cgColor }
+        didSet { applyColors() }
     }
 
     private let trackLayer = CALayer()
@@ -28,9 +28,19 @@ final class EpisodeProgressBackdrop: UIView {
     init() {
         super.init(frame: .zero)
         isUserInteractionEnabled = false
-        fillLayer.backgroundColor = fillColor.cgColor
         layer.addSublayer(trackLayer)
         layer.addSublayer(fillLayer)
+        applyColors()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _) in
+            self.applyColors()
+        }
+    }
+
+    /// Layer colors are CGColors, frozen at assignment (09 §9a); resolve
+    /// them against the current traits and again on appearance changes.
+    private func applyColors() {
+        trackLayer.backgroundColor = trackColor?.resolvedColor(with: traitCollection).cgColor
+        fillLayer.backgroundColor = fillColor.resolvedColor(with: traitCollection).cgColor
     }
 
     @available(*, unavailable)

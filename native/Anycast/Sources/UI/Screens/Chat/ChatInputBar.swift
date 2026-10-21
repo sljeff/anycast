@@ -2,16 +2,16 @@ import UIKit
 
 /// Hand-written plain-text input bar (07 §2.6: InputBarAccessoryView is
 /// deliberately NOT used). Mirrors the flutter_chat_ui composer defaults
-/// the shipped page kept: surfaceContainerLow bar background, a rounded
-/// (24) filled field (surfaceContainerHigh @ 80%) with "Type a message"
+/// the shipped page kept: v2 surface background, a rounded (24) filled
+/// field with "Type a message"
 /// placeholder, and a send glyph at onSurface 50%; multi-line up to 3
 /// lines; the button disables while a request is in flight.
 final class ChatInputBar: UIView {
 
     private enum Metrics {
-        static let barBackground = UIColor(red: 0x12 / 255, green: 0x12 / 255, blue: 0x12 / 255, alpha: 1)
-        static let fieldFill = UIColor(red: 0x24 / 255, green: 0x24 / 255, blue: 0x24 / 255, alpha: 0.8)
-        static let onSurface50 = UIColor.white.withAlphaComponent(0.5)
+        static let barBackground = Theme.surface
+        static let fieldFill = Theme.surfaceContainerHigh
+        static let onSurface50 = Theme.onSurfaceVariant.withAlphaComponent(0.7)
         static let fieldRadius: CGFloat = 24
         static let barPadding: CGFloat = 8
         static let fieldVerticalPadding: CGFloat = 9
@@ -38,12 +38,10 @@ final class ChatInputBar: UIView {
         backgroundColor = Metrics.barBackground
         insetsLayoutMarginsFromSafeArea = false
 
-        let fieldFont = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: UIFont.systemFont(ofSize: 14, weight: .regular)
-        )
+        let fieldFont = TypographyV2.bodyCompact.font()
         textView.font = fieldFont
         textView.adjustsFontForContentSizeCategory = true
-        textView.textColor = .white
+        textView.textColor = Theme.onSurface
         textView.backgroundColor = Metrics.fieldFill
         textView.layer.cornerRadius = Metrics.fieldRadius
         textView.layer.cornerCurve = .continuous
@@ -53,7 +51,7 @@ final class ChatInputBar: UIView {
             bottom: Metrics.fieldVerticalPadding,
             right: Metrics.fieldHorizontalPadding
         )
-        textView.keyboardAppearance = .dark
+        textView.keyboardAppearance = traitCollection.userInterfaceStyle == .dark ? .dark : .light
         textView.isScrollEnabled = false
         textView.delegate = self
         textView.isAccessibilityElement = true
@@ -119,9 +117,7 @@ final class ChatInputBar: UIView {
 
     /// Recomputes the 3-line height cap from the CURRENT body font.
     private func refreshFieldHeightCap() {
-        let font = textView.font ?? UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: UIFont.systemFont(ofSize: 14, weight: .regular)
-        )
+        let font = textView.font ?? TypographyV2.bodyCompact.font()
         fieldHeightLimit?.constant = 3 * font.lineHeight + 2 * Metrics.fieldVerticalPadding
     }
 

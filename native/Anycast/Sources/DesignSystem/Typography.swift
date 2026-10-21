@@ -24,10 +24,16 @@ nonisolated enum Typography {
         /// display numerals, e.g. the lyric time bar).
         let scalingTextStyle: UIFont.TextStyle?
 
+        /// Renders in the active theme's text face (SF Pro for sand) — the
+        /// bundled v1 family only decides weight and monospacing, so legacy
+        /// call sites share the v2 typeface.
         func font(traits: UITraitCollection? = nil) -> UIFont {
-            guard let base = UIFont(name: postScriptName, size: size) else {
-                assertionFailure("Font \(postScriptName) not registered — check UIAppFonts")
-                return UIFont.systemFont(ofSize: size)
+            let base: UIFont
+            if postScriptName.hasPrefix("RobotoMono") {
+                base = .monospacedSystemFont(ofSize: size, weight: .regular)
+            } else {
+                let weight: UIFont.Weight = postScriptName.hasSuffix("-Bold") ? .bold : .regular
+                base = ThemeRegistry.current.typography.font(size, weight, .text)
             }
             guard let scalingTextStyle else { return base }
             let metrics = UIFontMetrics(forTextStyle: scalingTextStyle)
@@ -53,19 +59,19 @@ nonisolated enum Typography {
     /// (styles.dart mainTitle).
     static let mainTitle = Style(
         postScriptName: "Comfortaa-Bold", size: 44, kern: 4.4,
-        color: Theme.primaryLightMax, scalingTextStyle: .largeTitle
+        color: Theme.onSurface, scalingTextStyle: .largeTitle
     )
 
     /// 24pt comfortaa w700, tracking 2.4 (styles.dart secondaryTitle).
     static let secondaryTitle = Style(
         postScriptName: "Comfortaa-Bold", size: 24, kern: 2.4,
-        color: Theme.primaryLightMax, scalingTextStyle: .title1
+        color: Theme.onSurface, scalingTextStyle: .title1
     )
 
     /// 14pt comfortaa regular (styles.dart defaultMainText).
     static let mainText = Style(
         postScriptName: "Comfortaa-Regular", size: 14, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .subheadline
+        color: Theme.onSurface, scalingTextStyle: .subheadline
     )
 
     /// 16pt notoSans w700 (styles.dart defaultTitle / cardTitleBold). This
@@ -75,7 +81,7 @@ nonisolated enum Typography {
     /// the parity rendering and must not switch to this style.
     static let cardTitleBold = Style(
         postScriptName: "NotoSans-Bold", size: 16, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .headline
+        color: Theme.onSurface, scalingTextStyle: .headline
     )
     static let defaultTitle = cardTitleBold
 
@@ -88,36 +94,39 @@ nonisolated enum Typography {
     /// 12pt inter, secondary text (styles.dart defaultText).
     static let defaultText = Style(
         postScriptName: "Inter-Regular", size: 12, kern: 0,
-        color: Theme.secondaryText, scalingTextStyle: .caption1
+        color: Theme.onSurfaceVariant, scalingTextStyle: .caption1
     )
 
     /// Card description — 12pt inter on 0x6B7280 (03 §2.11).
     static let cardDescription = Style(
         postScriptName: "Inter-Regular", size: 12, kern: 0,
-        color: Theme.secondaryLabelGray, scalingTextStyle: .caption1
+        color: Theme.onSurfaceVariant, scalingTextStyle: .caption1
     )
 
     // MARK: - Player / lyrics (03 §2.10)
 
-    /// Lyric main line — 14pt M PLUS Rounded 1c on grey[200].
+    /// Transcript lines (Anycast 2.0 UI kit `TranscriptLineCell`): one size
+    /// for every line so the follow highlight never changes line height —
+    /// the active line differs only by brightness.
     static let lyricMain = Style(
-        postScriptName: "RoundedMplus1c-Regular", size: 14, kern: 0,
-        color: Theme.lyricGrey200,
-        scalingTextStyle: .subheadline
-    )
-
-    /// Lyric active line — 16pt, greenAccent.
-    static let lyricActive = Style(
         postScriptName: "RoundedMplus1c-Regular", size: 16, kern: 0,
-        color: Theme.lyricGreenAccent,
+        color: Theme.playerSecondary,
         scalingTextStyle: .body
     )
 
-    /// Lyric translation — 14pt greenAccent (active translation grey[300]).
+    /// Active transcript line — full-strength player text.
+    static let lyricActive = Style(
+        postScriptName: "RoundedMplus1c-Regular", size: 16, kern: 0,
+        color: Theme.playerText,
+        scalingTextStyle: .body
+    )
+
+    /// Transcript translation — one step dimmer than the main line
+    /// (the active line's translation uses `playerSecondary`).
     static let lyricTranslation = Style(
-        postScriptName: "RoundedMplus1c-Regular", size: 14, kern: 0,
-        color: Theme.lyricGreenAccent,
-        scalingTextStyle: .subheadline
+        postScriptName: "RoundedMplus1c-Regular", size: 16, kern: 0,
+        color: Theme.playerSecondary.withAlphaComponent(0.55),
+        scalingTextStyle: .body
     )
 
     // MARK: - Misc pinned sizes
@@ -125,13 +134,13 @@ nonisolated enum Typography {
     /// Secondary tab labels — 12pt comfortaa (main.dart TabBar theme).
     static let tabLabel = Style(
         postScriptName: "Comfortaa-Regular", size: 12, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .caption1
+        color: Theme.onSurface, scalingTextStyle: .caption1
     )
 
     /// Login menu small text — roboto (login.dart:237).
     static let loginSmall = Style(
         postScriptName: "Roboto-Regular", size: 14, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .subheadline
+        color: Theme.onSurface, scalingTextStyle: .subheadline
     )
 
     /// HTML render error text — 12pt roboto mono, red (formatters renderHtml).
@@ -149,7 +158,7 @@ nonisolated enum Typography {
     /// re-baseline decision, not a drive-by fix.
     static let htmlBody = Style(
         postScriptName: "Inter-Regular", size: 14, kern: 0,
-        color: Theme.primaryLightMax, scalingTextStyle: .subheadline
+        color: Theme.onSurface, scalingTextStyle: .subheadline
     )
 
     /// All semantic styles, for tests and enumerations.
@@ -195,9 +204,11 @@ nonisolated enum TypographyV2 {
         let weight: UIFont.Weight
         let color: UIColor
         let scalingTextStyle: UIFont.TextStyle
+        /// Which theme face renders this style (`ThemeSpec.Typography`).
+        var role: ThemeSpec.FontRole = .text
 
         func font(traits: UITraitCollection? = nil) -> UIFont {
-            let base = UIFont.systemFont(ofSize: size, weight: weight)
+            let base = ThemeRegistry.current.typography.font(size, weight, role)
             let metrics = UIFontMetrics(forTextStyle: scalingTextStyle)
             if let traits {
                 return metrics.scaledFont(for: base, compatibleWith: traits)
@@ -218,18 +229,24 @@ nonisolated enum TypographyV2 {
         }
     }
 
-    static let displayLarge = Style(size: 48, lineHeight: 48, weight: .black, color: Theme.onSurface, scalingTextStyle: .largeTitle)
+    static let displayLarge = Style(size: 48, lineHeight: 48, weight: .black, color: Theme.onSurface, scalingTextStyle: .largeTitle, role: .display)
     static let displayMedium = Style(size: 34, lineHeight: 41, weight: .regular, color: Theme.onSurface, scalingTextStyle: .largeTitle)
     static let displaySmall = Style(size: 28, lineHeight: 34, weight: .regular, color: Theme.onSurface, scalingTextStyle: .title1)
     static let headlineLarge = Style(size: 28, lineHeight: 34, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .title1)
     static let headlineMedium = Style(size: 22, lineHeight: 28, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .title2)
     static let headlineSmall = Style(size: 17, lineHeight: 22, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .headline)
     static let titleLarge = Style(size: 20, lineHeight: 25, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .title2)
+    /// Episode card / queue row titles (UI kit 20 pt regular).
+    static let cardTitle = Style(size: 20, lineHeight: 25, weight: .regular, color: Theme.onSurface, scalingTextStyle: .title3)
     static let titleMedium = Style(size: 16, lineHeight: 21, weight: .medium, color: Theme.onSurface, scalingTextStyle: .body)
     static let titleSmall = Style(size: 15, lineHeight: 20, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .subheadline)
     static let bodyLarge = Style(size: 17, lineHeight: 22, weight: .regular, color: Theme.onSurface, scalingTextStyle: .body)
     static let bodyMedium = Style(size: 15, lineHeight: 20, weight: .regular, color: Theme.onSurface, scalingTextStyle: .subheadline)
     static let bodySmall = Style(size: 13, lineHeight: 18, weight: .regular, color: Theme.onSurface, scalingTextStyle: .footnote)
+    /// Figma's 14 pt card copy (inbox card description, detail metadata).
+    static let bodyCompact = Style(size: 14, lineHeight: 20, weight: .regular, color: Theme.onSurface, scalingTextStyle: .subheadline)
+    /// Figma's 12 pt meta line (show name, dates).
+    static let caption = Style(size: 12, lineHeight: 16, weight: .regular, color: Theme.onSurface, scalingTextStyle: .caption1)
     static let labelLarge = Style(size: 17, lineHeight: 22, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .body)
     static let labelMedium = Style(size: 12, lineHeight: 16, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .caption1)
     static let labelSmall = Style(size: 11, lineHeight: 13, weight: .medium, color: Theme.onSurface, scalingTextStyle: .caption2)
@@ -237,8 +254,8 @@ nonisolated enum TypographyV2 {
     /// All v2 styles, for tests and enumerations.
     static let allStyles: [Style] = [
         displayLarge, displayMedium, displaySmall, headlineLarge, headlineMedium,
-        headlineSmall, titleLarge, titleMedium, titleSmall, bodyLarge, bodyMedium,
-        bodySmall, labelLarge, labelMedium, labelSmall,
+        headlineSmall, titleLarge, cardTitle, titleMedium, titleSmall, bodyLarge, bodyMedium,
+        bodySmall, bodyCompact, caption, labelLarge, labelMedium, labelSmall,
     ]
 }
 
@@ -251,12 +268,29 @@ extension TypographyV2.Style {
     static let headlineMedium = TypographyV2.headlineMedium
     static let headlineSmall = TypographyV2.headlineSmall
     static let titleLarge = TypographyV2.titleLarge
+    static let cardTitle = TypographyV2.cardTitle
     static let titleMedium = TypographyV2.titleMedium
     static let titleSmall = TypographyV2.titleSmall
     static let bodyLarge = TypographyV2.bodyLarge
     static let bodyMedium = TypographyV2.bodyMedium
     static let bodySmall = TypographyV2.bodySmall
+    static let bodyCompact = TypographyV2.bodyCompact
+    static let caption = TypographyV2.caption
     static let labelLarge = TypographyV2.labelLarge
     static let labelMedium = TypographyV2.labelMedium
     static let labelSmall = TypographyV2.labelSmall
+}
+
+extension UIFont {
+    /// Same face with tabular (monospaced) digits, for times and counters
+    /// that change in place.
+    func monospacedDigits() -> UIFont {
+        let descriptor = fontDescriptor.addingAttributes([
+            .featureSettings: [[
+                UIFontDescriptor.FeatureKey.type: kNumberSpacingType,
+                UIFontDescriptor.FeatureKey.selector: kMonospacedNumbersSelector,
+            ]],
+        ])
+        return UIFont(descriptor: descriptor, size: pointSize)
+    }
 }

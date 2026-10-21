@@ -77,13 +77,9 @@ final class PodcastHomeViewController: UIViewController {
             sectionBar.heightAnchor.constraint(equalToConstant: 60),
         ])
 
+        // Section children fill this view and inherit its safe area, which
+        // already carries the shell's tab bar / mini player avoidance.
         showSection(0, animated: false)
-        propagateBottomAvoidance()
-    }
-
-    override func viewSafeAreaInsetsDidChange() {
-        super.viewSafeAreaInsetsDidChange()
-        propagateBottomAvoidance()
     }
 
     private func showSection(_ index: Int, animated: Bool = true) {
@@ -120,11 +116,6 @@ final class PodcastHomeViewController: UIViewController {
 
     private func updateHeaderStatus(_ status: String) {
         header.configure(HeaderView.Configuration(title: "Podcast", statusText: status.isEmpty ? nil : status))
-    }
-
-    private func propagateBottomAvoidance() {
-        let bottom = additionalSafeAreaInsets.bottom
-        sectionControllers.forEach { $0.additionalSafeAreaInsets.bottom = bottom }
     }
 
     private func openSettings() {

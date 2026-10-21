@@ -698,7 +698,7 @@ final class QACrawlUITests: XCTestCase {
     }
 
     private func ensureDetailOpen() -> Bool {
-        if app.buttons["Share episode"].exists { return true }
+        if app.buttons["More episode actions"].exists { return true }
         closeSheet()
         // v2 inbox cards are located by their `more` menu button; the whole
         // card opens Detail (09 §10 批次1).
@@ -707,7 +707,7 @@ final class QACrawlUITests: XCTestCase {
             .firstMatch
         guard card.waitForExistence(timeout: 4) else { return false }
         tapElement(card)
-        return app.buttons["Share episode"].waitForExistence(timeout: 6)
+        return app.buttons["More episode actions"].waitForExistence(timeout: 6)
     }
 
     /// Subscriptions is the second section within Podcast — tap it, then
@@ -828,7 +828,7 @@ final class QACrawlUITests: XCTestCase {
                            for index in 0..<tries {
                                let card = cards.element(boundBy: index)
                                s.tapElement(card)
-                               guard s.app.buttons["Share episode"]
+                               guard s.app.buttons["More episode actions"]
                                        .waitForExistence(timeout: 6) else { continue }
                                if s.detailBodyPopulated() { return true }
                                // Empty body: close and try the next card.
@@ -839,9 +839,9 @@ final class QACrawlUITests: XCTestCase {
                            // Last opened sheet may still be up; keep it for
                            // the capture and let assertDetailBody file the
                            // finding with the observed body length.
-                           return s.app.buttons["Share episode"].exists
+                           return s.app.buttons["More episode actions"].exists
                        },
-                       required: ["Share episode"],
+                       required: ["More episode actions"],
                        probe: true, settle: 3),
 
             Checkpoint(state: "channel-on-detail",

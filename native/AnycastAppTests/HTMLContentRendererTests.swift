@@ -21,7 +21,7 @@ struct HTMLContentRendererTests {
         let result = await renderer.attributedString(for: "Just a plain description", cacheKey: "k1")
         #expect(result.string == "Just a plain description")
         let color = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
-        #expect(color === Theme.primaryLightMax)
+        #expect(color === Theme.onSurface)
     }
 
     @Test("Sanitization-empty HTML falls back to htmlToText")
@@ -67,7 +67,7 @@ struct HTMLContentRendererTests {
         )
         #expect(result.string.contains("Hello"))
         let color = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
-        #expect(color === Theme.primaryLightMax)
+        #expect(color === Theme.onSurface)
         let font = result.attribute(.font, at: 0, effectiveRange: nil) as? UIFont
         #expect(font?.pointSize == Typography.htmlBody.font().pointSize)
     }
@@ -82,12 +82,44 @@ struct HTMLContentRendererTests {
             if value != nil {
                 let range = (result.string as NSString).range(of: "docs")
                 let color = result.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? UIColor
-                #expect(color === Theme.tabSelectedGreen)
+                #expect(color === Theme.primary)
                 sawLink = true
                 stop.pointee = true
             }
         }
         #expect(sawLink)
+    }
+
+    @Test("Oversized heading text normalizes into the single heading tier")
+    func oversizedHeadingIsClamped() async {
+        let renderer = HTMLContentRenderer()
+        // Machine-generated show notes wrap whole paragraphs in <h1>; WebKit
+        // parses it far past body size. The normalization must fold it into
+        // the single 1.3× semibold tier instead of preserving the ratio.
+        let result = await renderer.attributedString(
+            for: "<h1>A giant machine-generated heading</h1><p>Body text</p>",
+            cacheKey: "episode-h1"
+        )
+        let bodySize = Typography.htmlBody.font().pointSize
+        var headingSize: CGFloat?
+        var bodySawUnclamped = false
+        result.enumerateAttribute(.font, in: NSRange(location: 0, length: result.length)) { value, range, _ in
+            guard let font = value as? UIFont else { return }
+            let isHeadingRange = (result.string as NSString)
+                .substring(with: range)
+                .contains("giant machine-generated")
+            if isHeadingRange {
+                headingSize = font.pointSize
+            } else if font.pointSize > bodySize * 1.31 {
+                bodySawUnclamped = true
+            }
+        }
+        #expect(headingSize != nil)
+        // The heading tier is exactly 1.3× body (within float rounding).
+        if let headingSize {
+            #expect(abs(headingSize - bodySize * 1.3) < 0.5)
+        }
+        #expect(!bodySawUnclamped)
     }
 
     @Test("PlainTextHTMLCache memoizes per input")

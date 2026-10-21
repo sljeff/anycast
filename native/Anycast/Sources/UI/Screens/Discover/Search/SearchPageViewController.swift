@@ -3,7 +3,7 @@ import AnycastKit
 
 /// The global search sheet (lib/pages/discover.dart:104-313, 03 §2.6),
 /// presented from the AppBar search submit. Header: grabber whose band
-/// TAPS to close, the "You are searching for" + green keyword row, and the
+/// TAPS to close, the "You are searching for" + keyword row, and the
 /// Channels/Episodes tab strip over a swipeable two-page body. Each tab's
 /// search runs on its first display AND on every revisit (the Dart
 /// TabBarView children carry no KeepAliveWrapper). The Episodes page renders
@@ -21,7 +21,7 @@ final class SearchPageViewController: UIViewController {
     private let grabber = SheetGrabberView()
     private let keywordPrefixLabel = UILabel()
     private let keywordLabel = UILabel()
-    private let tabStrip: UnderlineTabBarView
+    private let tabStrip: ChipTabBarView
     private var pagingContainer: DiscoverPagingContainer!
     private let channelsPage: SearchChannelsPageViewController
     private let episodesPage: SearchEpisodesPageViewController
@@ -38,11 +38,7 @@ final class SearchPageViewController: UIViewController {
         self.context = context
         self.viewModel = SearchPageViewModel(searchText: searchText, api: context.api)
 
-        tabStrip = UnderlineTabBarView(
-            titles: ["Channels", "Episodes"],
-            selectedFont: Self.tabFont(),
-            unselectedFont: Self.tabFont()
-        )
+        tabStrip = ChipTabBarView(titles: ["Channels", "Episodes"])
         channelsPage = SearchChannelsPageViewController(context: context, viewModel: viewModel)
         episodesPage = SearchEpisodesPageViewController(context: context, viewModel: viewModel)
 
@@ -62,17 +58,13 @@ final class SearchPageViewController: UIViewController {
         context: UIContext,
         searchText: String
     ) {
+        // Medium→large detents give the header's pull-down somewhere to go;
+        // AppSheets also stops multi-detent expand sheets' scroll views from
+        // swallowing the top-edge drag (the elastic-blank symptom).
         AppSheets.presentExpand(
             SearchPageViewController(context: context, searchText: searchText),
-            from: presenter
-        )
-    }
-
-    /// Secondary-tab label font — Dart labelLarge: 17 pt w600 system
-    /// (anycast_theme.dart:327-331).
-    private static func tabFont() -> UIFont {
-        UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 17, weight: .semibold)
+            from: presenter,
+            detents: [.medium(), .large()]
         )
     }
 
@@ -129,30 +121,32 @@ final class SearchPageViewController: UIViewController {
         // "You are searching for" (labelMedium 12 w600) + keyword
         // (titleMedium 16 w500, primary green) — discover.dart:137-150.
         keywordPrefixLabel.text = "You are searching for"
-        keywordPrefixLabel.font = UIFontMetrics(forTextStyle: .caption1).scaledFont(
-            for: .systemFont(ofSize: 12, weight: .semibold)
-        )
+        keywordPrefixLabel.font = TypographyV2.labelMedium.font()
         keywordPrefixLabel.adjustsFontForContentSizeCategory = true
-        keywordPrefixLabel.textColor = Theme.primaryLightMax
+        keywordPrefixLabel.textColor = Theme.onSurfaceVariant
         keywordPrefixLabel.textAlignment = .center
         keywordPrefixLabel.numberOfLines = 1
 
         keywordLabel.text = viewModel.searchText
-        keywordLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 16, weight: .medium)
-        )
+        keywordLabel.font = TypographyV2.headlineSmall.font()
         keywordLabel.adjustsFontForContentSizeCategory = true
-        keywordLabel.textColor = Theme.primary
+        keywordLabel.textColor = Theme.onSurface
         keywordLabel.textAlignment = .center
         keywordLabel.numberOfLines = 1
         keywordLabel.lineBreakMode = .byTruncatingMiddle
         keywordLabel.isAccessibilityElement = true
         keywordLabel.accessibilityLabel = "Search keyword: \(viewModel.searchText)"
+        // Required horizontal hugging keeps the row's default .fill
+        // distribution from stretching a label across the row — a stretched
+        // label's centered text then drifted to one side. Compression stays
+        // at the label default so an over-wide keyword still truncates.
+        keywordPrefixLabel.setContentHuggingPriority(.required, for: .horizontal)
+        keywordLabel.setContentHuggingPriority(.required, for: .horizontal)
 
         let keywordRow = UIStackView(arrangedSubviews: [keywordPrefixLabel, keywordLabel])
         keywordRow.axis = .horizontal
         keywordRow.alignment = .center
-        keywordRow.spacing = 12
+        keywordRow.spacing = Spacing.md
         keywordRow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(keywordRow)
 
@@ -182,21 +176,41 @@ final class SearchPageViewController: UIViewController {
             self?.activateTabIfNeeded(index)
         }
 
-        // NO bottom-safe wrapper (03 §2.6): the bar hugs the sheet's very
-        // bottom edge, under the home indicator — unlike the Channel pages.
+        // The bar respects the bottom safe area (a deliberate v2 departure
+        // from the Dart 03 §2.6 bottom-edge pin, which drew the bar under
+        // the home indicator).
         view.addSubview(playerBar)
 
+        // The keyword pair centers as one unit (required centerX); the old
+        // required edge pins are kept at 999 as an over-wide guard — they
+        // yield to the centering until the content would overflow, then
+        // force the truncating compression.
+        let keywordLeading = keywordRow.leadingAnchor.constraint(
+            equalTo: view.leadingAnchor, constant: 16
+        )
+        keywordLeading.priority = UILayoutPriority(999)
+        let keywordTrailing = keywordRow.trailingAnchor.constraint(
+            equalTo: view.trailingAnchor, constant: -16
+        )
+        keywordTrailing.priority = UILayoutPriority(999)
+
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // 8pt of breathing room below the sheet's top edge.
+            grabber.topAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8
+            ),
             grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             grabber.widthAnchor.constraint(equalToConstant: 42),
             grabber.heightAnchor.constraint(equalToConstant: 6),
 
+            // +8 with the grabber's move so the original 16pt gap below the
+            // grabber band (14 = 8 + 6 tall) is preserved.
             keywordRow.topAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 22
+                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 30
             ),
-            keywordRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            keywordRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            keywordRow.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            keywordLeading,
+            keywordTrailing,
 
             tabStrip.topAnchor.constraint(equalTo: keywordRow.bottomAnchor, constant: 12),
             tabStrip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -210,7 +224,7 @@ final class SearchPageViewController: UIViewController {
 
             playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            playerBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            playerBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             playerBarHeight,
         ])
     }
@@ -320,11 +334,9 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
-        statusLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 17)
-        )
+        statusLabel.font = TypographyV2.bodyLarge.font()
         statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.textColor = Theme.primaryLightMax
+        statusLabel.textColor = Theme.onSurface
         statusLabel.textAlignment = .center
         statusLabel.isHidden = true
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -501,11 +513,9 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
-        statusLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: .systemFont(ofSize: 17)
-        )
+        statusLabel.font = TypographyV2.bodyLarge.font()
         statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.textColor = Theme.primaryLightMax
+        statusLabel.textColor = Theme.onSurface
         statusLabel.textAlignment = .center
         statusLabel.isHidden = true
         statusLabel.translatesAutoresizingMaskIntoConstraints = false

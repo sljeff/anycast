@@ -12,8 +12,9 @@ import AnycastKit
 ///   custom gesture always recognizes first, so 150 ms is the effective
 ///   threshold);
 /// - 1.1x lift: the moving cell carries a 1.1 scale transform
-///   (proxyDecorator, 03 §4) — drag sessions raised through the
-///   `UICollectionViewDragDelegate` additionally get a 1.1x custom preview;
+///   (proxyDecorator, 03 §4); system drag & drop is disabled — the 150 ms
+///   interactive movement is the single reorder path (a system drag
+///   session hijacked ≥ 0.5 s holds and dropped the reorder);
 /// - reorder transactions land in the diffable `reorderingHandlers`
 ///   (`didReorder`, never `moveItemAt`);
 /// - drag start collapses any expanded strip; edge auto-scroll is system;
@@ -38,7 +39,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
 
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
     private let spinner = UIActivityIndicatorView(style: .medium)
-    private let emptyState = UIView()
+    private let emptyState = EmptyStateView()
     private let emptyExploreButton = UIButton(type: .system)
 
     /// The 150 ms whole-card drag starter
@@ -102,11 +103,15 @@ final class PlaylistEpisodeListViewController: UIViewController {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         // 07 §6: the system reorder gesture has a fixed ~0.5 s hold; the
         // custom 150 ms gesture below begins interactive movement first,
-        // so the effective whole-card drag threshold is 150 ms. The drag
-        // delegate (1.1x preview) also serves any system-initiated drag.
-        collectionView.dragInteractionEnabled = true
-        collectionView.dragDelegate = binder
-        collectionView.reorderingCadence = .immediate
+        // so the effective whole-card drag threshold is 150 ms. System
+        // drag & drop stays OFF: a drag session raised by the system's own
+        // ~0.5 s lift recognizer raced the in-flight movement, cancelled
+        // it, and floated a SQUARE full-cell preview (the rounded card is
+        // only a subview of the wider item) whose drop had no handler —
+        // the reorder silently died on any hold ≥ 0.5 s. The 150 ms
+        // interactive movement is the single reorder path; its lift is the
+        // real cell carrying the 1.1x transform.
+        collectionView.dragInteractionEnabled = false
         collectionView.addGestureRecognizer(dragGesture)
         view.addSubview(collectionView)
         NSLayoutConstraint.activate([
@@ -130,81 +135,39 @@ final class PlaylistEpisodeListViewController: UIViewController {
     }
 
     /// AnycastEmptyState (playlists.dart:71-84): "All caught up? Explore new
-    /// shows!" with the green Explore button jumping to the Discover tab.
+    /// shows!" with the Explore button jumping to the Discover tab.
     private func buildEmptyState() {
         emptyState.isHidden = true
         emptyState.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyState)
 
-        let iconCircle = UIView()
-        iconCircle.backgroundColor = Theme.cardBackground
-        iconCircle.layer.cornerRadius = 32
-        iconCircle.translatesAutoresizingMaskIntoConstraints = false
-        let icon = UIImageView(image: UIImage(systemName: "music.note.list"))
-        icon.tintColor = Theme.primary
-        icon.contentMode = .scaleAspectFit
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        iconCircle.addSubview(icon)
-
-        let titleLabel = UILabel()
-        titleLabel.text = "All caught up?"
-        titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
-        titleLabel.textAlignment = .center
-        titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.numberOfLines = 0
-
-        let messageLabel = UILabel()
-        messageLabel.text = "Explore new shows!"
-        messageLabel.font = Typography.defaultText.font()
-        messageLabel.textColor = Theme.secondaryText
-        messageLabel.textAlignment = .center
-        messageLabel.adjustsFontForContentSizeCategory = true
-        messageLabel.numberOfLines = 0
-
-        var exploreConfiguration = UIButton.Configuration.filled()
-        exploreConfiguration.image = AppIcons.explore
-        exploreConfiguration.imagePadding = 8
-        exploreConfiguration.baseBackgroundColor = Theme.brandGreen
-        exploreConfiguration.baseForegroundColor = .white
-        exploreConfiguration.attributedTitle = AttributedString(
-            "Explore", attributes: AttributeContainer([
-                .font: Typography.mainText.font(),
-            ])
-        )
-        exploreConfiguration.cornerStyle = .capsule
-        emptyExploreButton.configuration = exploreConfiguration
+        emptyExploreButton.configuration = AnycastButton.configuration(.primary, title: "Explore", image: AppIcons.explore)
+        emptyExploreButton.addPressFeedback(scale: Motion.pressScaleSubtle)
         emptyExploreButton.addTarget(self, action: #selector(exploreTapped), for: .touchUpInside)
-
-        let stack = UIStackView(arrangedSubviews: [iconCircle, titleLabel, messageLabel, emptyExploreButton])
-        stack.axis = .vertical
-        stack.alignment = .center
-        stack.spacing = 12
-        stack.setCustomSpacing(24, after: messageLabel)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        emptyState.addSubview(stack)
+        emptyState.configure(EmptyStateView.Content(
+            icon: UIImage(systemName: "music.note.list"),
+            title: "All caught up?",
+            message: "Explore new shows!",
+            actions: [emptyExploreButton]
+        ))
 
         NSLayoutConstraint.activate([
-            icon.widthAnchor.constraint(equalToConstant: 30),
-            icon.heightAnchor.constraint(equalToConstant: 30),
-            icon.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
-
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: emptyState.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: emptyState.trailingAnchor, constant: -24),
-            stack.centerYAnchor.constraint(equalTo: emptyState.centerYAnchor),
-
             emptyState.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             emptyState.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            emptyState.topAnchor.constraint(equalTo: view.topAnchor),
-            emptyState.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            emptyState.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            emptyState.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
         ])
     }
 
     @objc private func exploreTapped() {
-        // v2 09 §3.5: Discover retired — discovery lives behind the search
-        // circle (was Get.find<HomeTabController>().onItemTapped(2)).
-        AppSheets.presentForm(SearchEntryViewController(context: context), from: topMostPresented())
+        // Jump to the Discover tab (playlists.dart: onItemTapped(2)),
+        // closing this list first when it is presented as a sheet.
+        let tabs = context.tabs
+        if presentingViewController != nil {
+            dismiss(animated: true) { tabs.select(2) }
+        } else {
+            tabs.select(2)
+        }
     }
 
     // MARK: - Layout (ReorderableListView padding: top 12 / bottom 64)
@@ -249,10 +212,20 @@ final class PlaylistEpisodeListViewController: UIViewController {
             return cell
         }
         // Route a: drag-driven reorder commits through the diffable
-        // reorderingHandlers (never `moveItemAt`).
+        // reorderingHandlers (never `moveItemAt`). The legacy interactive
+        // movement (system drag & drop is disabled below) applies its
+        // reordering transaction synchronously inside
+        // `endInteractiveMovement`, so this handler runs UNDERNEATH the
+        // data source's own snapshot apply — applying the reorder's
+        // follow-up snapshot right here would nest applies and trip
+        // UIKit's deadlock detector. Capture the drop's final order and
+        // commit one main-actor hop later, after that apply finishes.
         dataSource.reorderingHandlers.canReorderItem = { _ in true }
-        dataSource.reorderingHandlers.didReorder = { [weak self] _ in
-            self?.commitSnapshotReorder()
+        dataSource.reorderingHandlers.didReorder = { [weak self] transaction in
+            let after = transaction.finalSnapshot.itemIdentifiers
+            Task { @MainActor [weak self] in
+                self?.commitSnapshotReorder(after: after)
+            }
         }
     }
 
@@ -368,8 +341,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
             }
             liftedCell = cell
             // onReorderStart (playlists.dart:97-99): collapse any open
-            // strip the moment the drag starts. The drag-delegate path
-            // (itemsForBeginning) does the same for system-raised drags.
+            // strip the moment the drag starts.
             expandCoordinator.close()
             binder.refreshExpandedState(in: collectionView)
         case .changed:
@@ -396,10 +368,9 @@ final class PlaylistEpisodeListViewController: UIViewController {
 
     // MARK: - Reorder commit (states/playlist_episode.dart:93-122)
 
-    /// Derives (from, to) from the data source's post-drop snapshot and
-    /// applies the Dart move semantics.
-    private func commitSnapshotReorder() {
-        let after = dataSource.snapshot().itemIdentifiers
+    /// Derives (from, to) from the drop's final snapshot order (captured
+    /// in `didReorder`) and applies the Dart move semantics.
+    private func commitSnapshotReorder(after: [String]) {
         let before = episodes.compactMap(\.enclosureUrl)
         guard let (from, to) = Self.movedIndex(before: before, after: after) else { return }
         performReorder(from: from, to: to)

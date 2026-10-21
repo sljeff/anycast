@@ -405,14 +405,12 @@ final class LyricLineCell: UICollectionViewCell {
 // MARK: - Text styling
 
 /// Lyric typography: `Typography.lyricMain/.lyricActive/.lyricTranslation`
-/// (M PLUS Rounded 1c; 03 §2.10) with `height: 1.35` paragraphs. The
-/// active-translation grey[300] has no catalog token (translation-reversed
-/// color of the Dart baseline); it is pinned here.
+/// (03 §2.10) with `height: 1.35` paragraphs; the follow highlight is
+/// brightness only (Anycast 2.0 transcript).
 enum LyricsTextStyling {
 
-    /// Colors.grey[300] — active translation color (Dart
-    /// `translationActiveColor: grey[300]`, player.dart:742).
-    static let activeTranslationColor = UIColor(red: 0.878, green: 0.878, blue: 0.878, alpha: 1)
+    /// The active line's translation: one step below the active main line.
+    static let activeTranslationColor = Theme.playerSecondary
 
     /// `isSelected` = the painter's `isSelecting && isInAnchorArea`: the line
     /// under the selection anchor repaints EVERYTHING in `selectedColor`
@@ -601,7 +599,7 @@ final class LyricsTimeBarView: UIView {
         playButton.layer.cornerCurve = .continuous
         playButton.backgroundColor = UIColor.white.withAlphaComponent(0.34)
         playButton.setImage(AppIcons.play, for: .normal)
-        playButton.tintColor = Theme.accent
+        playButton.tintColor = Theme.primary
         playButton.isAccessibilityElement = true
         playButton.accessibilityLabel = "Play from selected line"
         playButton.translatesAutoresizingMaskIntoConstraints = false

@@ -1,6 +1,6 @@
 import UIKit
 
-/// Lets a UIControl that tracks its own touches (PlayerValueSlider,
+/// Lets a UIControl that tracks its own touches (the player scrubber,
 /// PlayerProgressBarView) win horizontal drags against enclosing scroll
 /// views. The player pages live inside a UIPageViewController whose
 /// internal scroll view claims horizontal pans and cancels the control's

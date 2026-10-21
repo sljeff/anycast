@@ -11,6 +11,25 @@ import Testing
 @MainActor
 struct ChatBubbleWidthTests {
 
+    @Test("listener messages sit in a sand bubble; replies read on the page")
+    func bubblesUseV2Colors() {
+        let human = ChatBubbleView(frame: .zero)
+        human.configure(with: ChatMessage(
+            id: UUID(), author: .human, createdAt: Date(), text: "Hello"
+        ))
+        let assistant = ChatBubbleView(frame: .zero)
+        assistant.configure(with: ChatMessage(
+            id: UUID(), author: .ai, createdAt: Date(), text: "Hi"
+        ))
+
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            let traits = UITraitCollection(userInterfaceStyle: style)
+            #expect(human.backgroundColor?.resolvedColor(with: traits)
+                == AnycastColor.sandAlpha3.resolvedColor(with: traits))
+            #expect(assistant.backgroundColor == .clear)
+        }
+    }
+
     @Test("bubble width cap holds for a long unbreakable URL")
     func longURLKeepsBubbleInsideCap() {
         let host = UIView(frame: CGRect(x: 0, y: 0, width: 402, height: 600))

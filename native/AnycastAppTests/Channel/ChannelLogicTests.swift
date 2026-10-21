@@ -41,15 +41,32 @@ struct ChannelLogicTests {
         #expect(geo.coverLeading(shrink: 0, paddedWidth: 320) == 320.0 / 2 - 60)
     }
 
-    @Test("Fold at maxExtent/4: secondary block exactly invisible")
-    func foldAtQuarter() {
+    @Test("Secondary fade: solid through 40% of shrink travel, gone by 85%")
+    func foldSecondaryFade() {
         let geo = makeGeometry()
-        let quarter = geo.maxExtent / 4
-        #expect(geo.secondaryOpacity(shrink: quarter) == 0)
-        // Beyond the quarter it stays clamped at 0.
-        #expect(geo.secondaryOpacity(shrink: quarter + 100) == 0)
-        // The two spacers are fully collapsed by then (120 + 12 rise).
-        #expect(geo.contentRise(shrink: quarter) == 132)
+        let start = geo.maxShrink * 0.4
+        let end = geo.maxShrink * 0.85
+
+        // 0% and the whole first 40% of the travel keep full opacity — the
+        // fade stays in step with the collapsing header instead of cutting
+        // out at maxExtent/4 and leaving an empty band.
+        #expect(geo.secondaryOpacity(shrink: 0) == 1)
+        #expect(geo.secondaryOpacity(shrink: start - 10) == 1)
+        #expect(geo.secondaryOpacity(shrink: start) == 1)
+
+        // Linear across the 40%–85% window: the midpoint sits at half opacity.
+        let mid = geo.maxShrink * 0.625
+        #expect(abs(geo.secondaryOpacity(shrink: mid) - 0.5) < 1e-9)
+
+        // From 85% of the travel on: fully hidden, clamped through max and
+        // beyond.
+        #expect(geo.secondaryOpacity(shrink: end) == 0)
+        #expect(geo.secondaryOpacity(shrink: geo.maxShrink) == 0)
+        #expect(geo.secondaryOpacity(shrink: geo.maxShrink + 1000) == 0)
+
+        // By the end of the fade the two spacers are fully collapsed
+        // (120 + 12 rise).
+        #expect(geo.contentRise(shrink: end) == 132)
     }
 
     @Test("Fold at maxShrink: fully collapsed")

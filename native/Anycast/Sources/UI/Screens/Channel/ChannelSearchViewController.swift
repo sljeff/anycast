@@ -143,11 +143,9 @@ final class ChannelSearchViewController: UIViewController {
         view.addGestureRecognizer(headerTap)
 
         noResultsLabel.text = "No results"
-        noResultsLabel.font = UIFontMetrics(forTextStyle: .title3).scaledFont(
-            for: .systemFont(ofSize: 22, weight: .semibold)
-        )
+        noResultsLabel.font = TypographyV2.headlineMedium.font()
         noResultsLabel.adjustsFontForContentSizeCategory = true
-        noResultsLabel.textColor = Theme.primaryLightMax
+        noResultsLabel.textColor = Theme.onSurface
         noResultsLabel.isHidden = true
         noResultsLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(noResultsLabel)
@@ -156,7 +154,8 @@ final class ChannelSearchViewController: UIViewController {
         view.addSubview(playerBar)
 
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // 8 pt of breathing room below the sheet's top edge.
+            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
             grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             grabber.widthAnchor.constraint(equalToConstant: 42),
             grabber.heightAnchor.constraint(equalToConstant: 6),

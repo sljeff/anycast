@@ -5,10 +5,11 @@ import AnycastKit
 /// Shared wiring of `EpisodeCardCell` rows for one playlist's episode list
 /// (playlists.dart:122-195): the three strip actions (play/pause, AI
 /// transcribe, remove), live play/pause and robot-lottie overlays, the
-/// Detail sheet on cover tap, the download indicator, and the drag
-/// delegate that serves system-raised drags a 1.1x lift preview (07 §6).
+/// Detail sheet on cover tap, and the download indicator. Reordering is
+/// owned by the list controller's 150 ms interactive movement (07 §6) —
+/// this binder carries no drag-and-drop surface.
 @MainActor
-final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
+final class PlaylistEpisodeListBinder: NSObject {
 
     /// Action strip button tags (`EpisodeCardCell` tags buttons by index).
     private static let playActionTag = 0
@@ -355,6 +356,7 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
     /// playback and clears the player state.
     func removeTapped(_ episode: PlaylistEpisodeRow) {
         guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return }
+        Haptics.queueRemoved()
         Task { [weak self] in
             guard let self else { return }
             let repository = self.context.database.playlistRepository()
@@ -399,6 +401,13 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
         NSLayoutConstraint.activate([
             overlay.centerXAnchor.constraint(equalTo: button.centerXAnchor),
             overlay.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            // Explicit size is mandatory: with only the center pins the
+            // loading lottie's animation canvas (edge-pinned to the control
+            // by PlayPauseIconControl.ensureLottie) blew the overlay up to
+            // hundreds of points and covered the whole row on device (PR #9
+            // regression; the mini player / player page pin explicit sizes).
+            overlay.widthAnchor.constraint(equalToConstant: overlay.size),
+            overlay.heightAnchor.constraint(equalToConstant: overlay.size),
         ])
         button.setImage(UIImage(), for: .normal)
         button.isAccessibilityElement = true
@@ -416,7 +425,7 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
                 isPlaying: playback.isPlaying,
                 isLoading: playback.isLoading
             ),
-            tint: Theme.primaryBackgroundDark
+            tint: Theme.onSurface
         )
         button.accessibilityLabel = overlay.accessibilityLabel
     }
@@ -430,7 +439,7 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
         switch display {
         case .processing:
             button.setImage(UIImage(), for: .normal)
-            button.tintColor = Theme.primaryBackgroundDark
+            button.tintColor = Theme.onSurface
             // Reuse an in-flight robot: visible cards reconfigure on every
             // playback / download tick, and rebuilding the lottie restarts
             // it from frame 0 — a processing robot would effectively freeze
@@ -448,6 +457,11 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
                     robot.centerXAnchor.constraint(equalTo: button.centerXAnchor),
                     robot.centerYAnchor.constraint(equalTo: button.centerYAnchor),
                     robot.heightAnchor.constraint(equalToConstant: 24),
+                    // Width too: a lottie pinned only by center + height lets
+                    // its animation canvas stretch the view horizontally —
+                    // the same class of blow-up as the play overlay (PR #9
+                    // device regression).
+                    robot.widthAnchor.constraint(equalToConstant: 24),
                 ])
                 robot.play()
             }
@@ -535,43 +549,6 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
                 await self?.context.api.getShortURL(for: url) ?? url
             }
         )
-    }
-
-    // MARK: - Drag & drop (07 §6): 1.1x preview for system-raised drags
-
-    /// Drag items for a drag session raised by the system reorder gesture;
-    /// the preview provider carries the 1.1x lift (03 §4 proxyDecorator).
-    func collectionView(
-        _ collectionView: UICollectionView,
-        itemsForBeginning session: UIDragSession,
-        at indexPath: IndexPath
-    ) -> [UIDragItem] {
-        // onReorderStart (playlists.dart:136-138): collapse any open strip.
-        expandCoordinator.close()
-        refreshExpandedState(in: collectionView)
-
-        let item = UIDragItem(itemProvider: NSItemProvider())
-        item.localObject = indexPath
-        let sourceCell = collectionView.cellForItem(at: indexPath)
-        item.previewProvider = { [weak sourceCell] in
-            guard let sourceCell else { return nil }
-            return Self.scaledPreview(of: sourceCell, scale: 1.1)
-        }
-        return [item]
-    }
-
-    /// A snapshot of the cell scaled to `scale`, inside a container sized
-    /// to the scaled bounds (UIDragPreview adopts the container's frame).
-    private static func scaledPreview(of cell: UICollectionViewCell, scale: CGFloat) -> UIDragPreview {
-        let size = cell.bounds.size
-        let scaled = CGSize(width: size.width * scale, height: size.height * scale)
-        let container = UIView(frame: CGRect(origin: .zero, size: scaled))
-        let snapshot = cell.snapshotView(afterScreenUpdates: false) ?? UIView(frame: cell.bounds)
-        snapshot.frame = CGRect(origin: .zero, size: size)
-        snapshot.center = CGPoint(x: scaled.width / 2, y: scaled.height / 2)
-        snapshot.transform = CGAffineTransform(scaleX: scale, y: scale)
-        container.addSubview(snapshot)
-        return UIDragPreview(view: container)
     }
 
     // MARK: - Helpers

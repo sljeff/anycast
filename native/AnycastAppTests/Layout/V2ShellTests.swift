@@ -42,8 +42,7 @@ struct V2ShellTests {
 
         let search = header.subviews.compactMap { $0 as? UITextField }
             .first { $0.accessibilityIdentifier == "header-search-field" }
-        let settings = header.subviews.compactMap { $0 as? GlassContainerView }
-            .flatMap { $0.glassContentView.subviews.compactMap { $0 as? UIButton } }
+        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }
             .first { $0.accessibilityIdentifier == "header-settings" }
         #expect(search?.accessibilityLabel == "Search")
         #expect(search?.placeholder == "Shows, episodes, and more")
@@ -64,6 +63,8 @@ struct V2ShellTests {
     @Test("Header scales for accessibility text and keeps actions clear")
     func headerDynamicTypeLayout() {
         let header = HeaderView()
+        let window = TraitHostWindow.attach(header)
+        defer { TraitHostWindow.detach(window) }
         header.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraExtraLarge
         header.configure(HeaderView.Configuration(title: "Discover", statusText: "Updated just now"))
         header.frame = CGRect(x: 0, y: 0, width: 393, height: 180)
@@ -73,7 +74,7 @@ struct V2ShellTests {
             .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-title" }
         let titleColumn = title?.superview
-        let actions = header.subviews.compactMap { $0 as? GlassContainerView }.first
+        let actions = header.subviews.compactMap { $0 as? AnycastIconButton }.first
         let titleRight = titleColumn?.frame.maxX ?? .infinity
         let actionLeft = actions?.frame.minX ?? 0
 
@@ -94,7 +95,7 @@ struct V2ShellTests {
         #expect(status?.isHidden == true)
         let search = header.subviews.compactMap { $0 as? UITextField }
             .first { $0.accessibilityIdentifier == "header-search-field" }
-        let settings = header.subviews.compactMap { $0 as? GlassContainerView }.first
+        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }.first
         #expect(search?.isHidden == false)
         #expect(settings?.isHidden == true)
     }
@@ -171,11 +172,17 @@ struct V2ShellTests {
         bar.layoutIfNeeded()
 
         let capsule = bar.subviews.first { $0 !== bar } ?? bar.subviews.first
-        // The v2 chrome family is the STATIC white-80 literal (09 §3.6 +
-        // patch-round 3: the dark design frame renders the capsule bright).
-        #expect(capsule?.backgroundColor == UIColor(white: 1, alpha: 0.8))
+        // The v2 chrome family is STATIC light (09 §3.6: the dark design
+        // frame renders the capsule bright), opaque since the 2.0
+        // unification round so list content never shows through.
+        let light = capsule?.backgroundColor?.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        let dark = capsule?.backgroundColor?.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+        #expect(light == dark, "capsule surface must not follow the appearance")
+        var alpha: CGFloat = 0
+        light?.getWhite(nil, alpha: &alpha)
+        #expect(alpha == 1, "capsule surface must be opaque")
         #expect(capsule?.layer.borderWidth == 1)
-        #expect(capsule?.layer.shadowOpacity == 0.05)
+        #expect(capsule?.layer.shadowOpacity == 0.08)
         #expect(capsule?.layer.cornerRadius == PlayerBarView.barHeight / 2, "full capsule silhouette")
 
         let labels = (capsule?.subviews.compactMap { $0 as? UILabel } ?? [])

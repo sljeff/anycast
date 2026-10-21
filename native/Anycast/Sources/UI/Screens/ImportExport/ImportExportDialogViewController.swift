@@ -46,14 +46,14 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         // Title row: 'Import/Export' + help IconButton (help_outline_rounded).
         let titleLabel = UILabel()
         titleLabel.text = "Import/Export"
-        titleLabel.font = Typography.secondaryTitle.font()
-        titleLabel.textColor = Theme.primaryLightMax
+        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0
 
         let helpButton = UIButton(type: .system)
         helpButton.setImage(AppIcons.help, for: .normal)
-        helpButton.tintColor = Theme.secondaryText
+        helpButton.tintColor = Theme.onSurfaceVariant
         helpButton.isAccessibilityElement = true
         helpButton.accessibilityLabel = "Import help"
         helpButton.widthAnchor.constraint(equalToConstant: 44).isActive = true
@@ -78,14 +78,14 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         let importButton = UIButton(type: .system)
         var importConfiguration = UIButton.Configuration.filled()
         importConfiguration.title = "Import"
-        importConfiguration.baseBackgroundColor = Theme.primaryLightMax
-        importConfiguration.baseForegroundColor = Theme.primaryBackgroundDark
+        importConfiguration.baseBackgroundColor = Theme.onSurface
+        importConfiguration.baseForegroundColor = Theme.background
         importConfiguration.cornerStyle = .capsule
         importConfiguration.contentInsets = NSDirectionalEdgeInsets(
             top: 12, leading: 32, bottom: 12, trailing: 32
         )
         importButton.configuration = importConfiguration
-        importButton.titleLabel?.font = Typography.mainText.font()
+        importButton.titleLabel?.font = TypographyV2.bodyMedium.font()
         importButton.titleLabel?.adjustsFontForContentSizeCategory = true
         importButton.addAction(
             UIAction { [weak self] _ in self?.pickOPMLFile() },
@@ -102,7 +102,7 @@ final class ImportExportDialogViewController: DialogBaseViewController,
             top: 12, leading: 32, bottom: 12, trailing: 32
         )
         exportButton.configuration = exportConfiguration
-        exportButton.titleLabel?.font = Typography.mainText.font()
+        exportButton.titleLabel?.font = TypographyV2.bodyMedium.font()
         exportButton.titleLabel?.adjustsFontForContentSizeCategory = true
         exportButton.addAction(
             UIAction { [weak self] _ in self?.exportSubscriptions() },
@@ -118,20 +118,12 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         // surface instead of `.roundedRect` — the system style paints pure
         // black, which is not a palette value and sat as a void on the
         // surface card (09 audit).
-        urlField.placeholder = "RSS Feed URL"
-        urlField.font = Typography.htmlBody.font()
-        urlField.textColor = Theme.primaryLightMax
-        urlField.backgroundColor = Theme.surfaceContainer
-        urlField.layer.borderColor = AnycastColor.sandAlpha4.cgColor
-        urlField.layer.borderWidth = 1
-        urlField.layer.cornerRadius = Radius.sm
-        urlField.layer.cornerCurve = .continuous
+        urlField.clearButtonMode = .whileEditing
+        urlField.applyAnycastStyle(placeholder: "RSS Feed URL")
         urlField.keyboardType = .URL
         urlField.autocorrectionType = .no
         urlField.autocapitalizationType = .none
         urlField.returnKeyType = .go
-        urlField.clearButtonMode = .whileEditing
-        urlField.borderStyle = .none
         urlField.delegate = self
         urlField.isAccessibilityElement = true
         urlField.accessibilityLabel = "RSS Feed URL"
@@ -315,7 +307,7 @@ final class ImportExportDialogViewController: DialogBaseViewController,
             title: ImportCopy.invalidFeedURLTitle, message: nil, preferredStyle: .alert
         )
         let title = NSAttributedString(string: ImportCopy.invalidFeedURLTitle, attributes: [
-            .font: Typography.cardTitleBold.font(),
+            .font: TypographyV2.headlineSmall.font(),
             .foregroundColor: UIColor.systemRed,
         ])
         let body = NSAttributedString(string: message, attributes: [

@@ -1,15 +1,14 @@
 import UIKit
 import ChatLayout
 
-/// Thin plain-text bubble mirroring the flutter_chat_ui defaults the
-/// shipped ChatPage used (03 §2.8/§6): ChatTheme.dark() — sent bubble
-/// 0xFF4169E1 (primary), received 0xFF1C1C1C (surfaceContainer), white
-/// 14 pt body text, 12 pt corner radius, 16/10 bubble padding, and the
-/// small 10 pt timestamp shown at the bubble's bottom end.
+/// Plain-text message in the Anycast 2.0 UI kit chat language
+/// (reading-first): the listener's messages sit in a quiet sand bubble, the
+/// assistant's replies read as plain text on the page; layout and
+/// timestamps are unchanged.
 final class ChatBubbleView: UIView {
 
     private enum Metrics {
-        static let bubbleRadius: CGFloat = 12
+        static let bubbleRadius = Radius.md
         static let bubbleHorizontalPadding: CGFloat = 16
         static let bubbleVerticalPadding: CGFloat = 10
         static let timeGap: CGFloat = 2
@@ -18,8 +17,6 @@ final class ChatBubbleView: UIView {
         static let maxBubbleWidthFraction: CGFloat = 0.75
     }
 
-    private static let sentBubbleColor = UIColor(red: 0x41 / 255, green: 0x69 / 255, blue: 0xE1 / 255, alpha: 1)
-    private static let receivedBubbleColor = UIColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1C / 255, alpha: 1)
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
@@ -57,18 +54,14 @@ final class ChatBubbleView: UIView {
         // is what breaks and the bubble overflows the list. Let the cap win
         // and wrap the token per character instead.
         textLabel.lineBreakMode = .byCharWrapping
-        textLabel.textColor = .white
-        textLabel.font = UIFontMetrics(forTextStyle: .body).scaledFont(
-            for: UIFont.systemFont(ofSize: 14, weight: .regular)
-        )
+        textLabel.textColor = Theme.onSurface
+        textLabel.font = TypographyV2.bodyLarge.font()
         textLabel.adjustsFontForContentSizeCategory = true
         textLabel.setContentHuggingPriority(.required, for: .horizontal)
         textLabel.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
-        timeLabel.textColor = .white
-        timeLabel.font = UIFontMetrics(forTextStyle: .caption2).scaledFont(
-            for: UIFont.systemFont(ofSize: 10, weight: .medium)
-        )
+        timeLabel.textColor = Theme.onSurfaceVariant
+        timeLabel.font = TypographyV2.labelSmall.font()
         timeLabel.adjustsFontForContentSizeCategory = true
         timeLabel.setContentHuggingPriority(.required, for: .horizontal)
         timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -91,7 +84,9 @@ final class ChatBubbleView: UIView {
     }
 
     func configure(with message: ChatMessage) {
-        backgroundColor = message.author == .human ? Self.sentBubbleColor : Self.receivedBubbleColor
+        backgroundColor = message.author == .human ? AnycastColor.sandAlpha3 : .clear
+        textLabel.textColor = Theme.onSurface
+        timeLabel.textColor = Theme.onSurfaceVariant
         textLabel.text = message.text
         timeLabel.text = Self.timeFormatter.string(from: message.createdAt)
         isAccessibilityElement = true
