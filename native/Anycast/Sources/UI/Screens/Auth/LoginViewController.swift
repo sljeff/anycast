@@ -291,6 +291,7 @@ final class LoginViewController: UIViewController {
         NSLayoutConstraint.activate([
             row.leadingAnchor.constraint(greaterThanOrEqualTo: button.leadingAnchor, constant: 16),
             row.trailingAnchor.constraint(lessThanOrEqualTo: button.trailingAnchor, constant: -16),
+            row.centerXAnchor.constraint(equalTo: button.centerXAnchor),
             row.centerYAnchor.constraint(equalTo: button.centerYAnchor),
             iconView.widthAnchor.constraint(equalToConstant: iconSize),
             iconView.heightAnchor.constraint(equalToConstant: iconSize),

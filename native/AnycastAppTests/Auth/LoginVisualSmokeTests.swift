@@ -39,6 +39,12 @@ struct LoginVisualSmokeTests {
             #expect(
                 missing.isEmpty,
                 "auth buttons partially rendered, missing: \(missing.joined(separator: ", "))")
+            // Each button's icon + title row sits centred in the button.
+            for title in foundTitles {
+                guard let row = Self.findRow(containing: title, in: login?.view),
+                      let button = row.superview else { continue }
+                #expect(abs(row.frame.midX - button.bounds.midX) < 1, "\(title) content is off-centre")
+            }
         }
 
         await MainActor.run { login?.dismiss(animated: false) }
@@ -50,6 +56,19 @@ struct LoginVisualSmokeTests {
         guard let view else { return false }
         if let label = view as? UILabel, label.text == text { return true }
         return view.subviews.contains { findLabel(text: text, in: $0) }
+    }
+
+    @MainActor
+    private static func findRow(containing text: String, in view: UIView?) -> UIStackView? {
+        guard let view else { return nil }
+        if let stack = view as? UIStackView,
+           stack.arrangedSubviews.contains(where: { ($0 as? UILabel)?.text == text }) {
+            return stack
+        }
+        for subview in view.subviews {
+            if let found = findRow(containing: text, in: subview) { return found }
+        }
+        return nil
     }
 
     // MARK: - Helpers
