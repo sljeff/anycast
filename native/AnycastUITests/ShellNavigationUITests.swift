@@ -21,8 +21,8 @@ final class ShellNavigationUITests: XCTestCase {
         XCTAssertTrue(inboxTab.waitForExistence(timeout: 20), "pill tab bar did not install")
         XCTAssertTrue(app.buttons["tab-1"].exists, "Playlist chip missing")
         XCTAssertTrue(app.buttons["tab-2"].exists, "Discover chip missing")
-        let searchButton = app.buttons["header-search"]
-        XCTAssertTrue(searchButton.exists, "header search button missing")
+        let searchTab = app.buttons["tab-search"]
+        XCTAssertTrue(searchTab.exists, "Search tab missing")
 
         let inboxSection = app.buttons["podcast-section-0"]
         let subscriptionsSection = app.buttons["podcast-section-1"]
@@ -42,22 +42,22 @@ final class ShellNavigationUITests: XCTestCase {
         app.buttons["tab-0"].tap()
         XCTAssertTrue(app.buttons["tab-0"].isSelected, "Inbox chip did not become selected")
 
-        // The header button opens the search sheet in its entry state with
-        // the field focused; submitting runs the search in the same sheet.
-        searchButton.tap()
-        let sheetField = app.textFields["search-page-field"]
-        XCTAssertTrue(sheetField.waitForExistence(timeout: 8), "search sheet did not open")
+        // The Search tab opens in its entry state with the field focused;
+        // submitting runs the search on the same page.
+        searchTab.tap()
+        let field = app.searchFields["search-page-field"].exists
+            ? app.searchFields["search-page-field"] : app.textFields["search-page-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8), "search field missing on the Search tab")
         guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
             throw XCTSkip("software keyboard unavailable — skipping search submission")
         }
-        sheetField.typeText("news\n")
+        field.typeText("news\n")
         XCTAssertTrue(app.buttons["Channels"].waitForExistence(timeout: 8), "search results did not appear")
-        // Swipe the sheet down to close it.
-        sheetField.swipeDown(velocity: .fast)
-        XCTAssertTrue(
-            sheetField.waitForNonExistence(timeout: 4),
-            "search results sheet did not close"
-        )
+        // While search is active the bar collapses to one unnamed tab
+        // button; closing search brings the full bar back.
+        app.buttons["Close"].tap()
+        app.buttons["tab-0"].tap()
+        XCTAssertTrue(app.buttons["tab-0"].isSelected, "Podcast tab did not come back")
 
         // Mini player appears only when a queue was restored (db_smoke
         // seeding per native/README.md); skip visibly when unseeded.

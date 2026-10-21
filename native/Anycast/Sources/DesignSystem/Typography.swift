@@ -251,11 +251,22 @@ nonisolated enum TypographyV2 {
     static let labelMedium = Style(size: 12, lineHeight: 16, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .caption1)
     static let labelSmall = Style(size: 11, lineHeight: 13, weight: .medium, color: Theme.onSurface, scalingTextStyle: .caption2)
 
+    // The three app-wide text styles (adopted 2026-10-21). Screens move onto
+    // these and the styles above retire as they do; only the 48 pt tab title
+    // (`displayLarge`) and the 22 pt Now Playing title stay outside them.
+    /// Titles, row names, button labels and chips.
+    static let emphasis = Style(size: 17, lineHeight: 22, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .headline)
+    /// Reading text, field input and settings rows.
+    static let body = Style(size: 15, lineHeight: 20, weight: .regular, color: Theme.onSurface, scalingTextStyle: .subheadline)
+    /// Subtitles, durations, hints and list descriptions.
+    static let meta = Style(size: 15, lineHeight: 20, weight: .regular, color: Theme.onSurfaceVariant, scalingTextStyle: .subheadline)
+
     /// All v2 styles, for tests and enumerations.
     static let allStyles: [Style] = [
         displayLarge, displayMedium, displaySmall, headlineLarge, headlineMedium,
         headlineSmall, titleLarge, cardTitle, titleMedium, titleSmall, bodyLarge, bodyMedium,
         bodySmall, bodyCompact, caption, labelLarge, labelMedium, labelSmall,
+        emphasis, body, meta,
     ]
 }
 
@@ -279,6 +290,9 @@ extension TypographyV2.Style {
     static let labelLarge = TypographyV2.labelLarge
     static let labelMedium = TypographyV2.labelMedium
     static let labelSmall = TypographyV2.labelSmall
+    static let emphasis = TypographyV2.emphasis
+    static let body = TypographyV2.body
+    static let meta = TypographyV2.meta
 }
 
 extension UIFont {

@@ -162,12 +162,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             guard let self else { return }
             AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
         }
-        header.onSearch = { [weak self] in
-            guard let self else { return }
-            SearchPageViewController.present(
-                from: self.topMostPresented(), context: self.context, searchText: ""
-            )
-        }
 
         categoryStrip.onSelect = { [weak self] value in
             guard let self else { return }
@@ -390,6 +384,15 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             guard let self else { return }
             self.isRefreshing = false
             self.refreshControl.endRefreshing()
+            // endRefreshing does not undo callRefresh's programmatic reveal
+            // when the list was off screen (another tab) while it ran; the
+            // list would stay 60 pt low. Settle it back to its top.
+            let top = -self.collectionView.adjustedContentInset.top
+            if !self.collectionView.isDragging, self.collectionView.contentOffset.y < top {
+                self.collectionView.setContentOffset(
+                    CGPoint(x: 0, y: top), animated: self.view.window != nil
+                )
+            }
         }
     }
 

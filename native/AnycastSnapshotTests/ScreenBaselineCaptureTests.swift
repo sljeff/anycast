@@ -356,16 +356,22 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S9 Search sheet (channels/episodes tabs)")
+    @Test("S9 Search tab (channels/episodes tabs)")
     func captureSearch() async throws {
         try await Self.withRoot { root in
             guard let context = await Self.liveContext() else {
                 Self.missingBaselineInput("live UIContext")
                 return
             }
-            SearchPageViewController.present(from: root, context: context, searchText: "news")
+            context.tabs.select(3)
+            guard let search = Self.find(SearchPageViewController.self, in: root) else {
+                Self.missingBaselineInput("Search tab")
+                return
+            }
+            search.search("news")
             try await Self.settle(4.0)
             try await Self.capture("S9-search")
+            context.tabs.select(0)
         }
     }
 
@@ -376,10 +382,11 @@ struct ScreenBaselineCaptureTests {
                 Self.missingBaselineInput("live UIContext")
                 return
             }
-            SearchPageViewController.present(from: root, context: context, searchText: "")
+            context.tabs.select(3)
             await Self.waitForFocusedTextField(in: root)
             try await Self.settle(1.0)
             try await Self.capture("S9b-search-entry")
+            context.tabs.select(0)
         }
     }
 
@@ -511,8 +518,8 @@ struct ScreenBaselineCaptureTests {
     ) async {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if let sheet = root.presentedViewController,
-               let field = firstTextField(in: sheet.view), field.isFirstResponder {
+            let host = root.presentedViewController ?? root
+            if let field = firstTextField(in: host.view), field.isFirstResponder {
                 return
             }
             try? await Task.sleep(for: .milliseconds(250))

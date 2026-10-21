@@ -744,6 +744,7 @@ final class ChannelHeaderView: UICollectionReusableView {
         coverView.layer.cornerRadius = Radius.md
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = Theme.surfaceContainerHigh
+        coverView.applyArtworkHairline()
         coverView.isAccessibilityElement = true
         coverView.accessibilityLabel = "Channel artwork"
         coverView.translatesAutoresizingMaskIntoConstraints = false

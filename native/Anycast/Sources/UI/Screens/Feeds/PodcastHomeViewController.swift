@@ -26,12 +26,6 @@ final class PodcastHomeViewController: UIViewController {
         Theme.installPageBase(on: view)
 
         header.configure(HeaderView.Configuration(title: "Podcast"))
-        header.onSearch = { [weak self] in
-            guard let self else { return }
-            SearchPageViewController.present(
-                from: self.topMostPresented(), context: self.context, searchText: ""
-            )
-        }
         header.onSettings = { [weak self] in self?.openSettings() }
         header.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(header)

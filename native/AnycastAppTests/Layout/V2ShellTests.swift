@@ -14,7 +14,7 @@ struct V2ShellTests {
 
     // MARK: - HeaderView (09 §3.8, Figma 624:30831)
 
-    @Test("Header paints the display title, status, search and settings actions")
+    @Test("Header paints the display title, Meta status and the settings action")
     func headerBasics() {
         let header = HeaderView()
         header.configure(HeaderView.Configuration(
@@ -36,31 +36,23 @@ struct V2ShellTests {
         #expect(status?.isHidden == false)
         #expect(
             status?.textColor.resolvedColor(with: dark)
-                == AnycastColor.sand9.resolvedColor(with: dark),
-            "status caption paints sand9"
+                == Theme.onSurfaceVariant.resolvedColor(with: dark),
+            "status line paints the Meta color"
         )
+        #expect(status?.font.pointSize == 15, "status line is Meta 15")
 
-        let search = header.subviews.compactMap { $0 as? AnycastIconButton }
-            .first { $0.accessibilityIdentifier == "header-search" }
-        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }
-            .first { $0.accessibilityIdentifier == "header-settings" }
-        #expect(search?.accessibilityLabel == "Search")
-        #expect(search?.isHidden == false)
-        #expect(settings?.accessibilityIdentifier == "header-settings")
+        let buttons = header.subviews.compactMap { $0 as? AnycastIconButton }
+        #expect(buttons.map(\.accessibilityIdentifier) == ["header-settings"], "Settings is the only action")
+        let settings = buttons.first
         #expect(settings?.isHidden == false)
         #expect(header.subviews.contains { $0 is UITextField } == false, "no inline search field")
-        if let search, let settings {
-            #expect(search.frame.maxX + Spacing.md == settings.frame.minX, "search sits left of settings")
-            #expect(search.frame.midY == settings.frame.midY)
+        if let settings {
+            #expect(settings.frame.maxX == header.bounds.maxX - Spacing.pageH, "settings sits at the trailing margin")
         }
 
-        var searchTaps = 0
         var settingsTaps = 0
-        header.onSearch = { searchTaps += 1 }
         header.onSettings = { settingsTaps += 1 }
-        search?.sendActions(for: .touchUpInside)
         settings?.sendActions(for: .touchUpInside)
-        #expect(searchTaps == 1)
         #expect(settingsTaps == 1)
     }
 
@@ -97,11 +89,8 @@ struct V2ShellTests {
             .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-status" }
         #expect(status?.isHidden == true)
-        let search = header.subviews.compactMap { $0 as? AnycastIconButton }
-            .first { $0.accessibilityIdentifier == "header-search" }
         let settings = header.subviews.compactMap { $0 as? AnycastIconButton }
             .first { $0.accessibilityIdentifier == "header-settings" }
-        #expect(search?.isHidden == false)
         #expect(settings?.isHidden == true)
     }
 

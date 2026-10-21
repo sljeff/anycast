@@ -1,41 +1,31 @@
 import UIKit
 
-/// Shared page header: an Anycast 2.0 display title with Search and Settings
-/// glass actions; Search opens the search sheet in its entry state.
+/// Shared page header: an Anycast 2.0 display title, a Meta status line and
+/// the Settings glass action. Search is its own tab (adopted 2026-10-21), so
+/// headers carry no search button.
 @MainActor
 final class HeaderView: UIView {
 
     struct Configuration {
         let title: String
         var statusText: String?
-        var showsSearch = true
         var showsSettings = true
 
         init(
             title: String,
             statusText: String? = nil,
-            showsSearch: Bool = true,
             showsSettings: Bool = true
         ) {
             self.title = title
             self.statusText = statusText
-            self.showsSearch = showsSearch
             self.showsSettings = showsSettings
         }
     }
 
-    var onSearch: (() -> Void)?
     var onSettings: (() -> Void)?
 
     private let titleLabel = UILabel()
     private let statusLabel = UILabel()
-    private let searchButton = AnycastIconButton(
-        style: .glass,
-        icon: AppIcons.search,
-        accessibilityLabel: "Search",
-        diameter: AnycastIconButton.largeDiameter,
-        glyphSize: 20
-    )
     private let settingsButton = AnycastIconButton(
         style: .glass,
         icon: AppIcons.settings,
@@ -52,15 +42,15 @@ final class HeaderView: UIView {
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
-        // Two action buttons narrow the title column; "Discover" would truncate.
+        // A long title shrinks a little before it truncates.
         titleLabel.adjustsFontSizeToFitWidth = true
         titleLabel.minimumScaleFactor = 0.75
         titleLabel.accessibilityIdentifier = "header-title"
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        statusLabel.font = TypographyV2.bodySmall.font()
+        statusLabel.font = TypographyV2.meta.font()
         statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.textColor = AnycastColor.sand9
+        statusLabel.textColor = TypographyV2.meta.color
         statusLabel.numberOfLines = 1
         statusLabel.accessibilityIdentifier = "header-status"
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -74,17 +64,13 @@ final class HeaderView: UIView {
         titleColumn.translatesAutoresizingMaskIntoConstraints = false
 
         addSubview(titleColumn)
-        addSubview(searchButton)
         addSubview(settingsButton)
 
         NSLayoutConstraint.activate([
             titleColumn.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.pageH),
             titleColumn.topAnchor.constraint(equalTo: topAnchor),
             titleColumn.bottomAnchor.constraint(equalTo: bottomAnchor),
-            titleColumn.trailingAnchor.constraint(lessThanOrEqualTo: searchButton.leadingAnchor, constant: -Spacing.md),
-
-            searchButton.trailingAnchor.constraint(equalTo: settingsButton.leadingAnchor, constant: -Spacing.md),
-            searchButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            titleColumn.trailingAnchor.constraint(lessThanOrEqualTo: settingsButton.leadingAnchor, constant: -Spacing.md),
 
             settingsButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.pageH),
             settingsButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
@@ -98,13 +84,10 @@ final class HeaderView: UIView {
         titleLabel.text = configuration.title
         statusLabel.text = configuration.statusText
         statusLabel.isHidden = configuration.statusText == nil
-        searchButton.isHidden = !configuration.showsSearch
         settingsButton.isHidden = !configuration.showsSettings
     }
 
     private func configureActions() {
-        searchButton.accessibilityIdentifier = "header-search"
-        searchButton.addAction(UIAction { [weak self] _ in self?.onSearch?() }, for: .touchUpInside)
         settingsButton.accessibilityIdentifier = "header-settings"
         settingsButton.addAction(UIAction { [weak self] _ in self?.onSettings?() }, for: .touchUpInside)
     }

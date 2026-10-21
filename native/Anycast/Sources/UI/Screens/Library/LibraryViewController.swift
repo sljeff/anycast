@@ -37,12 +37,6 @@ final class LibraryViewController: UIViewController {
                 guard let self else { return }
                 AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
             }
-            header.onSearch = { [weak self] in
-                guard let self else { return }
-                SearchPageViewController.present(
-                    from: self.topMostPresented(), context: self.context, searchText: ""
-                )
-            }
             header.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(header)
 

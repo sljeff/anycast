@@ -88,7 +88,6 @@ final class DiscoverViewController: UIViewController {
 
     private func buildHeader() {
         header.configure(HeaderView.Configuration(title: "Discover"))
-        header.onSearch = { [weak self] in self?.openSearch() }
         header.onSettings = { [weak self] in self?.openSettings() }
         header.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(header)
@@ -98,12 +97,6 @@ final class DiscoverViewController: UIViewController {
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
         ])
-    }
-
-    private func openSearch() {
-        SearchPageViewController.present(
-            from: topMostPresented(), context: context, searchText: ""
-        )
     }
 
     private func openSettings() {

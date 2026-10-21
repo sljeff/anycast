@@ -1,49 +1,48 @@
 import UIKit
 import AnycastKit
 
-/// The global search sheet (lib/pages/discover.dart:104-313, 03 §2.6),
-/// presented from the header search button. Header: the system grabber, an
-/// editable search field, and the Channels/Episodes tab strip over a
-/// swipeable two-page body. An empty query opens the entry state (field
-/// focused, no strip or results); submitting runs a fresh search. Each tab's
+/// The Search tab (lib/pages/discover.dart:104-313, 03 §2.6), its own tab at
+/// the trailing end of the tab bar since 2026-10-21. Header: the "Search"
+/// display title with Settings, then the Channels/Episodes tab strip over a
+/// swipeable two-page body. The field follows the platform: on iOS 26 it is
+/// the search tab's system field, at the bottom with the tab bar; iOS 18
+/// keeps the Anycast field under the header. An empty query is the entry
+/// state (no strip or results); submitting runs a fresh search. Each tab's
 /// search runs on its first display AND on every revisit (the Dart
 /// TabBarView children carry no KeepAliveWrapper). The Episodes page renders
 /// episode cards with play / add-to-playlist (UNGATED add — the SearchPage
-/// correction) through a fresh CardExpandCoordinator per sheet
-/// (`Get.put(CardListController())` per SearchPage build). The bottom hosts
-/// the player bar WITHOUT the bottom-safe wrapper (03 §2.6 verified
-/// difference vs Channel pages) — pinned to the sheet's bottom edge.
+/// correction) through a fresh CardExpandCoordinator per search. The mini
+/// player comes from the shell, as on every tab.
 @MainActor
-final class SearchPageViewController: UIViewController {
+final class SearchPageViewController: UIViewController, UISearchBarDelegate {
+
+    static let fieldPlaceholder = "Shows, episodes, and more"
 
     private let context: UIContext
     private var viewModel: SearchPageViewModel
 
+    private let header = HeaderView()
+    /// iOS 18 field under the header.
     private let searchField = UITextField()
+    /// iOS 26 search-tab field (installed on `navigationItem`).
+    private let searchController = UISearchController(searchResultsController: nil)
     private let tabStrip: ChipTabBarView
     private var pagingContainer: DiscoverPagingContainer!
     private var channelsPage: SearchChannelsPageViewController
     private var episodesPage: SearchEpisodesPageViewController
 
-    private let playerBar: PlayerBarView
-    private let playerBarHeight: NSLayoutConstraint
-    private let playbackObservation = ObservationLoop()
     /// Guards double activation when a scrub is followed by its settle.
     private var lastActivatedTab = -1
 
     // MARK: - Construction
 
-    init(context: UIContext, searchText: String) {
+    init(context: UIContext) {
         self.context = context
-        self.viewModel = SearchPageViewModel(searchText: searchText, api: context.api)
+        self.viewModel = SearchPageViewModel(searchText: "", api: context.api)
 
         tabStrip = ChipTabBarView(titles: ["Channels", "Episodes"])
         channelsPage = SearchChannelsPageViewController(context: context, viewModel: viewModel)
         episodesPage = SearchEpisodesPageViewController(context: context, viewModel: viewModel)
-
-        playerBar = context.makePlayerBar(style: .capsule)
-        playerBar.translatesAutoresizingMaskIntoConstraints = false
-        playerBarHeight = playerBar.heightAnchor.constraint(equalToConstant: 58)
 
         super.init(nibName: nil, bundle: nil)
     }
@@ -51,16 +50,15 @@ final class SearchPageViewController: UIViewController {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    /// Present factory (appbar.dart:101-106 — submit opens the sheet).
-    static func present(
-        from presenter: UIViewController,
-        context: UIContext,
-        searchText: String
-    ) {
-        AppSheets.presentExpand(
-            SearchPageViewController(context: context, searchText: searchText),
-            from: presenter
-        )
+    /// The iOS 26 search tab hosts the system field through its navigation
+    /// item, so the page sits in a navigation controller whose bar stays
+    /// hidden; iOS 18 hosts the page directly.
+    static func makeTabRoot(context: UIContext) -> UIViewController {
+        let page = SearchPageViewController(context: context)
+        guard #available(iOS 26.0, *) else { return page }
+        let navigation = UINavigationController(rootViewController: page)
+        navigation.setNavigationBarHidden(true, animated: false)
+        return navigation
     }
 
     // MARK: - Lifecycle
@@ -68,28 +66,8 @@ final class SearchPageViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
-        sheetPresentationController?.prefersGrabberVisible = true
-
         buildViewHierarchy()
-
-        playbackObservation.track(
-            read: { [weak self] in
-                guard let self else { return }
-                _ = self.context.playback.currentEpisode
-            },
-            onChange: { [weak self] in self?.renderPlayerBar() }
-        )
-        renderPlayerBar()
-
-        // The sheet opens on the Channels tab — its FutureBuilder is the
-        // one that builds (discover.dart:169); the Episodes tab's search
-        // fires on its first visit (no KeepAliveWrapper on these tabs).
-        // An empty query stays in the entry state and searches nothing.
-        if hasQuery {
-            activateTabIfNeeded(0)
-        } else {
-            setResultsVisible(false)
-        }
+        setResultsVisible(false)
     }
 
     private var hasQuery: Bool {
@@ -101,12 +79,15 @@ final class SearchPageViewController: UIViewController {
         pagingContainer.view.isHidden = !visible
     }
 
-    /// Runs a new search: the view model's text is immutable, so both tabs
-    /// get a fresh model and fresh pages.
-    private func submitSearch() {
-        let query = (searchField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Runs `text` as a new search: the view model's text is immutable, so
+    /// both tabs get a fresh model and fresh pages.
+    func search(_ text: String) {
+        let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
+        searchField.text = query
+        searchController.searchBar.text = query
         searchField.resignFirstResponder()
+        searchController.searchBar.resignFirstResponder()
 
         viewModel = SearchPageViewModel(searchText: query, api: context.api)
         channelsPage = SearchChannelsPageViewController(context: context, viewModel: viewModel)
@@ -120,6 +101,10 @@ final class SearchPageViewController: UIViewController {
         activateTabIfNeeded(0)
     }
 
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        search(searchBar.text ?? "")
+    }
+
     /// Tab activation with the settle guard: a tab ACTIVATION (first build
     /// or a revisit after leaving) re-runs that tab's search.
     private func activateTabIfNeeded(_ index: Int) {
@@ -131,27 +116,62 @@ final class SearchPageViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         episodesPage.refreshMembership()
-        if !hasQuery, tabStrip.isHidden {
+        // iOS 26 activates the search tab's field itself.
+        if #unavailable(iOS 26.0), !hasQuery {
             searchField.becomeFirstResponder()
         }
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // Leaving the tab takes the keyboard down with it.
+        view.endEditing(true)
     }
 
     // MARK: - Build
 
     private func buildViewHierarchy() {
-        // clearButtonMode must be set before the style: the style installs
-        // its right spacer only for `.never`.
-        searchField.clearButtonMode = .whileEditing
-        searchField.applyAnycastStyle(placeholder: "Shows, episodes, and more", icon: AppIcons.search)
-        searchField.text = viewModel.searchText
-        searchField.returnKeyType = .search
-        searchField.autocorrectionType = .no
-        searchField.autocapitalizationType = .none
-        searchField.accessibilityLabel = "Search"
-        searchField.accessibilityIdentifier = "search-page-field"
-        searchField.addAction(UIAction { [weak self] _ in self?.submitSearch() }, for: .primaryActionTriggered)
-        searchField.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(searchField)
+        header.configure(HeaderView.Configuration(title: "Search"))
+        header.onSettings = { [weak self] in
+            guard let self else { return }
+            AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
+        }
+        header.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(header)
+
+        let stripTop: NSLayoutConstraint
+        if #available(iOS 26.0, *) {
+            searchController.obscuresBackgroundDuringPresentation = false
+            searchController.searchBar.placeholder = Self.fieldPlaceholder
+            searchController.searchBar.autocorrectionType = .no
+            searchController.searchBar.autocapitalizationType = .none
+            searchController.searchBar.delegate = self
+            searchController.searchBar.searchTextField.accessibilityIdentifier = "search-page-field"
+            navigationItem.searchController = searchController
+            stripTop = tabStrip.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.gap)
+        } else {
+            // clearButtonMode must be set before the style: the style
+            // installs its right spacer only for `.never`.
+            searchField.clearButtonMode = .whileEditing
+            searchField.applyAnycastStyle(placeholder: Self.fieldPlaceholder, icon: AppIcons.search)
+            searchField.returnKeyType = .search
+            searchField.autocorrectionType = .no
+            searchField.autocapitalizationType = .none
+            searchField.accessibilityLabel = "Search"
+            searchField.accessibilityIdentifier = "search-page-field"
+            searchField.addAction(UIAction { [weak self] _ in
+                self?.search(self?.searchField.text ?? "")
+            }, for: .primaryActionTriggered)
+            searchField.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(searchField)
+            NSLayoutConstraint.activate([
+                searchField.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.gap),
+                searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+                searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+                searchField.heightAnchor.constraint(equalToConstant: 48),
+            ])
+            stripTop = tabStrip.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: Spacing.gap)
+        }
 
         tabStrip.translatesAutoresizingMaskIntoConstraints = false
         tabStrip.onSelect = { [weak self] index in
@@ -179,23 +199,12 @@ final class SearchPageViewController: UIViewController {
             self?.activateTabIfNeeded(index)
         }
 
-        // The bar floats as a capsule just above the home indicator, inset
-        // by pageH sideways like the Channel pages; the lists run under it.
-        view.addSubview(playerBar)
-
-        // Scrim behind the capsule so rows are not hard-cut by it (G-7).
-        let bottomFade = ScrollEdgeFade(edge: .bottom)
-        view.insertSubview(bottomFade, belowSubview: playerBar)
-
         NSLayoutConstraint.activate([
-            searchField.topAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20
-            ),
-            searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
-            searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
-            searchField.heightAnchor.constraint(equalToConstant: 48),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
 
-            tabStrip.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: Spacing.gap),
+            stripTop,
             tabStrip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tabStrip.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tabStrip.heightAnchor.constraint(equalToConstant: 44),
@@ -204,29 +213,7 @@ final class SearchPageViewController: UIViewController {
             pagingContainer.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             pagingContainer.view.topAnchor.constraint(equalTo: tabStrip.bottomAnchor),
             pagingContainer.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
-            playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
-            playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
-            playerBar.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.xs
-            ),
-            playerBarHeight,
-
-            bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bottomFade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomFade.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            bottomFade.topAnchor.constraint(
-                equalTo: playerBar.topAnchor, constant: -ScrollEdgeFade.fadeLength
-            ),
         ])
-    }
-
-    /// PlayerBar without bottomSafe still shrinks away entirely when
-    /// nothing plays (bottom_nav_bar.dart:86-88).
-    private func renderPlayerBar() {
-        let visible = context.playback.currentEpisode != nil
-        playerBar.isHidden = !visible
-        playerBarHeight.constant = visible ? 58 : 0
     }
 }
 

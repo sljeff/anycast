@@ -889,13 +889,15 @@ final class QACrawlUITests: XCTestCase {
             Checkpoint(state: "search",
                        action: { s in
                            s.closeSheet()
-                           s.currentTab = "tab-0"
-                           let searchButton = s.app.buttons["header-search"]
-                           guard searchButton.waitForExistence(timeout: 5) else { return false }
-                           s.tapElement(searchButton)
-                           let field = s.app.textFields["search-page-field"]
+                           s.currentTab = "tab-search"
+                           let searchTab = s.app.buttons["tab-search"]
+                           guard searchTab.waitForExistence(timeout: 5) else { return false }
+                           s.tapElement(searchTab)
+                           let field = s.app.searchFields["search-page-field"].exists
+                               ? s.app.searchFields["search-page-field"]
+                               : s.app.textFields["search-page-field"]
                            guard field.waitForExistence(timeout: 5) else { return false }
-                           // The search sheet opens focused; its field uses
+                           // The Search tab opens focused; its field uses
                            // the standard keyboard submit path into results.
                            guard s.audit else {
                                s.markSkipped("search", "keyboard submission",
@@ -914,14 +916,9 @@ final class QACrawlUITests: XCTestCase {
                                              "text field did not take focus on this app")
                                return false
                            }
-                           field.typeText("news")
-                           let searchKey = s.app.keyboards.buttons["search"]
-                           if searchKey.exists {
-                               s.tapPoint(CGPoint(x: searchKey.frame.midX,
-                                                  y: searchKey.frame.midY))
-                           } else {
-                               field.typeText("\n")
-                           }
+                           // Return submits; a "search" key lookup would
+                           // also match the Search tab button.
+                           field.typeText("news\n")
                            return s.app.buttons["Channels"]
                                .waitForExistence(timeout: 8)
                        },
@@ -931,6 +928,9 @@ final class QACrawlUITests: XCTestCase {
             Checkpoint(state: "playlists",
                        action: { s in
                            s.closeSheet()
+                           // Leaving active search restores the full tab bar.
+                           let closeSearch = s.app.buttons["Close"]
+                           if closeSearch.exists { s.tapElement(closeSearch) }
                            s.currentTab = "tab-1"
                            return s.tap(s.app.buttons["tab-1"], "Playlist chip")
                        },

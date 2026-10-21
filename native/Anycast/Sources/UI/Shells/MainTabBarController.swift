@@ -37,14 +37,16 @@ enum MiniPlayerVisibility {
 }
 
 /// Derives the fly-in animation endpoint from the LIVE tab bar (07 §3
-/// widget #11): Playlist is the middle destination, so the endpoint is the
-/// bar's center — degrading to the window bottom center when the bar is not
-/// on screen (A1-accepted adaptation). The shell attaches itself through
-/// `tabBarProvider` at install time.
+/// widget #11): the center of the Playlist tab's button, as the tab reports
+/// its frame — degrading to the bar's center when the tab has no frame, and
+/// to the window bottom center when the bar is not on screen (A1-accepted
+/// adaptation). The shell attaches itself through the providers at install
+/// time.
 @MainActor
 final class TabBarFlyInEndpointProvider: PlaylistFlyInEndpointProvider {
 
     var tabBarProvider: (() -> UITabBar?)?
+    var playlistTabProvider: (() -> UITab?)?
 
     private let fallback = WindowCenterBottomEndpointProvider()
 
@@ -52,20 +54,32 @@ final class TabBarFlyInEndpointProvider: PlaylistFlyInEndpointProvider {
         guard let tabBar = tabBarProvider?(), tabBar.window != nil, !tabBar.isHidden else {
             return fallback.playlistFlyInEndpoint(in: window)
         }
+        if let frame = playlistTabProvider?()?.frame(in: window), !frame.isEmpty {
+            return CGPoint(x: frame.midX, y: frame.midY)
+        }
         return window.convert(CGPoint(x: tabBar.bounds.midX, y: tabBar.bounds.midY), from: tabBar)
     }
 }
 
-/// The three-tab Flutter destination shell — Podcast / Playlist / Discover —
-/// on the system tab bar (Anycast 2.0 UI kit shell): Liquid Glass on
-/// iOS 26, where the bar minimizes while content scrolls down and the mini
-/// player rides in the bar's bottom accessory; on iOS 18 the classic bar
-/// with the mini player floating above it as a capsule. Unselected tabs
-/// stay resident (prewarmed) like the Flutter IndexedStack (03 §1.1).
+/// The Flutter destination shell — Podcast / Playlist / Discover — plus the
+/// Search tab at the trailing end (search role, adopted 2026-10-21), on the
+/// system tab bar (Anycast 2.0 UI kit shell): Liquid Glass on iOS 26, where
+/// Search stands apart from the other tabs, the bar minimizes while content
+/// scrolls down and the mini player rides in the bar's bottom accessory; on
+/// iOS 18 the classic bar with the mini player floating above it as a
+/// capsule. Unselected tabs stay resident (prewarmed) like the Flutter
+/// IndexedStack (03 §1.1).
 @MainActor
 final class MainTabBarController: UITabBarController, UITabBarControllerDelegate {
 
     private let context: UIContext
+    /// Each destination tab's normal and selected glyph; the selected tab
+    /// shows the filled variant.
+    private var tabImages: [String: (normal: UIImage, selected: UIImage)] = [:]
+    /// Every tab's root, resident from launch (a tab's provider runs lazily).
+    private var tabRoots: [UIViewController] = []
+    /// The fly-in endpoint's target (`TabBarFlyInEndpointProvider`).
+    private(set) var playlistTab: UITab?
 
     private let errorObservation = ObservationLoop()
     private let visibilityObservation = ObservationLoop()
@@ -100,20 +114,34 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         delegate = self
         tabBar.tintColor = Theme.primary
 
-        let tabs: [(UIViewController, String, UIImage, UIImage)] = [
+        let destinations: [(UIViewController, String, UIImage, UIImage)] = [
             (PodcastHomeViewController(context: context), "Podcast", AppIcons.inbox, AppIcons.inboxSelected),
             (PlaylistsPageViewController(context: context), "Playlist", AppIcons.playlist, AppIcons.playlistSelected),
             (DiscoverViewController(context: context), "Discover", AppIcons.discover, AppIcons.discoverSelected),
         ]
-        viewControllers = tabs.enumerated().map { index, tab in
-            let (controller, title, icon, selectedIcon) = tab
-            controller.tabBarItem = UITabBarItem(title: title, image: icon, selectedImage: selectedIcon)
-            controller.tabBarItem.tag = index
-            controller.tabBarItem.accessibilityIdentifier = "tab-\(index)"
+        var tabs: [UITab] = destinations.enumerated().map { index, destination in
+            let (controller, title, icon, selectedIcon) = destination
+            let identifier = "tab-\(index)"
             // Resident pages: their timers and observers start at launch.
             controller.loadViewIfNeeded()
-            return controller
+            tabImages[identifier] = (icon, selectedIcon)
+            let tab = UITab(title: title, image: index == 0 ? selectedIcon : icon, identifier: identifier) { _ in
+                controller
+            }
+            tab.accessibilityIdentifier = identifier
+            return tab
         }
+        let searchRoot = SearchPageViewController.makeTabRoot(context: context)
+        searchRoot.loadViewIfNeeded()
+        let searchTab = UISearchTab { _ in searchRoot }
+        searchTab.accessibilityIdentifier = "tab-search"
+        if #available(iOS 26.0, *) {
+            searchTab.automaticallyActivatesSearch = true
+        }
+        tabs.append(searchTab)
+        tabRoots = destinations.map(\.0) + [searchRoot]
+        playlistTab = tabs[1]
+        self.tabs = tabs
 
         if #available(iOS 26.0, *) {
             tabBarMinimizeBehavior = .onScrollDown
@@ -133,22 +161,32 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
 
     /// The tab-0 re-tap rule (03 §1.1): the Feeds screen owns the
     /// scroll-vs-refresh decision via TabZeroRetap.
-    func tabBarController(
-        _ tabBarController: UITabBarController, shouldSelect viewController: UIViewController
-    ) -> Bool {
-        if viewController === selectedViewController, viewControllers?.firstIndex(of: viewController) == 0 {
+    func tabBarController(_ tabBarController: UITabBarController, shouldSelectTab tab: UITab) -> Bool {
+        if tab === selectedTab, tab === tabs.first {
             context.tabs.handleTabZeroReTap()
         }
-        if viewController !== selectedViewController {
+        if tab !== selectedTab {
             Haptics.selection()
         }
         return true
     }
 
-    /// Programmatic selection (UIContext.tabs.select).
+    func tabBarController(
+        _ tabBarController: UITabBarController, didSelectTab selectedTab: UITab, previousTab: UITab?
+    ) {
+        for tab in [previousTab, selectedTab].compactMap({ $0 }) {
+            guard let images = tabImages[tab.identifier] else { continue }
+            tab.image = tab === selectedTab ? images.selected : images.normal
+        }
+    }
+
+    /// Programmatic selection (UIContext.tabs.select): 0–2 are the
+    /// destinations, 3 is Search.
     func selectTab(_ index: Int) {
-        guard let controllers = viewControllers, controllers.indices.contains(index) else { return }
-        selectedIndex = index
+        guard tabs.indices.contains(index) else { return }
+        let previous = selectedTab
+        selectedTab = tabs[index]
+        tabBarController(self, didSelectTab: tabs[index], previousTab: previous)
     }
 
     // MARK: - K6: playback failure toast
@@ -205,7 +243,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
             changes()
         }
         let avoidance = visible ? PlayerBarView.barHeight + FloatingMetrics.gap * 2 : 0
-        for child in viewControllers ?? [] {
+        for child in tabRoots {
             child.additionalSafeAreaInsets.bottom = avoidance
         }
     }

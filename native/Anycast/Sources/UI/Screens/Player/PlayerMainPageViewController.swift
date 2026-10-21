@@ -17,7 +17,7 @@ final class PlayerMainPageViewController: UIViewController {
     private let context: UIContext
     private let observation = ObservationLoop()
 
-    private let coverShadow = UIView()
+    private let coverFrame = UIView()
     private let coverView = UIImageView()
     private let shareButton = AnycastIconButton(
         style: .plain, icon: AppIcons.share, accessibilityLabel: "Share episode", glyphSize: 20
@@ -96,20 +96,9 @@ final class PlayerMainPageViewController: UIViewController {
         )
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        coverShadow.layer.shadowPath = UIBezierPath(
-            roundedRect: coverShadow.bounds, cornerRadius: Radius.artwork
-        ).cgPath
-    }
-
     // MARK: - Build
 
     private func build() {
-        coverShadow.layer.shadowColor = UIColor.black.cgColor
-        coverShadow.layer.shadowOpacity = 0.13
-        coverShadow.layer.shadowRadius = Spacing.md
-        coverShadow.layer.shadowOffset = CGSize(width: 0, height: Spacing.md)
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
         coverView.layer.cornerRadius = Radius.artwork
@@ -118,7 +107,7 @@ final class PlayerMainPageViewController: UIViewController {
         coverView.isAccessibilityElement = true
         coverView.accessibilityLabel = "Episode artwork"
         coverView.translatesAutoresizingMaskIntoConstraints = false
-        coverShadow.addSubview(coverView)
+        coverFrame.addSubview(coverView)
 
         shareButton.tintColor = Theme.playerSecondary
         shareButton.configuration?.baseForegroundColor = Theme.playerSecondary
@@ -161,7 +150,7 @@ final class PlayerMainPageViewController: UIViewController {
         updateScrubberSpacing()
         bottomStack.setCustomSpacing(Spacing.pageH, after: controls)
 
-        for block in [coverShadow, titleRow, bottomStack] {
+        for block in [coverFrame, titleRow, bottomStack] {
             block.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(block)
         }
@@ -174,28 +163,28 @@ final class PlayerMainPageViewController: UIViewController {
         // Square artwork at the inset width, capped at 320 pt; on short
         // windows it yields to a share of the page height so the column
         // never overflows (07 §4 hard requirement).
-        let coverWidth = coverShadow.widthAnchor.constraint(
+        let coverWidth = coverFrame.widthAnchor.constraint(
             equalTo: view.widthAnchor, constant: -Layout.artworkInset * 2
         )
         coverWidth.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
             topBalance.topAnchor.constraint(equalTo: view.topAnchor),
-            topBalance.bottomAnchor.constraint(equalTo: coverShadow.topAnchor),
+            topBalance.bottomAnchor.constraint(equalTo: coverFrame.topAnchor),
             topBalance.heightAnchor.constraint(greaterThanOrEqualToConstant: Spacing.pageHeader),
 
-            coverShadow.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            coverFrame.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             coverWidth,
-            coverShadow.widthAnchor.constraint(lessThanOrEqualToConstant: Layout.artworkMaxSide),
-            coverShadow.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -Layout.artworkInset * 2),
-            coverShadow.heightAnchor.constraint(equalTo: coverShadow.widthAnchor),
-            coverShadow.heightAnchor.constraint(lessThanOrEqualTo: view.heightAnchor, multiplier: 0.45),
-            coverView.topAnchor.constraint(equalTo: coverShadow.topAnchor),
-            coverView.bottomAnchor.constraint(equalTo: coverShadow.bottomAnchor),
-            coverView.leadingAnchor.constraint(equalTo: coverShadow.leadingAnchor),
-            coverView.trailingAnchor.constraint(equalTo: coverShadow.trailingAnchor),
+            coverFrame.widthAnchor.constraint(lessThanOrEqualToConstant: Layout.artworkMaxSide),
+            coverFrame.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -Layout.artworkInset * 2),
+            coverFrame.heightAnchor.constraint(equalTo: coverFrame.widthAnchor),
+            coverFrame.heightAnchor.constraint(lessThanOrEqualTo: view.heightAnchor, multiplier: 0.45),
+            coverView.topAnchor.constraint(equalTo: coverFrame.topAnchor),
+            coverView.bottomAnchor.constraint(equalTo: coverFrame.bottomAnchor),
+            coverView.leadingAnchor.constraint(equalTo: coverFrame.leadingAnchor),
+            coverView.trailingAnchor.constraint(equalTo: coverFrame.trailingAnchor),
 
-            titleRow.topAnchor.constraint(equalTo: coverShadow.bottomAnchor, constant: Spacing.pageHeader),
+            titleRow.topAnchor.constraint(equalTo: coverFrame.bottomAnchor, constant: Spacing.pageHeader),
             titleRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
             titleRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
 

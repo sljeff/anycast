@@ -61,22 +61,20 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        let searchButton = app.buttons["header-search"]
-        XCTAssertTrue(searchButton.waitForExistence(timeout: 5), "page header search button missing")
-        searchButton.tap()
-        let field = app.textFields["search-page-field"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5), "search sheet did not open")
+        let searchTab = app.buttons["tab-search"]
+        XCTAssertTrue(searchTab.waitForExistence(timeout: 5), "Search tab missing")
+        searchTab.tap()
+        let field = app.searchFields["search-page-field"].exists
+            ? app.searchFields["search-page-field"] : app.textFields["search-page-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "search field missing on the Search tab")
         guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
             // A connected hardware keyboard suppresses the software one; the
             // typing steps cannot run on such a runner (CI runners are fine).
             throw XCTSkip("software keyboard unavailable — skipping the submit flow")
         }
-        field.typeText("news")
-        if app.keyboards.buttons["search"].exists {
-            app.keyboards.buttons["search"].tap()
-        } else {
-            field.typeText("\n")
-        }
+        // Return submits; a "search" key lookup would also match the
+        // Search tab button.
+        field.typeText("news\n")
 
         // The results sheet's tab strip is the stable marker — do not weaken
         // with a collection-view fallback (one is always behind the sheet).
