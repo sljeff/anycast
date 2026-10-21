@@ -31,6 +31,8 @@ nonisolated enum Spacing {
     static let sheetTitleH: CGFloat = 64
     static let rowH: CGFloat = 70
     static let pageBottomSafe: CGFloat = 88
+    /// Content inset inside sheets: 54 − 28 = 26, the radius of a 52 pt capsule, so bottom controls sit concentric with the floating sheet corner.
+    static let sheetContent: CGFloat = 28
 }
 
 /// Anycast 2.0 corner radii (`AnycastRadius`).

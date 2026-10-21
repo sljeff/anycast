@@ -18,6 +18,8 @@ enum Haptics {
     static func queueRemoved() { impact(.light) }
     /// Sleep timer set or cancelled.
     static func timerSet() { impact(.medium) }
+    /// A press-and-hold destructive action completed.
+    static func confirm() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
 
     private static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
         UIImpactFeedbackGenerator(style: style).impactOccurred()
