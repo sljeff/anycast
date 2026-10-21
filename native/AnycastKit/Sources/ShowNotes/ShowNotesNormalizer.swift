@@ -30,8 +30,14 @@ public struct ShowNotesNormalizer {
     /// Parsed-node ceiling; pathological inputs return an empty document.
     public static let maximumNodeCount = 50_000
     /// Nesting ceiling guarding recursive walks (a narrow-but-deep tree stays
-    /// under the node cap but would overflow the recursive descent).
-    static let maximumParseDepth = 1_000
+    /// under the node cap but would overflow the recursive descent). The
+    /// walk costs a few stack frames per level and runs on the 512 KB stacks
+    /// of GCD worker threads (`ShowNotesStore` normalizes in a detached
+    /// task): 64 levels stay an order of magnitude short of that even with
+    /// fat unoptimized frames, while real show-notes markup nests several
+    /// times shallower — deeper input is pathological and takes the
+    /// caller's plain-text fallback.
+    static let maximumParseDepth = 64
     /// Deepest list nesting represented; deeper lists flatten onto depth 3.
     static let maximumListDepth = 3
     /// Deepest `blockquote` nesting represented; deeper quotes flatten into

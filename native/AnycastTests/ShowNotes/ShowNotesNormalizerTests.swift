@@ -651,4 +651,22 @@ struct ShowNotesNormalizerTests {
         let many = String(repeating: "<p>x</p>", count: 25_100)   // 50,200 nodes > 50k
         #expect(ShowNotesNormalizer.normalize(html: many).isEmpty)
     }
+
+    @Test("Nesting past the parse-depth ceiling returns an empty document")
+    func tooDeep() {
+        let deep = String(repeating: "<div>", count: ShowNotesNormalizer.maximumParseDepth + 1)
+            + "core" + String(repeating: "</div>", count: ShowNotesNormalizer.maximumParseDepth + 1)
+        #expect(ShowNotesNormalizer.normalize(html: deep).isEmpty)
+    }
+
+    @Test("Nesting within the parse-depth ceiling keeps the text")
+    func deepButLegalNestingKeepsText() {
+        // Divs unwrap presentationally, so the payload survives as a plain
+        // paragraph while the walk still descends the full depth.
+        let depth = ShowNotesNormalizer.maximumParseDepth / 2
+        let html = String(repeating: "<div>", count: depth) + "deep quote"
+            + String(repeating: "</div>", count: depth)
+        let plain = Self.flattenedText(of: ShowNotesNormalizer.normalize(html: html))
+        #expect(plain.contains("deep quote"))
+    }
 }

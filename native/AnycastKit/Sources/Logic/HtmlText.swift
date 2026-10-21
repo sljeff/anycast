@@ -65,9 +65,12 @@ public enum HtmlText {
     /// injection, no normalization (matches the Dart html package's
     /// `body.text`). SwiftSoup models `<script>`/`<style>` contents as
     /// DataNodes instead of TextNodes, so they are folded in explicitly
-    /// (K39 parity with Dart's text output).
+    /// (K39 parity with Dart's text output). The walk is iterative: feed
+    /// depth is untrusted and these stacks are 512 KB where this runs
+    /// (card-cache parsing, ingest), too small for a recursion per level.
     private static func collectTextNodes(_ element: Element, into output: inout String) {
-        for node in element.getChildNodes() {
+        var stack: [Node] = element.getChildNodes().reversed()
+        while let node = stack.popLast() {
             if let textNode = node as? TextNode {
                 output += textNode.getWholeText()
             } else if let child = node as? Element {
@@ -79,7 +82,7 @@ public enum HtmlText {
                         }
                     }
                 }
-                collectTextNodes(child, into: &output)
+                stack.append(contentsOf: child.getChildNodes().reversed())
             }
         }
     }
@@ -111,6 +114,12 @@ public enum HtmlText {
         "itemprop",
     ]
 
+    /// `sanitizeChildren` descends recursively, one frame per nesting level,
+    /// so feed depth must be bounded before that walk runs (this path also
+    /// serves off-main parsing on 512 KB stacks). Deeper trees return "" and
+    /// take the caller's plain-text fallback (`displayPayload`).
+    static let maximumTreeDepth = 64
+
     /// sanitize_html parses a FRAGMENT (never a full document), filters, and
     /// re-serializes. `id`/`class` are always dropped (the app passes no
     /// allowElementId/allowClassName).
@@ -118,6 +127,9 @@ public enum HtmlText {
         guard let document = try? SwiftSoup.parseBodyFragment(html),
               let body = document.body()
         else { return "" }
+        guard ShowNotesNormalizer.nodeStats(of: body).maxDepth <= maximumTreeDepth else {
+            return ""
+        }
         // Pretty-printing injects indentation and collapses internal
         // whitespace — the Dart serializer emits raw text nodes. Callers
         // apply the shipped `.trim()` themselves (renderHtml).

@@ -17,4 +17,20 @@ struct DisplayTextTests {
         #expect(DisplayText.clean("Just words, 100% plain.") == "Just words, 100% plain.")
         #expect(DisplayText.clean("") == "")
     }
+
+    @Test("Angle brackets in prose never lose content")
+    func angleBracketProseIsLossless() {
+        #expect(DisplayText.clean("for x<y values") == "for x<y values")
+        #expect(DisplayText.clean("Tickets at <event> sold out") == "Tickets at <event> sold out")
+        #expect(DisplayText.clean("Use <?xml version=\"1.0\"?> header")
+                == "Use <?xml version=\"1.0\"?> header")
+        #expect(DisplayText.clean("values <x> and <y>") == "values <x> and <y>")
+        #expect(DisplayText.clean("I <3 podcasts") == "I <3 podcasts")
+    }
+
+    @Test("Markup other than <br> stays literal instead of being stripped")
+    func nonBreakMarkupStaysLiteral() {
+        #expect(DisplayText.clean("hi <b>there</b> friend") == "hi <b>there</b> friend")
+        #expect(DisplayText.clean("escaped &lt;b&gt; decodes once") == "escaped <b> decodes once")
+    }
 }
