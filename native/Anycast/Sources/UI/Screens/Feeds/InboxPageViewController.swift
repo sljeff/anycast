@@ -563,13 +563,33 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             currentEnclosureURL: context.playback.currentEpisode?.enclosureUrl,
             episodeEnclosureURL: enclosureURL
         )
+        // The fly-in origin must be captured from the tapped cell BEFORE
+        // any step runs: the removal step deletes the row, so resolving the
+        // cell at fly-in time would miss it — the ball leaves from where
+        // the row was. The row's position is re-resolved by identity here,
+        // too: the action closures capture configure-time index paths,
+        // which go stale once an earlier animated removal shifts surviving
+        // rows without reconfiguring them. The re-resolution TIGHTENS only
+        // a list-surface caller's path: the Detail sheet passes nil, and
+        // nil must come out nil — its add runs without the flight (the
+        // landed Detail-action precedent,
+        // ChannelEpisodeListBinder.detailActions). A list action whose row
+        // vanished before firing (trim/refresh) also drops the flight —
+        // the configure-time fallback would feed the layout a stale,
+        // possibly out-of-range path.
+        let flyInStart = Self.resolvedFlyInStart(
+            actionPath: indexPath,
+            identityPath: currentIndexPath(of: episode),
+            in: collectionView,
+            window: view.window
+        )
         Task { [weak self] in
             var insertedRow = row
             for step in steps {
                 guard let self else { return }
                 switch step {
                 case .flyInAnimation:
-                    await self.runFlyIn(from: indexPath)
+                    await self.runFlyIn(from: flyInStart)
                 case .insertIntoPlaylist(let index):
                     let repository = self.context.database.playlistRepository()
                     try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: index)
@@ -590,19 +610,77 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
     }
 
-    /// AnimatedPlaylistIndicator FIRST, insert in its completion. From the
-    /// Detail sheet (indexPath nil) the animation is skipped — the landed
-    /// Detail-action precedent (ChannelEpisodeListBinder.detailActions).
-    /// v2 strip-less cards have no add button: the card CENTER is the
-    /// origin (09 §7a-C1).
-    private func runFlyIn(from indexPath: IndexPath?) async {
-        guard let indexPath, let window = view.window else { return }
-        let start: CGPoint
-        if let cell = collectionView.cellForItem(at: indexPath) {
-            start = cell.convert(CGPoint(x: cell.bounds.midX, y: cell.bounds.midY), to: window)
-        } else {
-            start = window.center
+    /// `perform`'s fly-in decision, whole: only a list-surface action
+    /// (non-nil `actionPath`) flies, and only while the row is still
+    /// resolvable (`identityPath` — the identity re-resolution of the row
+    /// against the CURRENT list). The Detail sheet passes a nil action
+    /// path and must never fly; a list action whose row already left the
+    /// list drops the flight rather than resolving a stale path. Internal
+    /// + static so the regression suite pins the contract at the same
+    /// entry `perform` uses.
+    static func resolvedFlyInStart(
+        actionPath: IndexPath?,
+        identityPath: IndexPath?,
+        in collectionView: UICollectionView,
+        window: UIWindow?
+    ) -> CGPoint? {
+        guard let actionPath, let identityPath else { return nil }
+        return flyInOrigin(in: collectionView, at: identityPath, window: window)
+    }
+
+    /// The resolution core. The origin's X never comes from the item: a
+    /// full leading swipe displaces the row toward the trailing edge, and
+    /// at action time BOTH lookup layers report the displaced position
+    /// (observed on device with the cell-center and the
+    /// layout-attributes strategies). The resting X of a full-width row
+    /// is the collection view's horizontal center, so the origin is the
+    /// item's Y (list swipes translate horizontally only — Y is
+    /// trustworthy) at the collection's center X. The path is guarded
+    /// against the collection view's CURRENT counts before touching the
+    /// layout: `layoutAttributesForItem` on a compositional section with
+    /// an out-of-range index can assert where `cellForItem` would return
+    /// nil.
+    static func flyInOrigin(
+        in collectionView: UICollectionView, at indexPath: IndexPath?, window: UIWindow?
+    ) -> CGPoint? {
+        guard let indexPath, let window else { return nil }
+        func pathIsInBounds() -> Bool {
+            indexPath.section >= 0
+                && indexPath.section < collectionView.numberOfSections
+                && indexPath.item >= 0
+                && indexPath.item < collectionView.numberOfItems(inSection: indexPath.section)
         }
+        let inBounds = pathIsInBounds()
+        let restingX = collectionView.convert(collectionView.bounds, to: window).midX
+        if inBounds, let frame = collectionView.layoutAttributesForItem(at: indexPath)?.frame {
+            let midY = collectionView.convert(CGPoint(x: 0, y: frame.midY), to: window).y
+            return CGPoint(x: restingX, y: midY)
+        }
+        if inBounds, let cell = collectionView.cellForItem(at: indexPath) {
+            let midY = cell.convert(CGPoint(x: 0, y: cell.bounds.midY), to: window).y
+            return CGPoint(x: restingX, y: midY)
+        }
+        return window.center
+    }
+
+    /// The row's CURRENT index path, resolved by identity (enclosure URL).
+    /// Animated removals shift surviving rows without reconfiguring them,
+    /// so the configure-time index paths captured in the action closures
+    /// drift; every action funnels through `perform`, which re-resolves
+    /// here — the context menu, the more pull-down, the swipe surfaces,
+    /// and VoiceOver custom actions all stay consistent.
+    private func currentIndexPath(of episode: FeedEpisodeRow) -> IndexPath? {
+        guard let url = episode.enclosureUrl,
+              let index = displayedEpisodes.firstIndex(where: { $0.enclosureUrl == url })
+        else { return nil }
+        return IndexPath(item: index, section: logicalSectionAtProviderIndex(Section.cards))
+    }
+
+    /// AnimatedPlaylistIndicator — runs AFTER the row's animated removal
+    /// (the planner's add-to-playlist order); the insert has already
+    /// committed by then.
+    private func runFlyIn(from start: CGPoint?) async {
+        guard let start, let window = view.window else { return }
         await withCheckedContinuation { continuation in
             context.flyInAnimator.fly(from: start, in: window) {
                 continuation.resume()
@@ -610,10 +688,62 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
     }
 
+    /// The removal side of every card action: database delete, in-memory
+    /// removal, and an ANIMATED row deletion. `performBatchUpdates` keeps
+    /// the surviving rows' measured attributes — the old no-animation
+    /// `reloadData()` re-estimated every self-sizing card and the
+    /// neighbors snapped. `renderList()` stays the bulk/full-refresh path
+    /// (fetch, trim, category reselect); this list is strip-less, so no
+    /// CardExpandCoordinator index needs closing before the mutation.
     private func removeFromInbox(urls: [String]) async {
         try? await context.database.feedRepository().removeByEnclosureUrls(urls)
-        episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
-        renderList()
+        // Everything is derived from the CURRENT data before any mutation:
+        // the in-memory removal happens INSIDE the batch closure, right
+        // before deleteItems — mutating the data source ahead of the batch
+        // makes its counts report post-removal numbers, and a layout pass
+        // in between (rotation, sheet dismissal, a pending reload) then
+        // trips UIKit's item-count consistency check.
+        let displayed = displayedEpisodes
+        let cardsSection = logicalSectionAtProviderIndex(Section.cards)
+        let removedPaths = displayed.indices.compactMap { index -> IndexPath? in
+            guard let url = displayed[index].enclosureUrl, urls.contains(url) else { return nil }
+            return IndexPath(item: index, section: cardsSection)
+        }
+        let displayedAfterRemoval = displayed.filter { row in
+            guard let url = row.enclosureUrl else { return true }
+            return !urls.contains(url)
+        }
+        // Animated deletion applies only while the rows were on screen AND
+        // the column keeps its structure: emptying the displayed list
+        // collapses every section into the ImportBlock empty state — that
+        // structural rebuild goes through the plain path.
+        guard view.window != nil, !removedPaths.isEmpty, !displayedAfterRemoval.isEmpty else {
+            episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
+            renderList()
+            return
+        }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            collectionView.performBatchUpdates {
+                self.episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
+                self.collectionView.deleteItems(at: removedPaths)
+            } completion: { _ in
+                continuation.resume()
+            }
+        }
+        lastSignature = displayedEpisodes.map(\.enclosureUrl)
+        // Post-completion state, not a cached one: a concurrent refresh may
+        // have emptied the list while the delete animation ran.
+        collectionView.backgroundView = displayedEpisodes.isEmpty ? emptyStateView : nil
+        refreshChromeStatus()
+    }
+
+    /// Inverse of `logicalSection(at:)` for the cards section: its provider
+    /// index after the header/strip sections that precede it collapse.
+    private func logicalSectionAtProviderIndex(_ logical: Int) -> Int {
+        var index = logical
+        if !showsHeader, logical > Section.header { index -= 1 }
+        if !showsCategoryStrip, logical > Section.strip { index -= 1 }
+        return index
     }
 
     // MARK: - Detail (whole-card and cover tap, card.dart:129-138 + 09 §7a-C1)
@@ -911,7 +1041,10 @@ extension InboxPageViewController: UICollectionViewDelegate {
         let remove = UIContextualAction(
             style: .destructive, title: "Remove",
             handler: { [weak self] _, _, completion in
-                self?.perform(.remove, episode: episode, at: nil)
+                // A list surface: pass the path (nil is reserved for the
+                // Detail sheet's no-fly contract; remove has no flight
+                // today, but the marker must stay truthful).
+                self?.perform(.remove, episode: episode, at: indexPath)
                 completion(true)
             }
         )

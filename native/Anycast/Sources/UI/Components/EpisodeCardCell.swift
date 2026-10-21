@@ -221,14 +221,25 @@ final class EpisodeCardCell: UICollectionViewCell {
 
     /// Action strip height 0↔60 (card.dart:279-291). The owning list drives
     /// the animation through `CardExpandAnimator.refresh`: this method only
-    /// moves the target (constraint + visibility) and settles the cell's
-    /// layout. The cell must NOT run its own animate block — a self-run
-    /// reveal raced the list's layout pass, and a height update that lost
-    /// the race left the strip overflowing the un-resized item.
-    func setExpanded(_ expanded: Bool) {
+    /// moves the target (constraint + visibility) and — unless the caller
+    /// opts out — settles the cell's layout. The cell must NOT run its own
+    /// animate block — a self-run reveal raced the list's layout pass, and a
+    /// height update that lost the race left the strip overflowing the
+    /// un-resized item.
+    ///
+    /// `settleLayout: false` is the animator's path. At animator time the
+    /// cell's item frame is still collapsed, so settling here would solve
+    /// the expanded strip INSIDE the collapsed frame — an over-constrained
+    /// state whose committed solve deforms the card body until the item
+    /// resize catches up. Deferred settling lets the animator's single
+    /// layout pass apply the item frame and the internal constraints in one
+    /// solve, inside one animation transaction.
+    func setExpanded(_ expanded: Bool, settleLayout: Bool = true) {
         stripHeightConstraint.constant = expanded ? Self.stripHeight : 0
         stripContainer.isHidden = !expanded
-        layoutIfNeeded()
+        if settleLayout {
+            layoutIfNeeded()
+        }
     }
 
     // MARK: - Build

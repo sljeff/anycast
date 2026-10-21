@@ -359,6 +359,108 @@ final class SmokeFlowsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 6))
     }
 
+    // MARK: - 10. Playlist whole-card drag reorder (seeded runs)
+
+    /// The 150 ms whole-card drag: hold a card ~0.6 s (deliberately past
+    /// the ~0.5 s window that used to raise the system drag session, lift
+    /// the square full-cell float, and kill the reorder), drag it onto a
+    /// lower card, release. The interactive movement is the single reorder
+    /// path, so the order must visibly change, a reverse drag restores the
+    /// seeded order, and the restored order must survive a relaunch
+    /// (database round trip).
+    func testPlaylistCardDragReorders() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
+        app.buttons["tab-1"].tap()
+
+        let cards = app.collectionViews.firstMatch.cells
+        guard cards.firstMatch.waitForExistence(timeout: 8), cards.count >= 3 else {
+            throw XCTSkip("no seeded playlist — drag flow needs db_smoke")
+        }
+
+        func cardTitles() -> [String] {
+            cards.allElementsBoundByIndex
+                .compactMap { $0.staticTexts.firstMatch.label }
+                .filter { !$0.isEmpty }
+        }
+
+        /// Waits until the visible card titles stop changing (the drop's
+        /// commit chain — repository write → playback steps → reload —
+        /// settles) instead of a fixed sleep that can race it.
+        func waitUntilTitlesStable(minimum: TimeInterval, timeout: TimeInterval) {
+            var last = cardTitles()
+            let started = Date()
+            var lastChange = started
+            let deadline = started + timeout
+            while Date() < deadline {
+                usleep(300_000)
+                let current = cardTitles()
+                if current != last {
+                    last = current
+                    lastChange = Date()
+                } else if Date().timeIntervalSince(lastChange) > 0.8,
+                          Date().timeIntervalSince(started) >= minimum {
+                    break
+                }
+            }
+        }
+        let before = cardTitles()
+        guard before.count >= 3 else {
+            throw XCTSkip("playlist cards did not expose titles — drag flow needs db_smoke")
+        }
+
+        // Hold ≥ 0.5 s (the old system-drag trigger) and drag the head
+        // onto the third card.
+        let first = cards.element(boundBy: 0)
+        let third = cards.element(boundBy: 2)
+        first.press(forDuration: 0.6, thenDragTo: third)
+        waitUntilTitlesStable(minimum: 1.0, timeout: 6.0)
+
+        let after = cardTitles()
+        XCTAssertEqual(Set(after), Set(before), "drag changed the playlist content set")
+        XCTAssertNotEqual(
+            after.first, before.first,
+            "the dragged head card did not move (order unchanged: \(after))"
+        )
+
+        // Restore the seeded order through the same gesture: drag the
+        // moved card back above the current head.
+        guard let movedIndex = after.firstIndex(of: before[0]), movedIndex > 0 else {
+            XCTFail("moved card \(before[0]) not found below the head after the drag")
+            return
+        }
+        let moved = cards.element(boundBy: movedIndex)
+        let top = cards.element(boundBy: 0)
+        moved.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(
+                forDuration: 0.6,
+                thenDragTo: top.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -0.4))
+            )
+        waitUntilTitlesStable(minimum: 1.0, timeout: 6.0)
+        XCTAssertEqual(
+            cardTitles().first, before[0],
+            "the restore drag did not return the original head"
+        )
+
+        // The restored order must survive a relaunch (database round trip).
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(
+            app.buttons["tab-1"].waitForExistence(timeout: 20),
+            "pill tab bar did not install after relaunch"
+        )
+        app.buttons["tab-1"].tap()
+        XCTAssertTrue(
+            cards.firstMatch.waitForExistence(timeout: 8),
+            "playlist list missing after relaunch"
+        )
+        XCTAssertEqual(
+            cardTitles().first, before[0],
+            "the restored playlist order did not persist across relaunch"
+        )
+    }
+
     // MARK: - 9. Login sheet opens from Settings (sandbox UI is not touched)
 
     /// Regression: tapping Account once must yield exactly one login sheet

@@ -117,18 +117,25 @@ enum InboxEpisodeAction: Equatable {
 }
 
 enum InboxActionStep: Equatable {
-    /// AnimatedPlaylistIndicator flies FIRST; the insert happens in its
-    /// completion (feeds.dart:104-128).
+    /// AnimatedPlaylistIndicator flies to the playlist tab. Native ordering
+    /// note: the step runs AFTER the row has already left the inbox — the
+    /// row animates away first, then the ball flies (the row "becomes a
+    /// ball and jumps into the playlist"); the Dart flow flew first while
+    /// the row lingered through the whole animation.
     case flyInAnimation
-    /// insertOrUpdateByIndex at the resolved slot (addToTop uses 0).
+    /// insertOrUpdateByIndex at the resolved slot (addToTop uses 0). In the
+    /// add flow this precedes the inbox removal: a process kill inside the
+    /// removal/fly animation window must leave the episode safely in the
+    /// playlist, not lost from both tables.
     case insertIntoPlaylist(Int)
     /// addToPlaylist no-op branch: this exact episode is currently playing
     /// (feed_episode.dart:88-91).
     case skipInsertCurrentlyPlaying
     /// removeByEnclosureUrls — every action ends with the episode leaving
-    /// the inbox.
+    /// the inbox (single-row removals animate the row away).
     case removeFromInbox
-    /// playByEpisode (play action only).
+    /// playByEpisode (play action only). Runs BEFORE the animated inbox
+    /// removal so playback never waits out the deletion animation.
     case playInsertedEpisode
     /// The playback queue observes the default playlist (native equivalent
     /// of the Dart Obx reactivity over the playlist controller).
@@ -138,7 +145,12 @@ enum InboxActionStep: Equatable {
 enum InboxActionPlanner {
 
     /// Side-effect order for one action, given the playback context that
-    /// `addToPlaylist` consults (feed_episode.dart:80-108).
+    /// `addToPlaylist` consults (feed_episode.dart:80-108). The add flow
+    /// commits the playlist insert FIRST (database-only; queue observers
+    /// fire only at `reloadPlaybackQueue`), then animates the row out of
+    /// the inbox, then runs the fly-in — the insert is durable before the
+    /// visual sequence starts, so a kill mid-animation leaves the episode
+    /// in the playlist instead of in neither table.
     static func steps(
         for action: InboxEpisodeAction,
         currentPlaylistId: Int64?,
@@ -147,11 +159,12 @@ enum InboxActionPlanner {
     ) -> [InboxActionStep] {
         switch action {
         case .play:
-            // addToTop(1, ep) → removeByEnclosureUrls → playByEpisode.
-            return [.insertIntoPlaylist(0), .removeFromInbox, .playInsertedEpisode]
+            // addToTop(1, ep) → playByEpisode → removeByEnclosureUrls:
+            // playback starts before the row animates away.
+            return [.insertIntoPlaylist(0), .playInsertedEpisode, .removeFromInbox]
 
         case .addToPlaylist:
-            var steps: [InboxActionStep] = [.flyInAnimation]
+            var steps: [InboxActionStep] = []
             let index = ChannelPlaylistLogic.addToPlaylistIndex(
                 currentPlaylistId: currentPlaylistId,
                 targetPlaylistId: ChannelPlaylistLogic.defaultPlaylistID,
@@ -166,8 +179,10 @@ enum InboxActionPlanner {
             } else {
                 steps.append(.skipInsertCurrentlyPlaying)
             }
-            // addToPlaylist(...).then((_) => removeByEnclosureUrls(...)).
+            // The visual sequence: the row animates away FIRST, then the
+            // ball flies (the insert above has already committed).
             steps.append(.removeFromInbox)
+            steps.append(.flyInAnimation)
             return steps
 
         case .remove:
