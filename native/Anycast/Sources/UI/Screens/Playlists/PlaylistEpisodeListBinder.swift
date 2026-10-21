@@ -90,7 +90,7 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
             rightText: PlaylistCardDisplay.rightText(input),
             descriptionHTML: episode.description,
             imageURL: episode.imageUrl,
-            showsProgressBackdrop: true,
+            showsProgress: true,
             progressFraction: PlaylistCardDisplay.progressFraction(input),
             downloadDisplay: downloadDisplay(for: enclosureURL)
         )
@@ -163,7 +163,7 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
                     pubDateMilliseconds: episode.pubDate,
                     nowEpochMilliseconds: 0
                 )),
-                rightText: TimeFormats.formatRemainingTime(
+                rightText: PlaylistCardDisplay.timeLeft(
                     durationMilliseconds: positionData.durationMilliseconds,
                     playedMilliseconds: positionData.positionMilliseconds
                 )

@@ -133,9 +133,11 @@ struct PlaylistPageModel: Equatable {
 
 // MARK: - Playlist card display (card.dart:50-82 / 232-275)
 
-/// Right-text + progress-backdrop reducer for the playlist card variant.
-/// The CURRENT episode reads live position data; every other row reads its
-/// stored playedDuration (card.dart:65-81).
+/// Time-text + progress reducer for the playlist card variant. The CURRENT
+/// episode reads live position data; every other row reads its stored
+/// playedDuration (card.dart:65-81). The card shows the time left once
+/// playback has started ("32m left", beside the meter) and the bare
+/// duration before that ("42m").
 enum PlaylistCardDisplay {
 
     struct Input {
@@ -150,25 +152,28 @@ enum PlaylistCardDisplay {
 
     static func rightText(_ input: Input) -> String {
         if input.isCurrentEpisode {
-            return TimeFormats.formatRemainingTime(
+            return timeLeft(
                 durationMilliseconds: input.liveDurationMilliseconds,
                 playedMilliseconds: input.livePositionMilliseconds
             )
         }
-        let duration = input.durationMilliseconds ?? 0
-        let played = input.playedDurationMilliseconds ?? 0
-        if played > 0 {
-            return TimeFormats.formatRemainingTime(
-                durationMilliseconds: duration,
-                playedMilliseconds: played
-            )
-        }
-        // Unplayed rows use the shared episode meta, "{relative date} · {duration}".
-        return RelativeTimeFormatter.dateAndDuration(
-            pubDateMilliseconds: input.pubDateMilliseconds,
-            durationMilliseconds: duration,
-            now: Date(timeIntervalSince1970: TimeInterval(input.nowEpochMilliseconds) / 1000)
+        return timeLeft(
+            durationMilliseconds: input.durationMilliseconds ?? 0,
+            playedMilliseconds: input.playedDurationMilliseconds ?? 0
         )
+    }
+
+    /// `TimeFormats.formatRemainingTime` (the golden-pinned minute math)
+    /// with the card's wording: "… left" instead of "… remaining"; an
+    /// unplayed episode reads as its bare duration.
+    static func timeLeft(durationMilliseconds: Int64, playedMilliseconds: Int64) -> String {
+        let text = TimeFormats.formatRemainingTime(
+            durationMilliseconds: durationMilliseconds,
+            playedMilliseconds: playedMilliseconds
+        )
+        let remaining = " remaining"
+        guard text.hasSuffix(remaining) else { return text }
+        return String(text.dropLast(remaining.count)) + " left"
     }
 
     /// playbackProgress (formatters.dart:80-87): clamped 0…1, 0 for a

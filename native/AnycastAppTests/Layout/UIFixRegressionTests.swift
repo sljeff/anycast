@@ -247,57 +247,54 @@ struct UIFixRegressionTests {
         }
     }
 
-    // MARK: - Card progress backdrop corners (4)
+    // MARK: - Card progress meter (4)
 
-    @Test("Card progress backdrop clips inside the rounded card corners")
-    func cardBackdropClippedToCorners() {
-        let cell = EpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 354, height: 104))
+    private func meter(in cell: EpisodeCardCell) -> UIView? {
+        func find(_ view: UIView) -> UIView? {
+            if view.accessibilityIdentifier == "episode-card-meter" { return view }
+            for subview in view.subviews { if let hit = find(subview) { return hit } }
+            return nil
+        }
+        return find(cell)
+    }
+
+    private func card(showsProgress: Bool, fraction: Double, rightText: String) -> EpisodeCardCell {
+        let cell = EpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 370, height: EpisodeCardCell.cardRowHeight))
         cell.configure(
             EpisodeCardContent(
-                title: "Episode", channelTitle: "Channel", rightText: "12m left",
+                title: "Episode", channelTitle: "Channel", rightText: rightText,
                 descriptionHTML: nil, imageURL: nil,
-                showsProgressBackdrop: true,
-                progressFraction: 0.6,
+                showsProgress: showsProgress,
+                progressFraction: fraction,
                 descriptionPlainText: "Description"
             ),
             actions: []
         )
         cell.layoutIfNeeded()
+        return cell
+    }
 
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = false
-        let renderer = UIGraphicsImageRenderer(size: cell.bounds.size, format: format)
-        let image = renderer.image { context in
-            cell.layer.render(in: context.cgContext)
+    @Test("Card progress: a 36 × 4 meter inside the plate, only once played")
+    func cardProgressMeter() {
+        let played = card(showsProgress: true, fraction: 0.36, rightText: "32m left")
+        let shown = meter(in: played)
+        #expect(shown?.isHidden == false)
+        #expect(shown?.bounds.size == CGSize(width: 36, height: 4))
+        #expect(shown?.accessibilityLabel == "36 percent played")
+        if let shown {
+            let frame = shown.convert(shown.bounds, to: played)
+            #expect(played.bounds.contains(frame), "meter sits inside the card")
         }
-        guard let cg = image.cgImage else {
-            Issue.record("cell render failed"); return
-        }
-        let pixel = { (x: Int, y: Int) -> (UInt8, UInt8, UInt8, UInt8) in
-            var data = [UInt8](repeating: 0, count: 4)
-            guard let ctx = CGContext(
-                data: &data, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ) else { return (0, 0, 0, 0) }
-            ctx.interpolationQuality = .none
-            ctx.draw(
-                cg,
-                in: CGRect(
-                    x: -CGFloat(x), y: -CGFloat(y),
-                    width: cell.bounds.width, height: cell.bounds.height
-                )
-            )
-            return (data[0], data[1], data[2], data[3])
-        }
-        // Inside the 20 pt corner radius the bottom-left corner must be
-        // empty (the backdrop no longer paints through the rounded edge)…
-        let corner = pixel(2, 100)
-        #expect(corner.3 == 0, "progress strip paints the rounded corner (alpha \(corner.3))")
-        // …while the strip itself still paints at the bottom center.
-        let center = pixel(177, 100)
-        #expect(center.3 > 200, "progress strip missing at the bottom edge (alpha \(center.3))")
+
+        let unplayed = card(showsProgress: true, fraction: 0, rightText: "42m")
+        #expect(meter(in: unplayed)?.isHidden == true, "an unplayed episode shows its duration only")
+
+        let plain = card(showsProgress: false, fraction: 0.5, rightText: "4d ago · 30m")
+        #expect(meter(in: plain)?.isHidden == true, "non-playlist cards never show the meter")
+
+        // Live progress turns the meter on for the current episode.
+        unplayed.updateLiveProgress(fraction: 0.1, rightText: "38m left")
+        #expect(meter(in: unplayed)?.isHidden == false)
     }
 
     // MARK: - Playlist Detail play button (5)
