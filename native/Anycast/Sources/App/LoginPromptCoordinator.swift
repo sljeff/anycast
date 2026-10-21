@@ -28,6 +28,20 @@ final class LoginPromptCoordinator {
     /// One attempt per second still self-heals once the pipeline frees.
     private var lastAttempt = Date.distantPast
 
+    /// Interactive-dismiss bridge for the presented login sheet. The sheet's
+    /// `UIPresentationController.delegate` is weak, so the coordinator
+    /// retains the adapter for the sheet's lifetime and replaces it on each
+    /// present.
+    private var dismissalAdapter: LoginDismissalAdapter?
+
+    /// Signed-out check for the dismissal handler. Injectable so tests can
+    /// simulate a signed-in dismissal; lazily defaults to the live auth
+    /// state (read at call time — `context` is attached after init).
+    /// Load-bearing, not documentation — see `rollbackLoginGatedProcessing`.
+    lazy var isSignedOut: @MainActor () -> Bool = { [weak self] in
+        self?.context?.auth.currentUID == nil
+    }
+
     /// Presents `LoginViewController` as a full-height expand sheet
     /// (03 §1.3 #7: expand true / threshold 0.9 → A2/A3 system sheet).
     func presentLogin() {
@@ -39,7 +53,39 @@ final class LoginPromptCoordinator {
         let top = anchor.topMostPresented()
         let login = LoginViewController(context: context)
         currentLogin = login
-        AppSheets.presentExpand(login, from: top)
+        AppSheets.presentExpand(login, from: top) { [weak self, weak login] in
+            self?.attachDismissalAdapter(to: login)
+        }
+    }
+
+    /// Attaches the interactive-dismiss signal in the present completion,
+    /// when the sheet's presentation controller exists for sure (it does
+    /// not reliably survive being touched before `present`).
+    private func attachDismissalAdapter(to login: UIViewController?) {
+        guard let login else { return }
+        let adapter = LoginDismissalAdapter()
+        adapter.onUserDismissed = { [weak self] in
+            self?.rollbackLoginGatedProcessing()
+        }
+        dismissalAdapter = adapter
+        login.sheetPresentationController?.delegate = adapter
+    }
+
+    /// Dismissing the login sheet WITHOUT signing in cancels the pending
+    /// generates: signed-out `processing` entries are unpollable local
+    /// state, so rolling them back frees the Generate button and removes
+    /// the URLs from the 15 s poll set — the poller stops re-401-ing and
+    /// re-presenting this sheet every round. NOTE the sheet's lifecycle: a
+    /// successful sign-in does NOT dismiss the sheet —
+    /// `LoginViewController.refreshState` flips it to the signed-in card
+    /// and keeps it on screen, so the user's later swipe-down fires the
+    /// SAME interactive-dismiss callback with `currentUID != nil`. The
+    /// `isSignedOut` check below is therefore load-bearing: it is the only
+    /// thing keeping a post-sign-in dismissal from rolling back genuinely
+    /// in-flight server-side processing entries.
+    private func rollbackLoginGatedProcessing() {
+        guard isSignedOut(), let context else { return }
+        context.subtitles.cancelLoginGatedProcessing()
     }
 
     /// `currentLogin` only dedupes sheets this coordinator presented. The
@@ -56,5 +102,25 @@ final class LoginPromptCoordinator {
             current = controller.presentingViewController
         }
         return false
+    }
+}
+
+/// Bridges the login sheet's interactive swipe-down dismissal into the
+/// coordinator: `presentationControllerDidDismiss` fires only for the
+/// user's interactive dismiss (a programmatic `dismiss(animated:)` never
+/// triggers it). The sheet has no close button, so the swipe-down is the
+/// cancel path — but it is NOT proof of "still signed out": after a
+/// successful sign-in the sheet stays up and its later swipe-down fires
+/// this same callback, so the coordinator's signed-out check is what
+/// decides what a dismissal means. The sheet's `delegate` property is
+/// typed `UISheetPresentationControllerDelegate` (it inherits the
+/// dismissal callbacks), so that is the conformance to declare.
+@MainActor
+private final class LoginDismissalAdapter: NSObject, UISheetPresentationControllerDelegate {
+
+    var onUserDismissed: (() -> Void)?
+
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        onUserDismissed?()
     }
 }

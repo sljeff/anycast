@@ -19,11 +19,17 @@ enum AppSheets {
     /// so the sheet's own drag owns the top edge — at the default, an
     /// embedded scroll view at its top swallows the pull-down and shows
     /// elastic blank space instead of resizing the sheet.
+    ///
+    /// `completion` runs after the presentation animation finishes, when
+    /// the sheet's presentation controller exists for sure — the hook the
+    /// login prompt uses to attach its interactive-dismiss delegate.
+    /// Optional and defaulted so every existing call site is unchanged.
     static func presentExpand(
         _ controller: UIViewController,
         from presenter: UIViewController,
         animated: Bool = true,
-        detents: [UISheetPresentationController.Detent] = [.large()]
+        detents: [UISheetPresentationController.Detent] = [.large()],
+        completion: (() -> Void)? = nil
     ) {
         controller.modalPresentationStyle = .pageSheet
         if let sheet = controller.sheetPresentationController {
@@ -33,7 +39,7 @@ enum AppSheets {
                 sheet.prefersScrollingExpandsWhenScrolledToEdge = false
             }
         }
-        presenter.present(controller, animated: animated)
+        presenter.present(controller, animated: animated, completion: completion)
     }
 
     /// Non-expand form sheet (03 §1.3 row 10 — EmailLogin is the one sheet
