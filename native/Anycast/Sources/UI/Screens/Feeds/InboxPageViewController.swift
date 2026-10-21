@@ -580,7 +580,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? "",
             pubDateMilliseconds: episode.pubDate,
-            durationSeconds: episode.duration,
+            durationMilliseconds: episode.duration,
             imageURL: episode.imageUrl,
             rssFeedURL: episode.rssFeedUrl ?? "",
             enclosureURL: enclosureURL,

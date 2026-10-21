@@ -518,10 +518,17 @@ final class PlaylistEpisodeListBinder: NSObject, UICollectionViewDragDelegate {
     // MARK: - Detail (cover tap → the same three actions inside Detail)
 
     private func presentDetail(episode: PlaylistEpisodeRow) {
+        // The Play capsule resumes from the live position for the current
+        // episode and from the stored playedDuration otherwise.
+        let positionData = context.playback.positionData
+        let isCurrent = episode.enclosureUrl != nil
+            && context.playback.currentEpisode?.enclosureUrl == episode.enclosureUrl
         let detailEpisode = DetailViewController.Episode(
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? "",
             pubDateMilliseconds: episode.pubDate,
+            durationMilliseconds: isCurrent ? positionData.durationMilliseconds : episode.duration,
+            playedMilliseconds: isCurrent ? positionData.positionMilliseconds : episode.playedDuration,
             imageURL: episode.imageUrl,
             rssFeedURL: episode.rssFeedUrl ?? "",
             enclosureURL: episode.enclosureUrl ?? "",

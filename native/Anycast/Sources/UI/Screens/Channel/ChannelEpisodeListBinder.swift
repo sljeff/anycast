@@ -270,6 +270,7 @@ final class ChannelEpisodeListBinder {
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? viewModel.channel.title ?? "",
             pubDateMilliseconds: episode.pubDate,
+            durationMilliseconds: episode.duration,
             imageURL: episode.imageUrl,
             rssFeedURL: viewModel.rssFeedURL,
             enclosureURL: enclosureURL,

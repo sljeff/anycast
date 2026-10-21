@@ -258,6 +258,7 @@ final class SearchEpisodeBinder {
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? item.channel.title ?? "",
             pubDateMilliseconds: episode.pubDate,
+            durationMilliseconds: episode.duration,
             imageURL: episode.imageUrl,
             rssFeedURL: episode.rssFeedUrl ?? item.channel.rssFeedUrl ?? "",
             enclosureURL: enclosureURL,

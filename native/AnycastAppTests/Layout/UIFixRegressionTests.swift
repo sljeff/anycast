@@ -341,7 +341,7 @@ struct UIFixRegressionTests {
         }
         let playButtons = detail.view.subviewsRecursive()
             .compactMap { $0 as? UIButton }
-            .filter { $0.accessibilityLabel == "Play" }
+            .filter { $0.accessibilityIdentifier == "detail-play" }
         guard let play = playButtons.first else {
             Issue.record("detail play button not found"); return
         }

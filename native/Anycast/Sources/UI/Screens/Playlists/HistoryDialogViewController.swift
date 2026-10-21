@@ -470,6 +470,7 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? "",
             pubDateMilliseconds: episode.pubDate,
+            durationMilliseconds: episode.duration,
             imageURL: episode.imageUrl,
             rssFeedURL: episode.rssFeedUrl ?? "",
             enclosureURL: episode.enclosureUrl ?? "",

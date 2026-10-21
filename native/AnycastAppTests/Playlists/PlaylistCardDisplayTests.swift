@@ -74,6 +74,30 @@ struct PlaylistCardDisplayTests {
         #expect(zero == "")
     }
 
+    // MARK: - Detail Play capsule label
+
+    @Test("Detail Play label: resume with time left, else play with the duration")
+    func detailPlayLabel() {
+        let resume = DetailViewController.PlayLabel.make(
+            durationMilliseconds: 80 * 60_000, playedMilliseconds: 48 * 60_000
+        )
+        #expect(resume.title == "Resume · 32m left")
+        #expect(abs(resume.fraction - 0.6) < 0.001)
+
+        let fresh = DetailViewController.PlayLabel.make(durationMilliseconds: 80 * 60_000, playedMilliseconds: nil)
+        #expect(fresh == DetailViewController.PlayLabel(title: "Play · 80m", fraction: 0))
+
+        let unknown = DetailViewController.PlayLabel.make(durationMilliseconds: nil, playedMilliseconds: 5_000)
+        #expect(unknown == DetailViewController.PlayLabel(title: "Play", fraction: 0))
+
+        // Played past the end clamps to a full capsule.
+        let over = DetailViewController.PlayLabel.make(
+            durationMilliseconds: 30 * 60_000, playedMilliseconds: 35 * 60_000
+        )
+        #expect(over.title == "Resume · 0m left")
+        #expect(over.fraction == 1)
+    }
+
     // MARK: - Progress fraction (playbackProgress, formatters.dart:80-87)
 
     @Test("Current row fraction uses live data and clamps")
