@@ -2,23 +2,26 @@ import Foundation
 import AnycastKit
 
 /// Pure model for the settings sheet (lib/pages/settings.dart, 03 §2.13):
-/// row/group structure, tooltip copy, picker value↔index mapping (G9),
-/// option lists, and the deep links. UI-free so the parity fixtures in
-/// AnycastAppTests/Settings assert against data, not UIKit.
+/// row/group structure, row copy and trailing values, tooltip copy, stepper
+/// step math, option lists, and the deep links. The grouping, copy and
+/// in-row steppers follow the restrained 2.0 Settings direction adopted
+/// 2026-10-21 (the Dart scroll-wheel pickers are gone). UI-free so the
+/// fixtures in AnycastAppTests/Settings assert against data, not UIKit.
 nonisolated enum SettingsPageModel {
 
-    // MARK: - Row identity (order = settings.dart ListView order)
+    // MARK: - Row identity (order = on-screen order)
 
     enum Row: Hashable {
         case account
-        case country
+        case cacheLimit
         case enableTranslation
         case targetLanguage
-        case importExport
-        case history
+        case country
         case autoRefreshInterval
         case maxFeedEpisodes
         case maxHistoryEpisodes
+        case importExport
+        case history
         case contactEmail
         case privacyPolicy
         case termsOfUse
@@ -27,32 +30,30 @@ nonisolated enum SettingsPageModel {
     struct Section {
         let header: String?
         let rows: [Row]
-        /// The trailing Privacy links render outside a group card in Dart
-        /// (a centered column, not a `SettingsGroup`).
+        /// The trailing Privacy links render outside a group plate (a
+        /// centered column of plain links, not a grouped list).
         let plainStyle: Bool
     }
 
-    /// Group structure exactly as settings.dart builds it. The Target
-    /// Language row is conditional (appended by `sections(includeTargetLanguage:)`).
-    static func sections(includeTargetLanguage: Bool) -> [Section] {
-        var transcriptRows: [Row] = [.country, .enableTranslation]
-        if includeTargetLanguage {
-            transcriptRows.append(.targetLanguage)
-        }
-        return [
+    /// Group structure of the 2.0 Settings page. Target Language is always
+    /// present; it reads "Off" and is inert while translation is off.
+    static func sections() -> [Section] {
+        [
             Section(header: nil, rows: [.account], plainStyle: false),
-            Section(header: "Transcript & Translation", rows: transcriptRows, plainStyle: false),
-            Section(header: "Podcast", rows: [.importExport, .history], plainStyle: false),
-            Section(header: "Other",
-                    rows: [.autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes],
+            Section(header: "Downloads & Storage", rows: [.cacheLimit], plainStyle: false),
+            Section(header: "Subtitles & Translation",
+                    rows: [.enableTranslation, .targetLanguage], plainStyle: false),
+            Section(header: "Content & Discovery",
+                    rows: [.country, .autoRefreshInterval, .maxFeedEpisodes,
+                           .maxHistoryEpisodes, .importExport, .history],
                     plainStyle: false),
-            Section(header: "Contact", rows: [.contactEmail], plainStyle: false),
+            Section(header: "Help", rows: [.contactEmail], plainStyle: false),
             Section(header: nil, rows: [.privacyPolicy, .termsOfUse], plainStyle: true),
         ]
     }
 
-    /// Whether the conditional row is visible: only while a target language
-    /// is set (settings.dart:239 — `targetLanguage.value == ''` → shrink).
+    /// Whether translation is on: a target language is set (settings.dart:239
+    /// — `targetLanguage.value == ''` means off).
     static func showsTargetLanguage(targetLanguage: String) -> Bool {
         !targetLanguage.isEmpty
     }
@@ -67,17 +68,48 @@ nonisolated enum SettingsPageModel {
     static func title(for row: Row) -> String {
         switch row {
         case .account: return "Account"
-        case .country: return "Country"
-        case .enableTranslation: return "Enable Transcript Translation"
+        case .cacheLimit: return "Cache Limit"
+        case .enableTranslation: return "Subtitle Translation"
         case .targetLanguage: return "Target Language"
-        case .importExport: return "Import / Export"
-        case .history: return "History"
-        case .autoRefreshInterval: return "Auto Refresh Interval"
-        case .maxFeedEpisodes: return "Max Episodes in Inbox"
-        case .maxHistoryEpisodes: return "Max Episodes in History"
-        case .contactEmail: return contactEmailDisplay
+        case .country: return "Discovery Region"
+        case .autoRefreshInterval: return "Auto Refresh"
+        case .maxFeedEpisodes: return "Inbox Limit"
+        case .maxHistoryEpisodes: return "History Limit"
+        case .importExport: return "Import & Export"
+        case .history: return "Listening History"
+        case .contactEmail: return "Contact Us"
         case .privacyPolicy: return "Privacy Policy"
         case .termsOfUse: return "Terms of Use (EULA)"
+        }
+    }
+
+    /// Optional one-line caption under the title.
+    static func subtitle(for row: Row) -> String? {
+        row == .enableTranslation ? "Translate generated text" : nil
+    }
+
+    /// Trailing value text; nil for rows that show none (switch, plain
+    /// chevron rows). Stepper rows show the stored value even when it is
+    /// off the choice list.
+    static func value(for row: Row, settings: AppSettings) -> String? {
+        switch row {
+        case .country:
+            return countryName(forCode: settings.countryCode)
+        case .targetLanguage:
+            return showsTargetLanguage(targetLanguage: settings.targetLanguage)
+                ? languageName(forCode: settings.targetLanguage) : "Off"
+        case .autoRefreshInterval:
+            return autoRefreshDisplay(seconds: settings.autoRefreshInterval)
+        case .maxFeedEpisodes:
+            return episodesDisplay(count: settings.maxFeedEpisodes)
+        case .maxHistoryEpisodes:
+            return episodesDisplay(count: settings.maxHistoryEpisodes)
+        case .cacheLimit:
+            return episodesDisplay(count: settings.maxCacheCount)
+        case .contactEmail:
+            return "Email"
+        default:
+            return nil
         }
     }
 
@@ -101,52 +133,79 @@ nonisolated enum SettingsPageModel {
         }
     }
 
-    // MARK: - Picker mapping (G9)
+    // MARK: - Stepper step math
 
-    /// `minutes.indexOf(interval ~/ 60)` with the CupertinoPicker fallback
-    /// (no match → row 0), settings.dart:312-316.
-    static func autoRefreshPickerIndex(seconds: Int64) -> Int {
-        let minutes = SettingsCodec.autoRefreshChoicesSeconds.map { $0 / 60 }
-        let index = minutes.firstIndex(of: seconds / 60) ?? -1
-        return max(0, index)
+    /// Cache Limit choices (episodes kept in the audio cache).
+    static let cacheLimitChoices: [Int64] = [5, 10, 20, 50, 100]
+
+    enum StepDirection {
+        case decrease
+        case increase
     }
 
-    static func autoRefreshSeconds(at index: Int) -> Int64 {
-        SettingsCodec.autoRefreshChoicesSeconds[clamped(index, in: SettingsCodec.autoRefreshChoicesSeconds)]
+    /// Choice list behind a stepper row; nil for rows that are not steppers.
+    static func stepperChoices(for row: Row) -> [Int64]? {
+        switch row {
+        case .autoRefreshInterval: return SettingsCodec.autoRefreshChoicesSeconds
+        case .maxFeedEpisodes, .maxHistoryEpisodes: return SettingsCodec.maxEpisodesChoices
+        case .cacheLimit: return cacheLimitChoices
+        default: return nil
+        }
     }
 
-    /// Picker rows: "1 min" … "30 min" (settings.dart:330-336).
-    static func autoRefreshLabel(at index: Int) -> String {
-        "\(SettingsCodec.autoRefreshChoicesSeconds[clamped(index, in: SettingsCodec.autoRefreshChoicesSeconds)] / 60) min"
+    /// The stored value a stepper row steps from.
+    static func stepperValue(for row: Row, settings: AppSettings) -> Int64? {
+        switch row {
+        case .autoRefreshInterval: return settings.autoRefreshInterval
+        case .maxFeedEpisodes: return settings.maxFeedEpisodes
+        case .maxHistoryEpisodes: return settings.maxHistoryEpisodes
+        case .cacheLimit: return settings.maxCacheCount
+        default: return nil
+        }
     }
 
-    /// Trailing value on the row: `interval ~/ 60` minutes.
+    /// Exact match, otherwise the nearest choice (the lower one on a tie), so
+    /// a stray stored value still steps from a sensible position.
+    static func choiceIndex(of value: Int64, in choices: [Int64]) -> Int {
+        if let exact = choices.firstIndex(of: value) { return exact }
+        return choices.indices.min { abs(choices[$0] - value) < abs(choices[$1] - value) } ?? 0
+    }
+
+    /// The choice one step away from `value`, clamped at the list ends.
+    static func steppedValue(from value: Int64, _ direction: StepDirection, in choices: [Int64]) -> Int64 {
+        let current = choiceIndex(of: value, in: choices)
+        let next = direction == .increase ? current + 1 : current - 1
+        return choices[min(max(0, next), choices.count - 1)]
+    }
+
+    /// Whether the minus half is usable: false at the minimum choice.
+    static func canDecrease(from value: Int64, in choices: [Int64]) -> Bool {
+        choiceIndex(of: value, in: choices) > 0
+    }
+
+    /// Whether the plus half is usable: false at the maximum choice.
+    static func canIncrease(from value: Int64, in choices: [Int64]) -> Bool {
+        choiceIndex(of: value, in: choices) < choices.count - 1
+    }
+
+    /// Trailing value on the Auto Refresh row: `interval ~/ 60` minutes.
     static func autoRefreshDisplay(seconds: Int64) -> String {
         "\(seconds / 60) min"
     }
 
-    /// The caps use `value ~/ 100` as the picker index (settings.dart:370-372,
-    /// 419-421) — NOT indexOf. Clamped so a stray DB value still lands on a
-    /// valid row (the Dart picker would scroll off-list instead).
-    static func maxEpisodesPickerIndex(count: Int64) -> Int {
-        let index = Int(count / 100)
-        return min(max(0, index), SettingsCodec.maxEpisodesChoices.count - 1)
+    static func episodesDisplay(count: Int64) -> String {
+        "\(count) episodes"
     }
 
-    static func maxEpisodesCount(at index: Int) -> Int64 {
-        SettingsCodec.maxEpisodesChoices[clamped(index, in: SettingsCodec.maxEpisodesChoices)]
-    }
-
-    static func maxEpisodesLabel(at index: Int) -> String {
-        String(SettingsCodec.maxEpisodesChoices[clamped(index, in: SettingsCodec.maxEpisodesChoices)])
-    }
-
-    static func maxEpisodesDisplay(count: Int64) -> String {
-        String(count)
-    }
-
-    private static func clamped(_ index: Int, in choices: [Int64]) -> Int {
-        min(max(0, index), choices.count - 1)
+    /// VoiceOver names for the minus/plus halves of each stepper row.
+    static func stepperAccessibilityLabels(for row: Row) -> (decrease: String, increase: String)? {
+        switch row {
+        case .autoRefreshInterval: return ("Shorter auto refresh interval", "Longer auto refresh interval")
+        case .maxFeedEpisodes: return ("Lower inbox limit", "Raise inbox limit")
+        case .maxHistoryEpisodes: return ("Lower history limit", "Raise history limit")
+        case .cacheLimit: return ("Lower cache limit", "Raise cache limit")
+        default: return nil
+        }
     }
 
     // MARK: - Country / language options
@@ -190,9 +249,6 @@ nonisolated enum SettingsPageModel {
 
     // MARK: - Deep links
 
-    /// Displayed contact address (settings.dart:461).
-    static let contactEmailDisplay = "kindjeff.com@gmail.com"
-
     /// The mailto the shipped app actually opens (settings.dart:451-458) —
     /// note the missing dot in the recipient, mirrored byte-for-byte.
     static let feedbackMailtoURL = URL(
@@ -204,11 +260,6 @@ nonisolated enum SettingsPageModel {
     static let termsOfUseURL = URL(
         string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
     )!
-
-    /// Both option sheets carry the package's default dialog header — the
-    /// shipped app shows "Select Country" over the language list too
-    /// (country_code_picker `headerText` default, never overridden).
-    static let optionSheetTitle = "Select Country"
 
     /// Dart `String.compareTo` — UTF-16 code-unit lexicographic comparison.
     private static func utf16Units(_ string: String) -> [UInt16] {

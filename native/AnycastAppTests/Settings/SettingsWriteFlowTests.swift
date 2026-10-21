@@ -4,8 +4,9 @@ import AnycastKit
 @testable import Anycast
 
 /// T7 write flows: the settings coordinator's notification payloads and box
-/// propagation over a real database, plus the language-change side-effect
-/// ordering (reset before persist, mirroring Dart `setTargetLanguage`).
+/// propagation over a real database, the stepper writes, plus the
+/// language-change side-effect ordering (reset before persist, mirroring
+/// Dart `setTargetLanguage`).
 @MainActor
 struct SettingsWriteFlowTests {
 
@@ -84,6 +85,59 @@ struct SettingsWriteFlowTests {
         note = await notes.next()
         #expect(note?.userInfo?[SettingsCoordinator.maxHistoryEpisodesKey] as? Int64 == 50)
         #expect(box.current.maxHistoryEpisodes == 50)
+    }
+
+    @Test("Cache limit write: persists, refreshes the box, posts the payload")
+    func cacheLimitNotification() async throws {
+        let (coordinator, box, database, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        var notes = NotificationCenter.default.notifications(
+            named: SettingsCoordinator.limitsDidChange, object: nil
+        ).makeAsyncIterator()
+
+        await coordinator.updateMaxCacheCount(50)
+
+        let note = await notes.next()
+        #expect(note?.userInfo?[SettingsCoordinator.maxCacheCountKey] as? Int64 == 50)
+        #expect(box.current.maxCacheCount == 50)
+        let reloaded = try await database.settingsRepository().load()
+        #expect(reloaded.maxCacheCount == 50)
+    }
+
+    @Test("Each stepper row steps through the writer into the coordinator and the box")
+    func stepperWrites() async throws {
+        let (coordinator, box, database, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        let writer = SettingsStepWriter(coordinator: coordinator)
+
+        let rows: [SettingsPageModel.Row] = [
+            .autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit,
+        ]
+        for row in rows {
+            let choices = try #require(SettingsPageModel.stepperChoices(for: row))
+            let before = try #require(SettingsPageModel.stepperValue(for: row, settings: box.current))
+            let up = SettingsPageModel.steppedValue(from: before, .increase, in: choices)
+            let down = SettingsPageModel.steppedValue(from: before, .decrease, in: choices)
+            #expect(up != before || down != before, "\(row) default must have a neighbour")
+
+            await writer.write(up, for: row)
+            #expect(SettingsPageModel.stepperValue(for: row, settings: box.current) == up, "\(row) up")
+            await writer.write(down, for: row)
+            #expect(SettingsPageModel.stepperValue(for: row, settings: box.current) == down, "\(row) down")
+        }
+
+        // Every write landed in the database, not just the box.
+        let reloaded = try await database.settingsRepository().load()
+        #expect(SettingsPageModel.stepperValue(for: .cacheLimit, settings: reloaded)
+            == SettingsPageModel.stepperValue(for: .cacheLimit, settings: box.current))
+        #expect(reloaded.autoRefreshInterval == box.current.autoRefreshInterval)
+        #expect(reloaded.maxFeedEpisodes == box.current.maxFeedEpisodes)
+        #expect(reloaded.maxHistoryEpisodes == box.current.maxHistoryEpisodes)
+
+        // Rows that are not steppers write nothing.
+        let snapshot = box.current
+        await writer.write(1, for: .country)
+        #expect(box.current == snapshot)
     }
 
     @Test("Language applier resets the translation map before persisting")

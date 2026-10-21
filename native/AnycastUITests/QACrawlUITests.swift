@@ -1020,12 +1020,19 @@ final class QACrawlUITests: XCTestCase {
                        required: [],
                        probe: true, settle: 3),
 
-            Checkpoint(state: "settings-picker",
+            Checkpoint(state: "settings-stepper",
                        action: { s in
-                           guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-autoRefreshInterval",
-                                          title: "Auto refresh") else { return false }
-                           return s.app.pickerWheels.firstMatch.waitForExistence(timeout: 6)
+                           guard s.ensureSettingsOpen() else { return false }
+                           let row = s.app.cells["settings-row-autoRefreshInterval"]
+                           guard row.waitForExistence(timeout: 6) else { return false }
+                           let longer = row.buttons["Longer auto refresh interval"]
+                           let shorter = row.buttons["Shorter auto refresh interval"]
+                           // Step once and back, so the crawl leaves the stored
+                           // interval as it found it.
+                           let (step, undo) = longer.isEnabled ? (longer, shorter) : (shorter, longer)
+                           guard step.exists, s.tap(step, "auto refresh stepper") else { return false }
+                           Thread.sleep(forTimeInterval: 0.5)
+                           return s.tap(undo, "auto refresh stepper back")
                        },
                        required: [],
                        probe: false, settle: 2),
@@ -1036,7 +1043,7 @@ final class QACrawlUITests: XCTestCase {
                            if close.exists { s.tapElement(close) ; Thread.sleep(forTimeInterval: 0.5) }
                            else { s.closeSheet() }
                            guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-country", title: "Country") else {
+                                 s.tapRow(identifier: "settings-row-country", title: "Discovery Region") else {
                                return false
                            }
                            return s.waitUntil(timeout: 6) {
@@ -1054,7 +1061,7 @@ final class QACrawlUITests: XCTestCase {
                            else { s.closeSheet() }
                            guard s.ensureSettingsOpen(),
                                  s.tapRow(identifier: "settings-row-importExport",
-                                          title: "Import / Export") else { return false }
+                                          title: "Import & Export") else { return false }
                            return s.app.textFields["RSS Feed URL"].waitForExistence(timeout: 6)
                                || s.app.buttons["Import help"].waitForExistence(timeout: 3)
                        },
@@ -1065,7 +1072,7 @@ final class QACrawlUITests: XCTestCase {
                        action: { s in
                            s.closeSheet()
                            guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-history", title: "History") else {
+                                 s.tapRow(identifier: "settings-row-history", title: "Listening History") else {
                                return false
                            }
                            return s.waitUntil(timeout: 6) {

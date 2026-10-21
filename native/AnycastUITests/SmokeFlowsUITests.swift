@@ -94,13 +94,24 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
+        // The Auto Refresh row is a stepper row: its text block carries the
+        // value, and the − | + halves are separate buttons.
+        func intervalValue(_ row: XCUIElement) -> String? {
+            row.otherElements["Auto Refresh"].value as? String
+        }
+        let shorter = "Shorter auto refresh interval"
+        let longer = "Longer auto refresh interval"
+
         app.buttons["Settings"].tap()
         let intervalRow = app.cells["settings-row-autoRefreshInterval"]
         guard intervalRow.waitForExistence(timeout: 8) else {
             XCTFail("settings sheet did not list the auto refresh row")
             return
         }
-        let before = intervalRow.value as? String
+        let before = intervalValue(intervalRow)
+        // Step up unless already at the longest interval.
+        let forward = intervalRow.buttons[longer].isEnabled ? longer : shorter
+        let back = forward == longer ? shorter : longer
         // Restore the original interval no matter how the test exits — the
         // change is persisted to the simulator database and would otherwise
         // leak into later runs on this device. (The steps live in a nested
@@ -112,40 +123,17 @@ final class SmokeFlowsUITests: XCTestCase {
             guard app.buttons["tab-0"].waitForExistence(timeout: 20) else { return }
             app.buttons["Settings"].tap()
             let row = app.cells["settings-row-autoRefreshInterval"]
-            guard row.waitForExistence(timeout: 8) else { return }
-            row.tap()
-            let wheel = app.pickerWheels.firstMatch
-            guard wheel.waitForExistence(timeout: 8) else { return }
-            wheel.adjust(toPickerWheelValue: original)
-            if app.buttons["Close"].exists { app.buttons["Close"].tap() }
-            else { app.swipeDown() }
+            guard row.waitForExistence(timeout: 8), intervalValue(row) != original else { return }
+            row.buttons[back].tap()
         }
         defer { restoreOriginalInterval() }
-        intervalRow.tap()
 
-        let picker = app.pickerWheels.firstMatch
-        guard picker.waitForExistence(timeout: 8) else {
-            XCTFail("value picker did not appear")
+        intervalRow.buttons[forward].tap()
+        waitUntil(timeout: 5) { intervalValue(intervalRow) != before }
+        guard let target = intervalValue(intervalRow), target != before else {
+            XCTFail("settings row did not change from \(before ?? "nil")")
             return
         }
-        // Pick a different option than the current one.
-        let choices = ["1 min", "3 min", "5 min", "10 min", "30 min"]
-        let current = picker.value as? String
-        guard let target = choices.first(where: { $0 != current }) else {
-            XCTFail("picker exposed no alternative choice")
-            return
-        }
-        picker.adjust(toPickerWheelValue: target)
-
-        // Close the picker sheet; the settings row reflects the new value
-        // through its accessibilityValue.
-        if app.buttons["Close"].exists { app.buttons["Close"].tap() }
-        else { app.swipeDown() }
-        waitUntil(timeout: 5) { (intervalRow.value as? String) == target }
-        XCTAssertEqual(
-            intervalRow.value as? String, target,
-            "settings row did not update to \(target)"
-        )
 
         // Relaunch: the value must come back from the database.
         app.terminate()
@@ -155,7 +143,7 @@ final class SmokeFlowsUITests: XCTestCase {
         let reopened = app.cells["settings-row-autoRefreshInterval"]
         XCTAssertTrue(reopened.waitForExistence(timeout: 8), "settings sheet did not reopen")
         XCTAssertEqual(
-            reopened.value as? String, target,
+            intervalValue(reopened), target,
             "auto refresh interval did not persist (was \(before ?? "nil"))"
         )
     }

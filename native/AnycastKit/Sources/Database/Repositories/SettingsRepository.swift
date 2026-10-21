@@ -68,6 +68,11 @@ public struct SettingsRepository: Sendable {
         try await update("maxHistoryEpisodes = ?", [value])
     }
 
+    @concurrent
+    public func setMaxCacheCount(_ value: Int64) async throws {
+        try await update("maxCacheCount = ?", [value])
+    }
+
     private func update(_ assignment: String, _ arguments: StatementArguments) async throws {
         try await database.queue.write { db in
             try db.execute(

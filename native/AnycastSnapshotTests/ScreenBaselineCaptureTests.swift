@@ -204,11 +204,11 @@ struct ScreenBaselineCaptureTests {
             // Same sheet and presentation as SettingsViewController's
             // private presentCountrySheet().
             let sheet = SettingsOptionSheetViewController(
-                title: SettingsPageModel.optionSheetTitle,
+                title: SettingsPageModel.title(for: .country),
                 options: SettingsPageModel.sortedCountries.map { ($0.name, $0.code) },
                 selectedCode: context.settingsBox.current.countryCode
             )
-            AppSheets.presentForm(sheet, from: settingsPage)
+            sheet.present(from: settingsPage)
             try await Self.settle(1.2)
             try await Self.capture("S16b-country")
         }
