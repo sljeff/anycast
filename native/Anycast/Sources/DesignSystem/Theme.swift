@@ -84,17 +84,6 @@ nonisolated enum Theme {
         view.backgroundColor = playerBackground
         view.overrideUserInterfaceStyle = .dark
     }
-
-    // MARK: - Legacy v1 bridge
-    //
-    // The v1 color aliases are retired; only the gradient wordmark pair
-    // remains for `GradientTextLabel` (specimen snapshot only).
-
-    /// AppBar gradient title — the v2 header drops the gradient wordmark;
-    /// `GradientTextLabel` retires with the PodcastsTabContainer rework
-    /// (V2 phase). Fades gold → transparent for the interim.
-    static let appBarGradientStart = primary
-    static let appBarGradientEnd = primary.withAlphaComponent(0)
 }
 
 /// Raw Anycast 2.0 scale tokens (`AnycastColor` in anycast_theme.dart) for

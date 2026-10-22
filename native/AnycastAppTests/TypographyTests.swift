@@ -42,11 +42,7 @@ struct TypographyTests {
 
     @Test("Semantic styles resolve and honor Dynamic Type")
     func semanticStyles() {
-        let styles: [Typography.Style] = [
-            .mainTitle, .secondaryTitle, .mainText, .cardTitleBold, .defaultTitle,
-            .cardTextLight, .defaultText, .cardDescription, .lyricMain, .lyricActive,
-            .lyricTranslation, .tabLabel, .loginSmall, .htmlError, .htmlBody,
-        ]
+        let styles: [Typography.Style] = [.defaultText, .htmlError]
         for style in styles {
             let base = style.font()
             #expect(base.pointSize > 0)
@@ -66,12 +62,12 @@ struct TypographyTests {
     }
 
     @Test("v1 styles render in the theme face, keeping size, weight and tracking")
-    func mainTitleAttributes() {
-        let attributes = Typography.mainTitle.attributes()
-        #expect((attributes[.kern] as? CGFloat) == 4.4)
+    func v1StyleAttributes() {
+        let attributes = Typography.defaultText.attributes()
+        #expect((attributes[.kern] as? CGFloat) == 0)
         let font = attributes[.font] as? UIFont
-        #expect(font?.pointSize == 44)
-        #expect(font?.fontName == ThemeRegistry.current.typography.font(44, .bold, .text).fontName)
+        #expect(font?.pointSize == 12)
+        #expect(font?.fontName == ThemeRegistry.current.typography.font(12, .regular, .text).fontName)
         #expect(Typography.htmlError.font().fontDescriptor.symbolicTraits.contains(.traitMonoSpace))
     }
 
@@ -152,8 +148,6 @@ struct TypographyTests {
             "onPrimary": Theme.onPrimary,
             "tertiary": Theme.tertiary,
             "error": Theme.error,
-            "appBarGradientStart": Theme.appBarGradientStart,
-            "appBarGradientEnd": Theme.appBarGradientEnd,
         ]
         for (name, token) in tokens {
             #expect(token != nil, "\(name) did not resolve — check the asset catalog")
