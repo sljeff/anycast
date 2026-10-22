@@ -2,12 +2,12 @@ import UIKit
 import AnycastKit
 
 /// Player page 2 (PlayerAI/Subtitles, 03 §2.10) in the Anycast 2.0
-/// transcript form: a centered "Transcript" header over the episode title,
-/// then the transcript five-state content (unavailable / prompt /
-/// processing / failed / ready) directly on the player backdrop — the
-/// status states use the shared empty-state block, the ready state is the
-/// bilingual lyrics view with the drag time bar, the AI-chat / export
-/// overlay and the play-pause morph.
+/// transcript form (type B, adopted 2026-10-21): a left-aligned header — the
+/// 44 pt episode cover beside "Transcript" over the episode title — then the
+/// transcript states directly on the player backdrop. Every non-ready state
+/// is one capsule panel above the page selector (thumb reach); the ready
+/// state is the bilingual lyrics view with the drag time bar, the AI-chat /
+/// export overlay and the play-pause morph.
 ///
 /// Row state is derived from the poll controllers plus async row fetches;
 /// polling cadence, K27 error policy and the K9 5-strike rule all live in
@@ -17,8 +17,18 @@ final class SubtitlesPageViewController: UIViewController {
 
     private let context: UIContext
 
+    private enum Layout {
+        static let headerArtwork: CGFloat = 44
+        static let headerArtworkRadius: CGFloat = 14
+        /// The status capsule sits 20 pt above the page selector
+        /// (contentHost already ends `Spacing.pageH` above it).
+        static let panelBottomGap: CGFloat = 20 - Spacing.pageH
+    }
+
     // MARK: Chrome
 
+    private let headerArtwork = UIImageView()
+    private var headerArtworkURL: String?
     private let headerTitleLabel = UILabel()
     private let titleLabel = UILabel()
     private let contentHost = UIView()
@@ -141,20 +151,30 @@ final class SubtitlesPageViewController: UIViewController {
     // MARK: - Chrome construction
 
     private func buildChrome() {
+        headerArtwork.contentMode = .scaleAspectFill
+        headerArtwork.clipsToBounds = true
+        headerArtwork.layer.cornerRadius = Layout.headerArtworkRadius
+        headerArtwork.layer.cornerCurve = .continuous
+        headerArtwork.backgroundColor = AnycastColor.sandAlpha3
+        headerArtwork.isAccessibilityElement = false
+        headerArtwork.translatesAutoresizingMaskIntoConstraints = false
+
         headerTitleLabel.text = "Transcript"
-        headerTitleLabel.font = TypographyV2.headlineSmall.font()
+        headerTitleLabel.font = TypographyV2.emphasis.font()
         headerTitleLabel.textColor = Theme.playerText
-        titleLabel.font = TypographyV2.bodyMedium.font()
+        titleLabel.font = TypographyV2.meta.font()
         titleLabel.textColor = Theme.playerSecondary
-        titleLabel.lineBreakMode = .byTruncatingTail
         for label in [headerTitleLabel, titleLabel] {
             label.adjustsFontForContentSizeCategory = true
-            label.textAlignment = .center
+            label.lineBreakMode = .byTruncatingTail
         }
 
-        let header = UIStackView(arrangedSubviews: [headerTitleLabel, titleLabel])
-        header.axis = .vertical
-        header.spacing = Spacing.xs
+        let titles = UIStackView(arrangedSubviews: [headerTitleLabel, titleLabel])
+        titles.axis = .vertical
+        let header = UIStackView(arrangedSubviews: [headerArtwork, titles])
+        header.axis = .horizontal
+        header.alignment = .center
+        header.spacing = Spacing.gap
         header.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(header)
 
@@ -165,6 +185,8 @@ final class SubtitlesPageViewController: UIViewController {
             header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
             header.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
+            headerArtwork.widthAnchor.constraint(equalToConstant: Layout.headerArtwork),
+            headerArtwork.heightAnchor.constraint(equalToConstant: Layout.headerArtwork),
 
             contentHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
             contentHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
@@ -261,6 +283,11 @@ final class SubtitlesPageViewController: UIViewController {
 
     private func updateHeader(episode: PlaylistEpisodeRow?) {
         titleLabel.text = episode?.title ?? ""
+        let imageURL = episode?.imageUrl ?? ""
+        guard imageURL != headerArtworkURL else { return }
+        headerArtworkURL = imageURL
+        headerArtwork.kf.cancelDownloadTask()
+        headerArtwork.setArtwork(URL(string: imageURL), title: episode?.channelTitle)
     }
 
     // MARK: - Rendering
@@ -317,103 +344,78 @@ final class SubtitlesPageViewController: UIViewController {
         contentHost.setNeedsLayout()
     }
 
-    // MARK: - Status panels (released baseline 1.2.1+38, 03 §2.10, on the
-    // shared empty-state block)
+    // MARK: - Status panels (released baseline 1.2.1+38 states, 03 §2.10,
+    // in the type B capsule)
 
-    private func embedFilling(_ child: UIView) {
-        child.translatesAutoresizingMaskIntoConstraints = false
-        contentHost.addSubview(child)
+    private func embedPanel(_ content: TranscriptStatusPanel.Content) {
+        let panel = TranscriptStatusPanel(content)
+        panel.translatesAutoresizingMaskIntoConstraints = false
+        contentHost.addSubview(panel)
         NSLayoutConstraint.activate([
-            child.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
-            child.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
-            child.topAnchor.constraint(equalTo: contentHost.topAnchor),
-            child.bottomAnchor.constraint(equalTo: contentHost.bottomAnchor),
+            panel.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
+            panel.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
+            panel.bottomAnchor.constraint(equalTo: contentHost.bottomAnchor, constant: -Layout.panelBottomGap),
         ])
     }
 
-    private func embedStatus(_ content: EmptyStateView.Content) {
-        let panel = EmptyStateView()
-        panel.configure(content)
-        embedFilling(panel)
-    }
-
-    private func makeButton(
-        _ kind: AnycastButton.Kind, title: String, image: UIImage?, action: @escaping () -> Void
-    ) -> UIButton {
-        let button = AnycastButton.make(kind, title: title, image: image)
-        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
-        return button
-    }
-
-    /// Ungenerated (player.dart 1.2.1+38): the AI transcript offer; the
-    /// Dart tap tooltip's text is the message, the newDoc capsule the
-    /// primary action triggering `subtitles.add(url)`.
+    /// Ungenerated: the AI transcript offer; Generate triggers
+    /// `subtitles.add(url)`.
     private func makePromptPanel() {
-        let generate = makeButton(.primary, title: "Generate transcript", image: AppIcons.newDoc) { [weak self] in
-            self?.generateTranscript()
-        }
-        embedStatus(.init(
+        embedPanel(.init(
             icon: UIImage(systemName: "sparkles"),
-            title: "Generate transcript with AI (Beta)",
-            message: "AI transcript may take about 2 ~ 5 minutes",
-            actions: [generate]
+            title: "AI transcript",
+            subtitle: "Beta · about 2–5 min",
+            action: ("Generate", { [weak self] in self?.generateTranscript() })
         ))
     }
 
-    /// Processing: the baseline lines under a spinner (player.dart 1.2.1+38).
     private func makeProcessingPanel() {
-        embedStatus(.init(
+        embedPanel(.init(
             showsSpinner: true,
-            title: "Generating with AI …",
-            message: "It may take 2 ~ 5 minutes. Feel free to explore or come back later."
+            title: "Generating transcript",
+            subtitle: "About 2–5 min · feel free to leave"
         ))
     }
 
-    /// Failed: the Retry capsule (03 §2.10 "Retry").
+    /// Failed: Retry re-runs the add (03 §2.10 "Retry").
     private func makeFailedPanel() {
-        let retry = makeButton(.primary, title: "Retry", image: nil) { [weak self] in
-            self?.generateTranscript()
-        }
-        embedStatus(.init(
+        embedPanel(.init(
             icon: UIImage(systemName: "exclamationmark.triangle"),
-            title: "Transcript generation failed",
-            actions: [retry]
+            title: "Couldn't generate",
+            subtitle: "Try again in a moment",
+            action: ("Retry", { [weak self] in self?.generateTranscript() })
         ))
     }
 
-    /// Unavailable (no episode): "Transcript unavailable" — player.dart:701-710.
+    /// Unavailable (no episode) — player.dart:701-710.
     private func makeUnavailablePanel() {
-        embedStatus(.init(
+        embedPanel(.init(
             icon: UIImage(systemName: "doc.text"),
-            title: "Transcript unavailable",
-            message: "Choose an episode to view or generate its transcript."
+            title: "No episode playing",
+            subtitle: "Choose one to see its transcript"
         ))
     }
 
-    /// Row fetch in flight: spinner + "Loading transcript…" —
-    /// player.dart:806-815.
+    /// Row fetch in flight — player.dart:806-815.
     private func makeLoadingPanel() {
-        embedStatus(.init(
+        embedPanel(.init(
             showsSpinner: true,
-            title: "Loading transcript…",
-            message: "Preparing the saved transcript for playback."
+            title: "Loading transcript",
+            subtitle: "Preparing it for playback"
         ))
     }
 
-    /// Row fetch failed: "Couldn't load transcript" + a Try-again action
-    /// that re-runs the row load — player.dart:789-805.
+    /// Row fetch failed; Retry re-runs the row load —
+    /// player.dart:789-805.
     private func makeLoadFailedPanel() {
-        let retry = makeButton(
-            .secondary, title: "Try again", image: UIImage(systemName: "arrow.triangle.2.circlepath")
-        ) { [weak self] in
-            guard let self, let url = self.loadedURL, !url.isEmpty else { return }
-            self.loadTranscriptRow(url: url)
-        }
-        embedStatus(.init(
+        embedPanel(.init(
             icon: UIImage(systemName: "arrow.triangle.2.circlepath"),
             title: "Couldn't load transcript",
-            message: "The saved transcript is temporarily unavailable.",
-            actions: [retry]
+            subtitle: "It's temporarily unavailable",
+            action: ("Retry", { [weak self] in
+                guard let self, let url = self.loadedURL, !url.isEmpty else { return }
+                self.loadTranscriptRow(url: url)
+            })
         ))
     }
 
@@ -701,4 +703,104 @@ final class SubtitlesPageViewController: UIViewController {
     ]
     """
     #endif
+}
+
+/// The type B status capsule: a leading glyph (or spinner), an Emphasis
+/// title over a Meta line, and an optional pill action in the player text
+/// color. The player is always dark, so the panel resolves its sand fill
+/// in dark.
+private final class TranscriptStatusPanel: UIView {
+
+    struct Content {
+        var icon: UIImage?
+        var showsSpinner = false
+        var title: String
+        var subtitle: String
+        var action: (title: String, handler: () -> Void)?
+    }
+
+    private static let height: CGFloat = 68
+    private static let actionHeight: CGFloat = 44
+
+    init(_ content: Content) {
+        super.init(frame: .zero)
+        overrideUserInterfaceStyle = .dark
+        backgroundColor = AnycastColor.sandAlpha3
+        layer.cornerRadius = Self.height / 2
+        layer.cornerCurve = .continuous
+
+        let leading: UIView
+        if content.showsSpinner {
+            let spinner = UIActivityIndicatorView(style: .medium)
+            spinner.color = Theme.playerText
+            spinner.startAnimating()
+            leading = spinner
+        } else {
+            let glyph = UIImageView(image: content.icon)
+            glyph.tintColor = Theme.playerText
+            glyph.contentMode = .center
+            glyph.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+            leading = glyph
+        }
+        leading.translatesAutoresizingMaskIntoConstraints = false
+
+        let titleLabel = UILabel()
+        titleLabel.text = content.title
+        titleLabel.font = TypographyV2.emphasis.font()
+        titleLabel.textColor = Theme.playerText
+        let subtitleLabel = UILabel()
+        subtitleLabel.text = content.subtitle
+        subtitleLabel.font = TypographyV2.meta.font()
+        subtitleLabel.textColor = Theme.playerSecondary
+        for label in [titleLabel, subtitleLabel] {
+            label.adjustsFontForContentSizeCategory = true
+            label.lineBreakMode = .byTruncatingTail
+        }
+        let text = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        text.axis = .vertical
+
+        let row = UIStackView(arrangedSubviews: [leading, text])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = Spacing.gap
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
+
+        if let action = content.action {
+            var configuration = UIButton.Configuration.filled()
+            configuration.title = action.title
+            configuration.baseBackgroundColor = Theme.playerText
+            configuration.baseForegroundColor = Theme.playerBackground
+            configuration.cornerStyle = .capsule
+            configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18)
+            configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+                var outgoing = incoming
+                outgoing.font = TypographyV2.emphasis.font()
+                return outgoing
+            }
+            let button = UIButton(configuration: configuration)
+            button.addAction(UIAction { _ in action.handler() }, for: .touchUpInside)
+            button.setContentHuggingPriority(.required, for: .horizontal)
+            button.setContentCompressionResistancePriority(.required, for: .horizontal)
+            button.heightAnchor.constraint(equalToConstant: Self.actionHeight).isActive = true
+            row.addArrangedSubview(button)
+        }
+
+        // 68 pt (radius 34); larger text sizes may grow it.
+        let preferredHeight = heightAnchor.constraint(equalToConstant: Self.height)
+        preferredHeight.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(greaterThanOrEqualToConstant: Self.height),
+            preferredHeight,
+            leading.widthAnchor.constraint(equalToConstant: 24),
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.pageH),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.gap),
+            row.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: Spacing.gap),
+            row.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -Spacing.gap),
+            row.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
