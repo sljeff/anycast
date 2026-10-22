@@ -105,10 +105,8 @@ final class DetailViewController: UIViewController {
     private let artwork = UIImageView()
     private var artworkSide: NSLayoutConstraint!
     private let titleLabel = UILabel()
-    /// At large the show and date settle at the cover's bottom edge
-    /// (`infoSpacer` after the title); at medium the column stays
-    /// top-aligned (`trailingSpacer` takes the slack).
-    private let infoSpacer = UIView()
+    /// Takes the slack below the meta line so the column stays top-aligned
+    /// beside the cover at both detents.
     private let trailingSpacer = UIView()
     private let actionRow = UIStackView()
     private let bottomFade = GradientFadeLayerView()
@@ -305,7 +303,7 @@ final class DetailViewController: UIViewController {
             label.setContentHuggingPriority(.required, for: .vertical)
         }
         hostButton.setContentHuggingPriority(.required, for: .vertical)
-        let info = UIStackView(arrangedSubviews: [titleLabel, infoSpacer, hostButton, meta, trailingSpacer])
+        let info = UIStackView(arrangedSubviews: [titleLabel, hostButton, meta, trailingSpacer])
         info.axis = .vertical
         info.alignment = .leading
         info.spacing = Spacing.xs
@@ -338,15 +336,12 @@ final class DetailViewController: UIViewController {
         return container
     }
 
-    /// Large gives the cover 160 pt and the title four lines, with the show
-    /// and date settled at the cover's bottom edge; medium is 120 pt and
-    /// three lines, top-aligned.
+    /// Large gives the cover 160 pt and the title four lines; medium is
+    /// 120 pt and three lines. Both keep the column top-aligned.
     private func applyDetentLayout() {
         let isLarge = sheetPresentationController?.selectedDetentIdentifier == .large
         artworkSide.constant = isLarge ? Layout.artworkLarge : Layout.artworkMedium
         titleLabel.numberOfLines = isLarge ? 4 : 3
-        infoSpacer.isHidden = !isLarge
-        trailingSpacer.isHidden = isLarge
     }
 
     // MARK: - Actions (Play capsule with progress; the rest behind •••)
