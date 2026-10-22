@@ -174,7 +174,7 @@ final class LoginViewController: UIViewController {
 
         let headline = UILabel()
         headline.text = LoginPageModel.signUpHeadline
-        headline.font = Self.font(17, .semibold, .body)
+        headline.font = TypographyV2.emphasis.font()
         headline.textColor = Theme.onSurface
         headline.textAlignment = .center
         headline.numberOfLines = 0
@@ -276,7 +276,7 @@ final class LoginViewController: UIViewController {
 
         let titleLabel = UILabel()
         titleLabel.text = title
-        titleLabel.font = Self.font(16, .semibold, .body)
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = foreground
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
@@ -349,7 +349,7 @@ final class LoginViewController: UIViewController {
         let card = Self.card()
         let stack = card.contentStack
 
-        let title = Self.label(LoginPageModel.userInfoTitle, font: Self.font(16, .medium, .body))
+        let title = Self.label(LoginPageModel.userInfoTitle, font: TypographyV2.emphasis.font())
 
         avatarIconView.backgroundColor = Theme.surface
         avatarIconView.layer.cornerRadius = 25
@@ -368,7 +368,7 @@ final class LoginViewController: UIViewController {
             avatarInnerStack.centerYAnchor.constraint(equalTo: avatarIconView.centerYAnchor),
         ])
 
-        emailLabel.font = Self.font(15, .semibold, .subheadline)
+        emailLabel.font = TypographyV2.body.font()
         emailLabel.textColor = Theme.onSurface
         emailLabel.numberOfLines = 2
         emailLabel.adjustsFontForContentSizeCategory = true
@@ -460,19 +460,19 @@ final class LoginViewController: UIViewController {
         let card = Self.card()
         let stack = card.contentStack
 
-        tierLabel.font = Self.font(16, .semibold, .body)
+        tierLabel.font = TypographyV2.emphasis.font()
         tierLabel.textColor = Theme.onSurface
         tierLabel.adjustsFontForContentSizeCategory = true
 
-        expiryLabel.font = Self.font(15, .regular, .subheadline)
-        expiryLabel.textColor = Theme.onSurface
+        expiryLabel.font = TypographyV2.meta.font()
+        expiryLabel.textColor = TypographyV2.meta.color
         expiryLabel.adjustsFontForContentSizeCategory = true
 
-        remainingCountLabel.font = Self.font(16, .bold, .body)
+        remainingCountLabel.font = TypographyV2.emphasis.font()
         remainingCountLabel.textColor = Theme.primary
         remainingCountLabel.adjustsFontForContentSizeCategory = true
 
-        remainingSuffixLabel.font = Self.font(15, .regular, .subheadline)
+        remainingSuffixLabel.font = TypographyV2.body.font()
         remainingSuffixLabel.textColor = Theme.onSurface
         remainingSuffixLabel.adjustsFontForContentSizeCategory = true
         remainingSuffixLabel.numberOfLines = 0
@@ -543,7 +543,7 @@ final class LoginViewController: UIViewController {
         let card = Self.card()
         let stack = card.contentStack
 
-        let title = Self.label(LoginPageModel.paywallTitle, font: Self.font(15, .bold, .subheadline))
+        let title = Self.label(LoginPageModel.paywallTitle, font: TypographyV2.emphasis.font())
 
         let infoButton = UIButton(type: .system)
         infoButton.setImage(AppIcons.infoOutline, for: .normal)
@@ -577,7 +577,7 @@ final class LoginViewController: UIViewController {
         let restore = UIButton(type: .system)
         restore.setTitle(LoginPageModel.restorePurchasesTitle, for: .normal)
         restore.setTitleColor(Theme.onSurfaceVariant, for: .normal)
-        restore.titleLabel?.font = Self.font(12, .semibold, .caption1)
+        restore.titleLabel?.font = TypographyV2.meta.font()
         restore.titleLabel?.adjustsFontForContentSizeCategory = true
         restore.addAction(UIAction { [weak self] _ in self?.restoreTapped() }, for: .touchUpInside)
         stack.addArrangedSubview(restore)
@@ -662,7 +662,7 @@ final class LoginViewController: UIViewController {
 
         let label = UILabel()
         label.text = LoginPageModel.autoRenewalTooltip
-        label.font = Self.font(13, .regular, .footnote)
+        label.font = TypographyV2.body.font()
         label.textColor = Theme.onSurface
         label.numberOfLines = 0
         label.adjustsFontForContentSizeCategory = true
@@ -765,7 +765,7 @@ final class LoginViewController: UIViewController {
         container.spacing = 4
 
         let title = UILabel()
-        title.font = Self.font(15, .bold, .subheadline)
+        title.font = TypographyV2.emphasis.font()
         title.textColor = Theme.onSurface
         title.adjustsFontForContentSizeCategory = true
 
@@ -791,19 +791,23 @@ final class LoginViewController: UIViewController {
         bullets.axis = .vertical
         bullets.spacing = 4
         bullets.alignment = .leading
+        // body size at semibold for the emphasised run.
+        let semibold = UIFontMetrics(forTextStyle: TypographyV2.body.scalingTextStyle).scaledFont(
+            for: ThemeRegistry.current.typography.font(TypographyV2.body.size, .semibold, .text)
+        )
         for bullet in LoginPageModel.plusBenefits {
             let label = UILabel()
             let full = bullet.prefix + bullet.bold + bullet.suffix
             let text = NSMutableAttributedString(
                 string: full,
                 attributes: [
-                    .font: Self.font(13, .regular, .footnote),
+                    .font: TypographyV2.body.font(),
                     .foregroundColor: Theme.onSurface,
                 ]
             )
             if !bullet.bold.isEmpty {
                 text.addAttributes(
-                    [.font: Self.font(13, .bold, .footnote)],
+                    [.font: semibold],
                     range: NSRange(location: bullet.prefix.count, length: bullet.bold.count)
                 )
             }
@@ -902,7 +906,7 @@ final class LoginViewController: UIViewController {
         func link(_ title: String, url: URL) -> UIButton {
             let button = UIButton(type: .system)
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: Self.font(12, .semibold, .caption1),
+                .font: TypographyV2.meta.font(),
                 .foregroundColor: Theme.primary,
                 .underlineStyle: NSUnderlineStyle.single.rawValue,
             ]
@@ -932,7 +936,7 @@ final class LoginViewController: UIViewController {
         config.title = LoginPageModel.deleteButtonTitle
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = Self.font(17, .bold, .body)
+            outgoing.font = TypographyV2.emphasis.font()
             return outgoing
         }
         button.configuration = config
@@ -1024,17 +1028,6 @@ final class LoginViewController: UIViewController {
     }
 
     // MARK: - Shared helpers
-
-    /// Shared Dynamic Type helper for the auth screens (app font tokens carry
-    /// no Material-scale equivalent for these labels); renders in the theme
-    /// text face.
-    static func font(
-        _ size: CGFloat, _ weight: UIFont.Weight, _ style: UIFont.TextStyle
-    ) -> UIFont {
-        UIFontMetrics(forTextStyle: style).scaledFont(
-            for: ThemeRegistry.current.typography.font(size, weight, .text)
-        )
-    }
 
     private static func label(_ text: String, font: UIFont) -> UILabel {
         let label = UILabel()
@@ -1224,14 +1217,14 @@ final class PlanCardView: UIControl {
 
         let title = UILabel()
         title.text = plan.title
-        title.font = LoginViewController.font(15, .bold, .subheadline)
+        title.font = TypographyV2.emphasis.font()
         title.textColor = Theme.onSurface
         title.textAlignment = .center
         title.adjustsFontForContentSizeCategory = true
 
         let price = UILabel()
         price.text = plan.priceLine
-        price.font = LoginViewController.font(12, .semibold, .caption1)
+        price.font = TypographyV2.emphasis.font()
         price.textColor = Theme.onSurface
         price.textAlignment = .center
         price.adjustsFontForContentSizeCategory = true
@@ -1254,7 +1247,7 @@ final class PlanCardView: UIControl {
         ])
 
         captionLabel.text = plan.autoRenewalCaption
-        captionLabel.font = LoginViewController.font(11, .medium, .caption2)
+        captionLabel.font = TypographyV2.meta.font()
         captionLabel.textAlignment = .center
         captionLabel.numberOfLines = 0
         captionLabel.adjustsFontForContentSizeCategory = true

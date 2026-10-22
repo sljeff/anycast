@@ -76,7 +76,7 @@ final class EmailLoginViewController: UIViewController {
         let register = UIButton(type: .system)
         register.setTitle(LoginPageModel.EmailLogin.registerButtonTitle, for: .normal)
         register.setTitleColor(Theme.primary, for: .normal)
-        register.titleLabel?.font = LoginViewController.font(17, .semibold, .body)
+        register.titleLabel?.font = TypographyV2.emphasis.font()
         register.titleLabel?.adjustsFontForContentSizeCategory = true
         register.addAction(
             UIAction { [weak self] _ in self?.presentRegisterUnsupported() },

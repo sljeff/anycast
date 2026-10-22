@@ -66,7 +66,7 @@ final class SignUpViewController: UIViewController {
 
         let tagline = UILabel()
         tagline.text = "next gen ai-power podcast"
-        tagline.font = TypographyV2.bodySmall.font()
+        tagline.font = TypographyV2.meta.font()
         tagline.textColor = Theme.onSurfaceVariant
 
         let brand = UIStackView(arrangedSubviews: [wordmark, tagline])
@@ -84,7 +84,7 @@ final class SignUpViewController: UIViewController {
             top: 18, leading: Spacing.pageH, bottom: 18, trailing: Spacing.pageH
         )
         submit.configuration = submitConfig
-        submit.titleLabel?.font = TypographyV2.titleMedium.font()
+        submit.titleLabel?.font = TypographyV2.emphasis.font()
         submit.accessibilityIdentifier = "signup-submit"
         submit.addAction(
             UIAction { [weak self] _ in self?.submitTapped() },
@@ -94,13 +94,13 @@ final class SignUpViewController: UIViewController {
 
         let signInLabel = UILabel()
         signInLabel.text = "Already have an account?"
-        signInLabel.font = TypographyV2.bodySmall.font()
+        signInLabel.font = TypographyV2.meta.font()
         signInLabel.textColor = AnycastColor.sand11
 
         let signInButton = UIButton(type: .system)
         signInButton.setTitle("Sign in", for: .normal)
         signInButton.setTitleColor(Theme.primary, for: .normal)
-        signInButton.titleLabel?.font = TypographyV2.bodySmall.font()
+        signInButton.titleLabel?.font = TypographyV2.emphasis.font()
         signInButton.accessibilityIdentifier = "signup-signin"
         signInButton.addAction(
             UIAction { [weak self] _ in self?.dismiss(animated: true) },
@@ -159,7 +159,7 @@ final class AuthFieldView: UIControl {
 
         let labelView = UILabel()
         labelView.text = label
-        labelView.font = TypographyV2.bodySmall.font()
+        labelView.font = TypographyV2.meta.font()
         labelView.textColor = Theme.onSurfaceVariant
 
         field.isSecureTextEntry = secure
@@ -167,7 +167,7 @@ final class AuthFieldView: UIControl {
         field.autocorrectionType = .no
         field.keyboardType = secure ? .default : .emailAddress
         field.returnKeyType = .done
-        field.font = TypographyV2.bodyLarge.font()
+        field.font = TypographyV2.body.font()
         field.textColor = Theme.onSurface
         field.backgroundColor = Theme.surfaceContainer
         field.layer.borderColor = AnycastColor.sandAlpha4.cgColor

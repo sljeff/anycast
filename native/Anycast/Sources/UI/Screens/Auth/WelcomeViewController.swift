@@ -36,7 +36,7 @@ final class WelcomeViewController: UIViewController {
 
         let tagline = UILabel()
         tagline.text = "next gen ai-power podcast"
-        tagline.font = TypographyV2.bodySmall.font()
+        tagline.font = TypographyV2.meta.font()
         tagline.adjustsFontForContentSizeCategory = true
         tagline.textColor = Theme.onSurfaceVariant
 
@@ -47,14 +47,14 @@ final class WelcomeViewController: UIViewController {
 
         let marketingTitle = UILabel()
         marketingTitle.text = "Unlock global knowledge through ai-power podcast"
-        marketingTitle.font = TypographyV2.displayLarge.font()
+        marketingTitle.font = TypographyV2.emphasis.font()
         marketingTitle.adjustsFontForContentSizeCategory = true
         marketingTitle.textColor = Theme.onSurface
         marketingTitle.numberOfLines = 0
 
         let marketingSubtitle = UILabel()
         marketingSubtitle.text = "explore global wisdom cross many languages*"
-        marketingSubtitle.font = TypographyV2.bodyLarge.font()
+        marketingSubtitle.font = TypographyV2.body.font()
         marketingSubtitle.adjustsFontForContentSizeCategory = true
         marketingSubtitle.textColor = Theme.onSurface
         marketingSubtitle.numberOfLines = 0
@@ -191,13 +191,13 @@ final class WelcomeViewController: UIViewController {
 
         let questionLabel = UILabel()
         questionLabel.text = "New here?"
-        questionLabel.font = TypographyV2.bodySmall.font()
+        questionLabel.font = TypographyV2.meta.font()
         questionLabel.textColor = AnycastColor.sand11
 
         let signUpButton = UIButton(type: .system)
         signUpButton.setTitle("Sign up", for: .normal)
         signUpButton.setTitleColor(Theme.primary, for: .normal)
-        signUpButton.titleLabel?.font = TypographyV2.bodySmall.font()
+        signUpButton.titleLabel?.font = TypographyV2.emphasis.font()
         signUpButton.accessibilityIdentifier = "welcome-signup"
         signUpButton.addAction(
             UIAction { [weak self] _ in
