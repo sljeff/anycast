@@ -44,9 +44,9 @@ class EmptyStateView: UIView {
         spinner.translatesAutoresizingMaskIntoConstraints = false
         disc.addSubview(spinner)
 
-        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
-        messageLabel.font = TypographyV2.bodyLarge.font()
+        messageLabel.font = TypographyV2.meta.font()
         messageLabel.textColor = Theme.onSurfaceVariant
         for label in [titleLabel, messageLabel] {
             label.textAlignment = .center

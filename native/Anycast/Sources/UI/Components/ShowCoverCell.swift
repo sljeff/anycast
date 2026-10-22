@@ -21,7 +21,7 @@ final class ShowCoverCell: UICollectionViewCell {
         coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = Theme.surfaceContainerHigh
 
-        titleLabel.font = TypographyV2.caption.font()
+        titleLabel.font = TypographyV2.meta.font()
         titleLabel.textColor = Theme.onSurfaceVariant
         titleLabel.numberOfLines = 2
         titleLabel.adjustsFontForContentSizeCategory = true

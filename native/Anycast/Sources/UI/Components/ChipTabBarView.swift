@@ -39,9 +39,9 @@ final class ChipTabBarView: UIView {
         stackView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(stackView)
 
-        // titleMedium, capped so accessibility sizes stay inside the chip.
-        let font = UIFontMetrics(forTextStyle: TypographyV2.titleMedium.scalingTextStyle).scaledFont(
-            for: ThemeRegistry.current.typography.font(TypographyV2.titleMedium.size, TypographyV2.titleMedium.weight, .text),
+        // emphasis, capped so accessibility sizes stay inside the chip.
+        let font = UIFontMetrics(forTextStyle: TypographyV2.emphasis.scalingTextStyle).scaledFont(
+            for: ThemeRegistry.current.typography.font(TypographyV2.emphasis.size, TypographyV2.emphasis.weight, .text),
             maximumPointSize: 22
         )
         for (index, title) in titles.enumerated() {

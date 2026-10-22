@@ -3,13 +3,13 @@ import UIKit
 extension UITextField {
     /// The single Anycast 2.0 input style (search fields, URL and email
     /// forms): surfaceContainer fill, md radius, outlineVariant hairline
-    /// that turns primary while editing, bodyLarge text, an optional
+    /// that turns primary while editing, body text, an optional
     /// leading glyph (otherwise a 16 pt inset). Height stays with the
     /// caller (48 pt standard).
     @MainActor
     func applyAnycastStyle(placeholder: String, icon: UIImage? = nil) {
         borderStyle = .none
-        font = TypographyV2.bodyLarge.font()
+        font = TypographyV2.body.font()
         adjustsFontForContentSizeCategory = true
         textColor = Theme.onSurface
         tintColor = Theme.primary

@@ -135,7 +135,7 @@ final class PlayerBarView: UIView {
         coverView.translatesAutoresizingMaskIntoConstraints = false
         capsule.addSubview(coverView)
 
-        titleLabel.font = TypographyV2.titleMedium.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         // The capsule floats on the static white-80 surface — light-variant
         // ink; the player-hosted styles keep the legacy chrome colors.

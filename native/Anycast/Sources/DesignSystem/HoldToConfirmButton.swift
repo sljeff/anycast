@@ -66,7 +66,7 @@ final class HoldToConfirmButton: UIButton {
         // so the plain style's highlight dimming is overridden.
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = TypographyV2.headlineSmall.font()
+            outgoing.font = TypographyV2.emphasis.font()
             outgoing.foregroundColor = Theme.error
             return outgoing
         }

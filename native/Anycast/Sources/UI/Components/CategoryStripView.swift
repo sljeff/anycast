@@ -76,7 +76,7 @@ final class CategoryStripView: UIView {
             )
             config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
                 var outgoing = incoming
-                outgoing.font = TypographyV2.titleMedium.font()
+                outgoing.font = TypographyV2.emphasis.font()
                 return outgoing
             }
             let button = UIButton(configuration: config)
