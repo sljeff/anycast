@@ -8,45 +8,47 @@ import AnycastKit
 /// `shrinkOffset`, so the scroll-driven fold stays testable and off the
 /// layout engine (07 §2.3: transforms/opacity only, per 08 §11.2).
 ///
-/// "Content scrolls under the compact bar": the cover and title collapse into
-/// a 60 pt bar at the top while the author / description / action block
-/// travels up 1:1 with the scroll and is clipped below that bar, so the list's
-/// first row always sits a constant gap under the action block and no empty
-/// band opens between the compact bar and the list.
+/// The left-weighted header (design canvas ChannelRefined, adopted
+/// 2026-10-21): an 88 pt cover at the leading margin with the title and
+/// author beside it, the description below. Scrolling shrinks the cover to
+/// a 60 pt compact bar (title beside it, author fading out) while the
+/// description travels up 1:1 with the scroll and is clipped below that
+/// bar, so the list's first row always sits a constant gap under it.
 struct ChannelFoldGeometry: Equatable {
 
     /// Cover top below the safe area; clears the system sheet grabber.
     static let coverTopGap: CGFloat = 24
-    static let expandedCoverSize: CGFloat = 120
+    static let expandedCoverSize: CGFloat = 88
     static let collapsedCoverSize: CGFloat = 60
-    static let collapsedCoverLeading: CGFloat = 16
     static let coverBottomGap: CGFloat = 12
-    static let titleBoxHeight: CGFloat = 60
-    /// Gap between the collapsed cover and the compact title.
-    static let titleLeadingGap: CGFloat = 12
-    /// Gap between the action row and the list's first row.
+    /// Gap between the cover and the title block beside it.
+    static let titleLeadingGap: CGFloat = 16
+    /// Title (Emphasis 22) + 4 + author (Meta 20).
+    static let titleBlockHeight: CGFloat = 46
+    static let titleLineHeight: CGFloat = 22
+    /// Gap between the description and the list's first row.
     static let contentBottomGap: CGFloat = 16
     /// Space under the compact cover that stays part of the compact bar.
     static let collapsedBottomGap: CGFloat = 12
     /// The clip line sits this far below the compact cover row.
     static let clipLineInset: CGFloat = 4
     /// Used until the real content block is measured (default Dynamic Type).
-    static let fallbackContentHeight: CGFloat = 118
+    static let fallbackContentHeight: CGFloat = 40
 
     /// Top safe-area inset of the sheet's own view — never a fixed status
     /// bar number (07 §4: any window size must survive).
     var safeAreaTop: CGFloat
 
-    /// Height of the author / description / action block, measured from the
-    /// real views at the header width.
+    /// Height of the description block, measured from the real view at the
+    /// header width.
     var contentHeight: CGFloat = ChannelFoldGeometry.fallbackContentHeight
 
     /// Cover top edge inside the header — pinned for every shrink value.
     var coverTop: CGFloat { safeAreaTop + Self.coverTopGap }
 
-    /// Top of the content block in the expanded state (below the title box).
+    /// Top of the description in the expanded state (below the cover row).
     var contentTop: CGFloat {
-        coverTop + Self.expandedCoverSize + Self.coverBottomGap + Self.titleBoxHeight
+        coverTop + Self.expandedCoverSize + Self.coverBottomGap
     }
 
     /// The compact bar: cover row plus a small bottom gap.
@@ -72,46 +74,33 @@ struct ChannelFoldGeometry: Equatable {
         max(minExtent, maxExtent - clampedShrink(shrink))
     }
 
-    /// Cover edge = max(120 - shrinkOffset, 60).
+    /// Cover edge = max(88 - shrinkOffset, 60); it stays at the leading
+    /// margin, so its bottom rises with the description above it.
     func coverSize(shrink: CGFloat) -> CGFloat {
         max(Self.expandedCoverSize - clampedShrink(shrink), Self.collapsedCoverSize)
     }
 
-    /// Cover leading (padded-content coordinates) =
-    /// max(initLeft - shrinkOffset, 16), initLeft = paddedWidth/2 - 60.
-    func coverLeading(shrink: CGFloat, paddedWidth: CGFloat) -> CGFloat {
-        let initial = paddedWidth / 2 - Self.expandedCoverSize / 2
-        return max(initial - clampedShrink(shrink), Self.collapsedCoverLeading)
+    /// 0 expanded → 1 once the cover reaches its compact size; drives the
+    /// author's fade.
+    func compactProgress(shrink: CGFloat) -> CGFloat {
+        let travel = Self.expandedCoverSize - Self.collapsedCoverSize
+        return min(clampedShrink(shrink) / travel, 1)
     }
 
-    /// Vertical rise of the title box while the two collapsing spacers above
-    /// it shrink: min(120, s) + min(12, s). The box ends level with the cover.
-    func contentRise(shrink: CGFloat) -> CGFloat {
-        let s = clampedShrink(shrink)
-        return min(s, Self.expandedCoverSize) + min(s, Self.coverBottomGap)
+    /// Title block leading (padded-content coordinates): beside the cover.
+    func titleLeading(shrink: CGFloat) -> CGFloat {
+        coverSize(shrink: shrink) + Self.titleLeadingGap
     }
 
-    /// Title box top edge (header space).
-    func titleTop(shrink: CGFloat) -> CGFloat {
-        contentTop - Self.titleBoxHeight - contentRise(shrink: shrink)
-    }
-
-    /// Title leading (padded-content coordinates). The title starts at
-    /// `expandedLeading` (centered under the cover) and, by the shrink at
-    /// which the cover has reached its final size (the title then starts to
-    /// share rows with it), sits right of the cover's trailing edge; from
-    /// there it follows that edge to the compact position. It therefore
-    /// never overlaps the cover.
-    func titleLeading(shrink: CGFloat, paddedWidth: CGFloat, expandedLeading: CGFloat) -> CGFloat {
-        let s = clampedShrink(shrink)
-        func clearOfCover(_ shrink: CGFloat) -> CGFloat {
-            coverLeading(shrink: shrink, paddedWidth: paddedWidth)
-                + coverSize(shrink: shrink) + Self.titleLeadingGap
-        }
-        let handover = Self.expandedCoverSize - Self.collapsedCoverSize
-        if s >= handover { return clearOfCover(s) }
-        let t = s / handover
-        return expandedLeading + (clearOfCover(handover) - expandedLeading) * t
+    /// Title block top (header space): the visible text is centered on the
+    /// cover — title and author expanded, the title alone once the author
+    /// has faded out (its 4 + 20 pt leave the centering as it fades). With
+    /// no author the title alone is centered throughout.
+    func titleTop(shrink: CGFloat, hasAuthor: Bool = true) -> CGFloat {
+        let progress = hasAuthor ? compactProgress(shrink: shrink) : 1
+        let authorShare = (Self.titleBlockHeight - Self.titleLineHeight) * progress
+        let visibleHeight = Self.titleBlockHeight - authorShare
+        return coverTop + (coverSize(shrink: shrink) - visibleHeight) / 2
     }
 
     /// Content block translation: 1:1 with the scroll.
@@ -168,6 +157,19 @@ enum ChannelSubscriptionDisplay: Equatable {
             return .loading
         }
         return subscribed ? .unsubscribe : .subscribe
+    }
+}
+
+/// Header byline: a search-result seed often has no author, so the feed's
+/// `itunes:author` fills it; nil (no line shown) when neither has one.
+enum ChannelHeaderLogic {
+    static func author(seed: String?, feed: String?) -> String? {
+        for candidate in [seed, feed] {
+            if let trimmed = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+        return nil
     }
 }
 
@@ -324,6 +326,7 @@ final class ChannelViewModel {
             if (channel.imageUrl ?? "").isEmpty {
                 channel = podcast.subscription
             }
+            channel.author = ChannelHeaderLogic.author(seed: channel.author, feed: podcast.subscription.author)
         }
         isLoading = false
         await updatePalette()

@@ -52,6 +52,9 @@ struct EpisodeCardContent {
     var rightText: String
     var descriptionHTML: String?
     var imageURL: String?
+    /// False inside a single show (ChannelSearch), where the name repeats
+    /// on every card; it still names the cover placeholder.
+    var showsChannel = true
 
     // Playlist-variant only
     /// Shows the inline progress meter while the episode has progress.
@@ -180,6 +183,7 @@ final class EpisodeCardCell: UICollectionViewCell {
 
         titleLabel.text = content.title
         channelLabel.text = content.channelTitle
+        channelLabel.isHidden = !content.showsChannel
         rightTextLabel.text = content.rightText
         rightTextLabel.isHidden = content.rightText.isEmpty
 
@@ -247,8 +251,9 @@ final class EpisodeCardCell: UICollectionViewCell {
         let percent = Int((min(max(fraction.isFinite ? fraction : 0, 0), 1) * 100).rounded())
         progressMeter.accessibilityLabel = "\(percent) percent played"
         rightTextLabel.textColor = visible ? Theme.onSurface : TypographyV2.meta.color
-        // No time and no meter: no separator dangling after the show name.
-        separatorLabel.isHidden = !visible && rightTextLabel.isHidden
+        // No time and no meter, or no show name before it: no dangling
+        // separator.
+        separatorLabel.isHidden = channelLabel.isHidden || (!visible && rightTextLabel.isHidden)
     }
 
     /// Live download-state push (PlaybackService.cacheStates).

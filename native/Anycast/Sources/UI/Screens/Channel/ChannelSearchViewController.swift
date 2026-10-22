@@ -137,6 +137,8 @@ final class ChannelSearchViewController: UIViewController {
         // right spacer when it is .never.
         searchField.clearButtonMode = .whileEditing
         searchField.applyAnycastStyle(placeholder: "Search episodes", icon: AppIcons.search)
+        // A capsule like the Search tab's field (height Spacing.xxl).
+        searchField.layer.cornerRadius = Spacing.xxl / 2
         searchField.returnKeyType = .search
         searchField.autocorrectionType = .no
         searchField.text = query
