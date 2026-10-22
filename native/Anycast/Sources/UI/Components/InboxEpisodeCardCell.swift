@@ -23,7 +23,7 @@ struct InboxCardContent {
 }
 
 /// The inbox card in the Anycast 2.0 UI kit form (`EpisodeCardCell`): the
-/// shared card plate (radius 32) carrying the title (20 pt, two lines,
+/// shared card plate (radius 32) carrying the title (emphasis, two lines,
 /// sentence case) over a two-line description, and a bottom row with the
 /// 36 pt circular show artwork — badged when the episode is playing or
 /// queued — the show name and date, and the `more` menu button. Whole-card
@@ -166,7 +166,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
             UITapGestureRecognizer(target: self, action: #selector(cardTapped))
         )
 
-        titleLabel.font = TypographyV2.cardTitle.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 2
         titleLabel.lineBreakMode = .byTruncatingTail
@@ -176,7 +176,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         titleLabel.isAccessibilityElement = true
         titleLabel.accessibilityTraits = [.button]
 
-        descriptionLabel.font = TypographyV2.bodyCompact.font()
+        descriptionLabel.font = TypographyV2.meta.font()
         descriptionLabel.textColor = Theme.onSurfaceVariant
         descriptionLabel.numberOfLines = 2
         descriptionLabel.lineBreakMode = .byTruncatingTail
@@ -205,7 +205,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         statusBadge.isHidden = true
 
         for label in [showNameLabel, metaLabel] {
-            label.font = TypographyV2.caption.font()
+            label.font = TypographyV2.meta.font()
             label.textColor = Theme.onSurfaceVariant
             label.adjustsFontForContentSizeCategory = true
         }
