@@ -404,13 +404,16 @@ final class LyricLineCell: UICollectionViewCell {
 
 // MARK: - Text styling
 
-/// Lyric typography: `Typography.lyricMain/.lyricActive/.lyricTranslation`
-/// (03 §2.10) with `height: 1.35` paragraphs; the follow highlight is
-/// brightness only (Anycast 2.0 transcript).
+/// Lyric typography: `TypographyV2.body` for the line and `TypographyV2.meta`
+/// for its translation, with `height: 1.35` paragraphs; the follow highlight
+/// is brightness only (Anycast 2.0 transcript).
 enum LyricsTextStyling {
 
     /// The active line's translation: one step below the active main line.
     static let activeTranslationColor = Theme.playerSecondary
+
+    /// The inactive line's translation: dimmer than the main line.
+    static let translationColor = Theme.playerSecondary.withAlphaComponent(0.55)
 
     /// `isSelected` = the painter's `isSelecting && isInAnchorArea`: the line
     /// under the selection anchor repaints EVERYTHING in `selectedColor`
@@ -421,26 +424,31 @@ enum LyricsTextStyling {
         isSelected: Bool = false,
         traits: UITraitCollection?
     ) -> NSAttributedString {
-        let mainStyle: Typography.Style = isActive ? .lyricActive : .lyricMain
+        let mainColor = isActive ? Theme.playerText : Theme.playerSecondary
         let translationColor = isActive
             ? activeTranslationColor
-            : Typography.lyricTranslation.color
+            : Self.translationColor
 
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineHeightMultiple = LyricsView.lineHeightMultiple
         paragraph.paragraphSpacing = Self.translationParagraphSpacing
 
         let attributed = NSMutableAttributedString()
-        var mainAttributes = mainStyle.attributes(traits: traits)
-        mainAttributes[.paragraphStyle] = paragraph
+        var mainAttributes: [NSAttributedString.Key: Any] = [
+            .font: TypographyV2.body.font(traits: traits),
+            .foregroundColor: mainColor,
+            .paragraphStyle: paragraph,
+        ]
         if isSelected {
             mainAttributes[.foregroundColor] = UIColor.white
         }
         attributed.append(NSAttributedString(string: line.text, attributes: mainAttributes))
         if let translation = line.translation, !translation.isEmpty {
-            var translationAttributes = Typography.lyricTranslation.attributes(traits: traits)
-            translationAttributes[.paragraphStyle] = paragraph
-            translationAttributes[.foregroundColor] = isSelected ? UIColor.white : translationColor
+            let translationAttributes: [NSAttributedString.Key: Any] = [
+                .font: TypographyV2.meta.font(traits: traits),
+                .foregroundColor: isSelected ? UIColor.white : translationColor,
+                .paragraphStyle: paragraph,
+            ]
             attributed.append(NSAttributedString(string: "\n"))
             attributed.append(NSAttributedString(string: translation, attributes: translationAttributes))
         }
