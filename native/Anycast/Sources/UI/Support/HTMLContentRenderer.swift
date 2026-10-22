@@ -186,8 +186,8 @@ final class HTMLContentRenderer {
 
     private func baseAttributes(traits: UITraitCollection?) -> [NSAttributedString.Key: Any] {
         [
-            .font: Typography.htmlBody.font(traits: traits),
-            .foregroundColor: Typography.htmlBody.color,
+            .font: TypographyV2.body.font(traits: traits),
+            .foregroundColor: TypographyV2.body.color,
         ]
     }
 
@@ -218,7 +218,7 @@ final class HTMLContentRenderer {
     }
 
     /// Links → the app link green (03 §5.1 0x6EE7B7); everything else gets
-    /// re-based onto the app's htmlBody style. The WebKit import stamps a
+    /// re-based onto the app's body style. The WebKit import stamps a
     /// full computed style on EVERY run — unstyled body text arrives as
     /// 12pt Times in pure black, which is invisible on the dark surface and
     /// is NOT an author choice (the Dart `textStyle` colors it onSurface).

@@ -95,7 +95,7 @@ struct HTMLContentRendererTests {
         let color = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
         #expect(color === Theme.onSurface)
         let font = result.attribute(.font, at: 0, effectiveRange: nil) as? UIFont
-        #expect(font?.pointSize == Typography.htmlBody.font().pointSize)
+        #expect(font?.pointSize == TypographyV2.body.font().pointSize)
     }
 
     @Test("Links are tinted with the app link green")

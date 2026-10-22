@@ -121,7 +121,7 @@ final class PlayerMainPageViewController: UIViewController {
         titleRow.alignment = .top
         titleRow.spacing = Spacing.gap
 
-        stateMessageLabel.font = TypographyV2.caption.font()
+        stateMessageLabel.font = TypographyV2.meta.font()
         stateMessageLabel.textColor = Theme.playerSecondary
         stateMessageLabel.textAlignment = .center
         stateMessageLabel.adjustsFontForContentSizeCategory = true
@@ -443,7 +443,7 @@ private final class PlayerTitleBlockView: UIView {
         channelConfig.titleLineBreakMode = .byTruncatingTail
         channelConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = TypographyV2.bodyMedium.font()
+            outgoing.font = TypographyV2.meta.font()
             return outgoing
         }
         channelButton.configuration = channelConfig

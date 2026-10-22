@@ -54,7 +54,7 @@ final class SettingsOptionSheetViewController: UIViewController {
     /// Title block + rows, clamped to 350 pt at least and 72% of the
     /// available detent height at most.
     static func detentHeight(rowCount: Int, maximum: CGFloat) -> CGFloat {
-        let titleBlock = contentInset + TypographyV2.headlineSmall.font().lineHeight
+        let titleBlock = contentInset + TypographyV2.emphasis.font().lineHeight
             + titleGap + contentInset
         let content = titleBlock + CGFloat(rowCount) * rowHeight
         return min(max(content, minimumDetentHeight), maximum * maximumDetentFraction)
@@ -86,7 +86,7 @@ final class SettingsOptionSheetViewController: UIViewController {
         }
 
         titleLabel.text = titleText
-        titleLabel.font = TypographyV2.headlineSmall.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0
@@ -148,7 +148,7 @@ final class SettingsOptionRowCell: UICollectionViewListCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        titleLabel.font = TypographyV2.bodyMedium.font()
+        titleLabel.font = TypographyV2.body.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
@@ -232,15 +232,15 @@ class SettingsRowCell: UICollectionViewListCell {
         super.init(frame: frame)
 
         // Labels truncate rather than wrap (restrained Settings copy rule).
-        titleLabel.font = TypographyV2.bodyMedium.font()
+        titleLabel.font = TypographyV2.body.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
-        subtitleLabel.font = TypographyV2.bodyMedium.font()
+        subtitleLabel.font = TypographyV2.meta.font()
         subtitleLabel.textColor = Theme.onSurfaceVariant
         subtitleLabel.adjustsFontForContentSizeCategory = true
         subtitleLabel.numberOfLines = 1
-        valueLabel.font = TypographyV2.bodyMedium.font()
+        valueLabel.font = TypographyV2.meta.font()
         valueLabel.textColor = Theme.onSurfaceVariant
         valueLabel.adjustsFontForContentSizeCategory = true
         valueLabel.numberOfLines = 1
@@ -358,7 +358,7 @@ class SettingsRowCell: UICollectionViewListCell {
         configure(title: title)
         usesPlate = false
         titleLabel.attributedText = NSAttributedString(string: title, attributes: [
-            .font: TypographyV2.bodyMedium.font(),
+            .font: TypographyV2.meta.font(),
             .foregroundColor: Theme.onSurfaceVariant,
             .underlineStyle: NSUnderlineStyle.single.rawValue,
         ])
@@ -489,7 +489,7 @@ enum SettingsTooltipOverlay {
 
         let label = UILabel()
         label.text = message
-        label.font = TypographyV2.bodySmall.font()
+        label.font = TypographyV2.body.font()
         // Inverse pair: readable over any page in both appearances.
         label.textColor = Theme.surface
         label.numberOfLines = 0

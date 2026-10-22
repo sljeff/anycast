@@ -152,7 +152,7 @@ final class ChannelSearchViewController: UIViewController {
         view.addSubview(searchField)
 
         noResultsLabel.text = "No results"
-        noResultsLabel.font = TypographyV2.headlineMedium.font()
+        noResultsLabel.font = TypographyV2.emphasis.font()
         noResultsLabel.adjustsFontForContentSizeCategory = true
         noResultsLabel.textColor = Theme.onSurface
         noResultsLabel.isHidden = true

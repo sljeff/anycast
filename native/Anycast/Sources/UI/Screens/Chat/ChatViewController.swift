@@ -117,8 +117,8 @@ final class ChatViewController: UIViewController {
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         headerBar.addSubview(closeButton)
 
-        // Material titleMedium: 16 pt w500 on playerText, two-line ellipsis.
-        titleLabel.font = TypographyV2.titleMedium.font()
+        // Sheet title (emphasis) on playerText, two-line ellipsis.
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textColor = Metrics.headerText
         titleLabel.numberOfLines = 2

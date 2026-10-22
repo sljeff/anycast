@@ -101,8 +101,8 @@ final class SettingsPageViewController: UIViewController {
     // MARK: - Build
 
     private func build() {
-        descriptionTextView.font = Typography.htmlBody.font()
-        descriptionTextView.textColor = Typography.htmlBody.color
+        descriptionTextView.font = TypographyV2.body.font()
+        descriptionTextView.textColor = TypographyV2.body.color
         descriptionTextView.adjustsFontForContentSizeCategory = true
         descriptionTextView.isAccessibilityElement = true
         descriptionTextView.accessibilityLabel = "Episode description"
@@ -147,7 +147,7 @@ final class SettingsPageViewController: UIViewController {
     /// UI kit audio-settings rows on a tinted card, hairline-divided.
     private func buildSettingsCard() -> UIView {
         for label in [speedValueLabel, countdownValueLabel] {
-            label.font = TypographyV2.bodyLarge.font().monospacedDigits()
+            label.font = TypographyV2.meta.font().monospacedDigits()
             label.textColor = Theme.playerSecondary
             label.adjustsFontForContentSizeCategory = true
             label.setContentHuggingPriority(.required, for: .horizontal)
@@ -194,7 +194,7 @@ final class SettingsPageViewController: UIViewController {
     private static func makeRow(title: String, subtitle: String?, trailing: [UIView]) -> UIView {
         let titleLabel = UILabel()
         titleLabel.text = title
-        titleLabel.font = TypographyV2.bodyLarge.font()
+        titleLabel.font = TypographyV2.body.font()
         titleLabel.textColor = Theme.playerText
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0
@@ -205,7 +205,7 @@ final class SettingsPageViewController: UIViewController {
         if let subtitle {
             let subtitleLabel = UILabel()
             subtitleLabel.text = subtitle
-            subtitleLabel.font = TypographyV2.caption.font()
+            subtitleLabel.font = TypographyV2.meta.font()
             subtitleLabel.textColor = Theme.playerSecondary
             subtitleLabel.adjustsFontForContentSizeCategory = true
             subtitleLabel.numberOfLines = 0

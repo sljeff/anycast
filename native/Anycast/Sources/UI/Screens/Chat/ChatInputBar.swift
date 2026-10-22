@@ -38,7 +38,7 @@ final class ChatInputBar: UIView {
         backgroundColor = Metrics.barBackground
         insetsLayoutMarginsFromSafeArea = false
 
-        let fieldFont = TypographyV2.bodyCompact.font()
+        let fieldFont = TypographyV2.body.font()
         textView.font = fieldFont
         textView.adjustsFontForContentSizeCategory = true
         textView.textColor = Theme.onSurface
@@ -117,7 +117,7 @@ final class ChatInputBar: UIView {
 
     /// Recomputes the 3-line height cap from the CURRENT body font.
     private func refreshFieldHeightCap() {
-        let font = textView.font ?? TypographyV2.bodyCompact.font()
+        let font = textView.font ?? TypographyV2.body.font()
         fieldHeightLimit?.constant = 3 * font.lineHeight + 2 * Metrics.fieldVerticalPadding
     }
 

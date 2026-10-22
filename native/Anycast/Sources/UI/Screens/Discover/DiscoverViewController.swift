@@ -115,7 +115,7 @@ final class DiscoverViewController: UIViewController {
         // (discover.dart:73-78 applied at page level).
         networkErrorLabel.text = "Network Error"
         networkErrorLabel.textColor = Theme.onSurfaceVariant
-        networkErrorLabel.font = TypographyV2.headlineSmall.font()
+        networkErrorLabel.font = TypographyV2.emphasis.font()
         networkErrorLabel.adjustsFontForContentSizeCategory = true
         networkErrorLabel.textAlignment = .center
         networkErrorLabel.isHidden = true

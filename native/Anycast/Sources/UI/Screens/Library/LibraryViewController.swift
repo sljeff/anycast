@@ -129,13 +129,13 @@ final class LibraryViewController: UIViewController {
 
         let titleLabel = UILabel()
         titleLabel.text = "anycast membership"
-        titleLabel.font = TypographyV2.titleMedium.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textColor = Theme.onSurface
 
         let messageLabel = UILabel()
         messageLabel.text = "Upgrade for AI transcripts and chat"
-        messageLabel.font = TypographyV2.bodySmall.font()
+        messageLabel.font = TypographyV2.meta.font()
         messageLabel.adjustsFontForContentSizeCategory = true
         messageLabel.textColor = Theme.onSurfaceVariant
 
@@ -195,7 +195,7 @@ final class LibraryViewController: UIViewController {
         )
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = TypographyV2.headlineSmall.font()
+            outgoing.font = TypographyV2.emphasis.font()
             return outgoing
         }
         config.title = "all shows"

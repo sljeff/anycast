@@ -196,7 +196,7 @@ final class ChannelViewController: UIViewController {
 
         emptyChannelLabel.text = "No channel"
         emptyChannelLabel.textColor = Theme.onSurfaceVariant
-        emptyChannelLabel.font = TypographyV2.headlineSmall.font()
+        emptyChannelLabel.font = TypographyV2.emphasis.font()
         emptyChannelLabel.isHidden = true
         emptyChannelLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyChannelLabel)

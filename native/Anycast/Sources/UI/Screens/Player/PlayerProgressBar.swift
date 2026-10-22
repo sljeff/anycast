@@ -145,18 +145,14 @@ final class PlayerProgressBarView: UIControl {
 
         for label in [positionLabel, remainingLabel] {
             // Monospaced digits keep the ticking times from jittering.
-            label.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(
-                for: ThemeRegistry.current.typography.font(13, .regular, .text).monospacedDigits()
-            )
+            label.font = TypographyV2.meta.font().monospacedDigits()
             label.textColor = Theme.playerSecondary
             label.adjustsFontForContentSizeCategory = true
             label.translatesAutoresizingMaskIntoConstraints = false
             addSubview(label)
         }
 
-        timeBubbleLabel.font = UIFontMetrics(forTextStyle: .title3).scaledFont(
-            for: ThemeRegistry.current.typography.font(20, .semibold, .text).monospacedDigits()
-        )
+        timeBubbleLabel.font = TypographyV2.emphasis.font().monospacedDigits()
         timeBubbleLabel.adjustsFontForContentSizeCategory = true
         timeBubbleLabel.textColor = Theme.playerBackground
         timeBubbleLabel.translatesAutoresizingMaskIntoConstraints = false

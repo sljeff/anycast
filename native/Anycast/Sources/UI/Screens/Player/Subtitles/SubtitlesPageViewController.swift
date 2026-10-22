@@ -572,7 +572,7 @@ final class SubtitlesPageViewController: UIViewController {
         }
         let label = UILabel()
         label.text = message
-        label.font = TypographyV2.titleSmall.font()
+        label.font = TypographyV2.meta.font()
         label.textColor = Theme.playerSecondary
         label.adjustsFontForContentSizeCategory = true
         elements.append(label)

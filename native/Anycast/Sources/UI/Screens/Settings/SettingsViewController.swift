@@ -140,7 +140,7 @@ final class SettingsViewController: UIViewController {
 
         let titleLabel = UILabel()
         titleLabel.text = "Settings"
-        titleLabel.font = TypographyV2.headlineLarge.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.accessibilityTraits = .header
@@ -225,7 +225,7 @@ final class SettingsViewController: UIViewController {
             var config = header.defaultContentConfiguration()
             config.text = title
             config.textProperties.color = Theme.onSurfaceVariant
-            config.textProperties.font = TypographyV2.bodyMedium.font()
+            config.textProperties.font = TypographyV2.meta.font()
             config.textProperties.adjustsFontForContentSizeCategory = true
             // Text lines up with the row text, 8 above the plate.
             config.directionalLayoutMargins = NSDirectionalEdgeInsets(

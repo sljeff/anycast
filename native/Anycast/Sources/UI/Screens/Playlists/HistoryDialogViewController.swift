@@ -118,7 +118,7 @@ final class HistoryDialogViewController: UIViewController {
 
     private func buildSheet() {
         titleLabel.text = "History"
-        titleLabel.font = TypographyV2.headlineSmall.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
@@ -206,7 +206,7 @@ final class HistoryDialogViewController: UIViewController {
         )
         undoConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = TypographyV2.headlineSmall.font()
+            outgoing.font = TypographyV2.emphasis.font()
             return outgoing
         }
         undoButton.configuration = undoConfiguration
@@ -214,7 +214,7 @@ final class HistoryDialogViewController: UIViewController {
         undoButton.addTarget(self, action: #selector(undoTapped), for: .touchUpInside)
 
         // Assistive-tech path: an inline confirm instead of the hold gesture.
-        confirmLabel.font = TypographyV2.bodyMedium.font()
+        confirmLabel.font = TypographyV2.body.font()
         confirmLabel.textColor = Theme.onSurface
         confirmLabel.textAlignment = .center
         confirmLabel.numberOfLines = 0
@@ -569,13 +569,13 @@ final class HistoryRowCell: UICollectionViewListCell {
         coverView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(coverView)
 
-        titleLabel.font = TypographyV2.headlineSmall.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.adjustsFontForContentSizeCategory = true
 
-        channelLabel.font = TypographyV2.bodyMedium.font()
+        channelLabel.font = TypographyV2.meta.font()
         channelLabel.textColor = Theme.onSurfaceVariant
         channelLabel.numberOfLines = 1
         channelLabel.lineBreakMode = .byTruncatingTail

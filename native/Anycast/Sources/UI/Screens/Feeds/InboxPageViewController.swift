@@ -919,7 +919,7 @@ final class HistoryTailCell: UICollectionViewCell {
         configuration.cornerStyle = .capsule
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = TypographyV2.bodySmall.font()
+            outgoing.font = TypographyV2.meta.font()
             return outgoing
         }
         button.configuration = configuration

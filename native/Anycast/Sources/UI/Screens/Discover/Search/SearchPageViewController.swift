@@ -300,7 +300,7 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
-        statusLabel.font = TypographyV2.bodyLarge.font()
+        statusLabel.font = TypographyV2.body.font()
         statusLabel.adjustsFontForContentSizeCategory = true
         statusLabel.textColor = Theme.onSurface
         statusLabel.textAlignment = .center
@@ -486,7 +486,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
-        statusLabel.font = TypographyV2.bodyLarge.font()
+        statusLabel.font = TypographyV2.body.font()
         statusLabel.adjustsFontForContentSizeCategory = true
         statusLabel.textColor = Theme.onSurface
         statusLabel.textAlignment = .center
