@@ -20,26 +20,11 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         self.context = context
         self.model = model
 
-        let layout = UICollectionViewCompositionalLayout { _, _ in
-            let item = NSCollectionLayoutItem(
-                layoutSize: NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(1),
-                    heightDimension: .estimated(PodcastCardCell.cardHeight)
-                )
-            )
-            let group = NSCollectionLayoutGroup.horizontal(
-                layoutSize: item.layoutSize, subitems: [item]
-            )
-            let section = NSCollectionLayoutSection(group: group)
-            // ListView.separated + PodcastCard margins (discover.dart:87-99):
-            // pageH 16 sides, gap 12 top, pageBottomSafe 88 bottom.
-            section.contentInsets = NSDirectionalEdgeInsets(
-                top: 12, leading: 16, bottom: 88, trailing: 16
-            )
-            section.interGroupSpacing = PodcastCardCell.spacing
-            return section
-        }
-        collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        // One grouped plate (discover.dart:87-99 margins: pageH 16 sides,
+        // gap 12 top, pageBottomSafe 88 bottom).
+        collectionView = UICollectionView(
+            frame: .zero, collectionViewLayout: PodcastCardCell.makeGroupedLayout()
+        )
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -150,6 +135,9 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         ) as! PodcastCardCell
         if model.channels.indices.contains(indexPath.item) {
             let channel = model.channels[indexPath.item]
+            cell.setPosition(
+                isFirst: indexPath.item == 0, isLast: indexPath.item == model.channels.count - 1
+            )
             cell.configure(
                 PodcastCardContent(
                     rssFeedURL: channel.rssFeedUrl ?? "",

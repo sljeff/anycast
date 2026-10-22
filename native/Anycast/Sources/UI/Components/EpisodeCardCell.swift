@@ -550,9 +550,6 @@ final class EpisodeCardCell: UICollectionViewCell {
             textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.gap),
             textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.gap),
             textColumn.bottomAnchor.constraint(lessThanOrEqualTo: cardContainer.bottomAnchor, constant: -Spacing.gap),
-            // Never shorter than the cover, even with an empty description.
-            textColumn.heightAnchor.constraint(greaterThanOrEqualTo: coverView.heightAnchor),
-
             metaRow.widthAnchor.constraint(lessThanOrEqualTo: textColumn.widthAnchor),
             rightTextLabel.widthAnchor.constraint(lessThanOrEqualTo: textColumn.widthAnchor, multiplier: 0.5),
 

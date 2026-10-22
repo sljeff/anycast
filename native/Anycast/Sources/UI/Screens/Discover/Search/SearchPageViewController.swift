@@ -235,9 +235,11 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
     init(context: UIContext, viewModel: SearchPageViewModel) {
         self.context = context
         self.viewModel = viewModel
+        // One grouped plate (discover.dart:187-195 insets: pageH 16 sides,
+        // gap 12 top, pageBottomSafe 88 bottom).
         collectionView = UICollectionView(
             frame: .zero,
-            collectionViewLayout: Self.makeListLayout()
+            collectionViewLayout: PodcastCardCell.makeGroupedLayout()
         )
         super.init(nibName: nil, bundle: nil)
     }
@@ -245,15 +247,14 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    /// ListView.separated insets (discover.dart:187-195 / 222-228):
-    /// pageH 16 sides, gap 12 top, pageBottomSafe 88 bottom — identical for
-    /// both tabs' lists.
-    static func makeListLayout(horizontalInset: CGFloat = 16) -> UICollectionViewCompositionalLayout {
+    /// The Episodes tab's stacked compact cards (discover.dart:222-228
+    /// insets: pageH 16 sides, gap 12 top, pageBottomSafe 88 bottom).
+    static func makeEpisodeListLayout(horizontalInset: CGFloat = 16) -> UICollectionViewCompositionalLayout {
         UICollectionViewCompositionalLayout { _, _ in
             let item = NSCollectionLayoutItem(
                 layoutSize: NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1),
-                    heightDimension: .estimated(PodcastCardCell.cardHeight)
+                    heightDimension: .estimated(EpisodeCardCell.cardRowHeight)
                 )
             )
             let group = NSCollectionLayoutGroup.horizontal(
@@ -263,7 +264,7 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
             section.contentInsets = NSDirectionalEdgeInsets(
                 top: 12, leading: horizontalInset, bottom: 88, trailing: horizontalInset
             )
-            section.interGroupSpacing = PodcastCardCell.spacing
+            section.interGroupSpacing = EpisodeCardCell.spacing
             return section
         }
     }
@@ -360,6 +361,9 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         ) as! PodcastCardCell
         if viewModel.channels.indices.contains(indexPath.item) {
             let channel = viewModel.channels[indexPath.item]
+            cell.setPosition(
+                isFirst: indexPath.item == 0, isLast: indexPath.item == viewModel.channels.count - 1
+            )
             cell.configure(
                 PodcastCardContent(
                     rssFeedURL: channel.rssFeedUrl ?? "",
@@ -421,7 +425,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         self.viewModel = viewModel
         collectionView = UICollectionView(
             frame: .zero,
-            collectionViewLayout: SearchChannelsPageViewController.makeListLayout()
+            collectionViewLayout: SearchChannelsPageViewController.makeEpisodeListLayout()
         )
         super.init(nibName: nil, bundle: nil)
     }
