@@ -17,6 +17,7 @@ final class DiscoverViewController: UIViewController {
 
     // Body
     private var categoryStrip: ChipTabBarView?
+    private var didAttachStripEdge = false
     private var pagingContainer: DiscoverPagingContainer?
     private let bodySpinner = UIActivityIndicatorView(style: .large)
     private let networkErrorLabel = UILabel()
@@ -153,8 +154,18 @@ final class DiscoverViewController: UIViewController {
         container.onSwipeSelect = { [weak self] index in
             self?.selectCategory(index, animatedPages: false)
         }
+        container.topChromeInset = ChipTabBarView.chipHeight
         container.onSelectedPageScrollViewChange = { [weak self] in
-            self?.setBottomEdgeScrollView(self?.pagingContainer?.selectedPageScrollView)
+            guard let self else { return }
+            let list = self.pagingContainer?.selectedPageScrollView
+            self.setBottomEdgeScrollView(list)
+            guard let list else { return }
+            if self.didAttachStripEdge {
+                ScrollEdgeChrome.retarget(chrome: strip, to: list, edge: .top)
+            } else {
+                self.didAttachStripEdge = true
+                ScrollEdgeChrome.attach(chrome: strip, to: list, edge: .top, in: self.view)
+            }
         }
         container.onScrub = { [weak self] index in
             // Mid-drag materialization — the PageView builds the page it is
@@ -172,9 +183,12 @@ final class DiscoverViewController: UIViewController {
 
             container.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             container.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            container.view.topAnchor.constraint(equalTo: strip.bottomAnchor),
+            // The lists run under the strip (content fades out behind it);
+            // `topChromeInset` keeps the first row below it.
+            container.view.topAnchor.constraint(equalTo: strip.topAnchor),
             container.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        view.bringSubviewToFront(strip)   // the pages now run under it
 
         categoryStrip = strip
         pagingContainer = container

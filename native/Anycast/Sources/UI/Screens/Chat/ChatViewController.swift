@@ -96,6 +96,13 @@ final class ChatViewController: UIViewController {
         }
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard collectionView != nil else { return }
+        ScrollEdgeChrome.clearTop(of: collectionView, to: headerBar.frame.maxY)
+        ScrollEdgeChrome.clearBottom(of: collectionView, to: inputBar.frame.minY)
+    }
+
     /// PopScope parity (lib/pages/chat.dart:17-22): closing the sheet
     /// clears the conversation — reopening starts fresh. `isBeingDismissed`
     /// keeps sheets presented ON TOP of this one (login on 401) from
@@ -111,7 +118,9 @@ final class ChatViewController: UIViewController {
     // MARK: - Chrome construction
 
     private func buildHeader() {
-        headerBar.backgroundColor = Metrics.headerBackground
+        // Clear: the list runs under the bar and fades out behind it
+        // (`ScrollEdgeChrome`); on iOS 18 the fade paints the header surface.
+        headerBar.backgroundColor = .clear
         headerBar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(headerBar)
 
@@ -209,13 +218,25 @@ final class ChatViewController: UIViewController {
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.topAnchor.constraint(equalTo: headerBar.bottomAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: inputBar.topAnchor),
+            // Runs under the header and the composer (content fades out
+            // behind both); `viewDidLayoutSubviews` keeps the resting list
+            // between them.
+            collectionView.topAnchor.constraint(equalTo: headerBar.topAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: inputBar.bottomAnchor),
         ])
+        ScrollEdgeChrome.attach(
+            chrome: headerBar, to: collectionView, edge: .top, in: view,
+            fadeColor: Metrics.headerBackground, restingGap: 0
+        )
+        ScrollEdgeChrome.attach(
+            chrome: inputBar, to: collectionView, edge: .bottom, in: view,
+            fadeColor: Metrics.chatSurface, restingGap: 0
+        )
     }
 
     private func buildInputBar() {
         inputBar.translatesAutoresizingMaskIntoConstraints = false
+        inputBar.backgroundColor = .clear   // the list fades out behind it
         view.addSubview(inputBar)
         // Keyboard avoidance: the bar rides the keyboard layout guide; the
         // list sits above the bar (07 §2.6 — ChatLayout needs no extra

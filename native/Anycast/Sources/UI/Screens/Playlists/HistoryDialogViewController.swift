@@ -100,6 +100,7 @@ final class HistoryDialogViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        ScrollEdgeChrome.clearTop(of: collectionView, to: titleLabel.frame.maxY + Spacing.gap)
         // Let the last row scroll clear of the pinned footer and its fade.
         let inset = footerStack.isHidden
             ? view.safeAreaInsets.bottom
@@ -152,7 +153,9 @@ final class HistoryDialogViewController: UIViewController {
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.sheetContent),
             titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.sheetContent),
 
-            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: Spacing.gap),
+            // Runs under the title row (content fades out behind it);
+            // `viewDidLayoutSubviews` keeps the resting first row in place.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -184,6 +187,11 @@ final class HistoryDialogViewController: UIViewController {
                 equalTo: footerStack.topAnchor, constant: -ScrollEdgeFade.fadeLength
             ),
         ])
+        ScrollEdgeChrome.attachTopBand(
+            to: collectionView, in: view, below: titleLabel.bottomAnchor, restingGap: Spacing.gap
+        )
+        ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view)
+        view.bringSubviewToFront(titleLabel)
         renderEmptyState()
     }
 

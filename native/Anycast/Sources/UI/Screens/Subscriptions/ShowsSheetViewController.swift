@@ -180,13 +180,25 @@ final class ShowsSheetViewController: UIViewController {
 
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: ShowsSheetLayout.inset),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -ShowsSheetLayout.inset),
-            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: ShowsSheetLayout.titleGap),
+            // Runs under the title row and the sheet's bottom edge, fading
+            // out behind both; `viewDidLayoutSubviews` keeps the resting
+            // layout of a grid that started below the title.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        ScrollEdgeChrome.attachTopBand(
+            to: collectionView, in: view, below: titleLabel.bottomAnchor, fadeColor: Theme.surface,
+            restingGap: ShowsSheetLayout.titleGap
+        )
+        ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view, fadeColor: Theme.surface)
+        view.bringSubviewToFront(titleLabel)
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        ScrollEdgeChrome.clearTop(
+            of: collectionView, to: titleLabel.frame.maxY + ShowsSheetLayout.titleGap
+        )
         let width = collectionView.bounds.width
         let safeBottom = view.safeAreaInsets.bottom
         // The last row ends the same gap above the sheet's bottom edge that

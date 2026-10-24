@@ -87,6 +87,14 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
     private let playerBar: PlayerBarView
     /// iOS 18 floating capsule placement (above the tab bar).
     private var floatingBottomConstraint: NSLayoutConstraint?
+    /// iOS 18: melts the pages' rows into the page colour behind the
+    /// capsule, so they are not hard-cut around it.
+    private var floatingFade: ScrollEdgeFade?
+    /// iOS 26+: the same melt behind the glass bottom bars (mini player
+    /// accessory + tab bar or search field), so list text never reads
+    /// through them. Tracks the system's content layout guide, so it follows
+    /// the bars when the tab bar minimizes.
+    private(set) var bottomBarFade: ScrollEdgeFade?
 
     private enum FloatingMetrics {
         /// Gap between the floating capsule and the tab bar / content.
@@ -145,6 +153,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
 
         if #available(iOS 26.0, *) {
             tabBarMinimizeBehavior = .onScrollDown
+            installBottomBarFade()
         } else {
             installFloatingPlayerBar()
         }
@@ -206,6 +215,37 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         )
     }
 
+    // MARK: - Bottom bar fade (iOS 26+)
+
+    /// A page-background gradient behind the system bars and above the tab
+    /// roots: solid from the bars' top edge to the screen bottom, ramping to
+    /// clear over `ScrollEdgeFade.fadeLength` above them. The system soft
+    /// edge effect stays on the scroll views; this gives the glass a calm
+    /// surface to sample and keeps list text from showing through. Its top
+    /// follows `contentLayoutGuide`, which the system moves with the
+    /// accessory and the minimizing tab bar.
+    @available(iOS 26.0, *)
+    private func installBottomBarFade() {
+        let fade = ScrollEdgeFade(edge: .bottom)
+        // Between the page content and the container that hosts the bars.
+        var barContainer: UIView? = tabBar
+        while let candidate = barContainer, candidate.superview !== view { barContainer = candidate.superview }
+        if let barContainer {
+            view.insertSubview(fade, belowSubview: barContainer)
+        } else {
+            view.insertSubview(fade, belowSubview: tabBar)
+        }
+        NSLayoutConstraint.activate([
+            fade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            fade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            fade.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            fade.topAnchor.constraint(
+                equalTo: contentLayoutGuide.bottomAnchor, constant: -ScrollEdgeFade.fadeLength
+            ),
+        ])
+        bottomBarFade = fade
+    }
+
     // MARK: - Mini player hosting
 
     private func installFloatingPlayerBar() {
@@ -218,6 +258,18 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
             playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
             bottom,
         ])
+
+        // The ramp starts where resting content ends (a gap above the
+        // capsule) and runs solid down to the tab bar.
+        let fade = ScrollEdgeFade(edge: .bottom)
+        view.insertSubview(fade, belowSubview: playerBar)
+        NSLayoutConstraint.activate([
+            fade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            fade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            fade.bottomAnchor.constraint(equalTo: tabBar.topAnchor),
+            fade.topAnchor.constraint(equalTo: playerBar.topAnchor, constant: -FloatingMetrics.gap),
+        ])
+        floatingFade = fade
     }
 
     /// The mini player shows while the queue has episodes (03 §2.9). On
@@ -236,6 +288,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         let changes = { [weak self] in
             guard let self else { return }
             self.playerBar.isHidden = !visible
+            self.floatingFade?.isHidden = !visible
         }
         if animated {
             UIView.animate(withDuration: Motion.quick, animations: changes)

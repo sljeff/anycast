@@ -81,9 +81,10 @@ final class SettingsOptionSheetViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor { traits in
+        let surface = UIColor { traits in
             traits.userInterfaceStyle == .dark ? AnycastColor.sandDark4 : AnycastColor.sand1
         }
+        view.backgroundColor = surface
 
         titleLabel.text = titleText
         titleLabel.font = TypographyV2.emphasis.font()
@@ -121,9 +122,23 @@ final class SettingsOptionSheetViewController: UIViewController {
 
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.contentInset),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Self.contentInset),
-            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: Self.titleGap),
+            // Runs under the title row and the sheet's bottom edge, fading
+            // out behind both; `viewDidLayoutSubviews` keeps the resting
+            // layout of a list that started below the title.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        ScrollEdgeChrome.attachTopBand(
+            to: collectionView, in: view, below: titleLabel.bottomAnchor, fadeColor: surface,
+            restingGap: Self.titleGap
+        )
+        ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view, fadeColor: surface)
+        view.bringSubviewToFront(titleLabel)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        ScrollEdgeChrome.clearTop(of: collectionView, to: titleLabel.frame.maxY + Self.titleGap)
     }
 }
 

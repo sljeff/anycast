@@ -110,6 +110,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        syncTopInset()
         // The empty state centers in the room beneath the chrome rows, not
         // behind them (the shelf and strip scroll with the list).
         var chromeHeight: CGFloat = 0
@@ -121,6 +122,19 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         if chromeHeight != lastChromeHeight {
             lastChromeHeight = chromeHeight
             view.setNeedsLayout()
+        }
+    }
+
+    /// The list spans the whole page; this inset (on top of the safe area)
+    /// puts the first row below the pinned header, same gap as the Playlist
+    /// page. A list resting at its top follows the new inset.
+    private func syncTopInset() {
+        let top = header.bounds.height + Spacing.xs
+        guard collectionView.contentInset.top != top else { return }
+        let wasAtTop = collectionView.contentOffset.y <= -collectionView.adjustedContentInset.top + 0.5
+        collectionView.contentInset.top = top
+        if wasAtTop {
+            collectionView.contentOffset.y = -collectionView.adjustedContentInset.top
         }
     }
 
@@ -330,14 +344,20 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            // Below the pinned header, same gap as the Playlist page.
-            collectionView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.xs),
+            // The list runs under the pinned header (content fades out
+            // behind it); `syncTopInset` keeps the resting first row where
+            // it sat when the list started below the header.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
         // With the list below the pinned header the automatic lookup no
         // longer finds it for the tab bar's minimize-on-scroll.
         setBottomEdgeScrollView(collectionView)
+        view.bringSubviewToFront(header)   // the list now runs under it
+        ScrollEdgeChrome.attach(
+            chrome: header, to: collectionView, edge: .top, in: view, reach: view.topAnchor
+        )
 
         emptyStateView.onExplore = { [weak self] in
             self?.context.tabs.select(2)
@@ -435,7 +455,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         isRefreshing = true
         refreshControl.beginRefreshing()
         let controlHeight = refreshControl.bounds.height > 0 ? refreshControl.bounds.height : 80
-        let revealY = -controlHeight
+        let revealY = -(collectionView.adjustedContentInset.top + controlHeight)
         if collectionView.contentOffset.y > revealY {
             collectionView.setContentOffset(CGPoint(x: 0, y: revealY), animated: true)
         }
@@ -740,7 +760,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     // MARK: - Tab0 re-tap (03 §1.1; the Inbox list even when Subscriptions shows)
 
     func tabZeroReTapped() {
-        let isAtTop = collectionView.contentOffset.y <= 0.5
+        let isAtTop = collectionView.contentOffset.y <= -collectionView.adjustedContentInset.top + 0.5
         switch TabZeroRetap.action(hasClient: true, isAtTop: isAtTop) {
         case .scrollToTop:
             let top = CGPoint(x: 0, y: -collectionView.adjustedContentInset.top)

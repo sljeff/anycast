@@ -67,6 +67,7 @@ final class ImportInstructionsViewController: UIViewController {
 
     /// Sheet content inset: the title, the rows and the chevrons share it.
     private static let contentInset: CGFloat = 28
+    private static let titleGap: CGFloat = 8
 
     private enum SectionKind {
         static let header = "ImportInstructionsHeader"
@@ -74,6 +75,7 @@ final class ImportInstructionsViewController: UIViewController {
     }
 
     private let collectionView: UICollectionView
+    private let titleLabel = UILabel()
     private var expandedSections: Set<Int> = []
 
     // MARK: - Present (showModalBottomSheet + DraggableScrollableSheet 0.7/0.6)
@@ -130,7 +132,6 @@ final class ImportInstructionsViewController: UIViewController {
 
         // Fixed title over the scrolling list — the Dart
         // Column[Handler, title, Expanded(ListView)].
-        let titleLabel = UILabel()
         titleLabel.text = ImportInstructionsContent.headerTitle
         titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
@@ -159,9 +160,22 @@ final class ImportInstructionsViewController: UIViewController {
 
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            // Runs under the title row and the sheet's bottom edge, fading
+            // out behind both; `viewDidLayoutSubviews` keeps the resting
+            // layout of a list that started below the title.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        ScrollEdgeChrome.attachTopBand(
+            to: collectionView, in: view, below: titleLabel.bottomAnchor, restingGap: Self.titleGap
+        )
+        ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view)
+        view.bringSubviewToFront(titleLabel)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        ScrollEdgeChrome.clearTop(of: collectionView, to: titleLabel.frame.maxY + Self.titleGap)
     }
 }
 

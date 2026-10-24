@@ -460,17 +460,19 @@ struct UIFixRegressionTests {
         let settings = Self.settingsFrame(of: header, in: inbox.view)
         #expect(Self.sameOrigin(settings, referenceSettings) && settings.size == referenceSettings.size,
                 "settings \(settings) vs \(referenceSettings)")
-        // The list starts right below the header (the Playlist gap).
+        // The list runs under the header (content fades out behind it); the
+        // first row still rests below it.
+        #expect(collection.frame.minY <= frame.minY, "the list runs under the header")
         #expect(
-            abs(collection.frame.minY - (frame.maxY + Spacing.xs)) < 0.5,
-            "the list does not start below the header: \(collection.frame) vs \(frame)"
+            collection.frame.minY + collection.adjustedContentInset.top >= frame.maxY,
+            "the first row rests below the header"
         )
 
         // A pull moves the list only.
-        collection.contentOffset = CGPoint(x: 0, y: -90)
+        collection.contentOffset = CGPoint(x: 0, y: -collection.adjustedContentInset.top - 90)
         inbox.view.layoutIfNeeded()
         #expect(Self.sameOrigin(header.convert(header.bounds, to: inbox.view), frame), "a pull moved the header")
-        collection.contentOffset = .zero
+        collection.contentOffset = CGPoint(x: 0, y: -collection.adjustedContentInset.top)
     }
 
     // MARK: - Strip expand reliability (6, playlist list)

@@ -13,6 +13,8 @@ final class ShareDialogViewController: DialogBaseViewController {
     private lazy var importer = PodcastImporter(database: context.database)
 
     private let listView = UITableView(frame: .zero, style: .plain)
+    private let titleLabel = UILabel()
+    private var actionRow: UIView?
     private var progressOverlay: ImportProgressOverlayController?
 
     /// Stub-era entry point (kept: the coordinator constructs by name).
@@ -36,7 +38,10 @@ final class ShareDialogViewController: DialogBaseViewController {
         // width: Get.width * 0.8 — kept relative to the presented container.
         constrainCardWidth(fraction: 0.8)
 
-        let titleLabel = UILabel()
+        // The list fades out behind the title and the action row; the card
+        // clips the full-width fades to its rounded corners.
+        cardView.clipsToBounds = true
+
         titleLabel.text = "Import Podcasts"
         titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
@@ -75,6 +80,7 @@ final class ShareDialogViewController: DialogBaseViewController {
         } else {
             let list = makeListView()
             let actions = makeActionRow()
+            actionRow = actions
             column.addArrangedSubview(list)
             column.addArrangedSubview(actions)
             column.alignment = .fill
@@ -90,6 +96,39 @@ final class ShareDialogViewController: DialogBaseViewController {
             column.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
             column.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -16),
         ])
+
+        if let actionRow {
+            // The table spans from the card's top to the action row's bottom
+            // (the 300 pt placeholder in the column keeps the resting
+            // layout); `viewDidLayoutSubviews` sets the insets.
+            cardView.insertSubview(listView, belowSubview: column)
+            NSLayoutConstraint.activate([
+                listView.leadingAnchor.constraint(equalTo: column.leadingAnchor),
+                listView.trailingAnchor.constraint(equalTo: column.trailingAnchor),
+                listView.topAnchor.constraint(equalTo: cardView.topAnchor),
+                listView.bottomAnchor.constraint(equalTo: column.bottomAnchor),
+            ])
+            ScrollEdgeChrome.attachTopBand(
+                to: listView, in: cardView, below: titleLabel.bottomAnchor,
+                fadeColor: Theme.surface, restingGap: Self.listGap
+            )
+            ScrollEdgeChrome.attach(
+                chrome: actionRow, to: listView, edge: .bottom, in: cardView,
+                fadeColor: Theme.surface, restingGap: Self.listGap
+            )
+            cardView.bringSubviewToFront(titleLabel)
+            cardView.bringSubviewToFront(column)
+        }
+    }
+
+    private static let listGap: CGFloat = 16
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard let actionRow else { return }
+        ScrollEdgeChrome.clearTop(of: listView, to: titleLabel.frame.maxY + Self.listGap)
+        let rowTop = actionRow.convert(actionRow.bounds, to: cardView).minY
+        ScrollEdgeChrome.clearBottom(of: listView, to: rowTop - 8)
     }
 
     /// ListView.separated of Card>ListTile rows (titleMedium, one line,
@@ -105,8 +144,12 @@ final class ShareDialogViewController: DialogBaseViewController {
         listView.isAccessibilityElement = true
         listView.accessibilityLabel = "Importable podcasts"
         listView.translatesAutoresizingMaskIntoConstraints = false
-        listView.heightAnchor.constraint(equalToConstant: 300).isActive = true
-        return listView
+        // The column holds a 300 pt placeholder; the table itself is pinned
+        // behind the card chrome in `viewDidLoad`.
+        let placeholder = UIView()
+        placeholder.translatesAutoresizingMaskIntoConstraints = false
+        placeholder.heightAnchor.constraint(equalToConstant: 300).isActive = true
+        return placeholder
     }
 
     /// Close (secondary) + Import (filled inverseSurface) — share.dart:67-117.

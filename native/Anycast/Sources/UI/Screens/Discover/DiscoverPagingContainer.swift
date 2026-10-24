@@ -5,6 +5,9 @@ import UIKit
 @MainActor
 protocol ScrollEdgePage: AnyObject {
     var edgeScrollView: UIScrollView { get }
+    /// Height of the chrome the list runs under at its top; the list rests
+    /// its first row below it and content fades out behind it as it scrolls.
+    var topChromeInset: CGFloat { get set }
 }
 
 extension UIViewController {
@@ -33,6 +36,14 @@ final class DiscoverPagingContainer: UIViewController, UIScrollViewDelegate {
     var onSwipeSelect: ((Int) -> Void)?
     /// The nearest page changed while the user is dragging toward it.
     var onScrub: ((Int) -> Void)?
+    /// The chrome the pages' lists run under (the chip strip above the
+    /// container); pushed to every installed page.
+    var topChromeInset: CGFloat = 0 {
+        didSet {
+            for page in installedPages.values { (page as? ScrollEdgePage)?.topChromeInset = topChromeInset }
+        }
+    }
+
     /// The selected page, or its list, changed (see `selectedPageScrollView`).
     var onSelectedPageScrollViewChange: (() -> Void)?
 
@@ -122,6 +133,7 @@ final class DiscoverPagingContainer: UIViewController, UIScrollViewDelegate {
     func install(_ page: UIViewController, at index: Int) {
         guard slots.indices.contains(index), installedPages[index] == nil else { return }
         installedPages[index] = page
+        (page as? ScrollEdgePage)?.topChromeInset = topChromeInset
         addChild(page)
         let slot = slots[index]
         slot.addSubview(page.view)

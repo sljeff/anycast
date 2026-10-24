@@ -27,6 +27,8 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     /// iOS 26 search-tab field (installed on `navigationItem`).
     private let searchController = UISearchController(searchResultsController: nil)
     private let tabStrip: ChipTabBarView
+    private var didAttachStripEdge = false
+    private var tabStripFade: ScrollEdgeFade?
     private var pagingContainer: DiscoverPagingContainer!
     private var channelsPage: SearchChannelsPageViewController
     private var episodesPage: SearchEpisodesPageViewController
@@ -76,6 +78,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
     private func setResultsVisible(_ visible: Bool) {
         tabStrip.isHidden = !visible
+        tabStripFade?.isHidden = !visible
         pagingContainer.view.isHidden = !visible
     }
 
@@ -186,8 +189,21 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         addChild(pagingContainer)
         view.addSubview(pagingContainer.view)
         pagingContainer.didMove(toParent: self)
+        pagingContainer.topChromeInset = ChipTabBarView.chipHeight
         pagingContainer.onSelectedPageScrollViewChange = { [weak self] in
-            self?.setBottomEdgeScrollView(self?.pagingContainer.selectedPageScrollView)
+            guard let self else { return }
+            let list = self.pagingContainer.selectedPageScrollView
+            self.setBottomEdgeScrollView(list)
+            guard let list else { return }
+            if self.didAttachStripEdge {
+                ScrollEdgeChrome.retarget(chrome: self.tabStrip, to: list, edge: .top)
+            } else {
+                self.didAttachStripEdge = true
+                self.tabStripFade = ScrollEdgeChrome.attach(
+                    chrome: self.tabStrip, to: list, edge: .top, in: self.view
+                )
+                self.tabStripFade?.isHidden = self.tabStrip.isHidden
+            }
         }
         pagingContainer.install(channelsPage, at: 0)
         pagingContainer.install(episodesPage, at: 1)
@@ -214,9 +230,15 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
             pagingContainer.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             pagingContainer.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            pagingContainer.view.topAnchor.constraint(equalTo: tabStrip.bottomAnchor),
+            // The lists run under the strip (content fades out behind it);
+            // `topChromeInset` keeps the first row below it.
+            pagingContainer.view.topAnchor.constraint(equalTo: tabStrip.topAnchor),
             pagingContainer.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        view.bringSubviewToFront(tabStrip)   // the pages now run under it
+        // The fade attached while the pages installed, before the strip moved
+        // up: keep it between the pages and the strip.
+        if let tabStripFade { view.insertSubview(tabStripFade, belowSubview: tabStrip) }
     }
 }
 
@@ -273,6 +295,9 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
     }
 
     var edgeScrollView: UIScrollView { collectionView }
+    var topChromeInset: CGFloat = 0 {
+        didSet { collectionView.contentInset.top = topChromeInset }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -439,6 +464,9 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     var edgeScrollView: UIScrollView { collectionView }
+    var topChromeInset: CGFloat = 0 {
+        didSet { collectionView.contentInset.top = topChromeInset }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()

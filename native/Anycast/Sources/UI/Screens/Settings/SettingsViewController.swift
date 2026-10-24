@@ -68,6 +68,7 @@ final class SettingsViewController: UIViewController {
     private var settings: AppSettings
 
     private let collectionView: UICollectionView
+    private let titleLabel = UILabel()
     private var dataSource: UICollectionViewDiffableDataSource<Int, SettingsPageModel.Row>?
 
     private let longPressRecognizer = UILongPressGestureRecognizer()
@@ -138,7 +139,6 @@ final class SettingsViewController: UIViewController {
 
         configureDataSource()
 
-        let titleLabel = UILabel()
         titleLabel.text = "Settings"
         titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
@@ -161,9 +161,18 @@ final class SettingsViewController: UIViewController {
 
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: Spacing.xs),
+            // Runs under the title row and the sheet's bottom edge, fading
+            // out behind both; `viewDidLayoutSubviews` keeps the resting
+            // layout of a list that started below the title.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        ScrollEdgeChrome.attachTopBand(
+            to: collectionView, in: view, below: titleLabel.bottomAnchor,
+            fadeColor: Theme.surfaceContainer, restingGap: Spacing.xs
+        )
+        ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view, fadeColor: Theme.surfaceContainer)
+        view.bringSubviewToFront(titleLabel)
 
         longPressRecognizer.minimumPressDuration = 0.5
         longPressRecognizer.addTarget(self, action: #selector(handleLongPress(_:)))
@@ -189,6 +198,11 @@ final class SettingsViewController: UIViewController {
                 self.refreshFromBox()
             })
         }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        ScrollEdgeChrome.clearTop(of: collectionView, to: titleLabel.frame.maxY + Spacing.xs)
     }
 
     deinit {

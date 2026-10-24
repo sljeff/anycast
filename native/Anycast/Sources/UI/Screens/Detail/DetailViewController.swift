@@ -249,6 +249,13 @@ final class DetailViewController: UIViewController {
             bottomFade.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
         ])
 
+        // The notes also melt away under the sheet's top edge once scrolled
+        // (the column rests `Layout.inset` below it, exactly at the strip's
+        // bottom).
+        ScrollEdgeChrome.attachTopEdge(
+            to: scrollView, in: view, height: Layout.inset, fadeColor: Theme.surface, restingGap: 0
+        )
+
         // The last line of the notes scrolls to rest above the fade.
         scrollView.contentInset.bottom = Layout.fadeHeight
         applyDetentLayout()

@@ -18,6 +18,7 @@ final class ChannelSearchViewController: UIViewController {
     private let playerBar: PlayerBarView
     private let playerBarHeight: NSLayoutConstraint
     private let noResultsLabel = UILabel()
+    private var noResultsCenterY: NSLayoutConstraint!
 
     private let expandCoordinator = CardExpandCoordinator()
     private var binder: ChannelEpisodeListBinder?
@@ -158,6 +159,9 @@ final class ChannelSearchViewController: UIViewController {
         noResultsLabel.isHidden = true
         noResultsLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(noResultsLabel)
+        noResultsCenterY = noResultsLabel.centerYAnchor.constraint(
+            equalTo: collectionView.centerYAnchor, constant: 60
+        )
 
         view.addSubview(collectionView)
         view.addSubview(playerBar)
@@ -169,7 +173,10 @@ final class ChannelSearchViewController: UIViewController {
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: Spacing.md),
+            // Runs under the search field (and the sheet's top edge); the top
+            // inset set in `viewDidLayoutSubviews` keeps the first row where
+            // it sat below the field.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             // Runs under the floating capsule; the section's 88 pt bottom
             // inset (plus the safe-area content inset) clears it.
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -195,10 +202,13 @@ final class ChannelSearchViewController: UIViewController {
             ),
 
             noResultsLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            noResultsLabel.centerYAnchor.constraint(
-                equalTo: collectionView.centerYAnchor, constant: 60
-            ),
+            noResultsCenterY,
         ])
+
+        ScrollEdgeChrome.attachTopBand(
+            to: collectionView, in: view, below: searchField.bottomAnchor, restingGap: Spacing.md
+        )
+        view.bringSubviewToFront(searchField)
 
         collectionView.dataSource = self
         collectionView.delegate = self
@@ -229,6 +239,18 @@ final class ChannelSearchViewController: UIViewController {
     private var filteredEpisodes: [FeedEpisodeRow] {
         guard let viewModel else { return [] }
         return ChannelSearchFilter.apply(query, to: viewModel.showEpisodes)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let top = searchField.frame.maxY + Spacing.md
+        if collectionView.contentInset.top != top {
+            let wasAtTop = collectionView.contentOffset.y <= -collectionView.contentInset.top + 0.5
+            collectionView.contentInset.top = top
+            collectionView.verticalScrollIndicatorInsets.top = top
+            noResultsCenterY.constant = 60 + top / 2   // centered in the room below the field
+            if wasAtTop { collectionView.contentOffset.y = -top }
+        }
     }
 
     /// The collection view ignores automatic inset adjustment, so the home

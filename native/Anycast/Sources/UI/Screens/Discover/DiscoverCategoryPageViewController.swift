@@ -32,6 +32,9 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     var edgeScrollView: UIScrollView { collectionView }
+    var topChromeInset: CGFloat = 0 {
+        didSet { collectionView.contentInset.top = topChromeInset }
+    }
 
     // MARK: - Lifecycle
 
