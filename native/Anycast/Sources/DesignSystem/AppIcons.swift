@@ -104,6 +104,7 @@ nonisolated enum AppIcons {
     // Settings & login (03 §2.13 / §2.14)
     static let settings = symbol("gearshape")
     static let search = symbol("magnifyingglass")
+    static let recentSearch = symbol("clock.arrow.circlepath")
     static let close = symbol("xmark")
     static let delete = symbol("trash")
     static let check = symbol("checkmark")

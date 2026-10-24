@@ -7,7 +7,8 @@ import AnycastKit
 /// swipeable two-page body. The field follows the platform: on iOS 26 it is
 /// the search tab's system field, at the bottom with the tab bar; iOS 18
 /// keeps the Anycast field under the header. An empty query is the entry
-/// state (no strip or results); submitting runs a fresh search. Each tab's
+/// state (recent searches and categories, no strip or results); submitting
+/// runs a fresh search and records it as a recent. Each tab's
 /// search runs on its first display AND on every revisit (the Dart
 /// TabBarView children carry no KeepAliveWrapper). The Episodes page renders
 /// episode cards with play / add-to-playlist (UNGATED add — the SearchPage
@@ -26,6 +27,10 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     private let searchField = UITextField()
     /// iOS 26 search-tab field (installed on `navigationItem`).
     private let searchController = UISearchController(searchResultsController: nil)
+    private let recentStore: RecentSearchStore
+    /// Recent searches and categories, shown while no results are.
+    let entryPage: SearchEntryViewController
+    private var entryFade: ScrollEdgeFade?
     private let tabStrip: ChipTabBarView
     private var didAttachStripEdge = false
     private var tabStripFade: ScrollEdgeFade?
@@ -38,9 +43,20 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
     // MARK: - Construction
 
-    init(context: UIContext) {
+    /// `loadCategories` defaults to the API's category names.
+    init(
+        context: UIContext,
+        recentStore: RecentSearchStore = RecentSearchStore(),
+        loadCategories: (() async throws -> [String])? = nil
+    ) {
         self.context = context
+        self.recentStore = recentStore
         self.viewModel = SearchPageViewModel(searchText: "", api: context.api)
+        let api = context.api
+        entryPage = SearchEntryViewController(
+            store: recentStore,
+            loadCategories: loadCategories ?? { try await api.listCategories().map(\.name) }
+        )
 
         tabStrip = ChipTabBarView(titles: ["Channels", "Episodes"])
         channelsPage = SearchChannelsPageViewController(context: context, viewModel: viewModel)
@@ -72,11 +88,31 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         setResultsVisible(false)
     }
 
-    private var hasQuery: Bool {
-        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    /// The chrome the entry list runs under: the header, plus the field on
+    /// iOS 18 where it sits under the header.
+    private var entryTopChrome: UIView {
+        if #available(iOS 26.0, *) { return header }
+        return searchField
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        clearEntryTop()
+    }
+
+    private func clearEntryTop() {
+        ScrollEdgeChrome.clearTop(of: entryPage.collectionView, to: entryTopChrome.frame.maxY)
+    }
+
+    /// Whether the results (strip and pages) replace the entry state.
+    private(set) var isShowingResults = false
+
     private func setResultsVisible(_ visible: Bool) {
+        isShowingResults = visible
+        entryPage.view.isHidden = visible
+        entryFade?.isHidden = visible
+        if !visible { entryPage.reload() }
+        setBottomEdgeScrollView(visible ? pagingContainer.selectedPageScrollView : entryPage.collectionView)
         tabStrip.isHidden = !visible
         tabStripFade?.isHidden = !visible
         pagingContainer.view.isHidden = !visible
@@ -87,6 +123,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     func search(_ text: String) {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
+        recentStore.record(query)
         searchField.text = query
         searchController.searchBar.text = query
         searchField.resignFirstResponder()
@@ -108,6 +145,16 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         search(searchBar.text ?? "")
     }
 
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        queryDidChange(searchText)
+    }
+
+    /// Emptying the field brings the entry state back.
+    private func queryDidChange(_ text: String) {
+        guard isShowingResults, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        setResultsVisible(false)
+    }
+
     /// Tab activation with the settle guard: a tab ACTIVATION (first build
     /// or a revisit after leaving) re-runs that tab's search.
     private func activateTabIfNeeded(_ index: Int) {
@@ -120,7 +167,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         super.viewDidAppear(animated)
         episodesPage.refreshMembership()
         // iOS 26 activates the search tab's field itself.
-        if #unavailable(iOS 26.0), !hasQuery {
+        if #unavailable(iOS 26.0), !isShowingResults {
             searchField.becomeFirstResponder()
         }
     }
@@ -165,6 +212,9 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
             searchField.addAction(UIAction { [weak self] _ in
                 self?.search(self?.searchField.text ?? "")
             }, for: .primaryActionTriggered)
+            searchField.addAction(UIAction { [weak self] _ in
+                self?.queryDidChange(self?.searchField.text ?? "")
+            }, for: .editingChanged)
             searchField.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(searchField)
             NSLayoutConstraint.activate([
@@ -193,7 +243,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         pagingContainer.onSelectedPageScrollViewChange = { [weak self] in
             guard let self else { return }
             let list = self.pagingContainer.selectedPageScrollView
-            self.setBottomEdgeScrollView(list)
+            if self.isShowingResults { self.setBottomEdgeScrollView(list) }
             guard let list else { return }
             if self.didAttachStripEdge {
                 ScrollEdgeChrome.retarget(chrome: self.tabStrip, to: list, edge: .top)
@@ -235,6 +285,27 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
             pagingContainer.view.topAnchor.constraint(equalTo: tabStrip.topAnchor),
             pagingContainer.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        // The entry list runs under the top chrome and fades out behind it,
+        // below the header and above the page base.
+        entryPage.onSelect = { [weak self] query in self?.search(query) }
+        // The list's safe-area share can arrive after the first layout.
+        entryPage.onAdjustedInsetChange = { [weak self] in self?.clearEntryTop() }
+        addChild(entryPage)
+        entryPage.view.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(entryPage.view, at: 0)
+        entryPage.didMove(toParent: self)
+        NSLayoutConstraint.activate([
+            entryPage.view.topAnchor.constraint(equalTo: view.topAnchor),
+            entryPage.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            entryPage.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            entryPage.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        let fade = ScrollEdgeChrome.attach(
+            chrome: entryTopChrome, to: entryPage.collectionView, edge: .top, in: view,
+            restingGap: Spacing.gap, reach: view.topAnchor
+        )
+        view.insertSubview(fade, aboveSubview: entryPage.view)
+        entryFade = fade
         view.bringSubviewToFront(tabStrip)   // the pages now run under it
         // The fade attached while the pages installed, before the strip moved
         // up: keep it between the pages and the strip.
