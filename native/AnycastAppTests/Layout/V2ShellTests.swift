@@ -176,6 +176,29 @@ struct V2ShellTests {
         #expect(labels.first?.accessibilityIdentifier == "mini-player-title")
     }
 
+    @Test("Mini player has no progress line in any hosting style and keeps its content centred")
+    func miniPlayerHasNoProgressLine() async {
+        guard let context = await Self.liveUIContext() else {
+            print("[v2shell] shell not ready; skipping mini player progress test"); return
+        }
+        for style in [PlayerBarView.HostingStyle.systemAccessory, .capsule] {
+            let bar = context.makePlayerBar(style: style)
+            bar.frame = CGRect(x: 0, y: 0, width: 408, height: PlayerBarView.barHeight)
+            bar.layoutIfNeeded()
+            #expect(!bar.containsView(ofType: EpisodeProgressBackdrop.self), "\(style): progress line present")
+
+            guard let capsule = bar.subviews.first else {
+                Issue.record("\(style): capsule container missing"); continue
+            }
+            for content in capsule.subviews {
+                #expect(
+                    abs(content.center.y - capsule.bounds.midY) < 0.5,
+                    "\(style): \(type(of: content)) is not vertically centred"
+                )
+            }
+        }
+    }
+
     // MARK: - Welcome / SignUp smoke (V2 scope: UI lands, auth stays TODO)
 
     @Test("Welcome and SignUp expose their entry identifiers")
@@ -211,6 +234,10 @@ struct V2ShellTests {
 }
 
 private extension UIView {
+    func containsView<T: UIView>(ofType type: T.Type) -> Bool {
+        self is T || subviews.contains { $0.containsView(ofType: type) }
+    }
+
     func recursiveAccessibilityIdentifiers() -> [String] {
         var found = accessibilityIdentifier.map { [$0] } ?? []
         for subview in subviews {

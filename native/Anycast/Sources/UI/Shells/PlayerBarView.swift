@@ -11,9 +11,8 @@ import AnycastKit
 /// side margins). With `.capsule` the view paints the sand capsule surface
 /// itself; in `.systemAccessory` the system glass capsule IS the surface —
 /// this view draws no background of its own (one chrome, not two nested
-/// layers), keeping only a clip shape for the progress fill. Under both
-/// styles a thin progress line (width driven by position/duration against
-/// OWN bounds — never screen math) runs along the inner bottom edge.
+/// layers), keeping only a clip shape for the content. The bar carries no
+/// progress line: position lives on the full-screen player.
 ///
 /// Gestures (03 §3.1): whole-bar tap opens the full-screen player; ANY
 /// vertical drag — up or down, no threshold, the shipped quirk — also opens
@@ -25,8 +24,6 @@ final class PlayerBarView: UIView {
     /// source for the view itself and for hosts that must avoid the
     /// floating fallback's frame (MainTabBarController.FallbackMetrics).
     static let barHeight: CGFloat = 58
-    /// The capsule's progress line.
-    static let capsuleProgressHeight: CGFloat = 3
 
     /// How the host surfaces the bar. ONE component, ONE silhouette: every
     /// style is a full capsule (radius == half the 58 pt height) — the bar
@@ -51,16 +48,15 @@ final class PlayerBarView: UIView {
     private let observation = ObservationLoop()
 
     private let capsule = UIView()
-    private let backdrop = EpisodeProgressBackdrop()
     private let coverView = UIImageView()
     private let titleLabel = UILabel()
     private let playPauseControl = PlayPauseIconControl(size: 32)
     private let forwardButton = UIButton(type: .custom)
     private var openedByPan = false
-    /// Last URL handed to the cover view. `positionData` is in the
-    /// observation read, so render() runs every 0.5 s tick — an
-    /// unconditional cancel+setImage would restart an in-flight cover
-    /// download on every tick (slow networks never finish loading it).
+    /// Last URL handed to the cover view. render() can re-run on any
+    /// observed change — an unconditional cancel+setImage would restart an
+    /// in-flight cover download each time (slow networks never finish
+    /// loading it).
     private var renderedCoverURL: URL?
 
     init(playback: PlaybackService, style: HostingStyle) {
@@ -93,33 +89,16 @@ final class PlayerBarView: UIView {
             capsule.layer.shadowRadius = 10
         }
         // Half the bar height in BOTH styles — one capsule silhouette
-        // everywhere (the clip shape for the progress fill; in the
-        // self-painting style also the visible surface's contour).
+        // everywhere (the content clip; in the self-painting style also the
+        // visible surface's contour).
         capsule.layer.cornerRadius = Self.barHeight / 2
         capsule.layer.cornerCurve = .continuous
-        // The progress fill is a square-cornered layer spanning the full
-        // capsule bounds; without clipping its leading edge pokes past the
-        // rounded caps as a vertical line instead of following the head's
-        // contour (and at high fractions it would poke past the tail too).
         capsule.clipsToBounds = true
         capsule.translatesAutoresizingMaskIntoConstraints = false
         addSubview(capsule)
 
         // Capsule and accessory share the compact content (UI kit mini
-        // player): a thin gold progress line on a sand track along the
-        // inner bottom edge, a round cover, one title line, small glyphs.
-        if style == .systemAccessory {
-            backdrop.trackColor = AnycastColor.sandAlpha3
-            backdrop.fillColor = Theme.primary
-        } else {
-            backdrop.trackColor = AnycastColor.sandAlpha3.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-            backdrop.fillColor = Theme.primary.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-        }
-        backdrop.layer.cornerRadius = Self.capsuleProgressHeight / 2
-        backdrop.clipsToBounds = true
-        backdrop.translatesAutoresizingMaskIntoConstraints = false
-        capsule.addSubview(backdrop)
-
+        // player): a round cover, one title line, small glyphs.
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
         // v2 capsule: circular 36 pt cover (Figma 83:2562).
@@ -214,15 +193,6 @@ final class PlayerBarView: UIView {
             titleLabel.centerYAnchor.constraint(equalTo: capsule.centerYAnchor),
         ])
 
-        // Inset by the cap radius so the line stays inside the rounded ends.
-        let inset = Self.barHeight / 2
-        NSLayoutConstraint.activate([
-            backdrop.leadingAnchor.constraint(equalTo: capsule.leadingAnchor, constant: inset),
-            backdrop.trailingAnchor.constraint(equalTo: capsule.trailingAnchor, constant: -inset),
-            backdrop.bottomAnchor.constraint(equalTo: capsule.bottomAnchor, constant: -Spacing.xs),
-            backdrop.heightAnchor.constraint(equalToConstant: Self.capsuleProgressHeight),
-        ])
-
         let tap = UITapGestureRecognizer(target: self, action: #selector(openTapped))
         tap.delegate = self
         capsule.addGestureRecognizer(tap)
@@ -257,7 +227,6 @@ final class PlayerBarView: UIView {
             read: { [weak self] in
                 guard let self else { return }
                 _ = self.playback.currentEpisode
-                _ = self.playback.positionData
                 _ = self.playback.isPlaying
                 _ = self.playback.isLoading
             },
@@ -267,13 +236,8 @@ final class PlayerBarView: UIView {
 
     private func render() {
         let episode = playback.currentEpisode
-        let position = playback.positionData
 
         titleLabel.text = episode?.title ?? ""
-        let fraction = position.durationMilliseconds > 0
-            ? Double(position.positionMilliseconds) / Double(position.durationMilliseconds)
-            : 0
-        backdrop.setFraction(fraction)
 
         let coverURL = episode?.imageUrl.flatMap(URL.init(string:))
         if coverURL != renderedCoverURL {

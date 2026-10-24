@@ -1,9 +1,9 @@
 import UIKit
 
-/// The position-driven progress-bar backdrop used by playlist cards and the
-/// mini player (03 §2.11 / §2.9): a backdrop whose FILLED width equals
+/// The position-driven progress-bar backdrop used by playlist cards
+/// (03 §2.11): a backdrop whose FILLED width equals
 /// `fraction × own bounds`. The caller sizes the view (the card's 36 × 4
-/// inline meter, or the mini player's full-height backdrop) — this
+/// inline meter) — this
 /// view fills whatever bounds it gets, driven purely by fraction, never by
 /// screen width (iOS 27 resizable-window rule, 07 §4), and updated through
 /// layers so per-tick updates never trigger a layout pass (08 §11.2).
