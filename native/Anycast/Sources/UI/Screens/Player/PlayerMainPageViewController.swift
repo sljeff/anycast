@@ -40,9 +40,14 @@ final class PlayerMainPageViewController: UIViewController {
     private var bottomStack = UIStackView()
 
     private enum Layout {
-        /// UI kit player artwork: 320 pt, inset 36 from the screen edges.
-        static let artworkMaxSide: CGFloat = 320
-        static let artworkInset = Spacing.pageSection
+        /// The page's one content column: the artwork, title row, scrubber
+        /// and transport all share these side insets.
+        static let columnInset = Spacing.pageHeader
+        /// Frame-to-ink slack at the share button's trailing side (the
+        /// 20 pt `square.and.arrow.up` is ~22.5 pt of ink centered in the
+        /// 44 pt hit target, measured), hung outside the column so the
+        /// glyph's ink, not the frame, meets the column's trailing edge.
+        static let shareInkInset: CGFloat = 10.75
         /// The transport's touch slots (UI kit `playerControls` container).
         static let transportSlot: CGFloat = 72
         /// Gap between the play slot and the skip slots (glyph centers
@@ -143,6 +148,7 @@ final class PlayerMainPageViewController: UIViewController {
         )
         retryRow.addArrangedSubview(retryButton)
 
+        progressBar.setContentCompressionResistancePriority(UILayoutPriority(800), for: .vertical)
         let controls = buildControls()
         bottomStack = UIStackView(arrangedSubviews: [stateMessageLabel, progressBar, controls, retryRow])
         bottomStack.axis = .vertical
@@ -160,37 +166,40 @@ final class PlayerMainPageViewController: UIViewController {
         let topBalance = UILayoutGuide()
         view.addLayoutGuide(topBalance)
 
-        // Square artwork at the inset width, capped at 320 pt; on short
-        // windows it yields to a share of the page height so the column
-        // never overflows (07 §4 hard requirement).
-        let coverWidth = coverFrame.widthAnchor.constraint(
-            equalTo: view.widthAnchor, constant: -Layout.artworkInset * 2
-        )
-        coverWidth.priority = .defaultHigh
+        // Square artwork at the column width, centered; on short windows
+        // (or under large Dynamic Type) the required top gap squeezes it
+        // smaller (07 §4 hard requirement: nothing is pushed off-screen).
+        let column = UILayoutGuide()
+        view.addLayoutGuide(column)
+        // Below the scrubber's compression resistance: when space runs out
+        // the artwork gives way first, not the title or the controls.
+        let coverWidth = coverFrame.widthAnchor.constraint(equalTo: column.widthAnchor)
+        coverWidth.priority = UILayoutPriority(700)
 
         NSLayoutConstraint.activate([
+            column.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.columnInset),
+            column.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.columnInset),
+
             topBalance.topAnchor.constraint(equalTo: view.topAnchor),
             topBalance.bottomAnchor.constraint(equalTo: coverFrame.topAnchor),
             topBalance.heightAnchor.constraint(greaterThanOrEqualToConstant: Spacing.pageHeader),
 
             coverFrame.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             coverWidth,
-            coverFrame.widthAnchor.constraint(lessThanOrEqualToConstant: Layout.artworkMaxSide),
-            coverFrame.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -Layout.artworkInset * 2),
+            coverFrame.widthAnchor.constraint(lessThanOrEqualTo: column.widthAnchor),
             coverFrame.heightAnchor.constraint(equalTo: coverFrame.widthAnchor),
-            coverFrame.heightAnchor.constraint(lessThanOrEqualTo: view.heightAnchor, multiplier: 0.45),
             coverView.topAnchor.constraint(equalTo: coverFrame.topAnchor),
             coverView.bottomAnchor.constraint(equalTo: coverFrame.bottomAnchor),
             coverView.leadingAnchor.constraint(equalTo: coverFrame.leadingAnchor),
             coverView.trailingAnchor.constraint(equalTo: coverFrame.trailingAnchor),
 
             titleRow.topAnchor.constraint(equalTo: coverFrame.bottomAnchor, constant: Spacing.pageHeader),
-            titleRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            titleRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            titleRow.leadingAnchor.constraint(equalTo: column.leadingAnchor),
+            titleRow.trailingAnchor.constraint(equalTo: column.trailingAnchor, constant: Layout.shareInkInset),
 
             bottomStack.topAnchor.constraint(equalTo: titleRow.bottomAnchor, constant: Layout.titleToScrubber),
-            bottomStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            bottomStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            bottomStack.leadingAnchor.constraint(equalTo: column.leadingAnchor),
+            bottomStack.trailingAnchor.constraint(equalTo: column.trailingAnchor),
             bottomStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.transportToSelector),
 
             shareSpinner.centerXAnchor.constraint(equalTo: shareButton.centerXAnchor),

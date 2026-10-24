@@ -37,7 +37,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Player page distribution (1) + thumb height (2)
 
-    @Test("Player main page: square capped cover, 28 pt rhythm, centered play")
+    @Test("Player main page: square column-width cover, 28 pt rhythm, centered play")
     func playerPageDistribution() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -84,9 +84,9 @@ struct UIFixRegressionTests {
         let bottomFrame = frameInPage(bottomStack)
         let playFrame = frameInPage(playPause)
 
-        // Square, capped at the UI kit's 320 pt and horizontally centered.
+        // Square, at most the 24 pt content column's width, horizontally centered.
         #expect(abs(coverFrame.width - coverFrame.height) < 1.5, "cover is not square: \(coverFrame)")
-        #expect(coverFrame.width <= 320.5, "cover exceeds its 320 pt cap: \(coverFrame.width)")
+        #expect(coverFrame.width <= page.bounds.width - 48 + 0.5, "cover exceeds the column: \(coverFrame.width)")
         #expect(abs(coverFrame.midX - page.bounds.midX) < 1, "cover is off center")
 
         // One 28 pt VISIBLE rhythm (subtitle → track, labels → transport,

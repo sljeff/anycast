@@ -3,9 +3,9 @@ import AnycastKit
 
 /// Player page 0 (PlayerSettings, player.dart:118-144 + the Settings widget
 /// 1148-1372, 03 §2.10): the episode's HTML description (empty payload
-/// collapses it) and the settings card scroll together as one column, the
-/// card following the notes directly, in the Anycast 2.0 audio-settings
-/// form — playback speed and sleep
+/// leaves the area empty) scrolls on its own above the settings card, which
+/// stays pinned just over the page selector, in the Anycast 2.0
+/// audio-settings form — playback speed and sleep
 /// timer rows with − / + steppers over the same stops the Dart sliders had
 /// (SPEED 0.5–2.0 ×0.25, COUNTDOWN 0–60 ×10), and the CONTINUOUS PLAY
 /// switch, its explanation shown as the row subtitle. SKIP SILENCE is
@@ -18,20 +18,27 @@ final class SettingsPageViewController: UIViewController {
     private let descriptionTextView = HTMLContentRenderer.makeTextView(
         linkTarget: HTMLContentRenderer.playerShared
     )
-    private let notesContainer = UIView()
-    private let scrollView = UIScrollView()
+    /// Hosts the notes scroll view: a scroll view's own layer mask scrolls
+    /// with its content, so the edge fade lives on this fixed parent.
+    private let notesHost = UIView()
+    private let notesScrollView = UIScrollView()
+    private let notesFadeMask = CAGradientLayer()
     private var renderedCacheKey: String?
 
     private static let speedStops = PlayerSliderMath.stops(min: 0.5, max: 2.0, divisions: 6)
     private static let countdownStops = SleepTimerController.sliderMinutes
 
     private enum Layout {
-        /// Clears the sheet's system grabber.
+        /// Clears the sheet's system grabber; the notes start this far down
+        /// and fade out over the same band as they scroll up.
         static let contentTop: CGFloat = 36
-        /// Notes → card gap.
-        static let sectionGap: CGFloat = 24
-        /// Last element → page selector when scrolled to the end.
-        static let contentBottom: CGFloat = 28
+        /// The notes' bottom fade: the last line rests above it at the end.
+        static let notesBottomFade: CGFloat = 32
+        /// Notes area → card gap (the fade provides the visual breathing room).
+        static let notesToCard: CGFloat = 8
+        /// Card → page selector; the settings card is the same kind of
+        /// object as the lyrics page's floating panel, which sits 20 pt up.
+        static let cardBottom: CGFloat = 20
         /// Equal vertical padding of every card row.
         static let rowPadding: CGFloat = 14
         /// The card's inner text insets; the notes text aligns to them.
@@ -107,41 +114,76 @@ final class SettingsPageViewController: UIViewController {
         descriptionTextView.isAccessibilityElement = true
         descriptionTextView.accessibilityLabel = "Episode description"
 
-        // The notes' text edges line up with the text inside the card.
+        // The notes' text edges line up with the text inside the card: the
+        // text view sits inside the page's 24 pt column, then the card's
+        // inner insets.
+        let textLeading = Spacing.pageHeader + Layout.cardLeading
+        let textTrailing = Spacing.pageHeader + Layout.cardTrailing
         descriptionTextView.translatesAutoresizingMaskIntoConstraints = false
-        notesContainer.addSubview(descriptionTextView)
-        NSLayoutConstraint.activate([
-            descriptionTextView.topAnchor.constraint(equalTo: notesContainer.topAnchor),
-            descriptionTextView.bottomAnchor.constraint(equalTo: notesContainer.bottomAnchor),
-            descriptionTextView.leadingAnchor.constraint(equalTo: notesContainer.leadingAnchor, constant: Layout.cardLeading),
-            descriptionTextView.trailingAnchor.constraint(equalTo: notesContainer.trailingAnchor, constant: -Layout.cardTrailing),
-        ])
+        notesScrollView.contentInsetAdjustmentBehavior = .never
+        notesScrollView.alwaysBounceVertical = false
+        notesScrollView.showsVerticalScrollIndicator = false
+        notesScrollView.translatesAutoresizingMaskIntoConstraints = false
+        notesScrollView.addSubview(descriptionTextView)
 
-        let contentStack = UIStackView(arrangedSubviews: [notesContainer, buildSettingsCard()])
-        contentStack.axis = .vertical
-        contentStack.spacing = Layout.sectionGap
-        contentStack.isLayoutMarginsRelativeArrangement = true
-        contentStack.directionalLayoutMargins = NSDirectionalEdgeInsets(
-            top: Layout.contentTop, leading: Spacing.pageHeader,
-            bottom: Layout.contentBottom, trailing: Spacing.pageHeader
-        )
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.contentInsetAdjustmentBehavior = .never
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(contentStack)
-        view.addSubview(scrollView)
-        NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        notesFadeMask.colors = [UIColor.clear, .white, .white, .clear].map(\.cgColor)
+        notesFadeMask.startPoint = CGPoint(x: 0.5, y: 0)
+        notesFadeMask.endPoint = CGPoint(x: 0.5, y: 1)
+        notesHost.layer.mask = notesFadeMask
+        notesHost.translatesAutoresizingMaskIntoConstraints = false
+        notesHost.addSubview(notesScrollView)
 
-            contentStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            contentStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            contentStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            contentStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+        notesScrollView.accessibilityIdentifier = "player-settings-notes"
+        let card = buildSettingsCard()
+        card.accessibilityIdentifier = "player-settings-card"
+        card.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(notesHost)
+        view.addSubview(card)
+        NSLayoutConstraint.activate([
+            card.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
+            card.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            card.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.cardBottom),
+
+            notesHost.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            notesHost.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            notesHost.topAnchor.constraint(equalTo: view.topAnchor),
+            notesHost.bottomAnchor.constraint(equalTo: card.topAnchor, constant: -Layout.notesToCard),
+
+            notesScrollView.leadingAnchor.constraint(equalTo: notesHost.leadingAnchor),
+            notesScrollView.trailingAnchor.constraint(equalTo: notesHost.trailingAnchor),
+            notesScrollView.topAnchor.constraint(equalTo: notesHost.topAnchor),
+            notesScrollView.bottomAnchor.constraint(equalTo: notesHost.bottomAnchor),
+
+            // The padding rides inside the content so offset 0 is "at rest".
+            descriptionTextView.topAnchor.constraint(
+                equalTo: notesScrollView.contentLayoutGuide.topAnchor, constant: Layout.contentTop
+            ),
+            descriptionTextView.bottomAnchor.constraint(
+                equalTo: notesScrollView.contentLayoutGuide.bottomAnchor, constant: -Layout.notesBottomFade
+            ),
+            descriptionTextView.leadingAnchor.constraint(
+                equalTo: notesScrollView.contentLayoutGuide.leadingAnchor, constant: textLeading
+            ),
+            descriptionTextView.trailingAnchor.constraint(
+                equalTo: notesScrollView.contentLayoutGuide.trailingAnchor, constant: -textTrailing
+            ),
+            descriptionTextView.widthAnchor.constraint(
+                equalTo: notesScrollView.frameLayoutGuide.widthAnchor, constant: -(textLeading + textTrailing)
+            ),
         ])
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Top ramp = the grabber band the notes start below (so a note at
+        // rest is never dimmed); bottom ramp = the clearance the last line
+        // rests above.
+        let height = notesHost.bounds.height
+        notesFadeMask.frame = notesHost.bounds
+        guard height > 0 else { return }
+        let top = min(Layout.contentTop / height, 0.5)
+        let bottom = max(1 - Layout.notesBottomFade / height, top)
+        notesFadeMask.locations = [0, NSNumber(value: top), NSNumber(value: bottom), 1]
     }
 
     /// UI kit audio-settings rows on a tinted card, hairline-divided.
@@ -283,7 +325,7 @@ final class SettingsPageViewController: UIViewController {
     // MARK: - Rendering
 
     /// renderHtml semantics (formatters.dart:152-180): empty payload → the
-    /// scroll area collapses; plain strings render as text; HTML routes
+    /// notes area stays empty; plain strings render as text; HTML routes
     /// through the shared renderer with the enclosure-URL cache key.
     private func renderDescription() {
         let episode = context.playback.currentEpisode
@@ -291,13 +333,14 @@ final class SettingsPageViewController: UIViewController {
         let cacheKey = episode?.enclosureUrl ?? "player-settings-none"
         guard cacheKey != renderedCacheKey else { return }
         renderedCacheKey = cacheKey
+        notesScrollView.contentOffset = .zero
 
         if case .empty = HtmlText.displayPayload(for: html) {
             descriptionTextView.attributedText = nil
-            notesContainer.isHidden = true
+            notesHost.isHidden = true
             return
         }
-        notesContainer.isHidden = false
+        notesHost.isHidden = false
         let textView = descriptionTextView
         let key = cacheKey
         Task {
