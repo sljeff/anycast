@@ -373,23 +373,17 @@ class SettingsRowCell: UICollectionViewListCell {
     }
 }
 
-/// Switch row cell: the label and caption left, a sand-tinted UISwitch
+/// Switch row cell: the label and caption left, a sand-tinted AnycastSwitch
 /// right. A tap anywhere on the row toggles the switch (`toggle()`), the
 /// same path VoiceOver activation takes.
 final class SettingsSwitchListCell: SettingsRowCell {
 
     var onSwitchChanged: ((Bool) -> Void)?
 
-    private let switchView = UISwitch()
+    private let switchView = AnycastSwitch()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        switchView.onTintColor = UIColor { traits in
-            traits.userInterfaceStyle == .dark ? AnycastColor.sandDark9 : AnycastColor.sand12
-        }
-        switchView.thumbTintColor = UIColor { traits in
-            traits.userInterfaceStyle == .dark ? AnycastColor.sandDark1 : AnycastColor.sand1
-        }
         switchView.setContentHuggingPriority(.required, for: .horizontal)
         switchView.setContentCompressionResistancePriority(.required, for: .horizontal)
         switchView.addTarget(self, action: #selector(switchToggled), for: .valueChanged)

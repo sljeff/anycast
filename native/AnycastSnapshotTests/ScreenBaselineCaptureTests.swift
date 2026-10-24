@@ -189,6 +189,36 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
+    @Test("S16c Settings with the translation switch flipped on (visual only)")
+    func captureSettingsSwitchOn() async throws {
+        try await Self.withRoot { root in
+            guard let context = await Self.liveContext() else {
+                Self.missingBaselineInput("live UIContext")
+                return
+            }
+            AppSheets.presentExpand(SettingsViewController(context: context), from: root)
+            try await Self.settle(1.5)
+            func switchCell(in view: UIView) -> SettingsSwitchListCell? {
+                if let cell = view as? SettingsSwitchListCell { return cell }
+                for subview in view.subviews {
+                    if let match = switchCell(in: subview) { return match }
+                }
+                return nil
+            }
+            guard let window = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow),
+                let cell = switchCell(in: window)
+            else {
+                Self.missingBaselineInput("the translation switch row (S16c)")
+                return
+            }
+            // `setOn` does not fire onSwitchChanged: the stored setting stays untouched.
+            cell.setOn(true, animated: false)
+            try await Self.settle(0.5)
+            try await Self.capture("S16c-settings-switch-on")
+        }
+    }
+
     @Test("S16b Country picker sheet over Settings")
     func captureCountryPicker() async throws {
         try await Self.withRoot { root in

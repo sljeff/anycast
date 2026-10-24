@@ -51,7 +51,7 @@ final class SettingsPageViewController: UIViewController {
         onMinus: { [weak self] in self?.stepCountdown(by: -1) },
         onPlus: { [weak self] in self?.stepCountdown(by: 1) }
     )
-    private let continuousSwitch = UISwitch()
+    private let continuousSwitch = AnycastSwitch()
     private var countdownTicker: Timer?
 
     init(context: UIContext) {
@@ -153,7 +153,6 @@ final class SettingsPageViewController: UIViewController {
             label.setContentHuggingPriority(.required, for: .horizontal)
         }
 
-        continuousSwitch.onTintColor = Theme.primary
         continuousSwitch.accessibilityLabel = "Continuous play"
 
         let rows = UIStackView(arrangedSubviews: [
