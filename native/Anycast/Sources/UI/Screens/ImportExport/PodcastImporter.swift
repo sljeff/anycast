@@ -131,9 +131,9 @@ final class PodcastImporter {
             return
         }
         if !fetched.isEmpty {
-            // The resident Subscriptions page reloads (Obx equivalent).
+            // The shows shelf reloads (Obx equivalent).
             NotificationCenter.default.post(
-                name: SubscriptionsPageViewController.subscriptionsDidChange,
+                name: ShowsShelfLayout.subscriptionsDidChange,
                 object: nil
             )
         }

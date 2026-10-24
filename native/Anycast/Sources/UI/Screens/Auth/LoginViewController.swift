@@ -180,9 +180,19 @@ final class LoginViewController: UIViewController {
         headline.numberOfLines = 0
         headline.adjustsFontForContentSizeCategory = true
 
+        let subheadline = UILabel()
+        subheadline.text = LoginPageModel.signUpSubheadline
+        subheadline.font = TypographyV2.meta.font()
+        subheadline.textColor = Theme.onSurfaceVariant
+        subheadline.textAlignment = .center
+        subheadline.numberOfLines = 0
+        subheadline.adjustsFontForContentSizeCategory = true
+
         loggedOutStack.addArrangedSubview(logo)
         loggedOutStack.addSpacer(50)
         loggedOutStack.addArrangedSubview(headline)
+        loggedOutStack.addSpacer(4)
+        loggedOutStack.addArrangedSubview(subheadline)
         loggedOutStack.addSpacer(50)
 
         let apple = Self.authButton(

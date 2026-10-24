@@ -16,7 +16,14 @@ final class ChatViewController: UIViewController {
     private enum Metrics {
         static let headerHeight: CGFloat = 64          // AnycastSpacing.sheetTitleH
         static let roundButtonSide: CGFloat = 40
-        static let titleHorizontalPadding: CGFloat = 16 // AnycastSpacing.pageH
+        static let titleHorizontalPadding: CGFloat = 16 // gap between header controls
+        /// Sheet content inset shared by the header, the list and the composer.
+        static let contentInset: CGFloat = 28
+        /// Transparent padding around the trash glyph inside its 40 pt box,
+        /// pulled out so the glyph (not the box) meets the 28 pt inset.
+        static let trashGlyphPadding: CGFloat = 12
+        /// Composer gap above the keyboard while it is up.
+        static let keyboardGap: CGFloat = 8
         static let chatSurface = Theme.background
         static let headerBackground = Theme.surface
         static let headerText = Theme.onSurface
@@ -72,6 +79,10 @@ final class ChatViewController: UIViewController {
         let url = (explicitEnclosureURL ?? episode?.enclosureUrl ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         resolvedEnclosureURL = url.isEmpty ? nil : url
+
+        // Exit is the X; with a single large detent a grabber would be a
+        // second, redundant dismiss affordance.
+        sheetPresentationController?.prefersGrabberVisible = false
 
         buildHeader()
         buildInputBar()
@@ -144,7 +155,7 @@ final class ChatViewController: UIViewController {
             headerBar.heightAnchor.constraint(equalToConstant: Metrics.headerHeight),
 
             closeButton.leadingAnchor.constraint(
-                equalTo: headerBar.leadingAnchor, constant: Metrics.titleHorizontalPadding
+                equalTo: headerBar.leadingAnchor, constant: Metrics.contentInset
             ),
             closeButton.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
             closeButton.widthAnchor.constraint(equalToConstant: Metrics.roundButtonSide),
@@ -162,7 +173,8 @@ final class ChatViewController: UIViewController {
             titleLabel.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
 
             trashButton.trailingAnchor.constraint(
-                equalTo: headerBar.trailingAnchor, constant: -Metrics.titleHorizontalPadding
+                equalTo: headerBar.trailingAnchor,
+                constant: -(Metrics.contentInset - Metrics.trashGlyphPadding)
             ),
             trashButton.centerYAnchor.constraint(equalTo: headerBar.centerYAnchor),
             trashButton.widthAnchor.constraint(equalToConstant: Metrics.roundButtonSide),
@@ -172,7 +184,9 @@ final class ChatViewController: UIViewController {
 
     private func buildList() {
         chatLayout.settings.interItemSpacing = 8
-        chatLayout.settings.additionalInsets = UIEdgeInsets(top: 8, left: 4, bottom: 8, right: 4)
+        chatLayout.settings.additionalInsets = UIEdgeInsets(
+            top: 8, left: Metrics.contentInset, bottom: 8, right: Metrics.contentInset
+        )
         chatLayout.keepContentOffsetAtBottomOnBatchUpdates = true
         chatLayout.keepContentAtBottomOfVisibleArea = true
 
@@ -205,11 +219,25 @@ final class ChatViewController: UIViewController {
         view.addSubview(inputBar)
         // Keyboard avoidance: the bar rides the keyboard layout guide; the
         // list sits above the bar (07 §2.6 — ChatLayout needs no extra
-        // plumbing of its own here).
+        // plumbing of its own here). With the keyboard down the bar keeps
+        // the 28 pt content inset from the sheet bottom (the home indicator's
+        // safe area wins when larger, as in Detail); with the keyboard up it
+        // sits a small gap above it. The guide ignores the bottom safe area
+        // so its top is the sheet bottom while the keyboard is hidden.
+        view.keyboardLayoutGuide.usesBottomSafeArea = false
+        let ridesKeyboard = inputBar.bottomAnchor.constraint(
+            equalTo: view.keyboardLayoutGuide.topAnchor, constant: -Metrics.keyboardGap
+        )
+        ridesKeyboard.priority = .defaultHigh
         NSLayoutConstraint.activate([
             inputBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             inputBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            inputBar.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor),
+            inputBar.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -Metrics.contentInset),
+            inputBar.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
+            inputBar.bottomAnchor.constraint(
+                lessThanOrEqualTo: view.keyboardLayoutGuide.topAnchor, constant: -Metrics.keyboardGap
+            ),
+            ridesKeyboard,
         ])
         inputBar.onSend = { [weak self] text in
             self?.handleSend(text)

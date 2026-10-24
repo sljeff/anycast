@@ -121,14 +121,15 @@ extension UICollectionView {
     /// UIKit folds it into `adjustedContentInset` — so empty and error
     /// states hosted there would sit under the header or the floating
     /// mini player. Call from `viewDidLayoutSubviews` to feed the inset in
-    /// as layout margins.
+    /// as layout margins. `additionalTop` pushes the state below chrome that
+    /// scrolls with the list (the height of the rows above it).
     @MainActor
-    func alignBackgroundViewMargins() {
+    func alignBackgroundViewMargins(additionalTop: CGFloat = 0) {
         guard let backgroundView else { return }
         backgroundView.insetsLayoutMarginsFromSafeArea = false
         let inset = adjustedContentInset
         let margins = NSDirectionalEdgeInsets(
-            top: inset.top + Spacing.pageH,
+            top: inset.top + additionalTop + Spacing.pageH,
             leading: Spacing.pageH,
             bottom: inset.bottom + Spacing.pageH,
             trailing: Spacing.pageH

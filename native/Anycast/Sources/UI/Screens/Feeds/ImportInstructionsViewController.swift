@@ -65,6 +65,9 @@ enum ImportInstructionsContent {
 /// exclusivity).
 final class ImportInstructionsViewController: UIViewController {
 
+    /// Sheet content inset: the title, the rows and the chevrons share it.
+    private static let contentInset: CGFloat = 28
+
     private enum SectionKind {
         static let header = "ImportInstructionsHeader"
         static let steps = "ImportInstructionsSteps"
@@ -91,7 +94,6 @@ final class ImportInstructionsViewController: UIViewController {
         }
         sheet?.detents = [fractionDetent(0.7), fractionDetent(0.6)]
         sheet?.prefersGrabberVisible = true
-        sheet?.preferredCornerRadius = 20
         presenter.present(controller, animated: true)
     }
 
@@ -108,7 +110,7 @@ final class ImportInstructionsViewController: UIViewController {
             )
             let section = NSCollectionLayoutSection(group: group)
             section.contentInsets = NSDirectionalEdgeInsets(
-                top: 0, leading: 24, bottom: 16, trailing: 24
+                top: 0, leading: Self.contentInset, bottom: 16, trailing: Self.contentInset
             )
             _ = environment
             return section
@@ -151,9 +153,9 @@ final class ImportInstructionsViewController: UIViewController {
         view.addSubview(titleLabel)
 
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Self.contentInset),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.contentInset),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -Self.contentInset),
 
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -230,7 +232,7 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        titleLabel.font = TypographyV2.emphasis.font()
+        titleLabel.font = TypographyV2.body.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -246,11 +248,11 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
         accessibilityTraits = [.button]
 
         NSLayoutConstraint.activate([
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             titleLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: chevron.leadingAnchor, constant: -8),
 
-            chevron.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            chevron.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             chevron.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             chevron.widthAnchor.constraint(equalToConstant: 16),
             chevron.heightAnchor.constraint(equalToConstant: 16),
@@ -284,7 +286,7 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
 }
 
 /// The numbered steps block under an open section (ExpansionTile children):
-/// left-indented small secondary text.
+/// secondary text on the rows' leading edge.
 final class ImportSectionStepsCell: UICollectionViewCell {
 
     private let stepsLabel = UILabel()
@@ -298,8 +300,8 @@ final class ImportSectionStepsCell: UICollectionViewCell {
         stepsLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stepsLabel)
         NSLayoutConstraint.activate([
-            stepsLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
-            stepsLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -8),
+            stepsLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            stepsLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor),
             stepsLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
             stepsLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
         ])

@@ -11,7 +11,9 @@ import UIKit
 /// - `lineGap` 12, content padding top 100 / sides 20 / bottom 20,
 ///   anchor 0.5 (active line vertically centered);
 /// - scroll animation 240 ms easeOutCubic, 500 ms ≥500 pt, 1 s ≥1000 pt;
-/// - top/bottom 80 pt fade (LyricStyles.default1 `fadeRange`);
+/// - top/bottom 80 pt fade (LyricStyles.default1 `fadeRange`); the bottom
+///   fade ends above `bottomClearance`, the floating overlay's footprint,
+///   so no line is drawn under the overlay buttons;
 /// - drag → manual scroll + centered time bar (widget #2); no auto re-follow
 ///   until the 3 s active-line resume fires (`neverResume`,
 ///   LyricsFollowStateMachine);
@@ -46,6 +48,22 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     static let selectionAnchorFraction: CGFloat = 0.5
     static let activeAnchorFraction: CGFloat = 0.48
 
+    /// Height at the bottom the floating overlay (AI / ••• buttons) covers.
+    /// Lines fade out completely above it, and the content scrolls far
+    /// enough that the last line can rest above the fade.
+    var bottomClearance: CGFloat = 0 {
+        didSet {
+            guard bottomClearance != oldValue else { return }
+            collectionView.contentInset.bottom = bottomClearance > 0
+                ? max(0, bottomClearance + Self.fadeRange - Self.bottomPadding)
+                : 0
+            setNeedsLayout()
+            if follow.mode == .following, !lines.isEmpty {
+                scrollToActiveLine(animated: false)
+            }
+        }
+    }
+
     private let layout = LyricsLinearLayout()
     private let collectionView: UICollectionView
     private var cellRegistration: UICollectionView.CellRegistration<LyricLineCell, Int>?
@@ -78,8 +96,8 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
             collectionView.topAnchor.constraint(equalTo: topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            timeBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            timeBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            timeBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalPadding),
+            timeBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalPadding),
             // The bar is pinned to the selection anchor — a FIXED position at
             // 0.5 × viewport height (lyric_selected_progress.dart renders it
             // `Positioned(top: state.centerY)` + `FractionalTranslation(0,-0.5)`
@@ -295,7 +313,11 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     }
 
     private var maxOffset: CGFloat {
-        max(0, layout.collectionViewContentSize.height - collectionView.bounds.height)
+        max(
+            0,
+            layout.collectionViewContentSize.height + collectionView.contentInset.bottom
+                - collectionView.bounds.height
+        )
     }
 
     // MARK: - Traits / cells
@@ -320,8 +342,9 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
             UIColor.white.cgColor,
             UIColor.white.cgColor,
             UIColor.clear.cgColor,
+            UIColor.clear.cgColor,
         ]
-        mask.locations = [0, 0.15, 0.85, 1]
+        mask.locations = [0, 0.15, 0.85, 1, 1]
         mask.startPoint = CGPoint(x: 0.5, y: 0)
         mask.endPoint = CGPoint(x: 0.5, y: 1)
         collectionView.layer.mask = mask
@@ -335,10 +358,17 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     override func layoutSubviews() {
         super.layoutSubviews()
         // Absolute fade range (default1 fadeRange 80/80), not proportional.
-        if let fadeMask {
-            let topRatio = bounds.height > 0 ? min(Self.fadeRange / bounds.height, 0.5) : 0
+        // The bottom ramp ends `bottomClearance` above the edge; everything
+        // below that is fully clear.
+        if let fadeMask, bounds.height > 0 {
+            let height = bounds.height
+            let topRatio = min(Self.fadeRange / height, 0.5)
+            let clearStart = max(1 - bottomClearance / height, topRatio)
+            let rampStart = max(clearStart - Self.fadeRange / height, topRatio)
             fadeMask.frame = bounds
-            fadeMask.locations = [0, NSNumber(value: topRatio), NSNumber(value: 1 - topRatio), 1]
+            fadeMask.locations = [
+                0, NSNumber(value: topRatio), NSNumber(value: rampStart), NSNumber(value: clearStart), 1,
+            ]
         }
     }
 
@@ -568,9 +598,11 @@ final class LyricsLinearLayout: UICollectionViewLayout {
 
 // MARK: - Time bar (widget #2)
 
-/// The drag-selection bar (player.dart:1061-1130): [mm:ss comfortaa 20 pt
-/// white with shadow] — [2 pt white line with shadow] — [36×36 translucent
-/// circle with a play glyph; tap stops selection and seeks].
+/// The drag-selection bar (player.dart:1061-1130): [2 pt white line with
+/// shadow] — [mm:ss meta white with shadow] — [36×36 translucent circle with
+/// a play glyph; tap stops selection and seeks]. The time sits on the
+/// trailing side: every lyric line starts at the leading padding, so a
+/// leading label would sit on top of the anchor line's first words.
 final class LyricsTimeBarView: UIView {
 
     var onPlayTapped: (() -> Void)?
@@ -579,18 +611,12 @@ final class LyricsTimeBarView: UIView {
     private let separator = UIView()
     private let playButton = UIButton(type: .custom)
 
-    private static let timeStyle = Typography.Style(
-        postScriptName: "Comfortaa-Bold",
-        size: 20,
-        kern: 0,
-        color: .white,
-        scalingTextStyle: .title2
-    )
-
     init() {
         super.init(frame: .zero)
 
-        timeLabel.textAlignment = .left
+        timeLabel.textAlignment = .right
+        timeLabel.setContentHuggingPriority(.required, for: .horizontal)
+        timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         timeLabel.adjustsFontForContentSizeCategory = true
         timeLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(timeLabel)
@@ -618,14 +644,14 @@ final class LyricsTimeBarView: UIView {
         addSubview(playButton)
 
         NSLayoutConstraint.activate([
-            timeLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
-            timeLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            separator.leadingAnchor.constraint(equalTo: timeLabel.trailingAnchor, constant: 12),
+            separator.leadingAnchor.constraint(equalTo: leadingAnchor),
+            separator.trailingAnchor.constraint(equalTo: timeLabel.leadingAnchor, constant: -12),
             separator.centerYAnchor.constraint(equalTo: centerYAnchor),
             separator.heightAnchor.constraint(equalToConstant: 2),
 
-            playButton.leadingAnchor.constraint(equalTo: separator.trailingAnchor, constant: 12),
+            timeLabel.trailingAnchor.constraint(equalTo: playButton.leadingAnchor, constant: -12),
+            timeLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+
             playButton.trailingAnchor.constraint(equalTo: trailingAnchor),
             // The button's edges define the bar's height: every other
             // subview pins only centerY, so without these Auto Layout
@@ -648,12 +674,14 @@ final class LyricsTimeBarView: UIView {
         let seconds = totalSeconds % 60
         let text = String(format: "%02d:%02d", minutes, seconds)
 
-        // Dart titleLarge + tabular figures + black54 (1,1) blur-4 shadow.
+        // Meta + tabular figures + black54 (1,1) blur-4 shadow, in white
+        // over the dark transcript.
         let shadow = NSShadow()
         shadow.shadowColor = UIColor.black.withAlphaComponent(0.54)
         shadow.shadowOffset = CGSize(width: 1, height: 1)
         shadow.shadowBlurRadius = 4
-        var attributes = Self.timeStyle.attributes()
+        var attributes = TypographyV2.meta.attributes()
+        attributes[.foregroundColor] = UIColor.white
         attributes[.shadow] = shadow
         if let base = attributes[.font] as? UIFont {
             let descriptor = base.fontDescriptor.addingAttributes([

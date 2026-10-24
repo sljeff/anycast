@@ -2,18 +2,24 @@ import UIKit
 
 /// Hand-written plain-text input bar (07 §2.6: InputBarAccessoryView is
 /// deliberately NOT used). Mirrors the flutter_chat_ui composer defaults
-/// the shipped page kept: v2 surface background, a rounded (24) filled
+/// the shipped page kept: page background, a rounded (24) filled
 /// field with "Type a message"
 /// placeholder, and a send glyph at onSurface 50%; multi-line up to 3
 /// lines; the button disables while a request is in flight.
 final class ChatInputBar: UIView {
 
     private enum Metrics {
-        static let barBackground = Theme.surface
+        static let barBackground = Theme.background
         static let fieldFill = Theme.surfaceContainerHigh
         static let onSurface50 = Theme.onSurfaceVariant.withAlphaComponent(0.7)
         static let fieldRadius: CGFloat = 24
         static let barPadding: CGFloat = 8
+        /// Sheet content inset: the field and send button sit 28 pt from the
+        /// sides; the owner positions the bar's bottom edge.
+        static let sideInset: CGFloat = 28
+        /// Transparent padding around the send glyph inside its 32 pt box,
+        /// pulled out so the glyph (not the box) meets the inset.
+        static let sendGlyphPadding: CGFloat = 7
         static let fieldVerticalPadding: CGFloat = 9
         static let fieldHorizontalPadding: CGFloat = 12
     }
@@ -37,6 +43,9 @@ final class ChatInputBar: UIView {
     private func setUpSubviews() {
         backgroundColor = Metrics.barBackground
         insetsLayoutMarginsFromSafeArea = false
+        directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: Metrics.barPadding, leading: Metrics.sideInset, bottom: 0, trailing: Metrics.sideInset
+        )
 
         let fieldFont = TypographyV2.body.font()
         textView.font = fieldFont
@@ -80,11 +89,6 @@ final class ChatInputBar: UIView {
         addSubview(placeholderLabel)
         addSubview(sendButton)
         NSLayoutConstraint.activate([
-            layoutMarginsGuide.topAnchor.constraint(equalTo: topAnchor, constant: Metrics.barPadding),
-            layoutMarginsGuide.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Metrics.barPadding),
-            layoutMarginsGuide.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Metrics.barPadding),
-            layoutMarginsGuide.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Metrics.barPadding),
-
             textView.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
             textView.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor),
             textView.bottomAnchor.constraint(equalTo: layoutMarginsGuide.bottomAnchor),
@@ -97,7 +101,9 @@ final class ChatInputBar: UIView {
             ),
 
             sendButton.leadingAnchor.constraint(equalTo: textView.trailingAnchor, constant: Metrics.barPadding),
-            sendButton.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
+            sendButton.trailingAnchor.constraint(
+                equalTo: layoutMarginsGuide.trailingAnchor, constant: Metrics.sendGlyphPadding
+            ),
             sendButton.centerYAnchor.constraint(equalTo: textView.centerYAnchor),
             sendButton.widthAnchor.constraint(equalToConstant: 32),
             sendButton.heightAnchor.constraint(equalToConstant: 32),

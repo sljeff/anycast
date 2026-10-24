@@ -504,6 +504,12 @@ final class SubtitlesPageViewController: UIViewController {
         return LyricDocument.parse(mainLRC: mainLRC, translationLRC: translationLRC)
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Lines clear the floating overlay instead of running under it.
+        lyricsView.bottomClearance = overlay.map { $0.bounds.height + Spacing.gap } ?? 0
+    }
+
     /// Bottom-right floating overlay (player.dart:1131-1203): AI chat entry
     /// + the export menu, as one grouped glass surface (07 §2.5).
     private func installOverlay() {

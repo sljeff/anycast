@@ -153,6 +153,9 @@ final class DiscoverViewController: UIViewController {
         container.onSwipeSelect = { [weak self] index in
             self?.selectCategory(index, animatedPages: false)
         }
+        container.onSelectedPageScrollViewChange = { [weak self] in
+            self?.setBottomEdgeScrollView(self?.pagingContainer?.selectedPageScrollView)
+        }
         container.onScrub = { [weak self] index in
             // Mid-drag materialization — the PageView builds the page it is
             // being dragged toward; the strip indicator tracks the drag

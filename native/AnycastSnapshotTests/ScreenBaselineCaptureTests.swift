@@ -75,23 +75,24 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S3 Subscriptions list (Podcast inner section)")
-    func captureSubscriptions() async throws {
+    @Test("S3 Shows sheet (the shelf's All shows)")
+    func captureShows() async throws {
         try await Self.withRoot { root in
             guard let context = await Self.liveContext() else {
                 Self.missingBaselineInput("live UIContext (S3)")
                 return
             }
             context.tabs.select(0)
-            guard let podcast = Self.find(PodcastHomeViewController.self, in: root),
-                  Self.tapButton("podcast-section-1", in: podcast.view)
-            else {
-                Self.missingBaselineInput("Podcast Subscriptions section (S3)")
+            let subscriptions = (try? await context.database.subscriptionRepository().listAll()) ?? []
+            guard !subscriptions.isEmpty else {
+                Self.missingBaselineInput("seeded subscriptions (S3)")
                 return
             }
-            try await Self.settle(1.2)
-            try await Self.capture("S3-subscriptions")
-            _ = Self.tapButton("podcast-section-0", in: podcast.view)
+            ShowsSheetViewController.present(
+                from: root, shows: ShowsShelfLayout.ordered(subscriptions), onSelect: { _ in }
+            )
+            try await Self.settle(1.5)
+            try await Self.capture("S3-shows-sheet")
         }
     }
 
@@ -525,17 +526,6 @@ struct ScreenBaselineCaptureTests {
             try? await Task.sleep(for: .milliseconds(250))
         }
         print("[screens] search field did not take focus within \(timeout)s")
-    }
-
-    private static func tapButton(_ identifier: String, in view: UIView) -> Bool {
-        if let button = view as? UIButton, button.accessibilityIdentifier == identifier {
-            button.sendActions(for: .touchUpInside)
-            return true
-        }
-        for subview in view.subviews where tapButton(identifier, in: subview) {
-            return true
-        }
-        return false
     }
 
     /// Shows a player page by walking the pager's data source — deterministic

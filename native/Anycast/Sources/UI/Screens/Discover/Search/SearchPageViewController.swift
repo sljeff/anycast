@@ -186,6 +186,9 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         addChild(pagingContainer)
         view.addSubview(pagingContainer.view)
         pagingContainer.didMove(toParent: self)
+        pagingContainer.onSelectedPageScrollViewChange = { [weak self] in
+            self?.setBottomEdgeScrollView(self?.pagingContainer.selectedPageScrollView)
+        }
         pagingContainer.install(channelsPage, at: 0)
         pagingContainer.install(episodesPage, at: 1)
         pagingContainer.onSwipeSelect = { [weak self] index in
@@ -221,7 +224,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
 /// PodcastCard results; tap opens the Channel sheet.
 @MainActor
-final class SearchChannelsPageViewController: UIViewController, UICollectionViewDataSource {
+final class SearchChannelsPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
 
     private let context: UIContext
     private let viewModel: SearchPageViewModel
@@ -268,6 +271,8 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
             return section
         }
     }
+
+    var edgeScrollView: UIScrollView { collectionView }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -397,7 +402,7 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
 /// Episode cards with the play / unguarded add-to-playlist actions; one
 /// fresh CardExpandCoordinator per SearchPage (Get.put per build).
 @MainActor
-final class SearchEpisodesPageViewController: UIViewController, UICollectionViewDataSource {
+final class SearchEpisodesPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
 
     private let context: UIContext
     private let viewModel: SearchPageViewModel
@@ -432,6 +437,8 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    var edgeScrollView: UIScrollView { collectionView }
 
     override func viewDidLoad() {
         super.viewDidLoad()

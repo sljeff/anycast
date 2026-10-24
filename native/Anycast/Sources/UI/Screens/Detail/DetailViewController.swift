@@ -118,6 +118,8 @@ final class DetailViewController: UIViewController {
         static let artworkLarge: CGFloat = 160
         static let actionHeight: CGFloat = 52
         static let fadeHeight: CGFloat = 40
+        /// Clear band between the notes' fade and the action row.
+        static let rowGap: CGFloat = Spacing.sm
     }
 
     static let mediumDetent = UISheetPresentationController.Detent.Identifier("detail-medium")
@@ -205,7 +207,8 @@ final class DetailViewController: UIViewController {
         content.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(content)
 
-        // The notes fade out above the actions.
+        // The notes fade out above the actions; the scroll view itself ends
+        // there (below), so nothing is ever drawn under or beside the row.
         bottomFade.configure(color: Theme.surface, fromTop: false)
         bottomFade.isUserInteractionEnabled = false
         bottomFade.translatesAutoresizingMaskIntoConstraints = false
@@ -224,7 +227,7 @@ final class DetailViewController: UIViewController {
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: actionRow.topAnchor, constant: -Layout.rowGap),
 
             content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             content.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
@@ -240,14 +243,14 @@ final class DetailViewController: UIViewController {
             actionRow.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
             rowBottom,
 
-            bottomFade.topAnchor.constraint(equalTo: actionRow.topAnchor, constant: -Layout.fadeHeight),
+            bottomFade.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -Layout.fadeHeight),
             bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bottomFade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomFade.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            bottomFade.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
         ])
 
-        // The notes scroll clear of the actions and their fade.
-        scrollView.contentInset.bottom = Layout.actionHeight + Layout.inset + Layout.fadeHeight
+        // The last line of the notes scrolls to rest above the fade.
+        scrollView.contentInset.bottom = Layout.fadeHeight
         applyDetentLayout()
     }
 
@@ -533,9 +536,11 @@ private final class ExpandedHitButton: UIButton {
     }
 }
 
-/// A vertical surface-color fade (opaque at one edge, clear at the other)
-/// for chrome that needs a soft edge without a blur view. The color is
-/// re-resolved on appearance changes (09 §9a).
+/// A vertical surface-color fade (fully opaque at one edge, clear at the
+/// other) for chrome that needs a soft edge without a blur view. The color
+/// is re-resolved on appearance changes and when the view joins a window
+/// (09 §9a); the opaque end is exactly 1.0 so content behind it never
+/// ghosts through.
 final class GradientFadeLayerView: UIView {
 
     override class var layerClass: AnyClass { CAGradientLayer.self }
@@ -552,12 +557,17 @@ final class GradientFadeLayerView: UIView {
         }
     }
 
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        // The first resolve ran detached (default traits).
+        applyColors()
+    }
+
     private func applyColors() {
         guard let gradient = layer as? CAGradientLayer else { return }
         let resolved = color.resolvedColor(with: traitCollection)
-        let opaque = resolved.withAlphaComponent(0.96).cgColor
+        let opaque = resolved.cgColor
         let clear = resolved.withAlphaComponent(0).cgColor
-        gradient.colors = fromTop ? [opaque, opaque, clear] : [clear, opaque, opaque]
-        gradient.locations = fromTop ? [0, 0.6, 1] : [0, 0.4, 1]
+        gradient.colors = fromTop ? [opaque, clear] : [clear, opaque]
     }
 }

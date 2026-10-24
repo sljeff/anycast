@@ -347,11 +347,13 @@ final class ChannelViewModel {
             channel.lastUpdated = newest.pubDate
         }
         try? await subscriptions.addMany([channel])
+        NotificationCenter.default.post(name: ShowsShelfLayout.subscriptionsDidChange, object: nil)
     }
 
     func unsubscribe() async {
         subscribed = false
         try? await subscriptions.remove(channel)
+        NotificationCenter.default.post(name: ShowsShelfLayout.subscriptionsDidChange, object: nil)
     }
 }
 

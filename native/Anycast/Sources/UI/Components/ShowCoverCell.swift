@@ -1,9 +1,9 @@
 import UIKit
 import Kingfisher
 
-/// A subscription in the cover grid (Anycast 2.0 UI kit `ShowCoverCell`):
-/// the square artwork (card radius, show-initial placeholder) over the show
-/// title. Tap opens the Channel sheet via the injected callback.
+/// A subscription in the Shows sheet's cover grid (Anycast 2.0 UI kit
+/// `ShowCoverCell`): the square artwork (card radius, show-initial
+/// placeholder) over the one-line show name.
 final class ShowCoverCell: UICollectionViewCell {
 
     static let reuseIdentifier = "ShowCoverCell"
@@ -23,7 +23,7 @@ final class ShowCoverCell: UICollectionViewCell {
 
         titleLabel.font = TypographyV2.meta.font()
         titleLabel.textColor = Theme.onSurfaceVariant
-        titleLabel.numberOfLines = 2
+        titleLabel.numberOfLines = 1
         titleLabel.adjustsFontForContentSizeCategory = true
 
         let stack = UIStackView(arrangedSubviews: [coverView, titleLabel])

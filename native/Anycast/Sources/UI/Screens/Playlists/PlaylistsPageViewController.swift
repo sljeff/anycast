@@ -93,6 +93,7 @@ final class PlaylistsPageViewController: UIViewController {
             let direction: UIPageViewController.NavigationDirection =
                 pageModel.currentIndex >= previous.currentIndex ? .forward : .reverse
             pageController.setViewControllers([page], direction: direction, animated: false)
+            setBottomEdgeScrollView(page.edgeScrollView)
         }
         // An empty playlist table cannot occur with the schema's guaranteed
         // default row (K31 idempotent INSERT OR IGNORE at open).
@@ -155,5 +156,6 @@ extension PlaylistsPageViewController: UIPageViewControllerDelegate {
               let index = pageModel.playlistIDs.firstIndex(of: list.playlistId)
         else { return }
         pageModel.currentIndex = index
+        setBottomEdgeScrollView(list.edgeScrollView)
     }
 }

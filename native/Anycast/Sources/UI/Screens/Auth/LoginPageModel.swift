@@ -188,7 +188,8 @@ nonisolated enum LoginPageModel {
     // MARK: - Copy (verbatim from login.dart / privacy.dart)
 
     // Logged-out (login.dart:45-126)
-    static let signUpHeadline = "Sign up now \n\n&\n\nGet 3 free audio transcriptions!"
+    static let signUpHeadline = "Sign up now"
+    static let signUpSubheadline = "Get 3 free audio transcriptions"
     static let appleButtonTitle = "Sign in with Apple"
     static let googleButtonTitle = "Sign in with Google"
     static let emailButtonTitle = "Sign in with Email"

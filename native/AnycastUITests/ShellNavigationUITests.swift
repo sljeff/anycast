@@ -24,14 +24,18 @@ final class ShellNavigationUITests: XCTestCase {
         let searchTab = app.buttons["tab-search"]
         XCTAssertTrue(searchTab.exists, "Search tab missing")
 
-        let inboxSection = app.buttons["podcast-section-0"]
-        let subscriptionsSection = app.buttons["podcast-section-1"]
-        XCTAssertTrue(inboxSection.exists, "Podcast Inbox section missing")
-        XCTAssertTrue(subscriptionsSection.exists, "Podcast Subscriptions section missing")
-        subscriptionsSection.tap()
-        XCTAssertTrue(subscriptionsSection.isSelected, "Subscriptions section did not become selected")
-        inboxSection.tap()
-        XCTAssertTrue(inboxSection.isSelected, "Inbox section did not become selected")
+        // The Podcast tab is the Inbox; with subscriptions its shows shelf
+        // ends in the All shows button, which opens the Shows sheet.
+        let allShows = app.buttons["shows-shelf-all"]
+        if allShows.waitForExistence(timeout: 8) {
+            allShows.tap()
+            XCTAssertTrue(
+                app.staticTexts["shows-sheet-title"].waitForExistence(timeout: 4),
+                "All shows did not open the Shows sheet"
+            )
+            app.swipeDown()
+            XCTAssertTrue(inboxTab.waitForExistence(timeout: 4))
+        }
 
         // Switch through every tab; children are prewarmed so this must
         // be instant (07 §2.1).

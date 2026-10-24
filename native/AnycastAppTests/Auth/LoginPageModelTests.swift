@@ -10,15 +10,10 @@ struct LoginPageModelTests {
 
     // MARK: - Logged-out copy (login.dart:45-126)
 
-    @Test("Headline is the Dart string verbatim, blank lines included")
+    @Test("Headline and subheadline are two lines (the Dart string's \"&\" line dropped)")
     func signUpHeadline() {
-        #expect(
-            LoginPageModel.signUpHeadline
-                == "Sign up now \n\n&\n\nGet 3 free audio transcriptions!"
-        )
-        #expect(
-            LoginPageModel.signUpHeadline.contains("\n\n&\n\n")
-        )
+        #expect(LoginPageModel.signUpHeadline == "Sign up now")
+        #expect(LoginPageModel.signUpSubheadline == "Get 3 free audio transcriptions")
     }
 
     @Test("Auth button order and titles (login.dart:66-127)")

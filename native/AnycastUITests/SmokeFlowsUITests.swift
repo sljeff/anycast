@@ -153,14 +153,12 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        // Subscriptions is the second section within the Podcast destination.
-        app.buttons["podcast-section-1"].tap()
-
-        let list = app.collectionViews.firstMatch
-        guard list.waitForExistence(timeout: 8), list.cells.count > 0 else {
+        // The first cover on the Podcast tab's shows shelf opens its Channel.
+        let cover = app.buttons["shows-shelf-cover-0"]
+        guard cover.waitForExistence(timeout: 8) else {
             throw XCTSkip("no seeded subscriptions — channel flow needs db_smoke")
         }
-        list.cells.firstMatch.tap()
+        cover.tap()
 
         // The tristate capsule is the channel sheet's stable marker.
         let subscribe = app.buttons["Subscribe"]

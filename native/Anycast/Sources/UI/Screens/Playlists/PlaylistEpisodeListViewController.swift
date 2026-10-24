@@ -23,7 +23,7 @@ import AnycastKit
 /// - persistence goes through `PlaylistRepository.insertOrUpdateByIndex`
 ///   with the K26-fixed move math (gesture-space target index).
 @MainActor
-final class PlaylistEpisodeListViewController: UIViewController {
+final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage {
 
     private let context: UIContext
     let playlistId: Int64
@@ -40,6 +40,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
     private let queueObservation = ObservationLoop()
 
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
+    var edgeScrollView: UIScrollView { collectionView }
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyState = EmptyStateView()
     private let emptyExploreButton = UIButton(type: .system)

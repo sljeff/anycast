@@ -4,8 +4,8 @@ import AnycastKit
 @testable import Anycast
 
 /// The V2 shell pieces (09 §10 V2): the header component, the category
-/// projection, the mini player capsule chrome, and the subscriptions status
-/// line. Color values are asserted with an explicit dark resolution
+/// projection, the mini player capsule chrome, and the Inbox status line.
+/// Color values are asserted with an explicit dark resolution
 /// (09 §9a).
 @MainActor
 struct V2ShellTests {
@@ -143,15 +143,6 @@ struct V2ShellTests {
 
         let never = InboxPageViewController.headerStatusText(lastRefresh: nil, episodeCount: 0, now: now)
         #expect(never == "updated — · 0 unlistened", "got: \(never)")
-    }
-
-    // MARK: - Library status line (09 §3.3)
-
-    @Test("Subscriptions status pluralizes the show count")
-    func subscriptionsStatusText() {
-        #expect(LibraryViewController.statusText(showCount: 0) == "0 shows")
-        #expect(LibraryViewController.statusText(showCount: 1) == "1 show")
-        #expect(LibraryViewController.statusText(showCount: 7) == "7 shows")
     }
 
     // MARK: - Mini player capsule chrome (09 §3.6 state c, Figma 83:2562)

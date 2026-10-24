@@ -5,7 +5,7 @@ import AnycastKit
 /// `listChannelsByCategoryId` PodcastCard list with a loading spinner and
 /// the centered "Network Error" state. No pull-to-refresh (03 §3.3).
 @MainActor
-final class DiscoverCategoryPageViewController: UIViewController, UICollectionViewDataSource {
+final class DiscoverCategoryPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
 
     private let context: UIContext
     private let model: DiscoverCategoryPageModel
@@ -30,6 +30,8 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    var edgeScrollView: UIScrollView { collectionView }
 
     // MARK: - Lifecycle
 

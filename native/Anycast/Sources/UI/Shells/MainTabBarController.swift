@@ -115,7 +115,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         tabBar.tintColor = Theme.primary
 
         let destinations: [(UIViewController, String, UIImage, UIImage)] = [
-            (PodcastHomeViewController(context: context), "Podcast", AppIcons.inbox, AppIcons.inboxSelected),
+            (InboxPageViewController(context: context), "Podcast", AppIcons.inbox, AppIcons.inboxSelected),
             (PlaylistsPageViewController(context: context), "Playlist", AppIcons.playlist, AppIcons.playlistSelected),
             (DiscoverViewController(context: context), "Discover", AppIcons.discover, AppIcons.discoverSelected),
         ]

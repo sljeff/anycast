@@ -101,6 +101,10 @@ final class CategoryStripView: UIView {
 
     var currentSelection: String? { selectedValue }
 
+    /// Whether the strip offers anything beyond the "All" chip; with only
+    /// "All" the page hides the strip entirely.
+    var hasFilters: Bool { chips.count > 1 }
+
     /// Silent selection update (programmatic moves).
     func select(_ value: String?, animated: Bool) {
         selectedValue = chips.contains { $0.value == value } ? value : nil
