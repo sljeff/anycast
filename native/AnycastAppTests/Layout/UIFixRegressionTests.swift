@@ -417,6 +417,62 @@ struct UIFixRegressionTests {
         try await Self.settle(window, seconds: 0.5)
     }
 
+    // MARK: - Inbox pinned header
+
+    @Test("Inbox header is pinned outside the list, matches Playlist's position and ignores a pull")
+    func inboxHeaderIsPinned() async throws {
+        guard let context = await Self.liveContext(),
+              let window = Self.keyWindow() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        defer { context.tabs.select(0) }
+
+        // Playlist first: its header is the reference position.
+        context.tabs.select(1)
+        try await Self.settle(window, seconds: 1.0)
+        guard let playlists = Self.find(PlaylistsPageViewController.self, in: window.rootViewController),
+              let reference = Self.firstView(in: playlists.view, where: { $0 is HeaderView }) as? HeaderView
+        else {
+            Issue.record("Playlist header not found"); return
+        }
+        let referenceFrame = reference.convert(reference.bounds, to: playlists.view)
+        let referenceTitle = Self.titleFrame(of: reference, in: playlists.view)
+        let referenceSettings = Self.settingsFrame(of: reference, in: playlists.view)
+
+        context.tabs.select(0)
+        try await Self.settle(window, seconds: 1.0)
+        guard let inbox = Self.find(InboxPageViewController.self, in: window.rootViewController),
+              let header = Self.firstView(in: inbox.view, where: { $0 is HeaderView }) as? HeaderView,
+              let collection = Self.firstView(in: inbox.view, where: { $0 is UICollectionView })
+                as? UICollectionView else {
+            Issue.record("Inbox header or list not found"); return
+        }
+
+        #expect(header.isDescendant(of: collection) == false, "the header must live outside the scroll view")
+        #expect(collection.subviewsRecursive().contains { $0 is HeaderView } == false)
+
+        // Same position as Playlist (the height differs: Inbox adds the status line).
+        let frame = header.convert(header.bounds, to: inbox.view)
+        #expect(Self.sameOrigin(frame, referenceFrame) && abs(frame.width - referenceFrame.width) < 0.01,
+                "Inbox header \(frame) vs Playlist \(referenceFrame)")
+        let title = Self.titleFrame(of: header, in: inbox.view)
+        #expect(Self.sameOrigin(title, referenceTitle), "title \(title) vs \(referenceTitle)")
+        let settings = Self.settingsFrame(of: header, in: inbox.view)
+        #expect(Self.sameOrigin(settings, referenceSettings) && settings.size == referenceSettings.size,
+                "settings \(settings) vs \(referenceSettings)")
+        // The list starts right below the header (the Playlist gap).
+        #expect(
+            abs(collection.frame.minY - (frame.maxY + Spacing.xs)) < 0.5,
+            "the list does not start below the header: \(collection.frame) vs \(frame)"
+        )
+
+        // A pull moves the list only.
+        collection.contentOffset = CGPoint(x: 0, y: -90)
+        inbox.view.layoutIfNeeded()
+        #expect(Self.sameOrigin(header.convert(header.bounds, to: inbox.view), frame), "a pull moved the header")
+        collection.contentOffset = .zero
+    }
+
     // MARK: - Strip expand reliability (6, playlist list)
 
     /// The strip-resize corruption guard. Inbox went strip-less (09 §7a-C1),
@@ -555,6 +611,20 @@ struct UIFixRegressionTests {
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
             .first(where: \.isKeyWindow)
+    }
+
+    private static func sameOrigin(_ a: CGRect, _ b: CGRect) -> Bool {
+        abs(a.minX - b.minX) < 0.01 && abs(a.minY - b.minY) < 0.01
+    }
+
+    private static func titleFrame(of header: HeaderView, in space: UIView) -> CGRect {
+        let label = header.subviewsRecursive().first { $0.accessibilityIdentifier == "header-title" }
+        return label.map { $0.convert($0.bounds, to: space) } ?? .null
+    }
+
+    private static func settingsFrame(of header: HeaderView, in space: UIView) -> CGRect {
+        let button = header.subviewsRecursive().first { $0.accessibilityIdentifier == "header-settings" }
+        return button.map { $0.convert($0.bounds, to: space) } ?? .null
     }
 
     private static func settle(_ window: UIWindow, seconds: Double) async throws {

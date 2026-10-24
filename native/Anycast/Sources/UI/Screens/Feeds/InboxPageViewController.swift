@@ -3,9 +3,10 @@ import os
 import AnycastKit
 
 /// Tab0 Inbox page (lib/pages/feeds.dart, 03 §2.3; v2 per 09 §3.2/§3.8 and
-/// the Anycast 2.0 UI kit Inbox) and the Podcast tab's root: the header, the
-/// shows shelf and the category strip scroll WITH the card list (Figma
-/// 1787:7899 scroll column) over the feedEpisode table, with the full refresh trigger set — pull-to-refresh
+/// the Anycast 2.0 UI kit Inbox) and the Podcast tab's root: the header is
+/// pinned above the list like the other tab headers, while the shows shelf
+/// and the category strip scroll WITH the card list (Figma 1787:7899 scroll
+/// column) over the feedEpisode table, with the full refresh trigger set — pull-to-refresh
 /// (UIRefreshControl, A4 adaptation), refreshOnStart, a 2 s-after-creation
 /// auto fetch, a periodic auto fetch every `autoRefreshInterval` seconds
 /// (DB default 300, restarted on settings change, K36), and the Tab0
@@ -19,12 +20,12 @@ import AnycastKit
 /// badges follow the playing episode and the playlist.
 final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
-    /// Scroll-column sections (Figma column order). The header always shows,
-    /// so Settings stays reachable on the empty inbox, with the empty state
-    /// beneath it. The shelf shows only with subscriptions, the strip only
-    /// with categories beyond "All", the history tail only with cards.
+    /// Scroll-column sections (Figma column order). The shelf shows only
+    /// with subscriptions, the strip only with categories beyond "All", the
+    /// history tail only with cards. The header is not a section: it is
+    /// pinned outside the list, so it stays on the empty inbox and Settings
+    /// remains reachable, with the empty state beneath it.
     enum Section {
-        case header
         case shelf
         case strip
         case cards
@@ -61,7 +62,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// Subscriptions in shelf order (most recently updated first).
     private var shows: [SubscriptionRow] = []
     /// The section kinds currently rendered, top to bottom.
-    private var sections: [Section] = [.header, .cards]
+    private var sections: [Section] = [.cards]
     /// The first non-empty card list rises in once per instance
     /// (`CardEntranceAnimator`); later reloads never replay it.
     private var didPlayEntrance = false
@@ -110,7 +111,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // The empty state centers in the room beneath the chrome rows, not
-        // behind them (the header, shelf and strip scroll with the list).
+        // behind them (the shelf and strip scroll with the list).
         var chromeHeight: CGFloat = 0
         if collectionView.backgroundView === emptyStateView {
             collectionView.layoutIfNeeded()
@@ -132,6 +133,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
         configureChrome()
+        buildHeader()
         buildCollectionView()
 
         // load(episodes) on init (feed_episode.dart:30).
@@ -167,10 +169,11 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     // MARK: - v2 chrome (09 §3.2/§3.8; scroll-flow hosting since 批次1)
 
-    /// The header/shelf/strip views are configured here and HOSTED by the
-    /// chrome list cells (Figma scrolls them with the column) — the cells
-    /// re-parent the shared views on dequeue, so exactly one materialized
-    /// host exists at a time.
+    /// The header/shelf/strip views are configured here. The shelf and strip
+    /// are HOSTED by the chrome list cells (Figma scrolls them with the
+    /// column) — the cells re-parent the shared views on dequeue, so exactly
+    /// one materialized host exists at a time. The header is pinned by
+    /// `buildHeader`.
     private func configureChrome() {
         header.configure(HeaderView.Configuration(title: "Podcast", statusText: nil))
         header.onSettings = { [weak self] in
@@ -209,7 +212,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     /// The section kinds for the current content, top to bottom.
     static func sections(hasShelf: Bool, hasStrip: Bool, hasCards: Bool) -> [Section] {
-        var kinds: [Section] = [.header]
+        var kinds: [Section] = []
         if hasShelf { kinds.append(.shelf) }
         if hasStrip { kinds.append(.strip) }
         kinds.append(.cards)
@@ -227,19 +230,29 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     // chrome, 09 §10 决策⑥)
 
     /// Figma scroll column (1787:7899): padding 0/16, vertical gap 12 —
-    /// the header section carries the gap as its bottom inset, the shelf
-    /// and the strip half of it, and the cards bake the other half into the
-    /// cell. Followed directly by cards, a chrome row carries only the other
-    /// half; the strip's 44 pt row already pads its chips.
+    /// the shelf section carries the gap as its bottom inset, the strip
+    /// half of it, and the cards bake the other half into the cell.
+    /// Followed directly by cards, a chrome row carries only the other
+    /// half; the strip's 44 pt row already pads its chips. The first
+    /// section tops up the gap the pinned header leaves above the list.
     private func makeSection(
+        index: Int, environment: NSCollectionLayoutEnvironment
+    ) -> NSCollectionLayoutSection? {
+        guard let section = makeSectionBody(index: index, environment: environment) else { return nil }
+        if index == 0 {
+            let cardsBake = sections[0] == .cards ? InboxEpisodeCardCell.verticalGap : 0
+            section.contentInsets.top += Spacing.gap - Spacing.xs - cardsBake
+        }
+        return section
+    }
+
+    private func makeSectionBody(
         index: Int, environment: NSCollectionLayoutEnvironment
     ) -> NSCollectionLayoutSection? {
         guard sections.indices.contains(index) else { return nil }
         let next = sections.indices.contains(index + 1) ? sections[index + 1] : nil
         let gapBeforeCards = InboxEpisodeCardCell.verticalGap
         switch sections[index] {
-        case .header:
-            return chromeSection(bottomInset: next == .cards ? gapBeforeCards : Spacing.gap)
         case .shelf:
             return chromeSection(bottomInset: next == .cards ? gapBeforeCards : Spacing.xs)
         case .strip:
@@ -280,6 +293,19 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         return section
     }
 
+    /// Pins the header above the list exactly like the Playlist header
+    /// (top = safe area top), so the three tab headers share positions and
+    /// a pull moves only the list.
+    private func buildHeader() {
+        header.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(header)
+        NSLayoutConstraint.activate([
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+        ])
+    }
+
     private func buildCollectionView() {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = .clear
@@ -304,13 +330,14 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            // Full-bleed top: the chrome scrolls under the status bar and
-            // the safe-area-adjusted inset keeps the resting header below
-            // it (Figma scroll column starts below the status bar).
-            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
+            // Below the pinned header, same gap as the Playlist page.
+            collectionView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.xs),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
+        // With the list below the pinned header the automatic lookup no
+        // longer finds it for the tab bar's minimize-on-scroll.
+        setBottomEdgeScrollView(collectionView)
 
         emptyStateView.onExplore = { [weak self] in
             self?.context.tabs.select(2)
@@ -776,7 +803,7 @@ extension InboxPageViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         guard let kind = sectionKind(section) else { return 0 }
         switch kind {
-        case .header, .shelf, .strip, .tail:
+        case .shelf, .strip, .tail:
             return 1
         case .cards:
             return displayedEpisodes.count
@@ -787,12 +814,6 @@ extension InboxPageViewController: UICollectionViewDataSource {
         _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
         switch sectionKind(indexPath.section) {
-        case .header:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: ChromeHostingCell.reuseIdentifier, for: indexPath
-            )
-            (cell as? ChromeHostingCell)?.host(header)
-            return cell
         case .shelf:
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: ChromeHostingCell.reuseIdentifier, for: indexPath
@@ -957,7 +978,7 @@ extension InboxPageViewController: UICollectionViewDelegate {
 
 // MARK: - Scroll-flow chrome hosting (批次1: the Figma column scrolls)
 
-/// Hosts one of the shared chrome views (header / shelf / strip) inside
+/// Hosts one of the shared chrome views (shelf / strip) inside
 /// a self-sizing list cell. Exactly one cell per section is ever alive, so
 /// re-parenting the shared view on (re)dequeue is safe.
 final class ChromeHostingCell: UICollectionViewCell {
