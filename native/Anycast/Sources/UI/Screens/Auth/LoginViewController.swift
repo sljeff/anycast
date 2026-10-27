@@ -958,62 +958,8 @@ final class LoginViewController: UIViewController {
     }
 
     private func presentDeleteConfirmation() {
-        let alert = UIAlertController(
-            title: LoginPageModel.deleteAlertTitle,
-            message: LoginPageModel.deleteAlertBody,
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: LoginPageModel.cancelTitle, style: .default))
-        alert.addAction(
-            UIAlertAction(title: LoginPageModel.deleteConfirmTitle, style: .destructive) { [weak self] _ in
-                guard let self else { return }
-                // The Dart stacked a spinner over the dialog before the
-                // DELETE (login.dart:749-764); presenting before this alert
-                // finishes dismissing is swallowed, so run the flow from the
-                // dismissal completion instead of a timed delay.
-                self.dismiss(animated: true) { self.performDelete() }
-            }
-        )
-        present(alert, animated: true)
-    }
-
-    private func performDelete() {
-        guard presentedViewController == nil else { return }
-        let spinner = FullScreenSpinnerViewController.present(over: self)
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            do {
-                let result = try await self.context.api.deleteUser()
-                spinner.dismissSpinner {
-                    switch result {
-                    case .deleted:
-                        // DELETE 200 → sign out (login.dart:760-763); backend
-                        // cascade removes Firebase + RevenueCat records.
-                        Task { @MainActor [weak self] in
-                            guard let self else { return }
-                            await self.context.auth.signOut(purchases: self.context.purchases)
-                            self.refreshState()
-                        }
-                    case .error(let signal):
-                        self.presentErrorSignal(signal)
-                    }
-                }
-            } catch {
-                // Transport failure: the Dart left this as an unhandled
-                // async error (no dialog).
-                spinner.dismissSpinner()
-            }
-        }
-    }
-
-    private func presentErrorSignal(_ signal: APIClient.ErrorSignal) {
-        switch signal {
-        case .loginRequired:
-            context.presentLogin()
-        case .errorMessage(let text):
-            presentAlert(title: "Error", message: text)
-        case .errorBody(let status, let body):
-            presentAlert(title: "Error \(status)", message: body)
+        AccountDeletionFlow.present(from: self, context: context) { [weak self] in
+            self?.refreshState()
         }
     }
 

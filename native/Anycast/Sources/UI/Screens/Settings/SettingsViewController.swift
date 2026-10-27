@@ -56,9 +56,39 @@ struct SettingsStepWriter {
 /// children (Login/ImportExport/History) are presented from here.
 final class SettingsViewController: UIViewController {
 
-    /// Plate corners stay the system inset-grouped radius: the list layout
-    /// exposes no corner-radius control short of hand-drawn plates.
-    private static let sections = SettingsPageModel.sections()
+    /// What the account rows render from. Signed-in vs signed-out is read
+    /// synchronously; the subscription, entitlement and quota fields fill in
+    /// as their async sources answer.
+    private struct AccountInfo {
+        var snapshot = LoginPageModel.AccountSnapshot(uid: nil, email: nil, providerID: nil)
+        /// Nil until RevenueCat has answered, so a Plus user never flashes
+        /// the free state.
+        var isSubscribed: Bool?
+        var plus: AccountPageModel.PlusStatus?
+        var remaining: Int?
+
+        var tier: AccountPageModel.Tier {
+            AccountPageModel.tier(signedIn: snapshot.signedIn, isSubscribed: isSubscribed ?? false)
+        }
+
+        /// Tier that drives the section list: the Upgrade plate waits for a
+        /// definite free answer.
+        var sectionTier: AccountPageModel.Tier {
+            snapshot.signedIn && isSubscribed == nil ? .plus : tier
+        }
+    }
+
+    /// The layout provider is built before `self` exists and must always see
+    /// the current sections, so it reads them through this box.
+    private final class SectionStore {
+        var sections: [SettingsPageModel.Section] = []
+    }
+
+    private let sectionStore: SectionStore
+    private var accountInfo = AccountInfo()
+    private var accountTask: Task<Void, Never>?
+
+    private var sections: [SettingsPageModel.Section] { sectionStore.sections }
 
     private let context: UIContext
     private var languageApplier: SettingsLanguageChangeApplier
@@ -81,9 +111,12 @@ final class SettingsViewController: UIViewController {
             translations: context.translations,
             coordinator: context.settingsCoordinator
         )
+        let store = SectionStore()
+        store.sections = SettingsPageModel.sections(tier: .signedOut)
+        self.sectionStore = store
         self.collectionView = UICollectionView(
             frame: .zero,
-            collectionViewLayout: Self.makeLayout()
+            collectionViewLayout: Self.makeLayout(store: store)
         )
 
         super.init(nibName: nil, bundle: nil)
@@ -92,8 +125,9 @@ final class SettingsViewController: UIViewController {
     /// Per-section list layout: inset-grouped plates 16 from the screen
     /// edges with 24-inset `sandAlpha4` separators; the trailing Privacy
     /// links sit outside any plate — plain appearance, no separators.
-    private static func makeLayout() -> UICollectionViewCompositionalLayout {
+    private static func makeLayout(store: SectionStore) -> UICollectionViewCompositionalLayout {
         UICollectionViewCompositionalLayout { sectionIndex, environment in
+            let sections = store.sections
             let section = sections.indices.contains(sectionIndex) ? sections[sectionIndex] : nil
             if section?.plainStyle == true {
                 var config = UICollectionLayoutListConfiguration(appearance: .plain)
@@ -111,7 +145,10 @@ final class SettingsViewController: UIViewController {
             // the system grouped gray over it.
             config.backgroundColor = .clear
             config.headerMode = section?.header == nil ? .none : .supplementary
-            config.headerTopPadding = sectionIndex == 0 ? Spacing.md : Spacing.pageHeader
+            // The gold Upgrade plate sits 12 below the identity row.
+            let isUpgradePlate = section?.rows == [.plusUpgrade]
+            config.headerTopPadding = sectionIndex == 0
+                ? Spacing.md : (isUpgradePlate ? Spacing.gap : Spacing.pageHeader)
             config.itemSeparatorHandler = { _, proposed in
                 var separator = proposed
                 separator.color = AnycastColor.sandAlpha4
@@ -137,6 +174,7 @@ final class SettingsViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = Theme.surfaceContainer
 
+        refreshAccount()
         configureDataSource()
 
         titleLabel.text = "Settings"
@@ -206,6 +244,7 @@ final class SettingsViewController: UIViewController {
     }
 
     deinit {
+        accountTask?.cancel()
         // UI teardown runs on the main thread; the observer tokens are not
         // Sendable so the access goes through an isolated assertion.
         MainActor.assumeIsolated {
@@ -231,11 +270,16 @@ final class SettingsViewController: UIViewController {
             self?.configureStepperCell(cell, for: row)
         }
 
+        let identityRegistration = UICollectionView.CellRegistration<SettingsIdentityRowCell, SettingsPageModel.Row> {
+            [weak self] cell, _, row in
+            self?.configureIdentityCell(cell, for: row)
+        }
+
         let headerRegistration = UICollectionView.SupplementaryRegistration<UICollectionViewListCell>(
             elementKind: UICollectionView.elementKindSectionHeader
-        ) { header, _, indexPath in
-            guard Self.sections.indices.contains(indexPath.section),
-                  let title = Self.sections[indexPath.section].header else { return }
+        ) { [weak self] header, _, indexPath in
+            guard let sections = self?.sections, sections.indices.contains(indexPath.section),
+                  let title = sections[indexPath.section].header else { return }
             var config = header.defaultContentConfiguration()
             config.text = title
             config.textProperties.color = Theme.onSurfaceVariant
@@ -254,6 +298,10 @@ final class SettingsViewController: UIViewController {
             collectionView: collectionView
         ) { collectionView, indexPath, row in
             switch row {
+            case .account, .plusUpgrade:
+                return collectionView.dequeueConfiguredReusableCell(
+                    using: identityRegistration, for: indexPath, item: row
+                )
             case .enableTranslation:
                 return collectionView.dequeueConfiguredReusableCell(
                     using: switchRegistration, for: indexPath, item: row
@@ -279,7 +327,7 @@ final class SettingsViewController: UIViewController {
 
     private func applySnapshot() {
         var snapshot = NSDiffableDataSourceSnapshot<Int, SettingsPageModel.Row>()
-        for (index, section) in Self.sections.enumerated() {
+        for (index, section) in sections.enumerated() {
             snapshot.appendSections([index])
             snapshot.appendItems(section.rows, toSection: index)
         }
@@ -321,7 +369,7 @@ final class SettingsViewController: UIViewController {
             // Target Language is inert while translation is off.
             let isDimmed = row == .targetLanguage && !translationIsOn
             let opensSomething: Set<SettingsPageModel.Row> = [
-                .account, .targetLanguage, .country, .importExport, .history,
+                .targetLanguage, .country, .importExport, .history,
             ]
             cell.configure(
                 title: title,
@@ -336,6 +384,26 @@ final class SettingsViewController: UIViewController {
         if let tooltip = SettingsPageModel.tooltip(for: row) {
             cell.accessibilityHint = tooltip
         }
+    }
+
+    /// The identity row and the gold Upgrade plate.
+    private func configureIdentityCell(_ cell: SettingsIdentityRowCell, for row: SettingsPageModel.Row) {
+        if row == .plusUpgrade {
+            cell.configureUpgradePlate()
+        } else {
+            var content = AccountPageModel.identity(
+                tier: accountInfo.tier,
+                email: accountInfo.snapshot.email,
+                remaining: accountInfo.remaining,
+                plus: accountInfo.plus
+            )
+            // Hold the subtitle back until the tier is certain.
+            if accountInfo.snapshot.signedIn, accountInfo.isSubscribed == nil {
+                content.subtitle = ""
+            }
+            cell.configure(identity: content)
+        }
+        cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
     }
 
     /// The translation switch row.
@@ -421,8 +489,80 @@ final class SettingsViewController: UIViewController {
 
     // MARK: - Child presentations
 
+    // MARK: Account
+
+    /// Re-reads the account rows' inputs: sign-in state synchronously, then
+    /// subscription, entitlement and quota asynchronously. Called on load
+    /// and whenever a child account sheet goes away (page sheets do not
+    /// trigger this page's `viewWillAppear`).
+    private func refreshAccount() {
+        accountTask?.cancel()
+        let snapshot = AuthAccountSnapshot.current(context: context)
+        let sameUser = snapshot.signedIn && snapshot.uid == accountInfo.snapshot.uid
+        accountInfo = sameUser
+            ? AccountInfo(snapshot: snapshot, isSubscribed: accountInfo.isSubscribed,
+                          plus: accountInfo.plus, remaining: accountInfo.remaining)
+            : AccountInfo(snapshot: snapshot)
+        applyAccountInfo()
+        guard snapshot.signedIn else { return }
+
+        let store = PaywallStore(purchases: context.purchases)
+        accountTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            async let subscribed = self.context.purchases.isSubscribed()
+            async let plus = store.plusStatus()
+            let isSubscribed = await subscribed
+            let status = await plus
+            guard !Task.isCancelled else { return }
+            self.accountInfo.isSubscribed = isSubscribed
+            self.accountInfo.plus = status
+            self.applyAccountInfo()
+
+            // A login-required answer is not escalated from Settings; the
+            // quota just stays unknown.
+            var remaining: Int?
+            if let result = try? await self.context.api.getUser(), case .user(let user) = result {
+                remaining = user.remaining
+            }
+            guard !Task.isCancelled else { return }
+            self.accountInfo.remaining = remaining
+            self.applyAccountInfo()
+        }
+    }
+
+    private func applyAccountInfo() {
+        sectionStore.sections = SettingsPageModel.sections(tier: accountInfo.sectionTier)
+        guard dataSource != nil else { return }
+        applySnapshot()
+        reconfigureVisible()
+    }
+
     private func presentAccount() {
-        AppSheets.presentExpand(LoginViewController(context: context), from: self)
+        if accountInfo.snapshot.signedIn {
+            let membership = MembershipViewController(
+                context: context,
+                isSubscribed: accountInfo.isSubscribed ?? false,
+                plus: accountInfo.plus,
+                remaining: accountInfo.remaining
+            )
+            membership.onAccountChanged = { [weak self] in self?.refreshAccount() }
+            presentAccountSheet(membership)
+        } else {
+            // Temporary: the signed-out row still opens the all-in-one Login
+            // sheet until the dedicated login page replaces it.
+            presentAccountSheet(LoginViewController(context: context))
+        }
+    }
+
+    private func presentUpgrade() {
+        // Temporary bridge to the paywall card inside the Login sheet until
+        // the standalone paywall exists.
+        presentAccountSheet(LoginViewController(context: context))
+    }
+
+    private func presentAccountSheet(_ controller: UIViewController) {
+        AppSheets.presentExpand(controller, from: self)
+        controller.presentationController?.delegate = self
     }
 
     private func presentImportExport() {
@@ -505,6 +645,7 @@ extension SettingsViewController: UICollectionViewDelegate {
         guard let row = dataSource?.itemIdentifier(for: indexPath) else { return }
         switch row {
         case .account: presentAccount()
+        case .plusUpgrade: presentUpgrade()
         case .country: presentCountrySheet()
         case .enableTranslation:
             (collectionView.cellForItem(at: indexPath) as? SettingsSwitchListCell)?.toggle()
@@ -516,5 +657,16 @@ extension SettingsViewController: UICollectionViewDelegate {
         case .privacyPolicy: presentSafari(SettingsPageModel.privacyPolicyURL)
         case .termsOfUse: presentSafari(SettingsPageModel.termsOfUseURL)
         }
+    }
+}
+
+// MARK: - UIAdaptivePresentationControllerDelegate
+
+extension SettingsViewController: UIAdaptivePresentationControllerDelegate {
+
+    /// A swipe-dismissed Login or Membership sheet may have changed the
+    /// account: re-read it.
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        refreshAccount()
     }
 }

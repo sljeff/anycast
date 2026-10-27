@@ -13,6 +13,8 @@ nonisolated enum SettingsPageModel {
 
     enum Row: Hashable {
         case account
+        /// Gold upgrade plate under the identity row (free tier only).
+        case plusUpgrade
         case cacheLimit
         case enableTranslation
         case targetLanguage
@@ -36,10 +38,14 @@ nonisolated enum SettingsPageModel {
     }
 
     /// Group structure of the 2.0 Settings page. Target Language is always
-    /// present; it reads "Off" and is inert while translation is off.
-    static func sections() -> [Section] {
-        [
-            Section(header: nil, rows: [.account], plainStyle: false),
+    /// present; it reads "Off" and is inert while translation is off. The
+    /// gold Upgrade plate follows the identity row for signed-in free users.
+    static func sections(tier: AccountPageModel.Tier) -> [Section] {
+        var sections = [Section(header: nil, rows: [.account], plainStyle: false)]
+        if tier == .free {
+            sections.append(Section(header: nil, rows: [.plusUpgrade], plainStyle: false))
+        }
+        sections += [
             Section(header: "Downloads & Storage", rows: [.cacheLimit], plainStyle: false),
             Section(header: "Subtitles & Translation",
                     rows: [.enableTranslation, .targetLanguage], plainStyle: false),
@@ -50,6 +56,7 @@ nonisolated enum SettingsPageModel {
             Section(header: "Help", rows: [.contactEmail], plainStyle: false),
             Section(header: nil, rows: [.privacyPolicy, .termsOfUse], plainStyle: true),
         ]
+        return sections
     }
 
     /// Whether translation is on: a target language is set (settings.dart:239
@@ -68,6 +75,7 @@ nonisolated enum SettingsPageModel {
     static func title(for row: Row) -> String {
         switch row {
         case .account: return "Account"
+        case .plusUpgrade: return AccountPageModel.upgradePlateTitle
         case .cacheLimit: return "Cache Limit"
         case .enableTranslation: return "Subtitle Translation"
         case .targetLanguage: return "Target Language"

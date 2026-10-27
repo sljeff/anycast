@@ -94,6 +94,23 @@ struct PaywallStore {
         guard let info = try? await Purchases.shared.customerInfo() else { return nil }
         return info.entitlements.active["plus"]?.expirationDate
     }
+
+    /// The `plus` entitlement's state for the Membership page and the
+    /// Settings identity row; nil when RevenueCat is not configured, the
+    /// fetch fails, or the account never had Plus.
+    func plusStatus() async -> AccountPageModel.PlusStatus? {
+        guard purchases.configured else { return nil }
+        guard let info = try? await Purchases.shared.customerInfo(),
+              let plus = info.entitlements.all["plus"] else { return nil }
+        return AccountPageModel.PlusStatus(
+            isActive: plus.isActive,
+            isTrial: plus.periodType == .trial,
+            willRenew: plus.willRenew,
+            hasBillingIssue: plus.billingIssueDetectedAt != nil,
+            expirationDate: plus.expirationDate,
+            period: plus.productIdentifier.contains("annual") ? .annual : .monthly
+        )
+    }
 }
 
 /// Firebase display fields for the User Info card (login.dart:165-199).

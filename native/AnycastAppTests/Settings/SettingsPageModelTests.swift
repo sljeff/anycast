@@ -14,7 +14,7 @@ struct SettingsPageModelTests {
 
     @Test("Sections and rows follow the 2.0 Settings grouping")
     func sectionRowOrder() {
-        let sections = SettingsPageModel.sections()
+        let sections = SettingsPageModel.sections(tier: .signedOut)
         #expect(sections.map(\.header) == [
             nil, "Downloads & Storage", "Subtitles & Translation",
             "Content & Discovery", "Help", nil,
@@ -30,6 +30,21 @@ struct SettingsPageModelTests {
         ])
         // Only the trailing privacy links render outside a group plate.
         #expect(sections.map(\.plainStyle) == [false, false, false, false, false, true])
+    }
+
+    @Test("The gold Upgrade plate follows the identity row for free users only")
+    func upgradePlateIsTierDependent() {
+        let free = SettingsPageModel.sections(tier: .free)
+        #expect(free.map(\.rows).prefix(3) == [[.account], [.plusUpgrade], [.cacheLimit]])
+        #expect(free.count == SettingsPageModel.sections(tier: .signedOut).count + 1)
+        #expect(free[1].header == nil)
+        #expect(free[1].plainStyle == false)
+
+        for tier in [AccountPageModel.Tier.signedOut, .plus] {
+            let rows = SettingsPageModel.sections(tier: tier).flatMap(\.rows)
+            #expect(!rows.contains(.plusUpgrade))
+        }
+        #expect(SettingsPageModel.identifier(for: .plusUpgrade) == "settings-row-plusUpgrade")
     }
 
     @Test("Translation is on while a target language is set (settings.dart:239)")
@@ -51,6 +66,7 @@ struct SettingsPageModelTests {
     func rowLabels() {
         let expected: [SettingsPageModel.Row: String] = [
             .account: "Account",
+            .plusUpgrade: "Anycast Plus",
             .cacheLimit: "Cache Limit",
             .enableTranslation: "Subtitle Translation",
             .targetLanguage: "Target Language",
@@ -95,7 +111,7 @@ struct SettingsPageModelTests {
         #expect(SettingsPageModel.value(for: .targetLanguage, settings: settings) == "Off")
 
         for row: SettingsPageModel.Row in [
-            .account, .enableTranslation, .importExport, .history, .privacyPolicy, .termsOfUse,
+            .account, .plusUpgrade, .enableTranslation, .importExport, .history, .privacyPolicy, .termsOfUse,
         ] {
             #expect(SettingsPageModel.value(for: row, settings: settings) == nil)
         }
@@ -117,7 +133,7 @@ struct SettingsPageModelTests {
             == "Limits the number of episodes in the history. Auto deleted if exceeded.")
 
         let withoutTooltip: [SettingsPageModel.Row] = [
-            .account, .cacheLimit, .enableTranslation, .importExport, .history,
+            .account, .plusUpgrade, .cacheLimit, .enableTranslation, .importExport, .history,
             .contactEmail, .privacyPolicy, .termsOfUse,
         ]
         for row in withoutTooltip {
