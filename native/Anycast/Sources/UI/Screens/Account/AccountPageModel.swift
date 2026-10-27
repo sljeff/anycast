@@ -54,7 +54,7 @@ nonisolated enum AccountPageModel {
     // MARK: - Dates
 
     /// "Oct 23, 2027" — fixed locale so the copy never follows the device
-    /// region; the time zone is injectable like `LoginPageModel.formatExpiry`.
+    /// region; the time zone is injectable.
     static func formatDate(_ date: Date, timeZone: TimeZone = .current) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

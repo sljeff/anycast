@@ -199,26 +199,6 @@ struct V2ShellTests {
         }
     }
 
-    // MARK: - Welcome / SignUp smoke (V2 scope: UI lands, auth stays TODO)
-
-    @Test("Welcome and SignUp expose their entry identifiers")
-    func authScreensSmoke() async {
-        guard let context = await Self.liveUIContext() else {
-            print("[v2shell] shell not ready; skipping auth smoke"); return
-        }
-        let welcome = WelcomeViewController(context: context)
-        welcome.loadViewIfNeeded()
-        #expect(welcome.view.subviews.contains { $0 is UIStackView })
-        #expect(welcome.view.backgroundColor == Theme.background)
-
-        let signUp = SignUpViewController(context: context)
-        signUp.loadViewIfNeeded()
-        let identifiers = signUp.view.recursiveAccessibilityIdentifiers()
-        #expect(identifiers.contains("signup-back"))
-        #expect(identifiers.contains("signup-submit"))
-        #expect(identifiers.contains("signup-wordmark"))
-    }
-
     // MARK: - Helpers
 
     @MainActor

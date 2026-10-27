@@ -347,55 +347,45 @@ final class SmokeFlowsUITests: XCTestCase {
 
     // MARK: - 9. Login sheet opens from Settings (sandbox UI is not touched)
 
-    /// Regression: tapping Account once must yield exactly one login sheet
-    /// (user report: the login window popped up twice). The account row
-    /// presents LoginViewController directly; the sheet's own signed-out
-    /// /api/user returns loginRequired, which routes to
-    /// LoginPromptCoordinator — before the coordinator deduped against the
-    /// whole presentation chain, that 401 stacked a second sheet on the
-    /// first. Two stacked sheets expose two "Sign in with Apple" buttons.
+    /// Regression: tapping the signed-out account row once must yield exactly
+    /// one login sheet (user report: the login window popped up twice). The
+    /// row presents the login sheet directly; a 401 from a background poller
+    /// routes to LoginPromptCoordinator, whose chain walk must swallow it.
+    /// Two stacked sheets expose two "Continue with Apple" buttons.
     func testLoginSheetOpens() throws {
         let app = XCUIApplication()
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         app.buttons["Settings"].tap()
-        let account = app.staticTexts["Account"]
+        let account = app.cells["settings-row-account"]
         guard account.waitForExistence(timeout: 8) else {
-            XCTFail("settings sheet did not list the Account row")
+            XCTFail("settings sheet did not list the account row")
             return
         }
         account.tap()
 
-        // Logged-out copy or the logged-in subscription card — either way the
-        // login sheet itself must be on screen.
-        let signedOut = app.staticTexts.containing(
-            NSPredicate(format: "label CONTAINS 'free audio transcriptions'")
-        ).firstMatch
+        // Signed out: the login sheet. Signed in: the Membership page.
+        let signedOut = app.buttons["login-apple"]
         let signedIn = app.staticTexts["Basic Plan"]
         let plus = app.staticTexts["Anycast Plus"]
         XCTAssertTrue(
             signedOut.waitForExistence(timeout: 10)
                 || signedIn.waitForExistence(timeout: 1)
                 || plus.waitForExistence(timeout: 1)
-                || app.buttons["Sign in with Apple"].waitForExistence(timeout: 2)
                 || app.staticTexts["User Info"].waitForExistence(timeout: 2),
             "login sheet did not appear"
         )
 
-        // Exactly one sheet: when the logged-out column rendered, a second
-        // stacked sheet would surface a second matching button. Wait out the
-        // reflux 401 window (the old double present landed ~1 s after the
-        // sheet appeared) before counting.
-        let appleButtons = app.buttons.matching(
-            NSPredicate(format: "label == %@", "Sign in with Apple")
-        )
+        // Exactly one sheet: wait out the 401 window (the old double present
+        // landed ~1 s after the sheet appeared) before counting.
+        let appleButtons = app.buttons.matching(identifier: "login-apple")
         if appleButtons.firstMatch.exists {
             Thread.sleep(forTimeInterval: 2)
             let stacked = appleButtons.count
             XCTAssertTrue(
                 stacked == 1,
-                "login sheet presented \(stacked) times for one Account tap"
+                "login sheet presented \(stacked) times for one account tap"
             )
         }
     }

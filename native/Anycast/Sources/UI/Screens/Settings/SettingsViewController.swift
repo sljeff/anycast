@@ -548,16 +548,18 @@ final class SettingsViewController: UIViewController {
             membership.onAccountChanged = { [weak self] in self?.refreshAccount() }
             presentAccountSheet(membership)
         } else {
-            // Temporary: the signed-out row still opens the all-in-one Login
-            // sheet until the dedicated login page replaces it.
-            presentAccountSheet(LoginViewController(context: context))
+            let login = LoginSheetViewController.present(
+                from: self, context: context, source: .settings
+            ) { [weak self] in self?.refreshAccount() }
+            login.presentationController?.delegate = self
         }
     }
 
     private func presentUpgrade() {
-        // Temporary bridge to the paywall card inside the Login sheet until
-        // the standalone paywall exists.
-        presentAccountSheet(LoginViewController(context: context))
+        let paywall = PaywallViewController.present(
+            from: self, context: context, variant: .standard
+        ) { [weak self] in self?.refreshAccount() }
+        paywall.presentationController?.delegate = self
     }
 
     private func presentAccountSheet(_ controller: UIViewController) {

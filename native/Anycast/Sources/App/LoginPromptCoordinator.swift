@@ -28,8 +28,8 @@ final class LoginPromptCoordinator {
     /// One attempt per second still self-heals once the pipeline frees.
     private var lastAttempt = Date.distantPast
 
-    /// Presents `LoginViewController` as a full-height expand sheet
-    /// (03 §1.3 #7: expand true / threshold 0.9 → A2/A3 system sheet).
+    /// Presents the login sheet for an expired session (`.reauth`: the
+    /// account's last-used provider leads).
     func presentLogin() {
         guard let anchor = presentingAnchor, let context else { return }
         if let currentLogin, currentLogin.view.window != nil { return }
@@ -37,20 +37,17 @@ final class LoginPromptCoordinator {
         guard Date().timeIntervalSince(lastAttempt) >= 1 else { return }
         lastAttempt = Date()
         let top = anchor.topMostPresented()
-        let login = LoginViewController(context: context)
-        currentLogin = login
-        AppSheets.presentExpand(login, from: top)
+        currentLogin = LoginSheetViewController.present(from: top, context: context, source: .reauth)
     }
 
     /// `currentLogin` only dedupes sheets this coordinator presented. The
-    /// Settings "Account" row presents LoginViewController directly, and
-    /// that sheet's own signed-out /api/user returns loginRequired —
-    /// without this chain walk the 401 stacked a second login sheet on
-    /// the first (the sheet's `.loginRequired` handler routes back here).
+    /// Settings "Account" row presents the login sheet directly, and a
+    /// 401 can still arrive while it is up — without this chain walk the
+    /// 401 stacked a second login sheet on the first.
     private func presentedChainContainsLogin(from anchor: UIViewController) -> Bool {
         var current: UIViewController? = anchor.topMostPresented()
         while let controller = current {
-            if controller is LoginViewController, !controller.isBeingDismissed {
+            if controller is LoginSheetViewController, !controller.isBeingDismissed {
                 return true
             }
             current = controller.presentingViewController

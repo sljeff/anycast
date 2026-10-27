@@ -12,9 +12,16 @@ import UIKit
 @MainActor
 struct PaywallStore {
 
-    enum StoreError: Error {
+    enum StoreError: LocalizedError {
         case notConfigured
         case planUnavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .notConfigured: "Purchases aren't available right now."
+            case .planUnavailable: "That plan isn't available right now."
+            }
+        }
     }
 
     private let purchases: RevenueCatController
@@ -31,46 +38,76 @@ struct PaywallStore {
 
     var isConfigured: Bool { purchases.configured }
 
-    /// `Purchases.getOfferings() → current.availablePackages` mapped to plan
-    /// cards (login.dart:448-462). Annual is identified by packageType
-    /// (login.dart:581-583).
-    func availablePlans() async throws -> [LoginPageModel.PlanCard] {
+    /// How a purchase attempt ended.
+    enum PurchaseOutcome: Equatable {
+        /// The customer now has an active entitlement.
+        case purchased
+        /// The user dismissed the system payment sheet.
+        case cancelled
+        /// The store accepted the request but no entitlement is active yet
+        /// (for example Ask to Buy); nothing to report.
+        case pending
+    }
+
+    /// The current offering's yearly and monthly packages as paywall plans,
+    /// plus the yearly plan's trial eligibility (unknown counts as not
+    /// eligible). Throws when RevenueCat is unconfigured or the fetch fails.
+    func loadPlans() async throws -> PaywallModel.Plans {
         guard purchases.configured else { throw StoreError.notConfigured }
         let offerings = try await Purchases.shared.offerings()
         let packages = offerings.current?.availablePackages ?? []
         Self.packagesByProduct = Dictionary(
-            uniqueKeysWithValues: packages.map { ($0.storeProduct.productIdentifier, $0) }
+            packages.map { ($0.storeProduct.productIdentifier, $0) },
+            uniquingKeysWith: { first, _ in first }
         )
-        return packages.map { package in
-            LoginPageModel.PlanCard(
-                productID: package.storeProduct.productIdentifier,
-                period: package.packageType == .annual ? .annual : .monthly,
-                priceString: package.localizedPriceString
-            )
+        let yearly = packages.first { $0.packageType == .annual }
+        let monthly = packages.first { $0.packageType == .monthly }
+        var eligible = false
+        if let yearly {
+            let result = await Purchases.shared.checkTrialOrIntroDiscountEligibility(packages: [yearly])
+            eligible = result[yearly]?.status.isEligible ?? false
         }
+        return PaywallModel.Plans(
+            yearly: yearly.map { Self.plan($0, period: .yearly) },
+            monthly: monthly.map { Self.plan($0, period: .monthly) },
+            yearlyTrialEligible: eligible
+        )
     }
 
-    /// `PurchaseParams.package → Purchases.purchase` (states/user.dart:306-315).
-    /// The Dart caller only printed errors; failures now surface to the user
-    /// (a silent Confirm is indistinguishable from a dead button), with the
-    /// user-cancelled payment sheet exempt — cancelling is not an error.
-    func purchase(_ card: LoginPageModel.PlanCard) async throws {
+    private static func plan(_ package: Package, period: PaywallModel.Period) -> PaywallModel.Plan {
+        let product = package.storeProduct
+        let formatter = product.priceFormatter
+        return PaywallModel.Plan(
+            productID: product.productIdentifier,
+            period: period,
+            price: product.price,
+            currencyCode: product.currencyCode ?? formatter?.currencyCode ?? "USD",
+            localeIdentifier: formatter?.locale.identifier ?? Locale.current.identifier,
+            priceString: product.localizedPriceString
+        )
+    }
+
+    /// Buys the cached package for `productID` (re-fetching offerings when
+    /// the cache is cold) and reports whether an entitlement is active after.
+    func purchase(productID: String) async throws -> PurchaseOutcome {
         guard purchases.configured else { throw StoreError.notConfigured }
         let package: Package
-        if let cached = Self.packagesByProduct[card.productID] {
+        if let cached = Self.packagesByProduct[productID] {
             package = cached
         } else {
             let offerings = try await Purchases.shared.offerings()
             guard let fetched = offerings.current?.availablePackages.first(where: {
-                $0.storeProduct.productIdentifier == card.productID
+                $0.storeProduct.productIdentifier == productID
             })
             else { throw StoreError.planUnavailable }
             package = fetched
         }
         do {
-            _ = try await Purchases.shared.purchase(package: package)
+            let result = try await Purchases.shared.purchase(package: package)
+            if result.userCancelled { return .cancelled }
+            return result.customerInfo.entitlements.active.isEmpty ? .pending : .purchased
         } catch let error as ErrorCode where error == .purchaseCancelledError {
-            // The user dismissed the system payment sheet.
+            return .cancelled
         }
     }
 

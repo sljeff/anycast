@@ -152,28 +152,6 @@ struct LayoutSanityTests {
                 try await Self.settleLayout(window)
             }
         }
-
-        // LoginViewController is HOSTED, not presented: instantiating it in
-        // a signed-out container fires its own 401 → the global login
-        // funnel → a coordinator sheet over the app chain, which parallel
-        // suites count. Parking the coordinator's anchor for the duration
-        // keeps the funnel silent; hosting the view still exercises the
-        // layout assertions.
-        let loginAnchor = context.loginPrompt.presentingAnchor
-        context.loginPrompt.presentingAnchor = nil
-        let login = LoginViewController(context: context)
-        window.addSubview(login.view)
-        login.view.frame = CGRect(x: 0, y: 0, width: window.bounds.width, height: min(window.bounds.height, 700))
-        try await Self.settleLayout(window)
-        let loginSize = login.view.bounds.size
-        #expect(loginSize.width > 0 && loginSize.height > 0, "LoginViewController collapsed")
-        #expect(
-            login.view.frame.height <= window.bounds.height + 1,
-            "LoginViewController is taller than the window"
-        )
-        login.view.removeFromSuperview()
-        context.loginPrompt.presentingAnchor = loginAnchor
-        try await Self.settleLayout(window)
     }
 
     /// The M3 review found the playlist list hidden with items loaded —

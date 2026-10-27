@@ -1088,13 +1088,13 @@ final class QACrawlUITests: XCTestCase {
                                  s.tapRow(identifier: "settings-row-account", title: "Account") else {
                                return false
                            }
+                           // Signed out: the login sheet ("Sign In & Sync" with
+                           // "Continue with Apple"); signed in: the Membership page.
                            return s.waitUntil(timeout: 10) {
-                               s.app.buttons["Sign in with Apple"].exists
+                               s.app.buttons["login-apple"].exists
+                                   || s.app.buttons["Continue with Apple"].exists
                                    || s.app.staticTexts["User Info"].exists
                                    || s.app.staticTexts["Basic Plan"].exists
-                                   || s.app.staticTexts
-                                       .containing(NSPredicate(format: "label CONTAINS 'free audio transcriptions'"))
-                                       .firstMatch.exists
                            }
                        },
                        required: [],

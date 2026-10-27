@@ -385,11 +385,10 @@ final class MembershipViewController: UIViewController {
                 self?.reload()
             }
         case .upgrade, .getItBack:
-            // Temporary bridge to the paywall card inside the Login sheet
-            // until the standalone paywall exists.
-            let login = LoginViewController(context: context)
-            AppSheets.presentExpand(login, from: self)
-            login.presentationController?.delegate = self
+            let paywall = PaywallViewController.present(
+                from: self, context: context, variant: .standard
+            ) { [weak self] in self?.reload() }
+            paywall.presentationController?.delegate = self
         }
     }
 
@@ -482,7 +481,7 @@ extension MembershipViewController: UIContextMenuInteractionDelegate {
 
 extension MembershipViewController: UIAdaptivePresentationControllerDelegate {
 
-    /// The Login sheet (upgrade bridge) was swiped away: the entitlement may
+    /// The paywall was swiped away: the entitlement may
     /// have changed.
     func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
         reload()

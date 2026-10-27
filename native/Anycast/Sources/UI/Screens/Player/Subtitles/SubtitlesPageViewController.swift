@@ -423,12 +423,28 @@ final class SubtitlesPageViewController: UIViewController {
     /// signal from the add itself becomes a toast (background polling is
     /// silent; 401 routes to login inside the poller).
     private func generateTranscript() {
+        guard loadedURL != nil else { return }
+        // Signed out: sign in first, then generate once the sheet reports
+        // success (the add would only bounce off a 401 otherwise).
+        guard AuthAccountSnapshot.current(context: context).signedIn else {
+            LoginSheetViewController.present(
+                from: topMostPresented(), context: context, source: .transcribe
+            ) { [weak self] in self?.startTranscriptGeneration() }
+            return
+        }
+        startTranscriptGeneration()
+    }
+
+    private func startTranscriptGeneration() {
         guard let url = loadedURL else { return }
         Task { @MainActor in
             let signal = await self.context.subtitles.add(url: url)
             guard let signal, let window = self.view.window else { return }
             switch signal {
             case .errorMessage(let text):
+                // A 403 at the quota limit opens the paywall instead of a
+                // toast; any other 403 keeps the toast.
+                if await self.presentQuotaPaywallIfExhausted() { return }
                 ToastPresenter.shared.show(text, in: window, duration: 3)
             case .errorBody(let status, let body):
                 ToastPresenter.shared.show("Error \(status): \(body)", in: window, duration: 3)
@@ -436,6 +452,29 @@ final class SubtitlesPageViewController: UIViewController {
                 break
             }
         }
+    }
+
+    /// Re-reads the account after a refused add: when it has no transcripts
+    /// left and the user is not Plus, presents the quota paywall (variant C)
+    /// for the current episode and returns true.
+    private func presentQuotaPaywallIfExhausted() async -> Bool {
+        var remaining: Int?
+        if let result = try? await context.api.getUser(), case .user(let user) = result {
+            remaining = user.remaining
+        }
+        let subscribed = remaining == 0 ? await context.purchases.isSubscribed() : false
+        guard PaywallModel.shouldPresentQuotaPaywall(refreshedRemaining: remaining, isSubscribed: subscribed),
+              let episode = context.playback.currentEpisode, view.window != nil else { return false }
+        let summary = PaywallModel.Episode(
+            title: episode.title ?? "",
+            showName: episode.channelTitle ?? "",
+            durationMilliseconds: episode.duration,
+            artworkURL: episode.imageUrl.flatMap(URL.init(string:))
+        )
+        PaywallViewController.present(
+            from: topMostPresented(), context: context, variant: .quota(summary)
+        )
+        return true
     }
 
     // MARK: - Ready area (LyricsWithShare)
