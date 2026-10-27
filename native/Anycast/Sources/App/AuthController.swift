@@ -126,12 +126,20 @@ final class AuthController {
         )
         _ = try await Auth.auth().signIn(with: credential)
         currentUID = Auth.auth().currentUser?.uid
+        LastSignInProviderStore.standard.record(.google)
     }
 
     func signInWithEmail(email: String, password: String) async throws {
         guard isFirebaseConfigured else { throw AuthError.firebaseNotConfigured }
         _ = try await Auth.auth().signIn(withEmail: email, password: password)
         currentUID = Auth.auth().currentUser?.uid
+        LastSignInProviderStore.standard.record(.email)
+    }
+
+    /// Emails a password-reset link ("Forgot?" on the email sign-in form).
+    func sendPasswordReset(email: String) async throws {
+        guard isFirebaseConfigured else { throw AuthError.firebaseNotConfigured }
+        try await Auth.auth().sendPasswordReset(withEmail: email)
     }
 
     /// Apple sign-in, two halves: system sheet presentation (M3 supplies the
@@ -163,6 +171,7 @@ final class AuthController {
         )
         _ = try await Auth.auth().signIn(with: oauthCredential)
         currentUID = Auth.auth().currentUser?.uid
+        LastSignInProviderStore.standard.record(.apple)
     }
 
     // MARK: - Sign out (docs/migration/02 §2.5)
