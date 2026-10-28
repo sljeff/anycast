@@ -3,8 +3,8 @@ import Testing
 @testable import Anycast
 
 /// Player main page: one 24 pt content column (artwork, title row, scrubber,
-/// transport); player settings page: notes scroll above a card pinned over
-/// the page selector. Hosts the real container (live context, seeded data
+/// transport) with speed and sleep beside it; This episode page: chapters
+/// and notes scroll under a fixed header. Hosts the real container (live context, seeded data
 /// not required) in a private window of an exact size.
 @MainActor
 @Suite(.serialized)
@@ -99,46 +99,43 @@ struct PlayerPageAlignmentTests {
         #expect(abs(coverFrame.midX - page.view.bounds.midX) < 1)
     }
 
-    // MARK: - Settings page
-
-    @Test("Settings: card pinned above the selector and visible with 50 paragraphs; notes scroll")
-    func settingsLongNotes() async throws {
+    @Test("Main page: speed and sleep flank the transport inside the column, in the thumb zone")
+    func mainAccessories() async throws {
         guard let host = await Host.make(size: CGSize(width: 402, height: 812)) else { return }
         defer { host.discard() }
-        let page = try #require(host.showSettings())
+        let page = try #require(host.showMain())
+        let play = try #require(Host.firstView(in: page.view) { ($0 as? UIButton)?.accessibilityLabel == "Play or pause" })
+        let playFrame = page.view.convert(play.bounds, from: play)
+        for (identifier, isLeading) in [("player-speed", true), ("player-sleep", false)] {
+            let button = try #require(Host.firstView(in: page.view) { $0.accessibilityIdentifier == identifier } as? UIButton)
+            let frame = page.view.convert(button.bounds, from: button)
+            #expect(frame.width >= 44 && frame.height >= 44, "\(identifier) hit target \(frame.size)")
+            #expect(abs(frame.midY - playFrame.midY) < 0.5, "\(identifier) off the transport row")
+            #expect(isLeading ? abs(frame.minX - 24) < 0.5 : abs(frame.maxX - (402 - 24)) < 0.5, "\(identifier) at \(frame)")
+            #expect(button.showsMenuAsPrimaryAction && button.menu != nil)
+            #expect(frame.minY > page.view.bounds.height / 2, "\(identifier) left the thumb zone")
+        }
+    }
+
+    // MARK: - This episode page
+
+    @Test("This episode: long notes scroll under the fixed header")
+    func episodeLongNotes() async throws {
+        guard let host = await Host.make(size: CGSize(width: 402, height: 812)) else { return }
+        defer { host.discard() }
+        let page = try #require(host.showEpisode())
         let paragraphs = (1...50).map { "Paragraph \($0): a fairly long line of show notes that wraps over more than one line." }
         try host.setNotes(paragraphs.joined(separator: "\n\n"), in: page)
 
-        let card = try #require(Host.firstView(in: page.view) { $0.accessibilityIdentifier == "player-settings-card" })
-        let notes = try #require(Host.firstView(in: page.view) { $0.accessibilityIdentifier == "player-settings-notes" } as? UIScrollView)
-        let cardFrame = page.view.convert(card.bounds, from: card)
+        let scroll = try #require(Host.firstView(in: page.view) { $0.accessibilityIdentifier == "player-episode-scroll" } as? UIScrollView)
+        let notes = try #require(Host.firstView(in: page.view) { $0.accessibilityIdentifier == "player-episode-notes" })
+        #expect(scroll.contentSize.height > scroll.bounds.height + 100, "long notes must scroll: \(scroll.contentSize)")
         let notesFrame = page.view.convert(notes.bounds, from: notes)
+        #expect(abs(notesFrame.minX - 24) < 0.5 && abs(notesFrame.maxX - (402 - 24)) < 0.5, "notes column \(notesFrame)")
         let selector = try #require(Host.firstView(in: host.container.view) { $0 is PlayerPageTabView })
         let selectorTop = host.container.view.convert(selector.bounds, from: selector).minY
-        let pageBottom = host.container.view.convert(page.view.bounds, from: page.view).minY + page.view.bounds.height
-
-        #expect(abs(cardFrame.maxY - (page.view.bounds.maxY - 20)) < 0.5, "card bottom \(cardFrame.maxY)")
-        #expect(cardFrame.maxY <= page.view.bounds.maxY && pageBottom <= selectorTop + 0.5)
-        #expect(abs(cardFrame.minX - 24) < 0.5 && abs(cardFrame.maxX - (402 - 24)) < 0.5)
-        #expect(notesFrame.maxY <= cardFrame.minY, "notes overlap the card")
-        #expect(notes.contentSize.height > notes.bounds.height + 100, "long notes must scroll: \(notes.contentSize)")
-
-        // Scrolling the notes never moves the card.
-        notes.contentOffset = CGPoint(x: 0, y: 300)
-        host.window.layoutIfNeeded()
-        #expect(page.view.convert(card.bounds, from: card) == cardFrame)
-    }
-
-    @Test("Settings: short or empty notes do not scroll")
-    func settingsShortNotes() async throws {
-        guard let host = await Host.make(size: CGSize(width: 402, height: 812)) else { return }
-        defer { host.discard() }
-        let page = try #require(host.showSettings())
-        try host.setNotes("Two short lines.\nNothing to scroll.", in: page)
-        let notes = try #require(Host.firstView(in: page.view) { $0.accessibilityIdentifier == "player-settings-notes" } as? UIScrollView)
-        #expect(notes.contentSize.height <= notes.bounds.height, "short notes scroll: \(notes.contentSize) in \(notes.bounds)")
-        let card = try #require(Host.firstView(in: page.view) { $0.accessibilityIdentifier == "player-settings-card" })
-        #expect(page.view.convert(card.bounds, from: card).maxY <= page.view.bounds.maxY - 20 + 0.5)
+        let pageBottom = host.container.view.convert(page.view.bounds, from: page.view).maxY
+        #expect(pageBottom <= selectorTop + 0.5)
     }
 
     // MARK: - Host
@@ -211,15 +208,15 @@ struct PlayerPageAlignmentTests {
             return page as? PlayerMainPageViewController
         }
 
-        func showSettings() -> SettingsPageViewController? {
-            let page = showFirstPage() as? SettingsPageViewController
+        func showEpisode() -> EpisodePageViewController? {
+            let page = showFirstPage() as? EpisodePageViewController
             window.layoutIfNeeded()
             return page
         }
 
         /// Replaces the notes' rendered content (the live seed's description
         /// would otherwise decide the test) and re-lays the page out.
-        func setNotes(_ text: String, in page: SettingsPageViewController) throws {
+        func setNotes(_ text: String, in page: EpisodePageViewController) throws {
             let textView = try #require(Self.firstView(in: page.view) { $0 is UITextView } as? UITextView)
             // An empty seed hides the notes host; the layout under test
             // needs it live.

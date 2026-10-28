@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import Anycast
 
-/// LyricsFollowStateMachine: the player's drag/neverResume configuration
-/// (player.dart:988-990 — neverResume, 300 ms select, 3000 ms active).
+/// LyricsFollowStateMachine: following stops on a user drag and stays
+/// stopped until the user taps "Back to now" (no timed auto-resume).
 struct LyricsFollowStateMachineTests {
 
     @Test("Initial mode follows the active line")
@@ -11,55 +11,42 @@ struct LyricsFollowStateMachineTests {
         #expect(LyricsFollowStateMachine().mode == .following)
     }
 
-    @Test("Drag suspends following and cancels any pending resume")
-    func dragSuspends() {
-        var machine = LyricsFollowStateMachine()
-        #expect(machine.handle(.dragBegan) == .cancel)
-        #expect(machine.mode == .selecting)
-    }
-
-    @Test("neverResume: after a drag only the 3 s active resume schedules")
-    func dragEndSchedulesActiveResume() {
+    @Test("A drag stops following")
+    func dragDetaches() {
         var machine = LyricsFollowStateMachine()
         machine.handle(.dragBegan)
-        #expect(machine.handle(.dragEnded) == .startActiveResume)
-        // Still selecting while the timer runs.
-        #expect(machine.mode == .selecting)
+        #expect(machine.mode == .detached)
     }
 
-    @Test("Timer fire after drag resumes following")
-    func timerResumes() {
+    @Test("Stays detached across further drags")
+    func staysDetached() {
         var machine = LyricsFollowStateMachine()
         machine.handle(.dragBegan)
-        machine.handle(.dragEnded)
-        #expect(machine.handle(.activeResumeTimerFired) == .none)
+        machine.handle(.dragBegan)
+        #expect(machine.mode == .detached)
+    }
+
+    @Test("Back to now resumes following")
+    func backToNowResumes() {
+        var machine = LyricsFollowStateMachine()
+        machine.handle(.dragBegan)
+        machine.handle(.backToNowRequested)
         #expect(machine.mode == .following)
     }
 
-    @Test("A new drag wins over a queued resume timer")
-    func redragCancels() {
+    @Test("Back to now while following is a no-op")
+    func backToNowWhileFollowing() {
         var machine = LyricsFollowStateMachine()
-        machine.handle(.dragBegan)
-        machine.handle(.dragEnded)
-        // The view cancels the timer on dragBegan; a late timer fire is a
-        // no-op because the machine is selecting again.
-        #expect(machine.handle(.dragBegan) == .cancel)
-        #expect(machine.handle(.activeResumeTimerFired) == .none)
-        #expect(machine.mode == .selecting)
-    }
-
-    @Test("stopSelection (time-bar play tap) returns to following at once")
-    func stopSelection() {
-        var machine = LyricsFollowStateMachine()
-        machine.handle(.dragBegan)
-        machine.handle(.dragEnded)
-        #expect(machine.handle(.stopSelectionRequested) == .cancel)
+        machine.handle(.backToNowRequested)
         #expect(machine.mode == .following)
     }
 
-    @Test("Resume constants mirror the Dart configuration")
-    func constants() {
-        #expect(LyricsFollowStateMachine.activeLineResumeMilliseconds == 3_000)
-        #expect(LyricsFollowStateMachine.selectLineResumeMilliseconds == 300)
+    @Test("A new drag after returning detaches again")
+    func redrag() {
+        var machine = LyricsFollowStateMachine()
+        machine.handle(.dragBegan)
+        machine.handle(.backToNowRequested)
+        machine.handle(.dragBegan)
+        #expect(machine.mode == .detached)
     }
 }

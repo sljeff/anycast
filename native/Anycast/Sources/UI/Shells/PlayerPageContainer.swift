@@ -170,12 +170,12 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
     init(context: UIContext) {
         self.context = context
         self.pages = [
-            SettingsPageViewController(context: context),
+            EpisodePageViewController(context: context),
             PlayerMainPageViewController(context: context),
             SubtitlesPageViewController(context: context),
         ]
         self.pageTab = PlayerPageTabView(items: [
-            .init(icon: AppIcons.playerSettings, accessibilityLabel: "Player settings"),
+            .init(icon: AppIcons.playerEpisode, accessibilityLabel: "This episode"),
             .init(icon: AppIcons.playerMain, accessibilityLabel: "Player main"),
             .init(icon: AppIcons.topology ?? UIImage(), accessibilityLabel: "Player AI transcript"),
         ])
@@ -253,6 +253,12 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
             animated: animated,
             completion: nil
         )
+    }
+
+    /// Pages that link to a sibling (the main page's chapter line opens
+    /// This episode) move the pager like a selector tap.
+    func selectPage(_ index: Int) {
+        pageTabSelected(index)
     }
 
     /// Capsule tap: page change animates 300 ms easeInOut in the Dart

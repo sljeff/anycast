@@ -98,7 +98,8 @@ nonisolated enum AppIcons {
     // Player (03 §2.10)
     static let replay10 = symbol("gobackward.10")
     static let forward30 = symbol("goforward.30")
-    static let playerSettings = symbol("gearshape")
+    static let playerEpisode = symbol("list.bullet")
+    static let sleepTimer = symbol("moon")
     static let playerMain = symbol("dot.radiowaves.left.and.right")
 
     // Settings & login (03 §2.13 / §2.14)

@@ -25,16 +25,16 @@ struct AnycastSwitchTests {
         return window
     }
 
-    @Test("ON track and thumb resolve to the sand tokens in light and dark")
+    @Test("ON track and thumb resolve to their tokens in light and dark")
     func onTrackAndThumb() throws {
         let toggle = AnycastSwitch()
         let onTint = try #require(toggle.onTintColor)
         let thumb = try #require(toggle.thumbTintColor)
 
         #expect(onTint.resolvedColor(with: light) == AnycastColor.sand12.resolvedColor(with: light))
-        #expect(onTint.resolvedColor(with: dark) == AnycastColor.sandDark9.resolvedColor(with: dark))
+        #expect(onTint.resolvedColor(with: dark) == AnycastColor.goldDark9.resolvedColor(with: dark))
         #expect(thumb.resolvedColor(with: light) == AnycastColor.sand1.resolvedColor(with: light))
-        #expect(thumb.resolvedColor(with: dark) == AnycastColor.sandDark1.resolvedColor(with: dark))
+        #expect(thumb.resolvedColor(with: dark) == AnycastColor.sandDark12.resolvedColor(with: dark))
     }
 
     @Test("OFF track is the stepper capsule fill in light and dark")
@@ -99,7 +99,7 @@ struct AnycastSwitchTests {
         let onTint = try #require(toggle.onTintColor)
         #expect(
             onTint.resolvedColor(with: toggle.traitCollection)
-                == AnycastColor.sandDark9.resolvedColor(with: dark)
+                == AnycastColor.goldDark9.resolvedColor(with: dark)
         )
     }
 }

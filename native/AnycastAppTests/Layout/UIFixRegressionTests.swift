@@ -91,13 +91,15 @@ struct UIFixRegressionTests {
 
         // One 28 pt VISIBLE rhythm (subtitle → track, labels → transport,
         // transport → selector); the frames carry the hidden slack, so the
-        // frame gaps are 28 - 24 and 28 - 13 (the page ends at the selector's
-        // top). Slack sits above the cover.
+        // frame gaps are at least 28 - 24 and exactly 28 - 13 (the page ends
+        // at the selector's top). The cover sits just under the grabber and
+        // the slack goes between the title and the scrubber, keeping the
+        // controls in the thumb zone.
         let topGap = coverFrame.minY
         let middleGap = bottomFrame.minY - titleFrame.maxY
         let bottomGap = page.bounds.maxY - bottomFrame.maxY
-        #expect(topGap >= 24 - 0.5, "content is crammed against the sheet top: \(topGap)")
-        #expect(abs(middleGap - 4) < 1.0, "title → scrubber frame gap is \(middleGap), expected 4")
+        #expect(abs(topGap - 36) < 0.5, "cover should sit just under the grabber: \(topGap)")
+        #expect(middleGap >= 4 - 0.5, "title → scrubber frame gap is \(middleGap), expected at least 4")
         #expect(abs(bottomGap - 15) < 1.0, "transport → selector frame gap is \(bottomGap), expected 15")
 
         // Play sits exactly on the page's center line.
@@ -111,11 +113,12 @@ struct UIFixRegressionTests {
         bar.frame = CGRect(x: 0, y: 0, width: 320, height: 60)
         bar.layoutIfNeeded()
 
-        // Layer order per init: track, buffered, played — inside the bar
-        // container, and nothing else.
+        // Layer order per init: track, buffered, played, chapter gaps —
+        // inside the bar container, and nothing else; no marks, no gaps.
         let shapes = (bar.barContainer.layer.sublayers ?? []).compactMap { $0 as? CAShapeLayer }
-        #expect(shapes.count == 3,
-                "expected exactly track/buffered/played shape layers, found \(shapes.count)")
+        #expect(shapes.count == 4,
+                "expected exactly track/buffered/played/chapter shape layers, found \(shapes.count)")
+        #expect(shapes.last?.path?.isEmpty ?? true, "chapter gaps drawn without chapters")
 
         // Fraction 1: the played capsule reaches the trailing cap; the
         // head travels the full width (no thumb inset resurrecting it).

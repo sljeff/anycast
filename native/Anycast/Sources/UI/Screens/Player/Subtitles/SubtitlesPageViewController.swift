@@ -2,12 +2,11 @@ import UIKit
 import AnycastKit
 
 /// Player page 2 (PlayerAI/Subtitles, 03 §2.10) in the Anycast 2.0
-/// transcript form (type B, adopted 2026-10-21): a left-aligned header — the
-/// 44 pt episode cover beside "Transcript" over the episode title — then the
-/// transcript states directly on the player backdrop. Every non-ready state
-/// is one capsule panel above the page selector (thumb reach); the ready
-/// state is the bilingual lyrics view with the drag time bar, the AI-chat /
-/// export overlay and the play-pause morph.
+/// transcript form (option A): a left-aligned header — the 44 pt episode
+/// cover beside "Transcript" over the episode title — then the transcript
+/// lines, ONE status capsule slot (following / back to now / jump undo /
+/// generation and translation states), and the shared scrubber + transport
+/// with the ••• menu and Ask AI flanking it, above the page selector.
 ///
 /// Row state is derived from the poll controllers plus async row fetches;
 /// polling cadence, K27 error policy and the K9 5-strike rule all live in
@@ -20,10 +19,14 @@ final class SubtitlesPageViewController: UIViewController {
     private enum Layout {
         static let headerArtwork: CGFloat = 44
         static let headerArtworkRadius: CGFloat = 14
-        /// The status capsule sits 20 pt above the page selector
-        /// (contentHost already ends `Spacing.pageH` above it).
-        static let panelBottomGap: CGFloat = 20 - Spacing.pageH
+        /// Gap between the lyrics and the status capsule slot.
+        static let lyricsToCapsule: CGFloat = Spacing.md
     }
+
+    /// In-memory for now (no persisted setting): when false, a loaded
+    /// translation is not rendered, copied or counted — the page shows the
+    /// transcript as mono.
+    static var showsTranslation = true
 
     // MARK: Chrome
 
@@ -32,6 +35,14 @@ final class SubtitlesPageViewController: UIViewController {
     private let headerTitleLabel = UILabel()
     private let titleLabel = UILabel()
     private let contentHost = UIView()
+    private let capsule = TranscriptStatusCapsuleView()
+    private lazy var transport = PlayerTransportView(context: context, transportGap: Spacing.gap)
+    private let moreButton = AnycastIconButton(
+        style: .tonal, icon: AppIcons.more, accessibilityLabel: "More transcript actions", glyphSize: 20
+    )
+    private let askAIButton = AnycastIconButton(
+        style: .tonal, icon: AppIcons.aiChat, accessibilityLabel: "Ask AI", glyphSize: 20
+    )
 
     // MARK: Observed state
 
@@ -46,9 +57,8 @@ final class SubtitlesPageViewController: UIViewController {
     // follow position survive)
 
     private let lyricsView = LyricsView()
-    private var lyricsBottomConstraint: NSLayoutConstraint?
-    private var inlineStatus: UIView?
-    private var overlay: GlassContainerView?
+    /// The last tap-jump, until the undo capsule times out or is used.
+    private let jumpUndo = PlaybackJumpUndo()
 
     private let stateLoop = ObservationLoop()
     private let progressLoop = ObservationLoop()
@@ -76,23 +86,14 @@ final class SubtitlesPageViewController: UIViewController {
 
         buildChrome()
 
-        lyricsView.onTapLine = { [weak self] _ in
-            guard let self else { return }
-            Task { @MainActor in
-                await self.context.playback.togglePlay()
-                // Dart: PlayPauseAnimation(isPlaying: !isPlaying.value) —
-                // the glyph shows the state AFTER the toggle.
-                if let window = self.view.window {
-                    PlayPauseAnimationView.presentOver(
-                        window, isPlaying: self.context.playback.isPlaying
-                    )
-                }
-            }
+        lyricsView.onTapLine = { [weak self] index in self?.jumpToLine(index) }
+        jumpUndo.onChange = { [weak self] in self?.updateCapsule() }
+        lyricsView.onFollowingChanged = { [weak self] isFollowing in
+            // Dragging away means the user moved on from the jump.
+            if !isFollowing { self?.jumpUndo.clear() }
+            self?.updateCapsule()
         }
-        lyricsView.onSeekLine = { [weak self] milliseconds in
-            guard let self else { return }
-            Task { await self.context.playback.seek(Int64(milliseconds)) }
-        }
+        lyricsView.contextMenuProvider = { [weak self] index in self?.makeLineMenu(for: index) }
 
         stateLoop.track(
             read: { [weak self] in
@@ -142,6 +143,7 @@ final class SubtitlesPageViewController: UIViewController {
             // retaining the closure) after the page is gone.
             demoTimer?.invalidate()
             #endif
+            jumpUndo.clear()
             if let languageObserver {
                 NotificationCenter.default.removeObserver(languageObserver)
             }
@@ -181,6 +183,17 @@ final class SubtitlesPageViewController: UIViewController {
         contentHost.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(contentHost)
 
+        lyricsView.isHidden = true
+        lyricsView.translatesAutoresizingMaskIntoConstraints = false
+        contentHost.addSubview(lyricsView)
+
+        capsule.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(capsule)
+
+        transport.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(transport)
+        buildTransportAccessories()
+
         NSLayoutConstraint.activate([
             header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
@@ -191,8 +204,39 @@ final class SubtitlesPageViewController: UIViewController {
             contentHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
             contentHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
             contentHost.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.gap),
-            contentHost.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Spacing.pageH),
+
+            lyricsView.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
+            lyricsView.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
+            lyricsView.topAnchor.constraint(equalTo: contentHost.topAnchor),
+            lyricsView.bottomAnchor.constraint(equalTo: contentHost.bottomAnchor),
+
+            capsule.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
+            capsule.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
+            capsule.topAnchor.constraint(equalTo: contentHost.bottomAnchor, constant: Layout.lyricsToCapsule),
+
+            transport.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
+            transport.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
+            transport.topAnchor.constraint(equalTo: capsule.bottomAnchor),
+            transport.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -PlayerTransportView.Layout.toSelector),
         ])
+    }
+
+    /// ••• (menu) left and Ask AI right of the transport: 44 pt round
+    /// buttons with a subtle player-text fill. Player colors only — the
+    /// player is always dark, so nothing adapts to the appearance.
+    private func buildTransportAccessories() {
+        for button in [moreButton, askAIButton] {
+            button.configuration?.baseBackgroundColor = Theme.playerText.withAlphaComponent(0.08)
+            button.configuration?.baseForegroundColor = Theme.playerText
+        }
+        moreButton.showsMenuAsPrimaryAction = true
+        moreButton.menu = UIMenu(children: [
+            UIDeferredMenuElement.uncached { [weak self] completion in
+                completion(self?.moreMenuElements() ?? [])
+            },
+        ])
+        askAIButton.addAction(UIAction { [weak self] _ in self?.openChat() }, for: .touchUpInside)
+        transport.setAccessories(leading: moreButton, trailing: askAIButton)
     }
 
     // MARK: - State refresh (observation → row loads → render)
@@ -308,115 +352,152 @@ final class SubtitlesPageViewController: UIViewController {
     private func render() {
         let state = currentState()
         guard state != renderedState else { return }
+        let wasReady = isReady
         renderedState = state
-        contentHost.subviews.forEach { $0.removeFromSuperview() }
-        lyricsBottomConstraint?.isActive = false
-        lyricsBottomConstraint = nil
-        inlineStatus = nil
-        overlay = nil
 
-        // The `Subtitles` widget state panels (player.dart 1.2.1+38): the
-        // wrapper states around the row fetches render status panels too —
-        // unavailable / loading / load-failed (a blank page was the QA
-        // crawl's "near-black transcript page"; the Dart baseline renders
-        // _TranscriptStatusPanel for every wrapper state, player.dart
-        // 700-812).
+        // The `Subtitles` widget states (player.dart 1.2.1+38): every
+        // wrapper state around the row fetches (unavailable / loading /
+        // load-failed) shows in the status capsule; a blank page was the QA
+        // crawl's "near-black transcript page".
+        if case .ready = state {
+            lyricsView.isHidden = false
+            // A fresh document starts out following again.
+            if !wasReady {
+                lyricsView.resetFollowing()
+                jumpUndo.clear()
+            }
+            // Every translation phase renders the lyrics — the in-flight or
+            // failed translation rows show the main lyric with the inline
+            // status in the capsule (player.dart:834-864).
+            reloadLyrics()
+        } else {
+            lyricsView.isHidden = true
+            jumpUndo.clear()
+        }
+        askAIButton.isEnabled = isReady
+        askAIButton.alpha = isReady ? 1 : 0.38
+        updateCapsule()
+    }
+
+    private var isReady: Bool {
+        if case .ready? = renderedState { return true }
+        return false
+    }
+
+    // MARK: - Status capsule (one state at a time)
+
+    /// Picks the capsule content: generation states while the transcript is
+    /// not ready; once ready, the jump undo, then back-to-now, then the
+    /// inline translation status, then the quiet following chip.
+    private func updateCapsule() {
+        capsule.show(capsuleContent())
+    }
+
+    private func capsuleContent() -> TranscriptStatusCapsuleView.Content? {
+        guard let state = renderedState else { return nil }
         switch state {
         case .unavailable:
-            makeUnavailablePanel()
+            return .init(
+                id: "unavailable", leading: .icon(UIImage(systemName: "doc.text")),
+                message: "No episode playing"
+            )
         case .loading:
-            makeLoadingPanel()
+            return .init(id: "loading", leading: .spinner, message: "Loading transcript")
         case .loadFailed:
-            makeLoadFailedPanel()
+            return .init(
+                id: "loadFailed", leading: .icon(UIImage(systemName: "arrow.triangle.2.circlepath")),
+                message: "Couldn't load transcript",
+                action: ("Retry", { [weak self] in
+                    guard let self, let url = self.loadedURL, !url.isEmpty else { return }
+                    self.loadTranscriptRow(url: url)
+                })
+            )
         case .prompt:
-            makePromptPanel()
+            return .init(
+                id: "prompt", leading: .icon(UIImage(systemName: "sparkles")),
+                message: "AI transcript",
+                action: ("Generate", { [weak self] in self?.generateTranscript() })
+            )
         case .processing:
-            makeProcessingPanel()
+            // The server reports no percentage, so just a spinner.
+            return .init(id: "processing", leading: .spinner, message: "Generating transcript")
         case .failed:
-            makeFailedPanel()
+            return .init(
+                id: "failed", leading: .icon(UIImage(systemName: "exclamationmark.triangle")),
+                message: "Couldn't transcribe",
+                action: ("Retry", { [weak self] in self?.generateTranscript() })
+            )
         case .ready(let translation):
-            // Every translation phase renders the lyrics area — the
-            // in-flight/failed translation rows show the main lyric with
-            // the inline status bar (player.dart:834-864).
-            installLyricsArea(translation: translation)
+            if let undo = jumpUndo.capsuleContent(undo: { [weak self] in self?.undoJump() }) {
+                return undo
+            }
+            if !lyricsView.isFollowing {
+                return .init(
+                    id: "backToNow", style: .filledButton,
+                    leading: .icon(UIImage(systemName: "chevron.down")),
+                    message: "Back to now",
+                    action: ("Back to now", { [weak self] in self?.lyricsView.returnToNow() })
+                )
+            }
+            switch translation {
+            case .translating:
+                // Baseline Row[RefreshProgressIndicator, "Translating
+                // subtitles..."] (player.dart 1.2.1+38).
+                return .init(id: "translating", leading: .spinner, message: "Translating subtitles…")
+            case .loadingTranslation:
+                return .init(id: "loadingTranslation", leading: .spinner, message: "Loading translation…")
+            case .translationUnavailable:
+                return .init(id: "translationUnavailable", message: "Translation unavailable")
+            case .mono, .bilingual:
+                return .init(id: "following", leading: .dot, message: "Following")
+            }
         }
-
-        contentHost.setNeedsLayout()
     }
 
-    // MARK: - Status panels (released baseline 1.2.1+38 states, 03 §2.10,
-    // in the type B capsule)
+    // MARK: - Tap to jump
 
-    private func embedPanel(_ content: TranscriptStatusPanel.Content) {
-        let panel = TranscriptStatusPanel(content)
-        panel.translatesAutoresizingMaskIntoConstraints = false
-        contentHost.addSubview(panel)
-        NSLayoutConstraint.activate([
-            panel.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
-            panel.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
-            panel.bottomAnchor.constraint(equalTo: contentHost.bottomAnchor, constant: -Layout.panelBottomGap),
-        ])
+    /// A line tap seeks to the line's start and keeps the play state. The
+    /// list does not scroll: the touched line stays put and only the
+    /// highlight moves. The capsule offers Undo for a few seconds.
+    private func jumpToLine(_ index: Int) {
+        guard lyricsView.lines.indices.contains(index) else { return }
+        let line = lyricsView.lines[index]
+        // Blank spacer lines (the LRC `[end]` rows) are not jump targets.
+        guard !line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        let previous = Int(context.playback.positionData.positionMilliseconds)
+        lyricsView.jump(toLine: index)
+        seek(toMilliseconds: line.startMilliseconds)
+        jumpUndo.record(from: previous, to: line.startMilliseconds)
     }
 
-    /// Ungenerated: the AI transcript offer; Generate triggers
-    /// `subtitles.add(url)`.
-    private func makePromptPanel() {
-        embedPanel(.init(
-            icon: UIImage(systemName: "sparkles"),
-            title: "AI transcript",
-            subtitle: "Beta · about 2–5 min",
-            action: ("Generate", { [weak self] in self?.generateTranscript() })
-        ))
+    /// A moment an AI reply cites: the same jump as a line tap, landing on
+    /// the line playing at that time.
+    private func jump(toMilliseconds milliseconds: Int) {
+        let previous = Int(context.playback.positionData.positionMilliseconds)
+        if isReady, !lyricsView.lines.isEmpty {
+            lyricsView.jump(toLine: LyricDocument.activeLineIndex(
+                lines: lyricsView.lines, positionMilliseconds: milliseconds
+            ))
+        }
+        seek(toMilliseconds: milliseconds)
+        jumpUndo.record(from: previous, to: milliseconds)
     }
 
-    private func makeProcessingPanel() {
-        embedPanel(.init(
-            showsSpinner: true,
-            title: "Generating transcript",
-            subtitle: "About 2–5 min · feel free to leave"
-        ))
+    private func undoJump() {
+        guard let jump = jumpUndo.take() else { return }
+        let index = LyricDocument.activeLineIndex(
+            lines: lyricsView.lines, positionMilliseconds: jump.previousMilliseconds
+        )
+        lyricsView.jump(toLine: index)
+        seek(toMilliseconds: jump.previousMilliseconds)
     }
 
-    /// Failed: Retry re-runs the add (03 §2.10 "Retry").
-    private func makeFailedPanel() {
-        embedPanel(.init(
-            icon: UIImage(systemName: "exclamationmark.triangle"),
-            title: "Couldn't generate",
-            subtitle: "Try again in a moment",
-            action: ("Retry", { [weak self] in self?.generateTranscript() })
-        ))
-    }
-
-    /// Unavailable (no episode) — player.dart:701-710.
-    private func makeUnavailablePanel() {
-        embedPanel(.init(
-            icon: UIImage(systemName: "doc.text"),
-            title: "No episode playing",
-            subtitle: "Choose one to see its transcript"
-        ))
-    }
-
-    /// Row fetch in flight — player.dart:806-815.
-    private func makeLoadingPanel() {
-        embedPanel(.init(
-            showsSpinner: true,
-            title: "Loading transcript",
-            subtitle: "Preparing it for playback"
-        ))
-    }
-
-    /// Row fetch failed; Retry re-runs the row load —
-    /// player.dart:789-805.
-    private func makeLoadFailedPanel() {
-        embedPanel(.init(
-            icon: UIImage(systemName: "arrow.triangle.2.circlepath"),
-            title: "Couldn't load transcript",
-            subtitle: "It's temporarily unavailable",
-            action: ("Retry", { [weak self] in
-                guard let self, let url = self.loadedURL, !url.isEmpty else { return }
-                self.loadTranscriptRow(url: url)
-            })
-        ))
+    private func seek(toMilliseconds milliseconds: Int) {
+        #if DEBUG
+        if demoMode { demoPositionMilliseconds = milliseconds }
+        #endif
+        Task { await context.playback.seek(Int64(milliseconds)) }
     }
 
     /// `controller.add(url)` with the K27 user-trigger surface: the error
@@ -477,163 +558,99 @@ final class SubtitlesPageViewController: UIViewController {
         return true
     }
 
-    // MARK: - Ready area (LyricsWithShare)
+    // MARK: - Lyrics
 
-    private func installLyricsArea(translation: TranslationPhase) {
-        // Three-edge embed: the bottom is `lyricsBottomConstraint` (full
-        // height in mono/bilingual, above the 48 pt inline status while
-        // translating — Dart `height - AnycastSpacing.xxl`).
-        lyricsView.translatesAutoresizingMaskIntoConstraints = false
-        contentHost.addSubview(lyricsView)
-        NSLayoutConstraint.activate([
-            lyricsView.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
-            lyricsView.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
-            lyricsView.topAnchor.constraint(equalTo: contentHost.topAnchor),
-        ])
+    private func reloadLyrics() {
         lyricsView.updateDocument(
             lines: currentLyricLines(),
             positionMilliseconds: Int(context.playback.positionData.positionMilliseconds)
         )
-
-        var inlineMessage: String?
-        var inlineSpinner = false
-        switch translation {
-        case .mono, .bilingual:
-            inlineMessage = nil
-        case .translating:
-            // Baseline Row[RefreshProgressIndicator, "Translating
-            // subtitles..."] pinned under the lyrics (player.dart 1.2.1+38).
-            inlineMessage = "Translating subtitles..."
-            inlineSpinner = true
-        case .loadingTranslation:
-            inlineMessage = "Loading translation…"
-            inlineSpinner = true
-        case .translationUnavailable:
-            inlineMessage = "Translation unavailable"
-            inlineSpinner = false
-        }
-
-        var statusTopAnchor = contentHost.bottomAnchor
-        if let inlineMessage {
-            let status = makeInlineStatus(message: inlineMessage, spinner: inlineSpinner)
-            status.translatesAutoresizingMaskIntoConstraints = false
-            contentHost.addSubview(status)
-            NSLayoutConstraint.activate([
-                status.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
-                status.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
-                status.bottomAnchor.constraint(equalTo: contentHost.bottomAnchor),
-                status.heightAnchor.constraint(equalToConstant: 48),
-            ])
-            inlineStatus = status
-            statusTopAnchor = status.topAnchor
-        }
-        lyricsBottomConstraint = lyricsView.bottomAnchor.constraint(equalTo: statusTopAnchor)
-        lyricsBottomConstraint?.isActive = true
-
-        installOverlay()
     }
 
     private func currentLyricLines() -> [LyricLine] {
         guard let subtitleRow else { return [] }
         let mainLRC = LRC.render(rawJSON: subtitleRow.subtitle)
         var translationLRC: String? {
-            guard case .ready(.bilingual)? = renderedState else { return nil }
+            guard Self.showsTranslation, case .ready(.bilingual)? = renderedState else { return nil }
             return LRC.render(rawJSON: translationRow?.translation)
         }
         return LyricDocument.parse(mainLRC: mainLRC, translationLRC: translationLRC)
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // Lines clear the floating overlay instead of running under it.
-        lyricsView.bottomClearance = overlay.map { $0.bounds.height + Spacing.gap } ?? 0
-    }
+    // MARK: - Line context menu (long-press)
 
-    /// Bottom-right floating overlay (player.dart:1131-1203): AI chat entry
-    /// + the export menu, as one grouped glass surface (07 §2.5).
-    private func installOverlay() {
-        let glass = GlassContainerView(mode: .container, cornerRadius: 20)
-        glass.translatesAutoresizingMaskIntoConstraints = false
-        contentHost.addSubview(glass)
-        overlay = glass
+    private func makeLineMenu(for index: Int) -> UIMenu? {
+        guard lyricsView.lines.indices.contains(index) else { return nil }
+        let text = lyricsView.lines[index].text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        let episodeTitle = context.playback.currentEpisode?.title ?? ""
 
-        let chatIcon = UIImageView(image: AppIcons.aiChat)
-        chatIcon.tintColor = Theme.primary
-        chatIcon.contentMode = .scaleAspectFit
-        chatIcon.isUserInteractionEnabled = true
-        chatIcon.isAccessibilityElement = true
-        chatIcon.accessibilityLabel = "AI chat"
-        chatIcon.accessibilityTraits = .button
-        chatIcon.translatesAutoresizingMaskIntoConstraints = false
-        chatIcon.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(openChat)))
-
-        let moreButton = UIButton(type: .system)
-        moreButton.setImage(AppIcons.more, for: .normal)
-        moreButton.tintColor = Theme.onSurfaceVariant
-        moreButton.isAccessibilityElement = true
-        moreButton.accessibilityLabel = "More transcript actions"
-        moreButton.showsMenuAsPrimaryAction = true
-        moreButton.menu = UIMenu(children: [
-            UIAction(
-                title: "Export subtitles",
-                image: AppIcons.exportFile
-            ) { [weak self] _ in
-                self?.exportTranscript()
+        return UIMenu(children: [
+            UIAction(title: "Ask AI about this", image: UIImage(systemName: "sparkles")) { [weak self] _ in
+                self?.openChat(draftQuestion: "Can you explain this part of the episode? \"\(text)\"")
+            },
+            UIAction(title: "Play from here", image: AppIcons.play) { [weak self] _ in
+                self?.jumpToLine(index)
+            },
+            UIAction(title: "Copy", image: AppIcons.copy) { [weak self] _ in
+                UIPasteboard.general.string = text
+                self?.showToast("Copied")
+            },
+            UIAction(title: "Share quote", image: AppIcons.share) { [weak self] _ in
+                let quote = episodeTitle.isEmpty ? "\"\(text)\"" : "\"\(text)\" — \(episodeTitle)"
+                let activity = UIActivityViewController(activityItems: [quote], applicationActivities: nil)
+                self?.topMostPresented().present(activity, animated: true)
             },
         ])
-        moreButton.translatesAutoresizingMaskIntoConstraints = false
-
-        let row = UIStackView(arrangedSubviews: [chatIcon, moreButton])
-        row.axis = .horizontal
-        row.spacing = 4
-        row.translatesAutoresizingMaskIntoConstraints = false
-        glass.glassContentView.addSubview(row)
-
-        NSLayoutConstraint.activate([
-            chatIcon.widthAnchor.constraint(equalToConstant: 24),
-            chatIcon.heightAnchor.constraint(equalToConstant: 24),
-            row.topAnchor.constraint(equalTo: glass.glassContentView.topAnchor, constant: 8),
-            row.bottomAnchor.constraint(equalTo: glass.glassContentView.bottomAnchor, constant: -8),
-            row.leadingAnchor.constraint(equalTo: glass.glassContentView.leadingAnchor, constant: 8),
-            row.trailingAnchor.constraint(equalTo: glass.glassContentView.trailingAnchor, constant: -4),
-
-            glass.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor),
-            glass.bottomAnchor.constraint(equalTo: lyricsView.bottomAnchor),
-        ])
     }
 
-    private func makeInlineStatus(message: String, spinner: Bool) -> UIView {
-        var elements: [UIView] = []
-        if spinner {
-            let indicator = UIActivityIndicatorView(style: .medium)
-            indicator.color = Theme.primary
-            indicator.startAnimating()
-            indicator.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                indicator.widthAnchor.constraint(equalToConstant: 18),
-                indicator.heightAnchor.constraint(equalToConstant: 18),
-            ])
-            elements.append(indicator)
+    // MARK: - ••• menu
+
+    private func moreMenuElements() -> [UIMenuElement] {
+        let enabled: UIMenuElement.Attributes = isReady ? [] : .disabled
+        var elements: [UIMenuElement] = []
+        // The toggle only exists once a translation has actually loaded.
+        if case .ready(.bilingual)? = renderedState {
+            elements.append(UIAction(
+                title: "Show translation",
+                state: Self.showsTranslation ? .on : .off
+            ) { [weak self] _ in
+                Self.showsTranslation.toggle()
+                self?.reloadLyrics()
+            })
         }
-        let label = UILabel()
-        label.text = message
-        label.font = TypographyV2.meta.font()
-        label.textColor = Theme.playerSecondary
-        label.adjustsFontForContentSizeCategory = true
-        elements.append(label)
-
-        let row = UIStackView(arrangedSubviews: elements)
-        row.axis = .horizontal
-        row.alignment = .center
-        row.spacing = 8
-        row.translatesAutoresizingMaskIntoConstraints = false
-        return row
+        elements.append(UIAction(
+            title: "Copy transcript", image: AppIcons.copy, attributes: enabled
+        ) { [weak self] _ in
+            guard let self else { return }
+            UIPasteboard.general.string = LyricDocument.plainText(lines: self.lyricsView.lines)
+            self.showToast("Copied")
+        })
+        elements.append(UIAction(
+            title: "Export subtitles", image: AppIcons.exportFile, attributes: enabled
+        ) { [weak self] _ in
+            self?.exportTranscript()
+        })
+        return elements
     }
 
-    // MARK: - Overlay actions
+    private func showToast(_ text: String) {
+        guard let window = view.window else { return }
+        ToastPresenter.shared.show(text, in: window, duration: 2)
+    }
 
-    @objc private func openChat() {
-        let chat = ChatViewController(context: context)
+    // MARK: - Actions
+
+    /// Opens the chat sheet. `draftQuestion` pre-fills the input (long-press
+    /// "Ask AI about this"); the chat asks for the current line lazily so a
+    /// quick-ask can quote what is playing.
+    private func openChat(draftQuestion: String? = nil) {
+        let chat = ChatViewController(
+            context: context,
+            draftQuestion: draftQuestion,
+            currentLineProvider: { [weak self] in self?.lyricsView.activeLineText },
+            onJump: { [weak self] milliseconds in self?.jump(toMilliseconds: milliseconds) }
+        )
         AppSheets.presentExpand(chat, from: topMostPresented())
     }
 
@@ -728,124 +745,38 @@ final class SubtitlesPageViewController: UIViewController {
         renderedState == .ready(translation: .bilingual)
     }
 
-    private static let demoSegmentsJSON: String = """
-    [
-      {"start":0.0,"end":3.0,"text":"Welcome to the demo transcript."},
-      {"start":3.0,"end":7.5,"text":"This line is longer so the active style can be observed."},
-      {"start":7.5,"end":12.0,"text":"Drag the lyrics to see the time bar."},
-      {"start":12.0,"end":18.0,"text":"Tapping a line toggles playback."},
-      {"start":18.0,"end":24.0,"text":"The transcript follows the active line."}
-    ]
-    """
+    /// The status capsule's current content id (smoke-test probe).
+    var demoCapsuleID: String? { capsule.currentID }
 
-    private static let demoTranslationJSON: String = """
-    [
-      {"start":0.0,"end":3.0,"text":"欢迎查看演示字幕。"},
-      {"start":3.0,"end":7.5,"text":"这一行较长，便于观察活动行样式。"},
-      {"start":7.5,"end":12.0,"text":"拖动歌词可看到时间横条。"},
-      {"start":12.0,"end":18.0,"text":"点击任意行可切换播放。"},
-      {"start":18.0,"end":24.0,"text":"字幕跟随当前播放行。"}
-    ]
-    """
+    /// Taps a lyric line as the user would (smoke-test hook).
+    func demoTapLine(_ index: Int) { lyricsView.onTapLine?(index) }
+
+    /// Lyric lines on screen (smoke-test probe).
+    var demoLines: [LyricLine] { lyricsView.lines }
+
+    /// 60 four-second segments so the demo list scrolls well past a
+    /// viewport (the first lines are fixed samples of the styles).
+    private static let demoSegmentCount = 60
+
+    private static let demoSegmentsJSON: String = demoJSON { index in
+        switch index {
+        case 0: "Welcome to the demo transcript."
+        case 1: "This line is longer so the active style can be observed."
+        case 2: "Drag the lyrics to stop following and see Back to now."
+        case 3: "Tapping a line jumps there and offers Undo."
+        default: "Demo line \(index + 1): the transcript follows the active line as it plays."
+        }
+    }
+
+    private static let demoTranslationJSON: String = demoJSON { index in
+        "演示字幕第 \(index + 1) 行：字幕跟随当前播放行。"
+    }
+
+    private static func demoJSON(_ text: (Int) -> String) -> String {
+        let segments = (0..<demoSegmentCount).map { index in
+            "{\"start\":\(Double(index) * 4),\"end\":\(Double(index + 1) * 4),\"text\":\"\(text(index))\"}"
+        }
+        return "[\(segments.joined(separator: ","))]"
+    }
     #endif
-}
-
-/// The type B status capsule: a leading glyph (or spinner), an Emphasis
-/// title over a Meta line, and an optional pill action in the player text
-/// color. The player is always dark, so the panel resolves its sand fill
-/// in dark.
-private final class TranscriptStatusPanel: UIView {
-
-    struct Content {
-        var icon: UIImage?
-        var showsSpinner = false
-        var title: String
-        var subtitle: String
-        var action: (title: String, handler: () -> Void)?
-    }
-
-    private static let height: CGFloat = 68
-    private static let actionHeight: CGFloat = 44
-
-    init(_ content: Content) {
-        super.init(frame: .zero)
-        overrideUserInterfaceStyle = .dark
-        backgroundColor = AnycastColor.sandAlpha3
-        layer.cornerRadius = Self.height / 2
-        layer.cornerCurve = .continuous
-
-        let leading: UIView
-        if content.showsSpinner {
-            let spinner = UIActivityIndicatorView(style: .medium)
-            spinner.color = Theme.playerText
-            spinner.startAnimating()
-            leading = spinner
-        } else {
-            let glyph = UIImageView(image: content.icon)
-            glyph.tintColor = Theme.playerText
-            glyph.contentMode = .center
-            glyph.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-            leading = glyph
-        }
-        leading.translatesAutoresizingMaskIntoConstraints = false
-
-        let titleLabel = UILabel()
-        titleLabel.text = content.title
-        titleLabel.font = TypographyV2.emphasis.font()
-        titleLabel.textColor = Theme.playerText
-        let subtitleLabel = UILabel()
-        subtitleLabel.text = content.subtitle
-        subtitleLabel.font = TypographyV2.meta.font()
-        subtitleLabel.textColor = Theme.playerSecondary
-        for label in [titleLabel, subtitleLabel] {
-            label.adjustsFontForContentSizeCategory = true
-            label.lineBreakMode = .byTruncatingTail
-        }
-        let text = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
-        text.axis = .vertical
-
-        let row = UIStackView(arrangedSubviews: [leading, text])
-        row.axis = .horizontal
-        row.alignment = .center
-        row.spacing = Spacing.gap
-        row.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(row)
-
-        if let action = content.action {
-            var configuration = UIButton.Configuration.filled()
-            configuration.title = action.title
-            configuration.baseBackgroundColor = Theme.playerText
-            configuration.baseForegroundColor = Theme.playerBackground
-            configuration.cornerStyle = .capsule
-            configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18)
-            configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-                var outgoing = incoming
-                outgoing.font = TypographyV2.emphasis.font()
-                return outgoing
-            }
-            let button = UIButton(configuration: configuration)
-            button.addAction(UIAction { _ in action.handler() }, for: .touchUpInside)
-            button.setContentHuggingPriority(.required, for: .horizontal)
-            button.setContentCompressionResistancePriority(.required, for: .horizontal)
-            button.heightAnchor.constraint(equalToConstant: Self.actionHeight).isActive = true
-            row.addArrangedSubview(button)
-        }
-
-        // 68 pt (radius 34); larger text sizes may grow it.
-        let preferredHeight = heightAnchor.constraint(equalToConstant: Self.height)
-        preferredHeight.priority = .defaultHigh
-        NSLayoutConstraint.activate([
-            heightAnchor.constraint(greaterThanOrEqualToConstant: Self.height),
-            preferredHeight,
-            leading.widthAnchor.constraint(equalToConstant: 24),
-            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.pageH),
-            row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.gap),
-            row.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: Spacing.gap),
-            row.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -Spacing.gap),
-            row.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }

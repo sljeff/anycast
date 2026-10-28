@@ -17,13 +17,15 @@ import UIKit
 /// code).
 final class AnycastSwitch: UISwitch {
 
-    /// ON track: sand12 in light, sandDark9 in dark.
+    /// ON track: sand12 in light, goldDark9 in dark. Dark keeps the thumb
+    /// lighter than the track (a light track under a dark thumb read as
+    /// switched the wrong way round).
     static let onTrackColor = UIColor { traits in
-        traits.userInterfaceStyle == .dark ? AnycastColor.sandDark9 : AnycastColor.sand12
+        traits.userInterfaceStyle == .dark ? AnycastColor.goldDark9 : AnycastColor.sand12
     }
-    /// Thumb: sand1 in light, sandDark1 in dark.
+    /// Thumb: sand1 in light, sandDark12 in dark.
     static let thumbColor = UIColor { traits in
-        traits.userInterfaceStyle == .dark ? AnycastColor.sandDark1 : AnycastColor.sand1
+        traits.userInterfaceStyle == .dark ? AnycastColor.sandDark12 : AnycastColor.sand1
     }
     /// OFF track: the stepper capsule's fill.
     static let offTrackColor = AnycastColor.sandAlpha4
