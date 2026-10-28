@@ -238,12 +238,83 @@ jobs:
         (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/native'))
     runs-on: xcode-27
     timeout-minutes: 60
+    env:
+      # Single source of truth for the native CI toolchain. The image's
+      # default Xcode is ignored on purpose: it rolled 27.0 -> 27.1 on
+      # 2026-10-23 and broke the smoke step. Upgrades are reviewed PRs
+      # that bump XCODE_VERSION and SIM_OS together; a pin the image no
+      # longer carries fails loudly in the provision step below.
+      XCODE_VERSION: '27.0'
+      # XCODE_VERSION must equal SIM_OS. A 27.1-built runner on the 27.0
+      # runtime is the pairing that crashed the smoke step, and the iOS
+      # 27.1 runtime supports no iPhone besides iPhone Duo — so 27.1 is
+      # not a drop-in bump. 27.0 + iPhone 18 Pro is the configuration
+      # every previously green CI run used. When bumping, pick a device
+      # type the new runtime actually supports.
+      SIM_OS: '27.0'
+      SIM_DEVICE_TYPE: 'iPhone 18 Pro'
 
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # Runs before the build so the device's first boot overlaps
+      # compilation. Everything downstream (build SDK, simulator runtime,
+      # device) derives from the pins above, never from image defaults or
+      # device-list ordering.
+      - name: Select pinned Xcode and provision smoke simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Flutter maintenance refs without native/ skip cleanly.
+          if [ ! -f native/project.yml ]; then
+            echo "native/project.yml not present on this ref — nothing to provision."
+            exit 0
+          fi
+          XCODE_APP="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::error::Pinned Xcode ${XCODE_VERSION} is not installed on this image; bump XCODE_VERSION as a reviewed change. Present:" >&2
+            ls -d /Applications/Xcode_*.app >&2 || true
+            exit 1
+          fi
+          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          # Guard against a bundle whose directory name lies.
+          xcodebuild -version | head -1 | grep -q "^Xcode ${XCODE_VERSION}" || {
+            echo "::error::$XCODE_APP reports itself as $(xcodebuild -version | head -1)." >&2
+            exit 1
+          }
+          SDK=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          case "$SDK" in
+            "$SIM_OS"|"$SIM_OS."*) ;;
+            *) echo "::error::Xcode ${XCODE_VERSION} ships simulator SDK ${SDK}, which does not match SIM_OS=${SIM_OS}; bump them together." >&2
+               exit 1 ;;
+          esac
+          RUNTIME_ID=$(xcrun simctl list runtimes --json \
+            | jq -r --arg v "$SIM_OS" \
+              '[.runtimes[] | select(.platform == "iOS" and .version == $v and .isAvailable)][0].identifier // empty')
+          DEVTYPE_ID=$(xcrun simctl list devicetypes --json \
+            | jq -r --arg n "$SIM_DEVICE_TYPE" \
+              '[.devicetypes[] | select(.name == $n)][0].identifier // empty')
+          if [ -z "$RUNTIME_ID" ] || [ -z "$DEVTYPE_ID" ]; then
+            echo "::error::iOS ${SIM_OS} runtime or device type '${SIM_DEVICE_TYPE}' is missing; adjust SIM_OS / SIM_DEVICE_TYPE." >&2
+            exit 1
+          fi
+          # Create our own device instead of adopting whatever the image
+          # pre-created: immune to device-list ordering and to runtimes
+          # with thin device lineups. Fails loudly if the pair cannot
+          # coexist.
+          UDID=$(xcrun simctl create ci-smoke "$DEVTYPE_ID" "$RUNTIME_ID" || {
+            echo "::error::simctl create failed — is ${SIM_DEVICE_TYPE} supported by iOS ${SIM_OS}?" >&2
+            exit 1
+          })
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          # Boot now; the smoke step waits for the boot to complete so
+          # first-boot work stays outside the test runner's stall
+          # watchdog.
+          xcrun simctl boot "$UDID"
 
     # The Xcode 27 image is preview-only and only reachable via the
     # `xcode-27` label (there is no macos-27 label; GA macOS images top
@@ -289,18 +360,11 @@ jobs:
             echo "native/project.yml not present on this ref — nothing to run."
             exit 0
           fi
-          # Pick whichever iPhone the image ships; the smoke suite is
-          # device-agnostic. The trailing `|| true` keeps a grep miss inside
-          # the command substitution from tripping set -e with grep's exit
-          # code before the friendly error branch below can report it.
-          UDID=$(xcrun simctl list devices available \
-            | grep -E "iPhone [0-9]+( Pro| Plus|e)? \(" \
-            | head -1 | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/' || true)
-          if [ -z "$UDID" ]; then
-            echo "no available iPhone simulator on this image" >&2
-            exit 1
-          fi
-          echo "using simulator $UDID"
+          # The provision step created and started this device; wait for
+          # the boot to finish so first-boot work stays outside the test
+          # runner's stall watchdog.
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          echo "using simulator $SIM_UDID"
           # Deterministic runner selection out of the shared derived data:
           # build-for-testing writes exactly one product xctestrun; exclude
           # patched copies (qa-gated / reference / *-patched) local crawl
@@ -319,7 +383,7 @@ jobs:
           rm -rf native/build/runs/ci/ui-smoke.xcresult
           xcodebuild \
             -xctestrun "$XCTESTRUN" \
-            -destination "id=$UDID" \
+            -destination "id=$SIM_UDID" \
             -derivedDataPath native/build/dd \
             -resultBundlePath native/build/runs/ci/ui-smoke.xcresult \
             -only-testing:AnycastUITests \
