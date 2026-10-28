@@ -165,12 +165,17 @@ struct ScrollEdgeChromeTests {
         defer { TraitHostWindow.detach(window) }
         let list = try #require(Self.firstDescendant(of: controller.view, of: UICollectionView.self))
         let bar = try #require(Self.firstDescendant(of: controller.view, of: ChatInputBar.self))
+        // The composer sits in the bottom chrome stack (with the example
+        // questions above it on an empty thread); compare in the list's space.
+        let chrome = try #require(bar.superview)
+        let barFrame = bar.convert(bar.bounds, to: list.superview)
+        let chromeFrame = chrome.convert(chrome.bounds, to: list.superview)
         // Header bar: the 64 pt row at the top of the page (safe area top).
         let headerBottom = list.frame.minY + list.adjustedContentInset.top
         #expect(headerBottom - list.frame.minY >= 64 - 0.5, "the list's top inset covers the 64 pt header")
-        #expect(list.frame.maxY == bar.frame.maxY, "the list runs under the composer")
+        #expect(abs(list.frame.maxY - barFrame.maxY) < 0.5, "the list runs under the composer")
         let restingBottom = list.frame.maxY - list.adjustedContentInset.bottom
-        #expect(abs(restingBottom - bar.frame.minY) < 0.5, "the last row still rests on the composer")
+        #expect(abs(restingBottom - chromeFrame.minY) < 0.5, "the last row still rests on the bottom chrome")
     }
 
     @Test("iOS 26 tab shell lays a page-background fade behind the bars; its top tracks the bars")

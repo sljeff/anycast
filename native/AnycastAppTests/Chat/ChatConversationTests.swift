@@ -6,7 +6,8 @@ import AnycastKit
 /// ChatConversation state machine (states/chat.dart port): send → "..."
 /// placeholder → whole-message replace; K8 (errors never masquerade as AI
 /// replies); K27 (401 → login); G13 history wiring through AnycastKit
-/// ChatHistory; clear-on-dismiss; isLoading gating.
+/// ChatHistory; failed sends kept for resend; New chat (clear); per-episode
+/// thread store; isLoading gating.
 @MainActor
 struct ChatConversationTests {
 
@@ -145,7 +146,7 @@ struct ChatConversationTests {
 
     // MARK: - K8: errors are never AI messages
 
-    @Test("non-2xx failure removes the placeholder and signals errorBody — no AI message inserted")
+    @Test("non-2xx failure removes the placeholder, marks the question failed and signals errorBody — no AI message inserted")
     func errorRemovesPlaceholder() async {
         let transport = ScriptedChatTransport()
         let conversation = ChatConversation(transport: transport)
@@ -159,6 +160,8 @@ struct ChatConversationTests {
 
         #expect(conversation.messages.map(\.author) == [.human])
         #expect(conversation.messages.map(\.text) == ["hi"])
+        #expect(conversation.messages[0].deliveryState == .failed)
+        #expect(conversation.lastFailedMessage?.text == "hi")
         #expect(errors == [.errorBody(status: 500, body: "boom")])
         #expect(!conversation.isLoading)
     }
@@ -211,7 +214,53 @@ struct ChatConversationTests {
         #expect(!conversation.isLoading)
     }
 
-    // MARK: - Clear-on-dismiss
+    // MARK: - Resend
+
+    @Test("resend replaces the failed message and succeeds — no duplicate")
+    func resendReplacesFailedMessage() async {
+        let transport = ScriptedChatTransport()
+        let conversation = ChatConversation(transport: transport)
+        transport.autoOutcome = .failure(.networkFailure)
+        await conversation.send("hi", enclosureURL: "enc")
+        let failedID = conversation.messages[0].id
+        #expect(conversation.messages.map(\.author) == [.human])
+
+        transport.autoOutcome = .reply("hello")
+        await conversation.resend(messageID: failedID, enclosureURL: "enc")
+
+        #expect(conversation.messages.map(\.text) == ["hi", "hello"])
+        #expect(conversation.messages.map(\.deliveryState) == [.sent, .sent])
+        #expect(conversation.lastFailedMessage == nil)
+        #expect(transport.requests.last?.input == "hi")
+    }
+
+    @Test("a failed message is left out of the next request's history")
+    func failedMessageExcludedFromHistory() async {
+        let transport = ScriptedChatTransport()
+        let conversation = ChatConversation(transport: transport)
+        transport.autoOutcome = .failure(.networkFailure)
+        await conversation.send("lost", enclosureURL: "enc")
+
+        transport.autoOutcome = .reply("ok")
+        await conversation.send("next", enclosureURL: "enc")
+
+        #expect(transport.requests.last?.history == [["human": "next"]])
+    }
+
+    @Test("resend of a message that is not failed does nothing")
+    func resendIgnoresSentMessage() async {
+        let transport = ScriptedChatTransport()
+        transport.autoOutcome = .reply("a")
+        let conversation = ChatConversation(transport: transport)
+        await conversation.send("q", enclosureURL: "enc")
+
+        await conversation.resend(messageID: conversation.messages[0].id, enclosureURL: "enc")
+
+        #expect(transport.requests.count == 1)
+        #expect(conversation.messages.count == 2)
+    }
+
+    // MARK: - New chat (clear)
 
     @Test("clear wipes messages; an in-flight reply lands on a dead conversation")
     func clearDuringFlight() async {
@@ -228,6 +277,27 @@ struct ChatConversationTests {
 
         #expect(conversation.messages.isEmpty, "late reply must not resurrect the cleared list")
         #expect(!conversation.isLoading, "sending re-enables after clear")
+    }
+
+    @Test("New chat during flight does not let the stale send reset a newer send's loading flag")
+    func staleSendKeepsNewerLoading() async {
+        let transport = ScriptedChatTransport()
+        let conversation = ChatConversation(transport: transport)
+
+        let first = Task { await conversation.send("one", enclosureURL: "enc") }
+        await parkUntilParked(transport)
+        conversation.clear()
+        let second = Task { await conversation.send("two", enclosureURL: "enc") }
+        for _ in 0..<10_000 where transport.parkedRequests < 2 { await Task.yield() }
+
+        transport.resolve(.reply("late"))
+        _ = await first.result
+        #expect(conversation.isLoading, "the newer request is still in flight")
+
+        transport.resolve(.reply("fresh"))
+        _ = await second.result
+        #expect(conversation.messages.map(\.text) == ["two", "fresh"])
+        #expect(!conversation.isLoading)
     }
 
     @Test("clear after a completed round wipes the transcript")
@@ -267,5 +337,50 @@ struct ChatConversationTests {
     func displayNames() {
         #expect(ChatConversation.displayName(for: .human) == "You")
         #expect(ChatConversation.displayName(for: .ai) == "AI")
+    }
+
+    // MARK: - Thread store
+
+    @Test("thread store returns the same conversation per URL and different ones per URL")
+    func threadStorePerURL() {
+        let store = ChatThreadStore()
+        let transport = ScriptedChatTransport()
+        let a1 = store.conversation(for: "enc-a") { transport }
+        let a2 = store.conversation(for: "enc-a") { Issue.record("must not rebuild"); return transport }
+        let b = store.conversation(for: "enc-b") { transport }
+        #expect(a1 === a2)
+        #expect(a1 !== b)
+    }
+
+    @Test("a thread keeps its messages and lands an in-flight reply with no observer attached")
+    func threadSurvivesDismissal() async {
+        let store = ChatThreadStore()
+        let transport = ScriptedChatTransport()
+        var conversation: ChatConversation? = store.conversation(for: "enc") { transport }
+        conversation?.onMessagesChanged = { _ in }   // a sheet's observer
+        let sendTask = Task { [conversation] in await conversation?.send("hi", enclosureURL: "enc") }
+        await parkUntilParked(transport)
+
+        // Sheet dismissed: its observers are gone, the thread is not.
+        conversation?.onMessagesChanged = nil
+        conversation = nil
+        transport.resolve(.reply("while you were away"))
+        _ = await sendTask.result
+
+        let reopened = store.conversation(for: "enc") { transport }
+        #expect(reopened.messages.map(\.text) == ["hi", "while you were away"])
+    }
+
+    // MARK: - Example questions
+
+    @Test("example question 3 carries the current line; without one it is sent alone")
+    func explainNowQuestion() {
+        #expect(
+            ChatExamplePrompts.question(for: ChatExamplePrompts.explainNow, currentLine: "the starter is the boss")
+                == "Explain this part: \"the starter is the boss\""
+        )
+        #expect(ChatExamplePrompts.question(for: ChatExamplePrompts.explainNow, currentLine: nil) == "Explain what I'm hearing now")
+        #expect(ChatExamplePrompts.question(for: ChatExamplePrompts.explainNow, currentLine: "  ") == "Explain what I'm hearing now")
+        #expect(ChatExamplePrompts.question(for: ChatExamplePrompts.summarize, currentLine: "x") == "Summarize this episode")
     }
 }
