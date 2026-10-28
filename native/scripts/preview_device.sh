@@ -7,14 +7,15 @@
 #
 # Settings come from the environment or native/.preview.env (gitignored):
 #   ANYCAST_PREVIEW_TEAM       Apple Developer team id (required)
-#   ANYCAST_PREVIEW_BUNDLE_ID  default com.qy9albh92w.anycast.dev
+#   ANYCAST_PREVIEW_BUNDLE_ID  default com.kindjeff.anycast.dev (the shipped
+#                              app's bundle with a .dev seed — see below)
 #   ANYCAST_PREVIEW_DEVICE     devicectl device id/name (default: first iPhone)
 #
-# The preview build drops the Sign in with Apple and App Group entitlements
-# (a Personal Team cannot provision them), so Apple sign-in and the share
-# extension hand-off are unavailable. It is a fresh install: existing app
-# data is not visible. project.yml is untouched; the overrides live in a
-# generated spec under build/preview that includes it.
+# The preview build keeps Sign in with Apple (the paid team provisions the
+# explicit App ID automatically) but still drops the App Group entitlement,
+# so the share extension hand-off is unavailable. It is a fresh install:
+# existing app data is not visible. project.yml is untouched; the overrides
+# live in a generated spec under build/preview that includes it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,7 +24,13 @@ if [[ -f .preview.env ]]; then
   source .preview.env
 fi
 team="${ANYCAST_PREVIEW_TEAM:-}"
-bundle_id="${ANYCAST_PREVIEW_BUNDLE_ID:-com.qy9albh92w.anycast.dev}"
+# The production bundle id is com.kindjeff.anycast (ios/Runner and
+# native/project.yml agree); the backend validates the Sign in with Apple
+# ID token audience against it, so testing login requires overriding
+# ANYCAST_PREVIEW_BUNDLE_ID=com.kindjeff.anycast. The default below keeps
+# a .dev seed so a day-to-day preview never collides with a real store
+# install of the shipped app.
+bundle_id="${ANYCAST_PREVIEW_BUNDLE_ID:-com.kindjeff.anycast.dev}"
 device="${ANYCAST_PREVIEW_DEVICE:-}"
 
 if [[ -z "$team" ]]; then
@@ -46,7 +53,11 @@ targets:
   Anycast:
     entitlements:REPLACE:
       path: Anycast.preview.entitlements
-      properties: {}
+      properties:
+        # Sign in with Apple needs an explicit (non-wildcard) App ID with
+        # the capability; automatic signing registers it. Without this
+        # entitlement ASAuthorization fails immediately with error 1000.
+        com.apple.developer.applesignin: [Default]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $bundle_id

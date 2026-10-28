@@ -47,6 +47,14 @@ actor PlainTextHTMLCache {
 /// (`&nbsp;`, a mid-string `<br/>`), which the Dart-parity `HtmlText` path
 /// passes through verbatim. Display surfaces decode it so readers never see
 /// raw markup; line breaks survive as newlines.
+///
+/// Lossless by construction: `<br>` variants are the ONLY sequences honored
+/// as markup — every other `<` is escaped before the string reaches the
+/// entity decoder, so the decoder cannot swallow prose. A naive re-parse
+/// drops everything a tag-like span would consume (`x<y values` → `x`);
+/// other partial markup (`<b>`) stays literal because nothing short of a
+/// real parser can distinguish it from angle-bracketed prose, and the
+/// show-notes pipeline owns that job.
 nonisolated enum DisplayText {
 
     static func clean(_ text: String) -> String {
@@ -54,7 +62,8 @@ nonisolated enum DisplayText {
         let breaks = text.replacingOccurrences(
             of: "<br\\s*/?>", with: "\n", options: [.regularExpression, .caseInsensitive]
         )
-        let decoded = HtmlText.htmlToText("<p>\(breaks)</p>")
+        let escaped = breaks.replacingOccurrences(of: "<", with: "&lt;")
+        let decoded = HtmlText.htmlToText("<p>\(escaped)</p>")
         return decoded.isEmpty ? text : decoded
     }
 

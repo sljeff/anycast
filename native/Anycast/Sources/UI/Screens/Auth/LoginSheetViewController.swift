@@ -27,6 +27,9 @@ final class LoginSheetViewController: UIViewController {
     /// a purchase started from here is attributed to the signed-in account.
     var onSignedIn: (() -> Void)?
 
+    /// Called when the close button dismisses the sheet without a sign-in.
+    var onCancelled: (() -> Void)?
+
     private var isSigningIn = false
     private var isResettingPassword = false
     private var keyboardHeight: CGFloat = 0
@@ -62,11 +65,14 @@ final class LoginSheetViewController: UIViewController {
         from presenter: UIViewController,
         context: UIContext,
         source: LoginSource,
-        onSignedIn: (() -> Void)? = nil
+        onSignedIn: (() -> Void)? = nil,
+        completion: ((LoginSheetViewController) -> Void)? = nil
     ) -> LoginSheetViewController {
         let sheet = LoginSheetViewController(context: context, source: source)
         sheet.onSignedIn = onSignedIn
-        presenter.present(sheet, animated: true)
+        presenter.present(sheet, animated: true) { [weak sheet] in
+            if let sheet { completion?(sheet) }
+        }
         return sheet
     }
 
@@ -118,6 +124,7 @@ final class LoginSheetViewController: UIViewController {
         closeButton.accessibilityIdentifier = "login-close"
         closeButton.addAction(UIAction { [weak self] _ in
             self?.dismiss(animated: true)
+            self?.onCancelled?()
         }, for: .touchUpInside)
         view.addSubview(closeButton)
 

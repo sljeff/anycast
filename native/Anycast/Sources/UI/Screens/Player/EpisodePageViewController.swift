@@ -49,14 +49,15 @@ final class EpisodePageViewController: UIViewController {
     private var chapterRows: [ChapterRowView] = []
     private var chapters: [EpisodeChapter] = []
     private var currentChapterIndex: Int?
-    /// Routes the notes' link taps: `anycast-seek:` jumps, anything else
-    /// opens like every other show-notes link. The text view holds it weakly.
-    private lazy var linkRouter = HTMLContentRenderer(onLinkTap: { [weak self] url in
-        self?.openLink(url)
-    })
-    private lazy var notesTextView = HTMLContentRenderer.makeTextView(linkTarget: linkRouter)
+    /// The notes render through the shared show-notes pipeline; link taps
+    /// route to `openLink` (`anycast-seek:` jumps, anything else opens like
+    /// every other show-notes link).
+    private let notesTextView = ShowNotesTextView()
     private let emptyLabel = UILabel()
     private var renderedCacheKey: String?
+    /// Episode + style metrics of the last notes render; doubles as the
+    /// re-entrancy guard against the metric echoes `setDocument` triggers.
+    private var renderedNotesSignature: String?
 
     private let capsule = TranscriptStatusCapsuleView()
     private let jumpUndo = PlaybackJumpUndo()
@@ -145,11 +146,22 @@ final class EpisodePageViewController: UIViewController {
         chaptersPlate.layer.cornerCurve = .continuous
         chaptersPlate.accessibilityIdentifier = "player-episode-chapters"
 
-        notesTextView.font = TypographyV2.body.font()
-        notesTextView.textColor = TypographyV2.body.color
-        notesTextView.adjustsFontForContentSizeCategory = true
-        notesTextView.accessibilityLabel = "Episode description"
+        // The document arrives pre-styled from ShowNotesStore, and the view
+        // must NOT be one a11y element: that would swallow the links' and
+        // images' own accessibility.
         notesTextView.accessibilityIdentifier = "player-episode-notes"
+        notesTextView.onLinkTap = { [weak self] url in self?.openLink(url) }
+        // Images zoom above whatever sheet stack is live.
+        notesTextView.presentImage = { [weak self] image, thumbnail in
+            guard let self else { return }
+            ZoomingImageViewController.present(
+                thumbnail: thumbnail, imageURL: image.url, alt: image.alt,
+                from: self.topMostPresented()
+            )
+        }
+        // Dynamic Type changes resize the document: re-render through the
+        // signature-guarded path.
+        notesTextView.onMetricsChange = { [weak self] in self?.renderNotes() }
 
         emptyLabel.text = "No show notes for this episode."
         emptyLabel.font = TypographyV2.meta.font()
@@ -236,21 +248,60 @@ final class EpisodePageViewController: UIViewController {
         chapters = EpisodeChapters.chapters(description: episode?.description, cacheKey: episode?.enclosureUrl)
         rebuildChapterRows()
 
+        renderNotes()
+    }
+
+    /// Renders the notes through the shared show-notes store, timestamps
+    /// linked as `anycast-seek:`. An empty rich document degrades to the
+    /// plain text the cards render.
+    private func renderNotes() {
+        let episode = context.playback.currentEpisode
         let html = episode?.description ?? ""
-        if case .empty = HtmlText.displayPayload(for: html) {
-            notesTextView.attributedText = nil
+        let cacheKey = episode?.enclosureUrl ?? "player-episode-none"
+        let signature = cacheKey + "#" + ShowNotesStyle.metricSignature(traitCollection: traitCollection)
+        guard signature != renderedNotesSignature else { return }
+        renderedNotesSignature = signature
+
+        let payload = HtmlText.displayPayload(for: html)
+        if case .empty = payload {
+            setNotes(NSAttributedString())
             notesTextView.isHidden = true
             emptyLabel.isHidden = episode == nil
             return
         }
         notesTextView.isHidden = false
         emptyLabel.isHidden = true
-        let textView = notesTextView
-        Task { [weak self] in
-            await HTMLContentRenderer.playerShared.render(html, cacheKey: cacheKey, into: textView)
-            guard let self, self.renderedCacheKey == cacheKey else { return }
-            textView.attributedText = EpisodeChapters.linkingTimestamps(in: textView.attributedText)
+        let traits = traitCollection
+        // Plain-string payloads keep their newlines — the normalizer
+        // collapses all whitespace.
+        if case .text(let plain) = payload {
+            setNotes(ShowNotesStore.shared.attributedFallback(
+                plain: plain, style: ShowNotesStyle(), traits: traits
+            ))
+            return
         }
+        Task { [weak self] in
+            guard let self else { return }
+            var attributed = await ShowNotesStore.shared.attributedString(
+                html: html, style: ShowNotesStyle(), traits: traits
+            )
+            if attributed.length == 0 {
+                let plain = await PlainTextHTMLCache.shared.plainText(for: html)
+                attributed = ShowNotesStore.shared.attributedFallback(
+                    plain: plain, style: ShowNotesStyle(), traits: traits
+                )
+            }
+            // A newer render (episode or trait change) superseded this one.
+            guard self.renderedNotesSignature == signature else { return }
+            self.setNotes(attributed)
+        }
+    }
+
+    private func setNotes(_ attributed: NSAttributedString) {
+        notesTextView.setDocument(
+            EpisodeChapters.linkingTimestamps(in: attributed),
+            imageLoader: KingfisherShowNotesImageLoader.shared
+        )
     }
 
     private func rebuildChapterRows() {

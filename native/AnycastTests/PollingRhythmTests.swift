@@ -184,6 +184,120 @@ struct PollingRhythmTests {
         #expect(quota == .errorMessage("Monthly transcription quota exhausted"))
     }
 
+    @Test("login-cancel rollback: processing entries clear, succeeded and other statuses survive")
+    func subtitleLoginCancelRollbackRevertsProcessing() async throws {
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
+        let controller = SubtitlePollController(
+            api: makeAPI(),
+            subtitles: database.subtitleRepository(),
+            timerFactory: ManualPollTimerFactory()
+        )
+        let pending = "https://x.example/ep1.mp3"
+        let done = "https://x.example/ep2.mp3"
+        let passthrough = "https://x.example/ep3.mp3"
+
+        // DB-seeded rows survive `start()` as-is: one succeeded row, one
+        // row carrying an arbitrary pass-through status string.
+        try await seedSubtitle(database: database, url: done, language: "en")
+        try await database.subtitleRepository().insert(SubtitleRow(
+            enclosureUrl: passthrough,
+            status: "queued",
+            subtitle: SubtitleSegment.encode([SubtitleSegment(start: 0, end: 4, text: "Hi")]),
+            language: "en"
+        ))
+        await controller.start()
+        #expect(controller.statuses[done] == "succeeded")
+        #expect(controller.statuses[passthrough] == "queued")
+
+        // An optimistic "processing" entry, seeded via a 200
+        // still-processing replay (the 401 variant is exercised by the
+        // after-loginRequired test below).
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 200, body: #"{"status": "processing"}"#)
+        }
+        await controller.add(url: pending)
+        #expect(controller.statuses[pending] == "processing")
+
+        controller.cancelLoginGatedProcessing()
+
+        #expect(controller.statuses[pending] == nil,
+                "processing entries roll back to an absent key (Generate button)")
+        #expect(controller.statuses[done] == "succeeded",
+                "succeeded entries are real server state and must survive")
+        #expect(controller.statuses[passthrough] == "queued",
+                "non-processing pass-through statuses must survive")
+    }
+
+    @Test("login-cancel rollback: a round after rollback emits no request for the reverted URL")
+    func subtitleLoginCancelRollbackStopsPolling() async throws {
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
+        let factory = ManualPollTimerFactory()
+        let controller = SubtitlePollController(
+            api: makeAPI(),
+            subtitles: database.subtitleRepository(),
+            timerFactory: factory
+        )
+        let url = "https://x.example/ep1.mp3"
+
+        await controller.start()
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 200, body: #"{"status": "processing"}"#)
+        }
+        await controller.add(url: url)
+
+        // Before the rollback every round re-requests the URL (the
+        // re-401 → re-present loop of the bug).
+        await controller.refreshProcessing()
+        #expect(!L2ContractTests.ReplayProtocol.requests().isEmpty)
+
+        controller.cancelLoginGatedProcessing()
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 401, body: "Unauthorized")
+        }
+
+        // After the rollback the URL left the poll set: a full tick emits
+        // nothing, so the poller cannot re-401 and re-present login.
+        await factory.timers.first!.tick()
+        #expect(L2ContractTests.ReplayProtocol.requests().isEmpty,
+                "a reverted URL must not be polled anymore")
+    }
+
+    @Test("login-cancel rollback: add() → loginRequired keeps processing until the rollback clears it")
+    func subtitleLoginCancelAfterLoginRequired() async throws {
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
+        let controller = SubtitlePollController(
+            api: makeAPI(),
+            subtitles: database.subtitleRepository(),
+            timerFactory: ManualPollTimerFactory()
+        )
+        let url = "https://x.example/ep1.mp3"
+        let loginFired = L2ContractTests.Locked(false)
+        controller.onLoginRequired = { loginFired.with { $0 = true } }
+
+        // Signed-out Generate: the request 401s, the login signal fires,
+        // `add()` returns nil (the sheet is the handling — apply routes
+        // loginRequired to onLoginRequired), and the optimistic
+        // "processing" stays (the sheet is pending, the user may still
+        // sign in).
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 401, body: "Unauthorized")
+        }
+        let signal = await controller.add(url: url)
+        #expect(signal == nil)
+        #expect(loginFired.with { $0 })
+        #expect(controller.statuses[url] == "processing")
+
+        // The user dismisses the sheet WITHOUT signing in: the rollback
+        // frees the UI back to the Generate button.
+        controller.cancelLoginGatedProcessing()
+        #expect(controller.statuses[url] == nil)
+        #expect(try await database.subtitleRepository().get(byEnclosureURL: url) == nil,
+                "no row was persisted for the never-accepted request")
+    }
+
     // MARK: - Translation poller
 
     /// Seed a succeeded subtitle row (language) as the translation input.

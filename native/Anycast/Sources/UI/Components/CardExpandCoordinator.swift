@@ -42,13 +42,55 @@ final class CardExpandCoordinator {
     }
 }
 
-/// One animated expand/collapse pass for a card list (03 §2.11): pushes the
-/// strip targets into the visible cells, then animates the item-size
-/// re-validation. The height-defining constraint changes must settle BEFORE
-/// the animated `invalidateLayout` — applied inside the same transaction the
-/// compositional layout re-measured the cell against its pre-change size,
-/// leaving the item collapsed while the strip overflowed the un-clipped
-/// cell, painting buttons over neighbor cards and eating their taps.
+/// One animated expand/collapse pass for a card list (03 §2.11). Two
+/// tightly-coupled halves (the height pass):
+///
+/// 1. Apply the strip targets to the visible cells WITHOUT animation and
+///    WITHOUT settling the cell's layout — constraint constants and
+///    visibility only. The owning cell must not lay out in this state: its
+///    item frame is still collapsed, and the over-constrained solve
+///    (expanded strip inside the collapsed frame) compresses the card body
+///    by exactly the strip height — measured 112 pt → 52 pt standalone,
+///    137⅔ pt → 77⅔ pt in-list — the one-frame device shrink. With the
+///    targets un-settled, no deformed state is ever computed, let alone
+///    committed.
+/// 2. Animate the item-size re-validation through a TARGETED invalidation
+///    of the visible items. The single layout pass inside the animation
+///    re-measures each item against the final constraint constants and
+///    lays every cell out at its FINAL frame — the only solve the new
+///    constraints ever see.
+///
+/// Both halves are load-bearing, measured on this codebase (iOS 27
+/// compositional layout; the strip-reliability toggle walk and the
+/// from-measured-height probes in the regression suite):
+/// - Constraint change and invalidation INSIDE one animation transaction
+///   (with or without a `performBatchUpdates` wrapper, with or without
+///   `selfSizingInvalidation = .enabledIncludingConstraints`): the
+///   compositional layout never re-measures with the new constants — the
+///   item keeps its pre-change size while the strip outran it (stuck
+///   collapsed; the batch wrapper additionally swallowed the targeted
+///   context, and `.enabledIncludingConstraints` left off-screen items
+///   stuck EXPANDED). The constants must land OUTSIDE the transaction; the
+///   forced settle the old code used for that was never the necessary
+///   part — only the solved intermediate state it committed was harmful.
+/// - TARGETED invalidation, not global: a global `invalidateLayout()`
+///   inside the animation transaction discarded the compositional
+///   layout's measured item sizes, so the animator's before-values fell
+///   back to the `.estimated()` heights — a taller tapped card animated
+///   estimate → expanded instead of measured → expanded (visibly
+///   shrinking first), and taller untouched cards twitched toward the
+///   estimate. Scoping the invalidation to the visible items keeps every
+///   measured size as its own before-value; items whose strip target did
+///   not change re-measure to the identical size and do not animate at
+///   all.
+///
+/// The visible-only scope leaves one theoretical gap — an expanded card
+/// scrolled fully off-screen keeps its measured +strip size until its cell
+/// recycles — which iOS 27 closes on its own: the item's estimated
+/// dimension is re-resolved against the reconfigured (collapsed) cell on
+/// reappearance, so the scroll-back settles collapsed (pinned by the
+/// regression suite's scroll-back test; no completion-phase invalidation
+/// needed).
 ///
 /// Motion: only the strip moves. An opening strip slides down out of its
 /// card while the item height grows; a closing strip fades out first and
@@ -104,32 +146,33 @@ enum CardExpandAnimator {
 
     /// 200 ms easeInOut — the Dart AnimatedContainer cadence.
     private static func apply(expandedPath: IndexPath?, in collectionView: UICollectionView) {
+        let visiblePaths = collectionView.indexPathsForVisibleItems
         // Cells whose strip actually opens get the reveal; settled cells
         // (already open or closed) must not animate.
         let opening = cells(in: collectionView, expandedPath: expandedPath, expanding: true)
-        // Phase 1 — apply the strip targets WITHOUT animation. Changing a
-        // cell's height-defining constraint and re-validating inside the
-        // SAME animation transaction makes the compositional layout
-        // re-measure the cell against its pre-change size (the item stays
-        // collapsed while the strip overflows it); settled first, the
-        // re-measure below sees the final constraint values.
+        // Phase 1 — strip targets, un-settled and without animation: the
+        // re-measure below solves the engine fresh and sees the final
+        // constants; the cell's internal layout must not run against the
+        // stale (collapsed) item frame.
         UIView.performWithoutAnimation {
-            for path in collectionView.indexPathsForVisibleItems {
+            for path in visiblePaths {
                 guard let cell = collectionView.cellForItem(at: path) as? EpisodeCardCell,
                       cell.isStripExpanded != (expandedPath == path)
                 else { continue }
-                cell.setExpanded(expandedPath == path)
+                cell.setExpanded(expandedPath == path, settleLayout: false)
                 if opening.contains(cell) { cell.prepareStripReveal() }
             }
         }
-        // Phase 2 — animate the item-height re-validation; the collection's
-        // layout pass carries the item resize, the cells' own reveal the strip.
+        // Phase 2 — the animated re-measure: one targeted invalidation,
+        // one layout pass; the cells' own reveal moves the strip.
         UIView.animate(
             withDuration: 0.2,
             delay: 0,
             options: [.curveEaseInOut, .allowUserInteraction]
         ) {
-            collectionView.collectionViewLayout.invalidateLayout()
+            let context = UICollectionViewLayoutInvalidationContext()
+            context.invalidateItems(at: visiblePaths)
+            collectionView.collectionViewLayout.invalidateLayout(with: context)
             collectionView.layoutIfNeeded()
         }
         for cell in opening { cell.revealStrip() }

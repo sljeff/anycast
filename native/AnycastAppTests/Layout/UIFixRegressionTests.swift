@@ -27,6 +27,26 @@ import AnycastKit
 ///    tab accessory (the system glass must be the only chrome).
 /// 8. Channel subscribe button spinning through the feed fetch and
 ///    rendering as a pointed lens instead of a capsule.
+/// 9. Playlist card expand animating from the layout's .estimated()
+///    fallback height instead of the card's measured height (visible
+///    shrink-then-expand; taller untouched cards twitched). The follow-up
+///    two-phase fix then committed a deformed intermediate solve (the
+///    expanded strip settled inside the still-collapsed item frame) — one
+///    visible shrink frame on device; the strip targets now land
+///    un-settled outside the animation transaction.
+/// 10. Playlist whole-card drag reorder dying when the system drag session
+///     hijacked a ≥ 0.5 s hold (square full-cell float, no drop handler);
+///     interactive movement is now the single reorder path.
+/// 11. Inbox add-to-playlist running the fly-in before the row left the
+///     list (illogical order) and removing the row through a full
+///     reloadData() that re-estimated every self-sizing card (neighbor
+///     snap). The row now animates away first, then the ball flies.
+/// 12. Mini player compact progress line starting under the artwork and
+///     ending mid-air (inset by the capsule's cap radius, aligned to
+///     nothing). The line now spans the whole content strip — leading at
+///     the title's leading edge (one artwork-gap clear of the cover),
+///     trailing at the play/pause glyph's VISIBLE trailing edge (the 44 pt
+///     hit slot's edge would outrun the glyph and break the rounded cap).
 ///
 /// Runs against the live shell with the seeded fixture; skips when the
 /// shell or the seed is absent. Serialized: the suite drives the SHARED
@@ -553,6 +573,616 @@ struct UIFixRegressionTests {
                 await Self.capture(window, name: "uifix-playlist-expanded")
             }
         }
+    }
+
+    // MARK: - 9. Expand animation source height (playlist list)
+
+    /// The expand/collapse must animate from the card's CURRENT measured
+    /// height. A global `invalidateLayout()` inside the animation
+    /// transaction discarded the compositional layout's measured item
+    /// sizes, so the animator's before-values fell back to the
+    /// `.estimated(112)` height: a taller tapped card visibly shrank
+    /// before expanding, and taller untouched cards twitched toward the
+    /// estimate. The two-phase fix for that then committed a second
+    /// shrink source: the unanimated constraint settle solved the expanded
+    /// strip inside the still-collapsed item frame, deforming the card
+    /// body for one visible frame on device. The animator now applies the
+    /// strip targets UN-settled outside the animation transaction (the
+    /// re-measure needs the constants outside it) and animates one
+    /// targeted invalidation inside — no solve ever runs against the
+    /// stale item frame. Pinned here by three probes: the animation's
+    /// from-value (the layer animation's `fromValue` when present, else
+    /// early presentation-layer samples), mid-transition card-body
+    /// stillness (never below its pre-tap height — kills both shrink
+    /// mechanisms empirically), and the settled +stripHeight outcome.
+    @Test("Playlist strip expand animates from the card's current height; neighbors hold still")
+    func playlistStripExpandAnimatesFromCurrentHeight() async throws {
+        guard let context = await Self.liveContext(),
+              let window = Self.keyWindow() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        let queue = (try? await context.database.playlistRepository()
+            .listEpisodes(playlistId: ChannelPlaylistLogic.defaultPlaylistID)) ?? []
+        guard queue.count >= 1,
+              let presenter = await Self.settledTopPresenter(in: window) ?? window.rootViewController else {
+            print("[uifix] seeded playlist empty; skipping"); return
+        }
+
+        // Seed one long-text card at the END of the playlist (it was a
+        // deterministically TALL card before the fixed-height plate; the
+        // fixture stays as a long-text probe).
+        // The defect only reads on a card taller than the .estimated()
+        // fallback (estimate < actual — the buggy animation ran estimate →
+        // expanded instead of measured → expanded); the fixture's own
+        // spread is not guaranteed, this row is. A full two-line title and
+        // two-line description push the text column past the 80 pt cover,
+        // so the card self-sizes above `cardRowHeight`.
+        let tallURL = "https://example.com/uifix-tall-card.mp3"
+        let tallRow = PlaylistEpisodeRow(
+            title: String(repeating: "A wrapped two-line title. ", count: 4),
+            description: String(repeating: "A long description body that wraps twice. ", count: 6),
+            duration: 3_600_000,
+            enclosureUrl: tallURL,
+            pubDate: 1_760_000_000_000,
+            channelTitle: "UIFix",
+            rssFeedUrl: "https://example.com/uifix.xml",
+            playlistId: ChannelPlaylistLogic.defaultPlaylistID,
+            playedDuration: 0
+        )
+        try? await context.database.playlistRepository().insertOrUpdateByIndex(
+            tallRow, playlistId: ChannelPlaylistLogic.defaultPlaylistID, index: queue.count
+        )
+        // Best-effort net for early exits; the happy path awaits its own
+        // cleanup first (idempotent delete by URL).
+        defer {
+            Task { try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: tallURL) }
+        }
+
+        let list = PlaylistEpisodeListViewController(
+            context: context, playlistId: ChannelPlaylistLogic.defaultPlaylistID
+        )
+        list.modalPresentationStyle = .pageSheet
+        presenter.present(list, animated: false)
+        defer { presenter.dismiss(animated: false) }
+        try await Self.settle(window, seconds: 1.2)
+
+        guard let collection = Self.firstView(in: list.view, where: { $0 is UICollectionView })
+                as? UICollectionView else {
+            Issue.record("playlist collection not found"); return
+        }
+
+        func itemHeight(_ item: Int) -> CGFloat {
+            collection.collectionViewLayout.layoutAttributesForItem(
+                at: IndexPath(item: item, section: 0)
+            )?.frame.height ?? 0
+        }
+        /// The card plate (the stack's first arranged subview) — the body
+        /// the intermediate-state deformation compresses.
+        func cardBody(of cell: EpisodeCardCell) -> UIView? {
+            (cell.contentView.subviews.first as? UIStackView)?.arrangedSubviews.first
+        }
+
+        let target = IndexPath(item: collection.numberOfItems(inSection: 0) - 1, section: 0)
+        collection.scrollToItem(at: target, at: .top, animated: false)
+        try await Self.settle(window, seconds: 0.4)
+        let targetBefore = itemHeight(target.item)
+        // The redesigned card plate is a fixed `cardRowHeight` tall, so the
+        // collapsed card measures exactly the `.estimated()` fallback and the
+        // estimate-vs-actual gap that originally exposed the global
+        // invalidation is no longer constructible. The from-height probe
+        // (presentation layer at t≈0), body stillness, neighbor stillness
+        // and the settled +stripHeight outcome below still discriminate
+        // the settle-before-invalidate and un-targeted-invalidation
+        // regressions.
+        let neighbors = collection.indexPathsForVisibleItems
+            .filter { $0.section == 0 && $0 != target }
+            .sorted { $0.item < $1.item }
+        let neighborsBefore = neighbors.compactMap { path -> (Int, CGFloat)? in
+            guard collection.cellForItem(at: path) != nil else { return nil }
+            return (path.item, itemHeight(path.item))
+        }
+        guard let cell = collection.cellForItem(at: target) as? EpisodeCardCell,
+              let body = cardBody(of: cell) else {
+            Issue.record("target card cell not visible"); return
+        }
+        let bodyBefore = body.frame.height
+        guard !neighborsBefore.isEmpty else {
+            Issue.record("no visible neighbor card — the neighbor-stillness probe has nothing to track")
+            return
+        }
+
+        cell.onCardTap?()
+
+        // Proof a real animation ran, captured synchronously at t≈0: the
+        // layer must carry the resize animation (Core Animation keys it
+        // "bounds.size"; the system's own self-sizing pass adds a second
+        // "-2" copy), and the MODEL must already sit at the final size
+        // while the PRESENTATION layer still shows the pre-tap height —
+        // an animated transition, not a snap. Mid-animation presentation
+        // SAMPLING is not usable as a probe here: the two overlapping
+        // resize animations blend in the presentation layer and can read
+        // far outside [from, to] mid-flight (observed 25⅔ pt between
+        // 137⅔ and 197⅔); the synchronous t≈0 read below is immune
+        // because the main thread has not yielded, so the last committed
+        // presentation is exactly the pre-tap state.
+        guard let resizeAnimation = cell.layer.animation(forKey: "bounds.size") as? CABasicAnimation else {
+            Issue.record("the expand produced no bounds.size animation — the item never animated")
+            return
+        }
+        #expect(cell.frame.height > targetBefore + EpisodeCardCell.stripHeight - 8,
+                "model height \(cell.frame.height) did not reach \(targetBefore + EpisodeCardCell.stripHeight) at t≈0")
+        // The RENDERED from-value: at t≈0 the presentation layer still
+        // shows the pre-tap height (within a few points) while the model
+        // is already at the final size — the resize visibly starts AT the
+        // measured height, never at the .estimated() fallback. (The
+        // animations' DECLARED fromValues are additive deltas from the
+        // system's overlapping self-sizing pass — observed 25⅔ = measured
+        // − estimate — and are not pinnable; the presentation layer is
+        // what the user sees.)
+        if let presentedAtStart = cell.layer.presentation()?.frame.height {
+            #expect(abs(presentedAtStart - targetBefore) < 8,
+                    "presentation at \(presentedAtStart) at t≈0 — not the card's measured height \(targetBefore)")
+        }
+        #expect(abs(resizeAnimation.duration - 0.2) < 0.05,
+                "expand animation duration \(resizeAnimation.duration) is not the animator's 0.2 s cadence")
+        if let secondary = cell.layer.animation(forKey: "bounds.size-2") as? CABasicAnimation {
+            print("[uifix] resize animations: primary from \(String(describing: resizeAnimation.fromValue)) additive=\(resizeAnimation.isAdditive), secondary from \(String(describing: secondary.fromValue)) additive=\(secondary.isAdditive)")
+        }
+        for _ in 0..<2 {
+            try await Task.sleep(for: .milliseconds(25))
+            // Card body never compresses: neither the model layer (an
+            // unanimated forced settle committing the deformed solve) nor
+            // the presentation layer (an animation whose from-value is the
+            // deformed solve) may dip below the pre-tap height.
+            let bodyPresented = body.layer.presentation()?.frame.height ?? body.frame.height
+            #expect(body.frame.height > bodyBefore - 1,
+                    "card body model height \(body.frame.height) dipped below pre-tap \(bodyBefore) mid-expand")
+            #expect(bodyPresented > bodyBefore - 1,
+                    "card body presented height \(bodyPresented) dipped below pre-tap \(bodyBefore) mid-expand")
+            // Neighbors animate nothing: presentation stays on their item
+            // height, and their item height never moves toward the estimate.
+            for path in neighbors {
+                guard let other = collection.cellForItem(at: path) else { continue }
+                let otherPresented = other.layer.presentation()?.frame.height ?? other.frame.height
+                #expect(abs(otherPresented - itemHeight(path.item)) < 4,
+                        "neighbor \(path.item) animated mid-expand (presented \(otherPresented), item \(itemHeight(path.item)))")
+                #expect(abs(itemHeight(path.item) - (neighborsBefore.first(where: { $0.0 == path.item })?.1 ?? itemHeight(path.item))) < 4,
+                        "neighbor \(path.item) item height drifted toward the estimate")
+            }
+        }
+
+        // Settled: exactly +stripHeight on the tapped card, neighbors intact.
+        try await Self.settle(window, seconds: 0.5)
+        #expect(abs(itemHeight(target.item) - (targetBefore + EpisodeCardCell.stripHeight)) < 8,
+                "expanded height \(itemHeight(target.item)) != collapsed \(targetBefore) + strip \(EpisodeCardCell.stripHeight)")
+        let settledBody = cardBody(of: cell)?.frame.height ?? 0
+        #expect(abs(settledBody - bodyBefore) < 1,
+                "settled card body height changed: \(settledBody) vs pre-tap \(bodyBefore)")
+        for (item, before) in neighborsBefore {
+            #expect(abs(itemHeight(item) - before) < 1,
+                    "neighbor \(item) changed height \(before) → \(itemHeight(item))")
+        }
+
+        // Restore the fixture: the seeded tall row leaves the playlist it
+        // was appended to (awaited, so later serialized tests read clean).
+        try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: tallURL)
+    }
+
+    // MARK: - 9b. Off-screen collapse (scroll-back settling)
+
+    /// The animator's targeted invalidation only reaches VISIBLE items.
+    /// When card A expands, scrolls fully off-screen, and card B is then
+    /// expanded (the coordinator logically collapses A), nothing told the
+    /// layout solver to drop A's measured +strip item size. On scroll-back
+    /// A's cell reconfigures collapsed (strip constant 0) — if its item
+    /// kept the stale expanded size, the top/bottom-pinned stack stretches
+    /// the card plate to fill the taller item.
+    ///
+    /// Measured on iOS 27: the stretch does NOT occur. The stale measured
+    /// size dies with the cell — once A's cell leaves the visible set and
+    /// recycles, the compositional layout re-resolves the item's estimated
+    /// dimension against the freshly configured (collapsed) cell when it
+    /// reappears: A settles at exactly its collapsed height with an
+    /// unstretched plate (137⅔ → 137⅔ in both this run and every retry).
+    /// No completion-phase invalidation of the previous path is needed;
+    /// this test pins that behavior so a future UIKit change that keeps
+    /// the stale size surfaces here instead of on users.
+    @Test("Playlist strip expand: off-screen collapse settles on scroll-back")
+    func playlistStripExpandOffscreenCollapseSettlesOnScrollBack() async throws {
+        guard let context = await Self.liveContext(),
+              let window = Self.keyWindow() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        let queue = (try? await context.database.playlistRepository()
+            .listEpisodes(playlistId: ChannelPlaylistLogic.defaultPlaylistID)) ?? []
+        guard queue.count >= 2,
+              let presenter = await Self.settledTopPresenter(in: window) ?? window.rootViewController else {
+            print("[uifix] seeded playlist < 2; skipping"); return
+        }
+
+        // Seed filler rows so the list MUST scroll: the viewport (~874 pt)
+        // has to be overflowable to push card A fully off-screen.
+        let fillerURLs = (0..<6).map { "https://example.com/uifix-filler-\($0).mp3" }
+        for (offset, url) in fillerURLs.enumerated() {
+            let row = PlaylistEpisodeRow(
+                title: "UIFix filler \(offset)",
+                description: "Filler row for the scroll-back probe.",
+                duration: 3_600_000,
+                enclosureUrl: url,
+                pubDate: 1_760_000_000_000,
+                channelTitle: "UIFix",
+                rssFeedUrl: "https://example.com/uifix.xml",
+                playlistId: ChannelPlaylistLogic.defaultPlaylistID,
+                playedDuration: 0
+            )
+            try? await context.database.playlistRepository().insertOrUpdateByIndex(
+                row, playlistId: ChannelPlaylistLogic.defaultPlaylistID, index: queue.count + offset
+            )
+        }
+        defer {
+            Task {
+                for url in fillerURLs {
+                    try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: url)
+                }
+            }
+        }
+
+        let list = PlaylistEpisodeListViewController(
+            context: context, playlistId: ChannelPlaylistLogic.defaultPlaylistID
+        )
+        list.modalPresentationStyle = .pageSheet
+        presenter.present(list, animated: false)
+        defer { presenter.dismiss(animated: false) }
+        try await Self.settle(window, seconds: 1.2)
+
+        guard let collection = Self.firstView(in: list.view, where: { $0 is UICollectionView })
+                as? UICollectionView else {
+            Issue.record("playlist collection not found"); return
+        }
+        func itemHeight(_ item: Int) -> CGFloat {
+            collection.collectionViewLayout.layoutAttributesForItem(
+                at: IndexPath(item: item, section: 0)
+            )?.frame.height ?? 0
+        }
+        func cardPlate(_ cell: EpisodeCardCell) -> UIView? {
+            (cell.contentView.subviews.first as? UIStackView)?.arrangedSubviews.first
+        }
+
+        // Expand card A (item 0).
+        let pathA = IndexPath(item: 0, section: 0)
+        collection.scrollToItem(at: pathA, at: .top, animated: false)
+        try await Self.settle(window, seconds: 0.3)
+        let collapsedA = itemHeight(0)
+        guard let cellA = collection.cellForItem(at: pathA) as? EpisodeCardCell,
+              let plateBefore = cardPlate(cellA) else {
+            Issue.record("card A not visible"); return
+        }
+        let plateHeightBefore = plateBefore.frame.height
+        cellA.onCardTap?()
+        try await Self.settle(window, seconds: 0.5)
+        #expect(abs(itemHeight(0) - collapsedA - EpisodeCardCell.stripHeight) < 8,
+                "card A did not expand (item \(itemHeight(0)), collapsed \(collapsedA))")
+
+        // Push A fully off-screen, then expand card B — the coordinator
+        // collapses A while nothing visible represents it. The criterion
+        // is the collection view's VISIBLE set (the same bounds-based set
+        // the animator drives); UIKit keeps buffer cells materialized
+        // slightly past the viewport, so cellForItem alone is not proof.
+        let lastIndex = collection.numberOfItems(inSection: 0) - 1
+        let pathB = IndexPath(item: lastIndex, section: 0)
+        collection.scrollToItem(at: pathB, at: .top, animated: false)
+        try await Self.settle(window, seconds: 0.4)
+        guard !collection.indexPathsForVisibleItems.contains(pathA) else {
+            Issue.record("card A never left the visible set — the filler rows do not overflow the viewport")
+            return
+        }
+        guard let cellB = collection.cellForItem(at: pathB) as? EpisodeCardCell else {
+            Issue.record("card B not visible"); return
+        }
+        cellB.onCardTap?()
+        try await Self.settle(window, seconds: 0.5)
+
+        // Scroll back: A must settle COLLAPSED — item height restored, no
+        // stretched plate.
+        collection.scrollToItem(at: pathA, at: .top, animated: false)
+        try await Self.settle(window, seconds: 0.5)
+        let settledA = itemHeight(0)
+        guard let cellAReturned = collection.cellForItem(at: pathA) as? EpisodeCardCell,
+              let plateReturned = cardPlate(cellAReturned) else {
+            Issue.record("card A did not come back on screen"); return
+        }
+        print("[uifix] off-screen collapse: item \(collapsedA) → settled \(settledA); plate \(plateHeightBefore) → \(plateReturned.frame.height)")
+        #expect(abs(settledA - collapsedA) < 4,
+                "card A's item settled at \(settledA) after scroll-back, not its collapsed height \(collapsedA)")
+        #expect(abs(plateReturned.frame.height - plateHeightBefore) < 2,
+                "card A's plate stretched on scroll-back (\(plateHeightBefore) → \(plateReturned.frame.height))")
+
+        // Fixture restore (awaited; the defer Task above is the early-exit net).
+        for url in fillerURLs {
+            try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: url)
+        }
+    }
+
+    /// The intermediate-state mechanism, pinned deterministically (no
+    /// shell): settling the expanded strip inside a still-collapsed cell
+    /// frame over-constrains the layout — the committed solve deforms the
+    /// card (body compressed or strip squashed away from its 60 pt target).
+    /// The animator's deferred settle (`settleLayout: false`) leaves the
+    /// cell's solved geometry untouched, so the single animated batch pass
+    /// is the first and only solve that sees the new constraints.
+    @Test("Strip target: forced settle deforms a collapsed cell; deferred settle does not solve")
+    func stripTargetSettleDeformsCollapsedCell() {
+        func makeCard() -> (EpisodeCardCell, UIView, UIView) {
+            let cell = EpisodeCardCell(
+                frame: CGRect(x: 0, y: 0, width: 354, height: EpisodeCardCell.cardRowHeight)
+            )
+            cell.configure(
+                EpisodeCardContent(
+                    title: "Episode", channelTitle: "Channel", rightText: "12m left",
+                    descriptionHTML: nil, imageURL: nil, descriptionPlainText: "Description"
+                ),
+                actions: [EpisodeCardAction(
+                    icon: UIImage(), accessibilityLabel: "Play"
+                ) {}]
+            )
+            cell.layoutIfNeeded()
+            let arranged = (cell.contentView.subviews.first as? UIStackView)?.arrangedSubviews ?? []
+            return (cell, arranged.first!, arranged.last!)
+        }
+
+        // Forced settle (the retired Phase 1): the expanded strip must fit
+        // inside the collapsed frame — impossible; the solve breaks. Either
+        // the card body compresses below its pre-expand height or the strip
+        // lands short of its 60 pt target — both are the deformed
+        // intermediate state.
+        let (forced, forcedBody, forcedStrip) = makeCard()
+        let forcedBefore = forcedBody.frame.height
+        UIView.performWithoutAnimation { forced.setExpanded(true) }
+        let deformed = abs(forcedBody.frame.height - forcedBefore) > 0.5
+            || abs(forcedStrip.frame.height - EpisodeCardCell.stripHeight) > 0.5
+        print("[uifix] forced settle: body \(forcedBefore) → \(forcedBody.frame.height), strip → \(forcedStrip.frame.height)")
+        #expect(deformed,
+                "forced settle inside a collapsed frame solved cleanly (body \(forcedBefore) → \(forcedBody.frame.height), strip \(forcedStrip.frame.height)) — the intermediate-state hypothesis would be unfounded")
+
+        // Deferred settle (the animator path): the target lands, no solve
+        // runs — the body keeps its collapsed geometry until the batch's
+        // own animated pass.
+        let (deferred, deferredBody, _) = makeCard()
+        let deferredBefore = deferredBody.frame.height
+        deferred.setExpanded(true, settleLayout: false)
+        #expect(abs(deferredBody.frame.height - deferredBefore) < 0.5,
+                "deferred settle moved the card body (\(deferredBefore) → \(deferredBody.frame.height)) before any layout pass")
+    }
+
+    // MARK: - 10. Whole-card drag reorder (the interactive-movement path)
+
+    /// The 150 ms whole-card drag drives `beginInteractiveMovementForItem`
+    /// → `updateInteractiveMovementTargetPosition` → `endInteractiveMovement`;
+    /// commits land in the diffable `reorderingHandlers`. This drives the
+    /// same API sequence a finger drag drives and asserts the reorder
+    /// reaches the database and survives the list's own reload. Also pins
+    /// the single-path rule: system drag & drop stays off (a system drag
+    /// session used to hijack holds ≥ 0.5 s, lift a square full-cell
+    /// preview, and silently drop the reorder).
+    @Test("Playlist reorder: interactive movement commits through reorderingHandlers and persists")
+    func playlistInteractiveMovementReorderPersists() async throws {
+        guard let context = await Self.liveContext(),
+              let window = Self.keyWindow() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        let queue = (try? await context.database.playlistRepository()
+            .listEpisodes(playlistId: ChannelPlaylistLogic.defaultPlaylistID)) ?? []
+        let beforeURLs = queue.compactMap(\.enclosureUrl)
+        guard beforeURLs.count >= 3,
+              let presenter = await Self.settledTopPresenter(in: window) ?? window.rootViewController else {
+            print("[uifix] seeded playlist < 3; skipping"); return
+        }
+
+        let list = PlaylistEpisodeListViewController(
+            context: context, playlistId: ChannelPlaylistLogic.defaultPlaylistID
+        )
+        list.modalPresentationStyle = .pageSheet
+        presenter.present(list, animated: false)
+        defer { presenter.dismiss(animated: false) }
+        try await Self.settle(window, seconds: 1.2)
+
+        guard let collection = Self.firstView(in: list.view, where: { $0 is UICollectionView })
+                as? UICollectionView else {
+            Issue.record("playlist collection not found"); return
+        }
+
+        // The single-path rule: no system drag session may run over this
+        // list (it raced the 150 ms gesture and killed the reorder).
+        #expect(!collection.dragInteractionEnabled,
+                "system drag & drop must stay disabled on the playlist list")
+        #expect(collection.dragDelegate == nil,
+                "no drag delegate may be installed on the playlist list")
+
+        // Drive the exact API sequence dragGestureFired drives: lift the
+        // head, move it to the last slot, drop.
+        let last = IndexPath(item: beforeURLs.count - 1, section: 0)
+        guard let lastAttributes = collection.collectionViewLayout.layoutAttributesForItem(at: last) else {
+            Issue.record("last item attributes missing"); return
+        }
+        #expect(collection.beginInteractiveMovementForItem(at: IndexPath(item: 0, section: 0)),
+                "interactive movement did not begin")
+        try await Task.sleep(for: .milliseconds(80))
+        collection.updateInteractiveMovementTargetPosition(
+            CGPoint(x: lastAttributes.frame.midX, y: lastAttributes.frame.maxY - 5)
+        )
+        try await Task.sleep(for: .milliseconds(80))
+        collection.endInteractiveMovement()
+        // The commit chain (repository write → playback steps → reload)
+        // runs in a Task; settle before reading the database.
+        try await Self.settle(window, seconds: 2.0)
+
+        let expected = Array(beforeURLs.dropFirst()) + [beforeURLs[0]]
+        let afterURLs = (try? await context.database.playlistRepository()
+            .listEpisodes(playlistId: ChannelPlaylistLogic.defaultPlaylistID))?
+            .compactMap(\.enclosureUrl) ?? []
+        #expect(afterURLs == expected,
+                "interactive movement did not persist (after \(afterURLs), expected \(expected))")
+        #expect(list.episodes.compactMap(\.enclosureUrl) == expected,
+                "the in-memory list did not follow the reorder (\(list.episodes.compactMap(\.enclosureUrl)))")
+
+        // Restore the seeded order — this writes the LIVE app container; a
+        // leftover reorder would skew later runs' head-episode assumptions.
+        for (index, row) in queue.enumerated() {
+            try await context.database.playlistRepository()
+                .insertOrUpdateByIndex(row, playlistId: ChannelPlaylistLogic.defaultPlaylistID, index: index)
+        }
+    }
+
+    // MARK: - 11. Inbox add-to-playlist: animated removal precedes the fly-in
+
+    /// The add flow's shape: the playlist insert commits FIRST (kill-window
+    /// safety), the row animates away (a batch delete that keeps the
+    /// surviving rows' measured sizes — the old no-animation reloadData()
+    /// re-estimated every self-sizing card and the neighbors snapped), THEN
+    /// the ball flies. Pins the visual order (the fly overlay appears only
+    /// after the row VISUALLY leaves the list), the neighbor stillness
+    /// (tracked by cell identity, not position), the collection view's own
+    /// row count, and the database outcome, then restores the fixture.
+    @Test("Inbox add-to-playlist: row animates away first, then the fly-in")
+    func inboxAddToPlaylistRemovesRowBeforeFlyIn() async throws {
+        guard let context = await Self.liveContext(),
+              let window = Self.keyWindow() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        context.tabs.select(0)
+        try await Self.settle(window, seconds: 1.5)
+
+        guard let inbox = Self.find(InboxPageViewController.self, in: window.rootViewController),
+              let collection = Self.firstView(in: inbox.view, where: { $0 is UICollectionView })
+                as? UICollectionView else {
+            print("[uifix] inbox missing; skipping"); return
+        }
+        let rowsBefore = (try? await context.database.feedRepository().listAll()) ?? []
+        // A card that is not the currently playing episode — adding the
+        // playing episode is the skip-insert branch and never lands in the
+        // playlist.
+        let playingURL = context.playback.currentEpisode?.enclosureUrl
+        guard let episodeIndex = rowsBefore.firstIndex(where: {
+            guard let url = $0.enclosureUrl, !url.isEmpty else { return false }
+            return url != playingURL
+        }) else {
+            print("[uifix] seeded inbox empty; skipping"); return
+        }
+        let episodeRow = rowsBefore[episodeIndex]
+        guard let url = episodeRow.enclosureUrl else { return }
+
+        // Resolve the card's index path: card cells all share the cards
+        // section; the displayed order is the repository order (no filter).
+        guard let cardSection = collection.indexPathsForVisibleItems
+            .first(where: { collection.cellForItem(at: $0) is InboxEpisodeCardCell })?.section,
+              let cell = collection.cellForItem(
+                  at: IndexPath(item: episodeIndex, section: cardSection)
+              ) as? InboxEpisodeCardCell else {
+            print("[uifix] target card not visible; skipping"); return
+        }
+        guard let add = cell.menuActions.first(where: { $0.accessibilityLabel == "Add to playlist" }) else {
+            Issue.record("card carries no add action"); return
+        }
+
+        // Identity-tracked cells: after the delete, positions shift, so the
+        // probes follow the CELL OBJECTS (the removed card's cell and one
+        // surviving neighbor) instead of index paths.
+        weak let removedCell = cell
+        let neighborCandidate = collection.indexPathsForVisibleItems
+            .filter { $0 != IndexPath(item: episodeIndex, section: cardSection) }
+            .sorted { $0.item < $1.item }
+            .compactMap { collection.cellForItem(at: $0) as? InboxEpisodeCardCell }
+            .first
+        guard let neighbor = neighborCandidate else {
+            Issue.record("no second visible inbox card — the neighbor-stillness probe has nothing to track")
+            return
+        }
+        weak let neighborCell = neighbor
+
+        // The collection view's OWN count (the visual list), not the data
+        // source's.
+        let cardsCountBefore = collection.numberOfItems(inSection: cardSection)
+
+        add.handler()
+
+        // Order probes. The fly overlay's MODEL frame is its 24×24 endpoint
+        // from the moment the flight commits — the 200×48 capsule exists
+        // only in the presentation layer, so that is where the probe looks.
+        func flyOverlayPresent() -> Bool {
+            window.subviews.contains { sub in
+                sub.frame.width < 32 && sub.frame.height < 32
+                    && (sub.layer.presentation()?.frame.width ?? 0) > 60
+            }
+        }
+        // The deleted cell's VISUAL disappearance. UIKit parks the recycled
+        // cell as a hidden, zero-alpha subview of the collection view (its
+        // `window` stays non-nil), so the probe watches the fade-out end
+        // state instead of view teardown.
+        func removedCellVisuallyGone() -> Bool {
+            guard let removedCell else { return true }
+            return removedCell.isHidden || removedCell.alpha < 0.05
+        }
+        var commitTime: TimeInterval?      // batch commits (count drops)
+        var goneTime: TimeInterval?        // delete animation ends (cell leaves the window)
+        var flyTime: TimeInterval?
+        var neighborHeights: [CGFloat] = []
+        let start = Date()
+        while Date().timeIntervalSince(start) < 3 {
+            let elapsed = Date().timeIntervalSince(start)
+            if commitTime == nil,
+               collection.numberOfItems(inSection: cardSection) == cardsCountBefore - 1 {
+                commitTime = elapsed
+            }
+            if goneTime == nil, removedCellVisuallyGone() { goneTime = elapsed }
+            if flyTime == nil, flyOverlayPresent() { flyTime = elapsed }
+            if let neighborCell { neighborHeights.append(neighborCell.frame.height) }
+            if commitTime != nil, goneTime != nil, flyTime != nil { break }
+            try await Task.sleep(for: .milliseconds(30))
+        }
+        #expect(commitTime != nil, "collection view row count never decreased")
+        #expect(flyTime != nil, "fly-in overlay never appeared")
+        #expect(goneTime != nil, "the removed card's cell never faded out")
+        if let commit = commitTime, let fly = flyTime {
+            #expect(fly >= commit - 0.05,
+                    "fly-in (\(fly)s) ran before the delete committed (\(commit)s)")
+        }
+        // The visual claim itself: the ball leaves only once the row has
+        // visibly gone (the fly starts in the delete-animation completion).
+        if let gone = goneTime, let fly = flyTime {
+            #expect(fly >= gone - 0.1,
+                    "fly-in (\(fly)s) started before the row left the screen (\(gone)s)")
+        }
+        // Neighbor stillness by identity: the surviving cell's height never
+        // moves through the whole flow (a reloadData() would re-estimate
+        // it; the animated delete keeps it).
+        #expect(!neighborHeights.isEmpty, "the neighbor probe never sampled its cell")
+        #expect(neighborHeights.allSatisfy { abs($0 - (neighborHeights.first ?? $0)) < 1.5 },
+                "neighbor card height changed mid-removal (\(neighborHeights)) — the list re-estimated its cards")
+
+        // Settled: exactly one row gone VISUALLY (collection view count, the
+        // removed cell off-screen), and the episode moved inbox → default
+        // playlist in the database.
+        try await Self.settle(window, seconds: 1.5)
+        #expect(collection.numberOfItems(inSection: cardSection) == cardsCountBefore - 1,
+                "collection view count \(collection.numberOfItems(inSection: cardSection)) != \(cardsCountBefore - 1)")
+        #expect(removedCellVisuallyGone(), "the removed card's cell is still visible after the settle")
+        if let removedCell {
+            #expect(!collection.visibleCells.contains(removedCell),
+                    "the removed card's cell still reports as visible after the settle")
+        }
+        #expect(neighborCell?.window != nil,
+                "the surviving neighbor cell left the screen — the wrong row was deleted")
+        let inboxAfter = (try? await context.database.feedRepository().listAll()) ?? []
+        #expect(!inboxAfter.contains { $0.enclosureUrl == url }, "episode stayed in the inbox")
+        let playlistAfter = (try? await context.database.playlistRepository()
+            .listEpisodes(playlistId: ChannelPlaylistLogic.defaultPlaylistID)) ?? []
+        #expect(playlistAfter.contains { $0.enclosureUrl == url },
+                "episode never landed in the playlist")
+
+        // Restore the fixture (the live container must not leak this add):
+        // back out of the playlist, return the inbox row.
+        try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: url)
+        try? await context.database.feedRepository().insertMany([episodeRow])
     }
 
     // MARK: - Podcast tab shows shelf

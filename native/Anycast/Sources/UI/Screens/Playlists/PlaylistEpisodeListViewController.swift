@@ -12,8 +12,9 @@ import AnycastKit
 ///   custom gesture always recognizes first, so 150 ms is the effective
 ///   threshold);
 /// - 1.1x lift: the moving cell carries a 1.1 scale transform
-///   (proxyDecorator, 03 §4) — drag sessions raised through the
-///   `UICollectionViewDragDelegate` additionally get a 1.1x custom preview;
+///   (proxyDecorator, 03 §4); system drag & drop is disabled — the 150 ms
+///   interactive movement is the single reorder path (a system drag
+///   session hijacked ≥ 0.5 s holds and dropped the reorder);
 /// - reorder transactions land in the diffable `reorderingHandlers`
 ///   (`didReorder`, never `moveItemAt`);
 /// - drag start collapses any expanded strip; edge auto-scroll is system;
@@ -121,11 +122,15 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         // 07 §6: the system reorder gesture has a fixed ~0.5 s hold; the
         // custom 150 ms gesture below begins interactive movement first,
-        // so the effective whole-card drag threshold is 150 ms. The drag
-        // delegate (1.1x preview) also serves any system-initiated drag.
-        collectionView.dragInteractionEnabled = true
-        collectionView.dragDelegate = binder
-        collectionView.reorderingCadence = .immediate
+        // so the effective whole-card drag threshold is 150 ms. System
+        // drag & drop stays OFF: a drag session raised by the system's own
+        // ~0.5 s lift recognizer raced the in-flight movement, cancelled
+        // it, and floated a SQUARE full-cell preview (the rounded card is
+        // only a subview of the wider item) whose drop had no handler —
+        // the reorder silently died on any hold ≥ 0.5 s. The 150 ms
+        // interactive movement is the single reorder path; its lift is the
+        // real cell carrying the 1.1x transform.
+        collectionView.dragInteractionEnabled = false
         collectionView.addGestureRecognizer(dragGesture)
         view.addSubview(collectionView)
         NSLayoutConstraint.activate([
@@ -244,10 +249,20 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             return cell
         }
         // Route a: drag-driven reorder commits through the diffable
-        // reorderingHandlers (never `moveItemAt`).
+        // reorderingHandlers (never `moveItemAt`). The legacy interactive
+        // movement (system drag & drop is disabled below) applies its
+        // reordering transaction synchronously inside
+        // `endInteractiveMovement`, so this handler runs UNDERNEATH the
+        // data source's own snapshot apply — applying the reorder's
+        // follow-up snapshot right here would nest applies and trip
+        // UIKit's deadlock detector. Capture the drop's final order and
+        // commit one main-actor hop later, after that apply finishes.
         dataSource.reorderingHandlers.canReorderItem = { _ in true }
-        dataSource.reorderingHandlers.didReorder = { [weak self] _ in
-            self?.commitSnapshotReorder()
+        dataSource.reorderingHandlers.didReorder = { [weak self] transaction in
+            let after = transaction.finalSnapshot.itemIdentifiers
+            Task { @MainActor [weak self] in
+                self?.commitSnapshotReorder(after: after)
+            }
         }
     }
 
@@ -373,8 +388,7 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             }
             liftedCell = cell
             // onReorderStart (playlists.dart:97-99): collapse any open
-            // strip the moment the drag starts. The drag-delegate path
-            // (itemsForBeginning) does the same for system-raised drags.
+            // strip the moment the drag starts.
             expandCoordinator.close()
             binder.refreshExpandedState(in: collectionView)
         case .changed:
@@ -401,10 +415,9 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
 
     // MARK: - Reorder commit (states/playlist_episode.dart:93-122)
 
-    /// Derives (from, to) from the data source's post-drop snapshot and
-    /// applies the Dart move semantics.
-    private func commitSnapshotReorder() {
-        let after = dataSource.snapshot().itemIdentifiers
+    /// Derives (from, to) from the drop's final snapshot order (captured
+    /// in `didReorder`) and applies the Dart move semantics.
+    private func commitSnapshotReorder(after: [String]) {
         let before = episodes.compactMap(\.enclosureUrl)
         guard let (from, to) = Self.movedIndex(before: before, after: after) else { return }
         performReorder(from: from, to: to)

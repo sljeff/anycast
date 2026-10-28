@@ -97,11 +97,15 @@ final class DetailViewController: UIViewController {
     /// "In playlist" in place of the add action.
     private let isInPlaylist: Bool
     private let actions: [EpisodeCardAction]
+    /// LEGACY parameter, kept in the init/present signatures so existing
+    /// call sites stay untouched: the show notes no longer route through
+    /// HTMLContentRenderer. The notes render through ShowNotesStore into
+    /// the ShowNotesTextView below; this instance is stored but unused.
     private let htmlRenderer: HTMLContentRenderer
     private let now: () -> Date
 
     private let scrollView = UIScrollView()
-    private let descriptionTextView: UITextView
+    private let descriptionTextView: ShowNotesTextView
     private let artwork = UIImageView()
     private var artworkSide: NSLayoutConstraint!
     private let titleLabel = UILabel()
@@ -176,7 +180,7 @@ final class DetailViewController: UIViewController {
         self.shortenURL = shortenURL
         self.isInPlaylist = isInPlaylist
         self.now = now
-        self.descriptionTextView = HTMLContentRenderer.makeTextView()
+        self.descriptionTextView = ShowNotesTextView()
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -323,9 +327,27 @@ final class DetailViewController: UIViewController {
         header.alignment = .top
         header.spacing = Spacing.pageH
 
-        descriptionTextView.font = TypographyV2.body.font()
-        descriptionTextView.textColor = TypographyV2.body.color
-        descriptionTextView.adjustsFontForContentSizeCategory = true
+        // Show-notes pipeline wiring. The document arrives pre-styled from
+        // ShowNotesStore (ShowNotesStyle owns fonts/colors), so the view
+        // gets no manual typography here. Links keep the system default
+        // action. Images zoom above whatever sheet stack is live; weak self
+        // breaks the view-owns-closure-owns-self cycle.
+        descriptionTextView.presentImage = { [weak self] image, thumbnail in
+            guard let self else { return }
+            ZoomingImageViewController.present(
+                thumbnail: thumbnail,
+                imageURL: image.url,
+                alt: image.alt,
+                from: self.topMostPresented()
+            )
+        }
+        // Image loads and dynamic-type/appearance changes resize the
+        // document; re-render through the same signature-guarded path
+        // (see renderDescription) so layout stays valid without an echo
+        // loop.
+        descriptionTextView.onMetricsChange = { [weak self] in
+            self?.renderDescription()
+        }
 
         let stack = UIStackView(arrangedSubviews: [header, descriptionTextView])
         stack.axis = .vertical
@@ -431,12 +453,52 @@ final class DetailViewController: UIViewController {
 
     // MARK: - Behavior
 
+    /// Signature of the last notes render (enclosure + style metrics).
+    /// Doubles as the renderDescription re-entrancy guard: repeated ticks
+    /// and the metrics echoes that setDocument itself triggers collapse
+    /// here, while a real dynamic-type/appearance change produces a new
+    /// signature and re-renders — no render → metrics → render loop.
+    private var renderedNotesSignature: String?
+
+    /// Renders the notes through the shared show-notes store: rich HTML →
+    /// pre-styled attributed document; an empty rich document (empty,
+    /// sanitized-away, or failed payload) degrades to the same plain text
+    /// the cards render via PlainTextHTMLCache.
     private func renderDescription() {
-        Task {
-            await htmlRenderer.render(
-                episode.descriptionHTML,
-                cacheKey: episode.enclosureURL,
-                into: descriptionTextView
+        let signature = episode.enclosureURL + "#"
+            + ShowNotesStyle.metricSignature(traitCollection: traitCollection)
+        guard signature != renderedNotesSignature else { return }
+        renderedNotesSignature = signature
+
+        let html = episode.descriptionHTML
+        let traits = traitCollection
+        // Plain-string payloads (no leading '<') keep their newlines — the
+        // normalizer collapses ALL whitespace, which would fuse a plain
+        // multi-line description into one paragraph.
+        if case .text(let plain) = HtmlText.displayPayload(for: html) {
+            descriptionTextView.setDocument(
+                ShowNotesStore.shared.attributedFallback(
+                    plain: plain, style: ShowNotesStyle(), traits: traits
+                ),
+                imageLoader: KingfisherShowNotesImageLoader.shared
+            )
+            return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            var attributed = await ShowNotesStore.shared.attributedString(
+                html: html, style: ShowNotesStyle(), traits: traits
+            )
+            if attributed.length == 0 {
+                let plain = await PlainTextHTMLCache.shared.plainText(for: html)
+                attributed = ShowNotesStore.shared.attributedFallback(
+                    plain: plain, style: ShowNotesStyle(), traits: traits
+                )
+            }
+            // A newer render (trait change) superseded this one: drop it.
+            guard self.renderedNotesSignature == signature else { return }
+            self.descriptionTextView.setDocument(
+                attributed, imageLoader: KingfisherShowNotesImageLoader.shared
             )
         }
     }

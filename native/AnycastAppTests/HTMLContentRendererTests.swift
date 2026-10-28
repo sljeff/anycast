@@ -24,13 +24,13 @@ struct HTMLContentRendererTests {
         #expect(color === Theme.onSurface)
     }
 
-    @Test("Stray markup in a plain (non-'<') payload is decoded")
-    func plainPayloadDecodesStrayMarkup() async {
+    @Test("Non-break markup in a plain (non-'<') payload stays literal")
+    func plainPayloadKeepsStrayMarkupLiteral() async {
         let renderer = HTMLContentRenderer()
         let result = await renderer.attributedString(
             for: "Listen to <em>Planet Money</em>", cacheKey: "k-stray"
         )
-        #expect(result.string == "Listen to Planet Money")
+        #expect(result.string == "Listen to <em>Planet Money</em>")
     }
 
     @Test("Spacer paragraphs and stacked line breaks collapse to one blank line")
@@ -114,6 +114,38 @@ struct HTMLContentRendererTests {
             }
         }
         #expect(sawLink)
+    }
+
+    @Test("Oversized heading text normalizes into the single heading tier")
+    func oversizedHeadingIsClamped() async {
+        let renderer = HTMLContentRenderer()
+        // Machine-generated show notes wrap whole paragraphs in <h1>; WebKit
+        // parses it far past body size. The normalization must fold it into
+        // the single 1.3× semibold tier instead of preserving the ratio.
+        let result = await renderer.attributedString(
+            for: "<h1>A giant machine-generated heading</h1><p>Body text</p>",
+            cacheKey: "episode-h1"
+        )
+        let bodySize = TypographyV2.body.font().pointSize
+        var headingSize: CGFloat?
+        var bodySawUnclamped = false
+        result.enumerateAttribute(.font, in: NSRange(location: 0, length: result.length)) { value, range, _ in
+            guard let font = value as? UIFont else { return }
+            let isHeadingRange = (result.string as NSString)
+                .substring(with: range)
+                .contains("giant machine-generated")
+            if isHeadingRange {
+                headingSize = font.pointSize
+            } else if font.pointSize > bodySize * 1.31 {
+                bodySawUnclamped = true
+            }
+        }
+        #expect(headingSize != nil)
+        // The heading tier is exactly 1.3× body (within float rounding).
+        if let headingSize {
+            #expect(abs(headingSize - bodySize * 1.3) < 0.5)
+        }
+        #expect(!bodySawUnclamped)
     }
 
     @Test("PlainTextHTMLCache memoizes per input")

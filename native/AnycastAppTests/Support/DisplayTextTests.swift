@@ -34,10 +34,10 @@ struct DisplayTextTests {
         #expect(DisplayText.plainText(fromHTML: "<p>Tom&nbsp;&amp;&nbsp;Jerry</p>") == "Tom & Jerry")
     }
 
-    @Test("Plain input keeps its own line breaks and decodes stray markup")
+    @Test("Plain input keeps its own line breaks; non-break markup stays literal")
     func plainTextKeepsPlainInputBreaks() {
         #expect(DisplayText.plainText(fromHTML: "Listen to <em>Planet Money</em> today")
-                == "Listen to Planet Money today")
+                == "Listen to <em>Planet Money</em> today")
         #expect(DisplayText.plainText(fromHTML: "Para one.\n\n\n\nPara two.\nLine.")
                 == "Para one.\n\nPara two.\nLine.")
         #expect(DisplayText.plainText(fromHTML: "") == "")
@@ -49,5 +49,21 @@ struct DisplayTextTests {
         #expect("\u{2028}\u{2029}".replacingOccurrences(
             of: "[\\t\\f\\x{0B}\\p{Zs}]+", with: " ", options: .regularExpression
         ) == "\u{2028}\u{2029}")
+    }
+
+    @Test("Angle brackets in prose never lose content")
+    func angleBracketProseIsLossless() {
+        #expect(DisplayText.clean("for x<y values") == "for x<y values")
+        #expect(DisplayText.clean("Tickets at <event> sold out") == "Tickets at <event> sold out")
+        #expect(DisplayText.clean("Use <?xml version=\"1.0\"?> header")
+                == "Use <?xml version=\"1.0\"?> header")
+        #expect(DisplayText.clean("values <x> and <y>") == "values <x> and <y>")
+        #expect(DisplayText.clean("I <3 podcasts") == "I <3 podcasts")
+    }
+
+    @Test("Markup other than <br> stays literal instead of being stripped")
+    func nonBreakMarkupStaysLiteral() {
+        #expect(DisplayText.clean("hi <b>there</b> friend") == "hi <b>there</b> friend")
+        #expect(DisplayText.clean("escaped &lt;b&gt; decodes once") == "escaped <b> decodes once")
     }
 }
