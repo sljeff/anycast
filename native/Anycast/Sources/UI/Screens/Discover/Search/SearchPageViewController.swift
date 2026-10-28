@@ -149,6 +149,15 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         queryDidChange(searchText)
     }
 
+    /// The search tab's Close button is the bar's cancel button. It discards
+    /// the query: the system empties the field only after the controller has
+    /// dismissed, with no `textDidChange`, so the entry state has to come back
+    /// from here. (A tab switch does not dismiss the controller; the results
+    /// stay with the text.)
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        queryDidChange("")
+    }
+
     /// Emptying the field brings the entry state back.
     private func queryDidChange(_ text: String) {
         guard isShowingResults, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }

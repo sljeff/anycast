@@ -3,7 +3,8 @@ import Testing
 @testable import Anycast
 
 /// The Search tab's entry state: which sections show for which data, that it
-/// gives way to the results, and that choosing a recent query submits it.
+/// gives way to the results and comes back when the field is emptied or
+/// cancelled, and that choosing a recent query submits it.
 @MainActor
 struct SearchEntryStateTests {
 
@@ -98,6 +99,40 @@ struct SearchEntryStateTests {
         page.loadViewIfNeeded()
         page.search("  Planet Money ")
         #expect(store.queries == ["Planet Money"])
+    }
+
+    @Test("Emptying the field brings the entry state back; a non-empty edit keeps the results")
+    func emptiedFieldReturnsToEntry() async {
+        guard let context = await Self.liveUIContext() else { return }
+        let page = SearchPageViewController(context: context, recentStore: makeStore([]), loadCategories: { [] })
+        page.loadViewIfNeeded()
+        page.search("news")
+        #expect(page.isShowingResults)
+
+        let bar = UISearchBar()
+        page.searchBar(bar, textDidChange: "new")
+        #expect(page.isShowingResults)
+        page.searchBar(bar, textDidChange: "  ")
+        #expect(!page.isShowingResults)
+        #expect(!page.entryPage.view.isHidden)
+    }
+
+    @Test("Cancelling the field (the search tab's Close) discards the query; the recent stays")
+    func cancelReturnsToEntry() async {
+        guard let context = await Self.liveUIContext() else { return }
+        let store = makeStore([])
+        let page = SearchPageViewController(context: context, recentStore: store, loadCategories: { [] })
+        page.loadViewIfNeeded()
+        page.search("news")
+        #expect(page.isShowingResults)
+
+        // The system clears the bar's text only after this callback.
+        let bar = UISearchBar()
+        bar.text = "news"
+        page.searchBarCancelButtonClicked(bar)
+        #expect(!page.isShowingResults)
+        #expect(!page.entryPage.view.isHidden)
+        #expect(store.queries == ["news"])
     }
 
     // MARK: - Helpers
