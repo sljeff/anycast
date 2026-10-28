@@ -33,23 +33,48 @@ final class SmokeFlowsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["tab-1"].exists, "Playlist chip missing")
         XCTAssertTrue(app.buttons["tab-2"].exists, "Discover chip missing")
 
-        for tab in ["tab-1", "tab-2", "tab-0"] {
-            app.buttons[tab].tap()
-            XCTAssertTrue(app.buttons[tab].isSelected, "\(tab) chip did not become selected")
-            // Scroll the tab's first list when it has content (seeded runs);
-            // on a bare simulator the empty state has nothing to scroll.
+        /// iOS 26+ minimizes the bar while a list scrolls down
+        /// (`tabBarMinimizeBehavior = .onScrollDown`). The minimized bar
+        /// exposes only a synthesized pill for the selected tab — no `tab-N`
+        /// identifier, value "Collapsed" — plus Search. Give the scroll-back
+        /// a moment to re-expand the bar, else tap the pill. iOS 18 never
+        /// minimizes, so there the first lookup always succeeds.
+        func expandedTab(_ identifier: String) -> XCUIElement {
+            let tab = app.buttons[identifier]
+            if tab.waitForExistence(timeout: 2) { return tab }
+            let pill = app.tabBars.buttons
+                .matching(NSPredicate(format: "selected == true"))
+                .firstMatch
+            XCTAssertTrue(pill.exists, "\(identifier) missing and no minimized tab bar pill to expand")
+            pill.tap()
+            XCTAssertTrue(
+                tab.waitForExistence(timeout: 3),
+                "minimized tab bar did not expand to show \(identifier)"
+            )
+            return tab
+        }
+
+        for identifier in ["tab-1", "tab-2", "tab-0"] {
+            let tab = expandedTab(identifier)
+            tab.tap()
+            waitUntil(timeout: 3) { tab.isSelected }
+            XCTAssertTrue(tab.isSelected, "\(identifier) chip did not become selected")
+            // Scroll the tab's first list when it has content: seeded runs,
+            // and Discover whenever the runner has network.
             let list = app.collectionViews.firstMatch
             if list.exists, list.cells.count > 0 {
-                // Upper-half coordinate drags only: element swipes compute
-                // their press point from the element frame, and with the v2
-                // floating mini player capsule (~y 654-712) the press can
-                // land ON it — its any-direction pan-open quirk (03 §2.9)
-                // then presents the player sheet over the whole shell.
-                let mid = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
-                let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
-                let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-                mid.press(forDuration: 0.05, thenDragTo: upper)
-                upper.press(forDuration: 0.05, thenDragTo: lower)
+                // App-coordinate drags in a fixed band: below Discover's
+                // category strip (y 131-175 on an 874 pt screen, which sits
+                // in front of the list, so a press on it never reaches the
+                // list) and above the iOS 18 floating mini player capsule
+                // (~y 654-712), whose any-direction pan-open quirk (03 §2.9)
+                // would present the player sheet over the whole shell.
+                // Element swipes are avoided: their press point comes from
+                // the element frame.
+                let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+                let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
+                lower.press(forDuration: 0.05, thenDragTo: upper)   // scroll down
+                upper.press(forDuration: 0.05, thenDragTo: lower)   // scroll back
             }
         }
     }

@@ -58,8 +58,10 @@ final class ShellNavigationUITests: XCTestCase {
         field.typeText("news\n")
         XCTAssertTrue(app.buttons["Channels"].waitForExistence(timeout: 8), "search results did not appear")
         // While search is active the bar collapses to one unnamed tab
-        // button; closing search brings the full bar back.
+        // button; closing search brings the full bar back asynchronously,
+        // so wait for the chip instead of tapping into the collapsed bar.
         app.buttons["Close"].tap()
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 3), "full tab bar did not come back after Close")
         app.buttons["tab-0"].tap()
         XCTAssertTrue(app.buttons["tab-0"].isSelected, "Podcast tab did not come back")
 
