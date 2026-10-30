@@ -237,6 +237,11 @@ final class EpisodePageViewController: UIViewController {
         jumpUndo.clear()
         scrollView.contentOffset = .zero
 
+        // No episode (queue drained while the sheet is open): the 44 pt
+        // artwork tile and the empty title row read like a failed load —
+        // drop them and let the capsule name the state.
+        headerArtwork.isHidden = episode == nil
+        episodeTitleLabel.isHidden = episode == nil
         episodeTitleLabel.text = episode?.title ?? ""
         let imageURL = episode?.imageUrl ?? ""
         if imageURL != headerArtworkURL {
@@ -249,6 +254,7 @@ final class EpisodePageViewController: UIViewController {
         rebuildChapterRows()
 
         renderNotes()
+        updateCapsule()
     }
 
     /// Renders the notes through the shared show-notes store, timestamps
@@ -372,6 +378,16 @@ final class EpisodePageViewController: UIViewController {
     }
 
     private func updateCapsule() {
+        // No episode (queue drained while the sheet is open): the slot
+        // names the state — the same message the transport and the
+        // transcript page one swipe over show.
+        if context.playback.currentEpisode == nil {
+            capsule.show(.init(
+                id: "nothing-playing", leading: .none,
+                message: PlayerProgressVisualState.nothingPlayingMessage
+            ))
+            return
+        }
         capsule.show(jumpUndo.capsuleContent(undo: { [weak self] in self?.undoJump() }))
     }
 }

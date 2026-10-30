@@ -326,6 +326,11 @@ final class SubtitlesPageViewController: UIViewController {
     }
 
     private func updateHeader(episode: PlaylistEpisodeRow?) {
+        // No episode (queue drained while the sheet is open): the 44 pt
+        // artwork tile and the empty title row read like a failed load —
+        // drop them; the capsule names the state.
+        headerArtwork.isHidden = episode == nil
+        titleLabel.isHidden = episode == nil
         titleLabel.text = episode?.title ?? ""
         let imageURL = episode?.imageUrl ?? ""
         guard imageURL != headerArtworkURL else { return }
@@ -398,8 +403,8 @@ final class SubtitlesPageViewController: UIViewController {
         switch state {
         case .unavailable:
             return .init(
-                id: "unavailable", leading: .icon(UIImage(systemName: "doc.text")),
-                message: "No episode playing"
+                id: "unavailable", leading: .none,
+                message: PlayerProgressVisualState.nothingPlayingMessage
             )
         case .loading:
             return .init(id: "loading", leading: .spinner, message: "Loading transcript")

@@ -29,10 +29,12 @@ struct PlayerProgressBarTests {
 
     @Test("Visual-state ladder order and messages (Dart resolve order)")
     func visualState() {
-        // No episode wins over everything.
+        // No episode wins over everything. The message is the shared
+        // drained-player string (a normal end state — no fault wording).
         #expect(PlayerProgressVisualState.resolve(hasEpisode: false, isLoading: true, durationMilliseconds: 5) == .disabled)
         #expect(PlayerProgressVisualState.resolve(hasEpisode: false, isLoading: false, durationMilliseconds: 0) == .disabled)
-        #expect(PlayerProgressVisualState.disabled.message == "Playback unavailable")
+        #expect(PlayerProgressVisualState.disabled.message == "Nothing playing")
+        #expect(PlayerProgressVisualState.disabled.message == PlayerProgressVisualState.nothingPlayingMessage)
         #expect(!PlayerProgressVisualState.disabled.allowsSeek)
 
         #expect(PlayerProgressVisualState.resolve(hasEpisode: true, isLoading: true, durationMilliseconds: 5) == .loading)

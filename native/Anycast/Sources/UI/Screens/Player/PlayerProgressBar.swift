@@ -5,6 +5,13 @@ import UIKit
 /// swap the bar to a message, dim it to 0.48 and block seeking.
 enum PlayerProgressVisualState: Equatable {
 
+    /// The drained-player message, shared by every surface that names the
+    /// state (the transport's progress message and the episode/transcript
+    /// capsules) — one state, one string. Reached when the queue finishes
+    /// or the playing head is removed while the sheet is open; a normal
+    /// end state, so no fault wording.
+    static let nothingPlayingMessage = "Nothing playing"
+
     case normal
     case loading
     case unknownDuration
@@ -18,12 +25,16 @@ enum PlayerProgressVisualState: Equatable {
         return .normal
     }
 
+    /// `unavailable` wording is reserved for the "an episode exists but
+    /// this datum is missing" family (Duration unavailable, Translation
+    /// unavailable) — disjoint from `.disabled`, which never has an
+    /// episode.
     var message: String? {
         switch self {
         case .normal: nil
         case .loading: "Loading…"
         case .unknownDuration: "Duration unavailable"
-        case .disabled: "Playback unavailable"
+        case .disabled: Self.nothingPlayingMessage
         }
     }
 
@@ -104,6 +115,9 @@ final class PlayerProgressBarView: UIControl {
     /// Chapter starts cut thin gaps through the track (page ground colour).
     private let chapterLayer = CAShapeLayer()
     private var chapterStartsMilliseconds: [Int64] = []
+    /// The message the a11y value carries while seeking is blocked
+    /// (`setAllowsSeek`); nil while adjustable.
+    private var disabledStatusMessage: String?
     private let positionLabel = UILabel()
     private let remainingLabel = UILabel()
     /// The time bubble shown above the track while held.
@@ -234,12 +248,20 @@ final class PlayerProgressBarView: UIControl {
     }
 
     /// Dart IgnorePointer + 0.48 opacity when the visual state disallows
-    /// seeking; time labels hidden (timeLabelLocation .none).
-    func setAllowsSeek(_ allows: Bool) {
+    /// seeking; time labels hidden (timeLabelLocation .none). The
+    /// adjustable trait goes with it — VoiceOver must not announce a
+    /// control it can adjust when seeking is blocked; the status message
+    /// (`Loading…` / `Nothing playing`) becomes the value instead.
+    func setAllowsSeek(_ allows: Bool, statusMessage: String? = nil) {
         isEnabled = allows
         alpha = allows ? 1 : 0.48
         positionLabel.isHidden = !allows
         remainingLabel.isHidden = !allows
+        accessibilityTraits = allows ? [.adjustable] : []
+        disabledStatusMessage = statusMessage
+        accessibilityValue = allows
+            ? accessibilityValue
+            : statusMessage
     }
 
     // MARK: - Drawing
@@ -309,10 +331,14 @@ final class PlayerProgressBarView: UIControl {
             positionMilliseconds: effectivePosition,
             durationMilliseconds: duration
         )
-        accessibilityValue = PlayerProgressClock.accessibilityValue(
-            positionMilliseconds: effectivePosition,
-            durationMilliseconds: duration
-        )
+        // While blocked, the clock reads 0:00 of 0:00 — the status message
+        // is the honest value (see setAllowsSeek).
+        accessibilityValue = isEnabled
+            ? PlayerProgressClock.accessibilityValue(
+                positionMilliseconds: effectivePosition,
+                durationMilliseconds: duration
+            )
+            : disabledStatusMessage
     }
 
     private func layoutBarLayers() {

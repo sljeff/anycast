@@ -126,6 +126,9 @@ final class PlayerTransportView: UIView {
         stateMessageLabel.textColor = Theme.playerSecondary
         stateMessageLabel.textAlignment = .center
         stateMessageLabel.adjustsFontForContentSizeCategory = true
+        // Two lines at the accessibility text sizes — the message must
+        // not truncate at AX5.
+        stateMessageLabel.numberOfLines = 2
         stateMessageLabel.isHidden = true
 
         progressBar.setContentCompressionResistancePriority(UILayoutPriority(800), for: .vertical)
@@ -238,7 +241,7 @@ final class PlayerTransportView: UIView {
         } else {
             stateMessageLabel.isHidden = true
         }
-        progressBar.setAllowsSeek(state.allowsSeek)
+        progressBar.setAllowsSeek(state.allowsSeek, statusMessage: state.message)
         progressBar.update(
             positionMilliseconds: position.positionMilliseconds,
             bufferedMilliseconds: position.bufferedMilliseconds,
