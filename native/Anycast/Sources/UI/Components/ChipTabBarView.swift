@@ -1,13 +1,10 @@
 import UIKit
 
 /// The secondary tab strip in the Anycast 2.0 UI kit strip language (same
-/// as `CategoryStripView`): text chips whose selection reads through the
-/// title ink plus a small rounded underline tracking the selected title —
-/// the selected chip in full ink with the indicator beneath it, the rest
-/// at `sandAlpha8`, cross-faded on change. When the chips fit the strip's
-/// width they spread evenly across it (SearchPage tabs, Channel
-/// Newest/Oldest); when they overflow, the strip scrolls horizontally
-/// (Discover's many categories).
+/// as `CategoryStripView`): text chips whose selection reads through
+/// brightness alone — the selected title in full ink, the rest at
+/// `sandAlpha8`, cross-faded on change. Used by Discover categories
+/// (scrolls), SearchPage tabs, and Channel Newest/Oldest.
 ///
 /// Interaction notes (03 §2.1/§3.5): the strip mirrors a TabBar — selection
 /// changes animate, and the strip scrolls horizontally when its chips
@@ -19,20 +16,10 @@ final class ChipTabBarView: UIView {
 
     let scrollView = UIScrollView()
     private let stackView = UIStackView()
-    /// The selected-title underline (the deleted v1 underline strip's language).
-    private let indicator = UIView()
     private var chips: [UIView] = []
     private var titleLabels: [UILabel] = []
-    /// centerX link to the selected label — constraint-driven so the
-    /// indicator is correct on the FIRST layout pass (a manual frame calc
-    /// runs before the stack has positioned its labels) and tracks the
-    /// label through scrolls, rotations, and Dynamic Type.
-    private var indicatorCenterX: NSLayoutConstraint?
 
     static let chipHeight: CGFloat = 44
-
-    /// 24×3 rounded bar under the selected title.
-    private static let indicatorSize = CGSize(width: 24, height: 3)
 
     private(set) var selectedIndex: Int = 0
 
@@ -48,29 +35,13 @@ final class ChipTabBarView: UIView {
 
         stackView.axis = .horizontal
         stackView.alignment = .center
-        // Plain .fill: the equal-width chain below (added after the chips
-        // are built) splits the strip into equal segments when it fits, so
-        // each title centers in its own fraction of the width — the classic
-        // tab-bar rhythm — instead of two titles drifting to the far edges
-        // with a dead middle.
-        stackView.distribution = .fill
         stackView.spacing = 0
         stackView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(stackView)
 
-        indicator.backgroundColor = Theme.primary
-        indicator.layer.cornerRadius = Self.indicatorSize.height / 2
-        indicator.isUserInteractionEnabled = false
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        // Inside the scroll view (content space, above the stack): the
-        // indicator follows the selected label when the strip scrolls —
-        // an indicator in strip space would stay put as labels move under
-        // it. All of its constraints stay in content space.
-        scrollView.addSubview(indicator)
-
-        // titleMedium, capped so accessibility sizes stay inside the chip.
-        let font = UIFontMetrics(forTextStyle: TypographyV2.titleMedium.scalingTextStyle).scaledFont(
-            for: ThemeRegistry.current.typography.font(TypographyV2.titleMedium.size, TypographyV2.titleMedium.weight, .text),
+        // emphasis, capped so accessibility sizes stay inside the chip.
+        let font = UIFontMetrics(forTextStyle: TypographyV2.emphasis.scalingTextStyle).scaledFont(
+            for: ThemeRegistry.current.typography.font(TypographyV2.emphasis.size, TypographyV2.emphasis.weight, .text),
             maximumPointSize: 22
         )
         for (index, title) in titles.enumerated() {
@@ -103,62 +74,18 @@ final class ChipTabBarView: UIView {
             titleLabels.append(label)
         }
 
-        // Equal segments when the chips fit: chained at 749, just below the
-        // labels' 750 compression resistance. A fitting strip holds the
-        // fill constraint below, and this chain splits the width into equal
-        // fractions (each title centers in its own — Channels/Episodes sit
-        // at the quarter points, not glued to the edges). An overflowing
-        // strip keeps natural chip widths (label compression wins, the
-        // chain breaks) and scrolls.
-        for chip in chips.dropFirst() {
-            let equalWidth = chip.widthAnchor.constraint(equalTo: chips[0].widthAnchor)
-            equalWidth.priority = UILayoutPriority(749)
-            equalWidth.isActive = true
-        }
-
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            // Content-guide pins use symmetric page margins: the chips
-            // distribute over [pageH, width - pageH] instead of hugging the
-            // screen edges. The fill constraint below carries the MATCHING
-            // -2*pageH constant, so a fitting strip still has contentSize
-            // EXACTLY equal to the viewport — it never scrolls, never clips
-            // the trailing chip, and never jogs horizontally on selection
-            // (a content wider than the viewport with nothing to scroll to).
-            stackView.leadingAnchor.constraint(
-                equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Spacing.pageH
-            ),
-            stackView.trailingAnchor.constraint(
-                equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Spacing.pageH
-            ),
+            stackView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Spacing.xs),
+            stackView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Spacing.xs),
             stackView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             stackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             stackView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
-
-            indicator.widthAnchor.constraint(equalToConstant: Self.indicatorSize.width),
-            indicator.heightAnchor.constraint(equalToConstant: Self.indicatorSize.height),
-            // Bottom in CONTENT space (stack bottom == strip bottom — the
-            // strip never scrolls vertically).
-            indicator.bottomAnchor.constraint(equalTo: stackView.bottomAnchor),
         ])
-
-        // Segment fill when the chips fit: the fill sits just below the
-        // labels' compression resistance (750), so it holds whenever the
-        // chips fit (the equal-width chain above then splits it evenly)
-        // and yields for an overflowing strip (Discover) — which then
-        // keeps its natural content width and scrolls instead of
-        // truncating chips. The -2*pageH constant mirrors the
-        // content-guide pins above.
-        let fillWidth = stackView.widthAnchor.constraint(
-            equalTo: scrollView.frameLayoutGuide.widthAnchor,
-            constant: -2 * Spacing.pageH
-        )
-        fillWidth.priority = UILayoutPriority(749)
-        fillWidth.isActive = true
 
         applySelection(animated: false)
     }
@@ -202,33 +129,12 @@ final class ChipTabBarView: UIView {
         } else {
             apply()
         }
-        placeIndicator(animated: animated)
         if chips.indices.contains(selectedIndex),
            // Only overflowing strips need this, and the pre-layout init pass
            // has no meaningful frames yet.
            chips[selectedIndex].frame.width > 0,
            scrollView.contentSize.width > scrollView.bounds.width {
             scrollView.scrollRectToVisible(chips[selectedIndex].frame.insetBy(dx: -Spacing.pageH, dy: 0), animated: animated)
-        }
-    }
-
-    /// Slides the underline under the selected label — a constraint swap
-    /// (0.2s TabBar-style slide, indicator-follows-label move), so position
-    /// stays Auto Layout-driven on first layout and through Dynamic Type.
-    private func placeIndicator(animated: Bool) {
-        guard titleLabels.indices.contains(selectedIndex) else { return }
-        let label = titleLabels[selectedIndex]
-        indicatorCenterX?.isActive = false
-        let center = indicator.centerXAnchor.constraint(equalTo: label.centerXAnchor)
-        indicatorCenterX = center
-        center.isActive = true
-        if animated, !Motion.reduceMotion {
-            UIView.animate(
-                withDuration: 0.2, delay: 0,
-                options: [.curveEaseInOut, .allowUserInteraction]
-            ) {
-                self.layoutIfNeeded()
-            }
         }
     }
 }

@@ -14,7 +14,6 @@ struct RelativeTimeFormatterTests {
     struct G10 {
         var reference_now_ms: Int64
         var formatDatetime: [String: String]
-        var formatDate: [String: String]
     }
 
     /// JSONSerialization, not Codable: the golden table carries non-string
@@ -28,8 +27,7 @@ struct RelativeTimeFormatterTests {
         }
         return G10(
             reference_now_ms: (object["reference_now_ms"] as? NSNumber)?.int64Value ?? 0,
-            formatDatetime: strings("formatDatetime"),
-            formatDate: strings("formatDate")
+            formatDatetime: strings("formatDatetime")
         )
     }
 
@@ -66,24 +64,6 @@ struct RelativeTimeFormatterTests {
         #expect(RelativeTimeFormatter.format(golden.reference_now_ms, now: now) == "just now")
     }
 
-    @Test("formatDate matches the G10 golden table")
-    func formatDateGolden() throws {
-        let golden = try Self.loadGolden()
-        let now = Date(timeIntervalSince1970: TimeInterval(golden.reference_now_ms) / 1000)
-        var calendar = Foundation.Calendar(identifier: .gregorian)
-        calendar.timeZone = .current
-        let referenceYear = calendar.component(.year, from: now)
-
-        #expect(
-            RelativeTimeFormatter.formatDate(Self.utcMilliseconds(2020, 5, 15), now: now)
-                == golden.formatDate["past_2020"]
-        )
-        #expect(
-            RelativeTimeFormatter.formatDate(Self.utcMilliseconds(referenceYear, 1, 5), now: now)
-                == golden.formatDate["this_year"]
-        )
-    }
-
     @Test("timeago en_short ladder spot checks")
     func ladder() {
         let nowMs: Int64 = 1_800_000_000_000
@@ -95,5 +75,31 @@ struct RelativeTimeFormatterTests {
         #expect(RelativeTimeFormatter.format(secondsAgo(5 * 60), now: now) == "5m ago")
         #expect(RelativeTimeFormatter.format(secondsAgo(47 * 60), now: now) == "~1h ago")
         #expect(RelativeTimeFormatter.format(secondsAgo(5 * 3600), now: now) == "5h ago")
+    }
+
+    @Test("dateAndDuration joins the known parts with a middle dot")
+    func dateAndDuration() {
+        let nowMs: Int64 = 1_800_000_000_000
+        let now = Date(timeIntervalSince1970: TimeInterval(nowMs) / 1000)
+        let twoMinutesAgo = nowMs - 120_000
+        let thirtyMinutes: Int64 = 30 * 60_000
+
+        #expect(RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: twoMinutesAgo, durationMilliseconds: thirtyMinutes, now: now
+        ) == "2m ago · 30m")
+        // No pubDate → duration only.
+        #expect(RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: nil, durationMilliseconds: thirtyMinutes, now: now
+        ) == "30m")
+        // Zero or unknown duration → date only.
+        #expect(RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: twoMinutesAgo, durationMilliseconds: 0, now: now
+        ) == "2m ago")
+        #expect(RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: twoMinutesAgo, durationMilliseconds: nil, now: now
+        ) == "2m ago")
+        #expect(RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: nil, durationMilliseconds: nil, now: now
+        ) == "")
     }
 }

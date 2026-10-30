@@ -7,7 +7,7 @@ import AnycastKit
 /// (each test names the user-visible symptom it pins):
 ///
 /// 1. Player main page collapsed at the top with one dead gap above the
-///    page tab (Flutter parity is `MainAxisAlignment.spaceEvenly`).
+///    page tab (now one 28 pt rhythm below the cover with the slack above it).
 /// 2. Player progress thumb/glow halo rendering as a dark ring over the
 ///    track (removed: the played segment's rounded head is the indicator)
 ///    and the square-cornered stub the head became during the first
@@ -57,7 +57,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Player page distribution (1) + thumb height (2)
 
-    @Test("Player main page: square capped cover, balanced whitespace, centered play")
+    @Test("Player main page: square column-width cover, 28 pt rhythm, centered play")
     func playerPageDistribution() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -104,22 +104,23 @@ struct UIFixRegressionTests {
         let bottomFrame = frameInPage(bottomStack)
         let playFrame = frameInPage(playPause)
 
-        // Square, capped at 356 pt (the v2 content-rail width) and
-        // horizontally centered; on a 402 pt screen the cover fills the
-        // full 24 pt-inset rail and aligns with the title/progress rows.
+        // Square, at most the 24 pt content column's width, horizontally centered.
         #expect(abs(coverFrame.width - coverFrame.height) < 1.5, "cover is not square: \(coverFrame)")
-        #expect(coverFrame.width <= 356.5, "cover exceeds its 356 pt cap: \(coverFrame.width)")
+        #expect(coverFrame.width <= page.bounds.width - 48 + 0.5, "cover exceeds the column: \(coverFrame.width)")
         #expect(abs(coverFrame.midX - page.bounds.midX) < 1, "cover is off center")
 
-        // The whitespace above the cover equals the gap between the title
-        // and the scrubber block (UI kit balance), unless a floor binds.
+        // One 28 pt VISIBLE rhythm (subtitle → track, labels → transport,
+        // transport → selector); the frames carry the hidden slack, so the
+        // frame gaps are at least 28 - 24 and exactly 28 - 13 (the page ends
+        // at the selector's top). The cover sits just under the grabber and
+        // the slack goes between the title and the scrubber, keeping the
+        // controls in the thumb zone.
         let topGap = coverFrame.minY
         let middleGap = bottomFrame.minY - titleFrame.maxY
-        #expect(topGap >= 24 - 0.5, "content is crammed against the sheet top: \(topGap)")
-        #expect(middleGap >= 12 - 0.5, "title runs into the scrubber: \(middleGap)")
-        if topGap > 24.5 && middleGap > 12.5 {
-            #expect(abs(topGap - middleGap) < 2.0, "unbalanced: top \(topGap) vs middle \(middleGap)")
-        }
+        let bottomGap = page.bounds.maxY - bottomFrame.maxY
+        #expect(abs(topGap - 36) < 0.5, "cover should sit just under the grabber: \(topGap)")
+        #expect(middleGap >= 4 - 0.5, "title → scrubber frame gap is \(middleGap), expected at least 4")
+        #expect(abs(bottomGap - 15) < 1.0, "transport → selector frame gap is \(bottomGap), expected 15")
 
         // Play sits exactly on the page's center line.
         #expect(abs(playFrame.midX - page.bounds.midX) < 1, "play is off center: \(playFrame.midX)")
@@ -132,11 +133,12 @@ struct UIFixRegressionTests {
         bar.frame = CGRect(x: 0, y: 0, width: 320, height: 60)
         bar.layoutIfNeeded()
 
-        // Layer order per init: track, buffered, played — inside the bar
-        // container, and nothing else.
+        // Layer order per init: track, buffered, played, chapter gaps —
+        // inside the bar container, and nothing else; no marks, no gaps.
         let shapes = (bar.barContainer.layer.sublayers ?? []).compactMap { $0 as? CAShapeLayer }
-        #expect(shapes.count == 3,
-                "expected exactly track/buffered/played shape layers, found \(shapes.count)")
+        #expect(shapes.count == 4,
+                "expected exactly track/buffered/played/chapter shape layers, found \(shapes.count)")
+        #expect(shapes.last?.path?.isEmpty ?? true, "chapter gaps drawn without chapters")
 
         // Fraction 1: the played capsule reaches the trailing cap; the
         // head travels the full width (no thumb inset resurrecting it).
@@ -236,7 +238,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Mini player chrome (7)
 
-    @Test("Mini player: one silhouette — accessory hosts no own chrome, standalone is a capsule")
+    @Test("Mini player: one silhouette — accessory hosts no own chrome, capsule paints opaque sand")
     func miniPlayerSingleChrome() async {
         guard let context = await Self.liveContext() else {
             print("[uifix] shell not ready; skipping"); return
@@ -244,7 +246,7 @@ struct UIFixRegressionTests {
         // (style, expected capsule background alpha, expected side margin)
         let cases: [(PlayerBarView.HostingStyle, CGFloat, CGFloat)] = [
             (.systemAccessory, 0, 0),
-            (.standalone, 0.10, 12),
+            (.capsule, 1, 0),
         ]
         for (style, expectedAlpha, expectedMargin) in cases {
             let bar = context.makePlayerBar(style: style)
@@ -261,118 +263,61 @@ struct UIFixRegressionTests {
                     "\(style): leading margin \(capsule.frame.minX), expected \(expectedMargin)")
             #expect(abs(capsule.frame.maxX - (320 - expectedMargin)) < 0.5,
                     "\(style): trailing edge \(capsule.frame.maxX), expected \(320 - expectedMargin)")
-            // Same capsule contour in both styles — a flatter standalone
-            // radius (the old 16) made the bar read as a different element
-            // on sheet-hosted screens than in the system accessory.
+            // Same capsule contour in both styles, so the bar reads as one
+            // element on sheet-hosted screens and in the system accessory.
             #expect(abs(capsule.layer.cornerRadius - 29) < 0.5,
                     "\(style): corner radius \(capsule.layer.cornerRadius) is not a capsule (29)")
         }
     }
 
-    // MARK: - Mini player compact progress line (12)
+    // MARK: - Card progress meter (4)
 
-    /// The compact styles' thin progress line spans the whole content
-    /// strip: leading at the title's leading edge (one artwork-gap clear
-    /// of the cover), trailing at the play/pause slot's trailing edge.
-    /// The standalone style keeps its full-height fill.
-    @Test("Mini player progress line runs from the title's leading to the play/pause trailing edge")
-    func miniPlayerProgressLineAnchoredToControls() async {
-        guard let context = await Self.liveContext() else {
-            print("[uifix] shell not ready; skipping"); return
+    private func meter(in cell: EpisodeCardCell) -> UIView? {
+        func find(_ view: UIView) -> UIView? {
+            if view.accessibilityIdentifier == "episode-card-meter" { return view }
+            for subview in view.subviews { if let hit = find(subview) { return hit } }
+            return nil
         }
-        for style: PlayerBarView.HostingStyle in [.systemAccessory, .capsule] {
-            let bar = context.makePlayerBar(style: style)
-            bar.frame = CGRect(x: 0, y: 0, width: 320, height: PlayerBarView.barHeight)
-            bar.layoutIfNeeded()
-            guard let capsule = bar.subviews.first,
-                  let backdrop = capsule.subviews.compactMap({ $0 as? EpisodeProgressBackdrop }).first,
-                  let cover = capsule.subviews.compactMap({ $0 as? UIImageView }).first,
-                  let title = capsule.subviews
-                    .compactMap({ $0 as? UILabel })
-                    .first(where: { $0.accessibilityIdentifier == "mini-player-title" }),
-                  let playPause = capsule.subviews.compactMap({ $0 as? PlayPauseIconControl }).first else {
-                Issue.record("\(style): mini player subviews missing"); continue
-            }
-            #expect(abs(backdrop.frame.minX - title.frame.minX) < 0.5,
-                    "\(style): line leading \(backdrop.frame.minX) ≠ title leading \(title.frame.minX)")
-            #expect(abs(backdrop.frame.maxX - (playPause.frame.maxX - playPause.glyphInset)) < 0.5,
-                    "\(style): line trailing \(backdrop.frame.maxX) ≠ play/pause glyph trailing \(playPause.frame.maxX - playPause.glyphInset)")
-            #expect(backdrop.frame.minX > cover.frame.maxX,
-                    "\(style): line leading \(backdrop.frame.minX) reaches under the artwork (ends \(cover.frame.maxX))")
-            // Inside the capsule's straight-walled region: at the line's
-            // height the rounded cap has already curved inward past
-            // bounds.maxX - 10, so the end must clear that contour.
-            #expect(backdrop.frame.maxX <= capsule.bounds.maxX - 10,
-                    "\(style): line trailing \(backdrop.frame.maxX) breaks into the rounded cap (\(capsule.bounds.maxX))")
-        }
-
-        // Standalone keeps the full-height fill (sheet bars, 03 §2.9).
-        let standalone = context.makePlayerBar(style: .standalone)
-        standalone.frame = CGRect(x: 0, y: 0, width: 320, height: PlayerBarView.barHeight)
-        standalone.layoutIfNeeded()
-        if let capsule = standalone.subviews.first,
-           let fill = capsule.subviews.compactMap({ $0 as? EpisodeProgressBackdrop }).first {
-            // fill.frame is capsule-local; compare against the capsule's
-            // own bounds (capsule.frame carries the 12 pt host margin).
-            #expect(abs(fill.frame.minX - capsule.bounds.minX) < 0.5
-                    && abs(fill.frame.maxX - capsule.bounds.maxX) < 0.5,
-                    "standalone fill must still span the capsule")
-        } else {
-            Issue.record("standalone: fill backdrop missing")
-        }
+        return find(cell)
     }
 
-    // MARK: - Card progress backdrop corners (4)
-
-    @Test("Card progress backdrop clips inside the rounded card corners")
-    func cardBackdropClippedToCorners() {
-        let cell = EpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 354, height: 104))
+    private func card(showsProgress: Bool, fraction: Double, rightText: String) -> EpisodeCardCell {
+        let cell = EpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 370, height: EpisodeCardCell.cardRowHeight))
         cell.configure(
             EpisodeCardContent(
-                title: "Episode", channelTitle: "Channel", rightText: "12m left",
+                title: "Episode", channelTitle: "Channel", rightText: rightText,
                 descriptionHTML: nil, imageURL: nil,
-                showsProgressBackdrop: true,
-                progressFraction: 0.6,
+                showsProgress: showsProgress,
+                progressFraction: fraction,
                 descriptionPlainText: "Description"
             ),
             actions: []
         )
         cell.layoutIfNeeded()
+        return cell
+    }
 
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = false
-        let renderer = UIGraphicsImageRenderer(size: cell.bounds.size, format: format)
-        let image = renderer.image { context in
-            cell.layer.render(in: context.cgContext)
+    @Test("Card progress: a 36 × 4 meter inside the plate, only once played")
+    func cardProgressMeter() {
+        let played = card(showsProgress: true, fraction: 0.36, rightText: "32m left")
+        let shown = meter(in: played)
+        #expect(shown?.isHidden == false)
+        #expect(shown?.bounds.size == CGSize(width: 36, height: 4))
+        #expect(shown?.accessibilityLabel == "36 percent played")
+        if let shown {
+            let frame = shown.convert(shown.bounds, to: played)
+            #expect(played.bounds.contains(frame), "meter sits inside the card")
         }
-        guard let cg = image.cgImage else {
-            Issue.record("cell render failed"); return
-        }
-        let pixel = { (x: Int, y: Int) -> (UInt8, UInt8, UInt8, UInt8) in
-            var data = [UInt8](repeating: 0, count: 4)
-            guard let ctx = CGContext(
-                data: &data, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ) else { return (0, 0, 0, 0) }
-            ctx.interpolationQuality = .none
-            ctx.draw(
-                cg,
-                in: CGRect(
-                    x: -CGFloat(x), y: -CGFloat(y),
-                    width: cell.bounds.width, height: cell.bounds.height
-                )
-            )
-            return (data[0], data[1], data[2], data[3])
-        }
-        // Inside the 20 pt corner radius the bottom-left corner must be
-        // empty (the backdrop no longer paints through the rounded edge)…
-        let corner = pixel(2, 100)
-        #expect(corner.3 == 0, "progress strip paints the rounded corner (alpha \(corner.3))")
-        // …while the strip itself still paints at the bottom center.
-        let center = pixel(177, 100)
-        #expect(center.3 > 200, "progress strip missing at the bottom edge (alpha \(center.3))")
+
+        let unplayed = card(showsProgress: true, fraction: 0, rightText: "42m")
+        #expect(meter(in: unplayed)?.isHidden == true, "an unplayed episode shows its duration only")
+
+        let plain = card(showsProgress: false, fraction: 0.5, rightText: "4d ago · 30m")
+        #expect(meter(in: plain)?.isHidden == true, "non-playlist cards never show the meter")
+
+        // Live progress turns the meter on for the current episode.
+        unplayed.updateLiveProgress(fraction: 0.1, rightText: "38m left")
+        #expect(meter(in: unplayed)?.isHidden == false)
     }
 
     // MARK: - Playlist Detail play button (5)
@@ -419,7 +364,7 @@ struct UIFixRegressionTests {
         }
         let playButtons = detail.view.subviewsRecursive()
             .compactMap { $0 as? UIButton }
-            .filter { $0.accessibilityLabel == "Play" }
+            .filter { $0.accessibilityIdentifier == "detail-play" }
         guard let play = playButtons.first else {
             Issue.record("detail play button not found"); return
         }
@@ -493,6 +438,64 @@ struct UIFixRegressionTests {
         await Self.capture(window, name: "uifix-inbox-card-detail")
         detail.dismiss(animated: false)
         try await Self.settle(window, seconds: 0.5)
+    }
+
+    // MARK: - Inbox pinned header
+
+    @Test("Inbox header is pinned outside the list, matches Playlist's position and ignores a pull")
+    func inboxHeaderIsPinned() async throws {
+        guard let context = await Self.liveContext(),
+              let window = Self.keyWindow() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        defer { context.tabs.select(0) }
+
+        // Playlist first: its header is the reference position.
+        context.tabs.select(1)
+        try await Self.settle(window, seconds: 1.0)
+        guard let playlists = Self.find(PlaylistsPageViewController.self, in: window.rootViewController),
+              let reference = Self.firstView(in: playlists.view, where: { $0 is HeaderView }) as? HeaderView
+        else {
+            Issue.record("Playlist header not found"); return
+        }
+        let referenceFrame = reference.convert(reference.bounds, to: playlists.view)
+        let referenceTitle = Self.titleFrame(of: reference, in: playlists.view)
+        let referenceSettings = Self.settingsFrame(of: reference, in: playlists.view)
+
+        context.tabs.select(0)
+        try await Self.settle(window, seconds: 1.0)
+        guard let inbox = Self.find(InboxPageViewController.self, in: window.rootViewController),
+              let header = Self.firstView(in: inbox.view, where: { $0 is HeaderView }) as? HeaderView,
+              let collection = Self.firstView(in: inbox.view, where: { $0 is UICollectionView })
+                as? UICollectionView else {
+            Issue.record("Inbox header or list not found"); return
+        }
+
+        #expect(header.isDescendant(of: collection) == false, "the header must live outside the scroll view")
+        #expect(collection.subviewsRecursive().contains { $0 is HeaderView } == false)
+
+        // Same position as Playlist (the height differs: Inbox adds the status line).
+        let frame = header.convert(header.bounds, to: inbox.view)
+        #expect(Self.sameOrigin(frame, referenceFrame) && abs(frame.width - referenceFrame.width) < 0.01,
+                "Inbox header \(frame) vs Playlist \(referenceFrame)")
+        let title = Self.titleFrame(of: header, in: inbox.view)
+        #expect(Self.sameOrigin(title, referenceTitle), "title \(title) vs \(referenceTitle)")
+        let settings = Self.settingsFrame(of: header, in: inbox.view)
+        #expect(Self.sameOrigin(settings, referenceSettings) && settings.size == referenceSettings.size,
+                "settings \(settings) vs \(referenceSettings)")
+        // The list runs under the header (content fades out behind it); the
+        // first row still rests below it.
+        #expect(collection.frame.minY <= frame.minY, "the list runs under the header")
+        #expect(
+            collection.frame.minY + collection.adjustedContentInset.top >= frame.maxY,
+            "the first row rests below the header"
+        )
+
+        // A pull moves the list only.
+        collection.contentOffset = CGPoint(x: 0, y: -collection.adjustedContentInset.top - 90)
+        inbox.view.layoutIfNeeded()
+        #expect(Self.sameOrigin(header.convert(header.bounds, to: inbox.view), frame), "a pull moved the header")
+        collection.contentOffset = CGPoint(x: 0, y: -collection.adjustedContentInset.top)
     }
 
     // MARK: - Strip expand reliability (6, playlist list)
@@ -572,43 +575,6 @@ struct UIFixRegressionTests {
         }
     }
 
-    // MARK: - 7, sheet chrome safe area
-
-    /// The search sheet was the one screen whose player bar pinned to the
-    /// RAW bottom edge (under the home indicator) — every other page
-    /// anchors to the safe area. Guards the anchor itself, because the bar
-    /// hides when nothing plays and its frame cannot be asserted.
-    @Test("Search sheet player bar anchors to the safe area, not the raw bottom")
-    func searchSheetPlayerBarRespectsSafeArea() async throws {
-        guard let context = await Self.liveContext(),
-              let window = Self.keyWindow() else {
-            print("[uifix] shell not ready; skipping"); return
-        }
-        let sheet = SearchPageViewController(context: context, searchText: "safe-area")
-        sheet.modalPresentationStyle = .pageSheet
-        let presenter = await Self.settledTopPresenter(in: window) ?? window.rootViewController
-        presenter?.present(sheet, animated: false)
-        defer { presenter?.dismiss(animated: false) }
-        try await Self.settle(window, seconds: 0.6)
-
-        guard let bar = Self.firstView(in: sheet.view, where: { $0 is PlayerBarView }),
-              let host = bar.superview as? UIView else {
-            Issue.record("player bar not found in the search sheet"); return
-        }
-        let bottomAnchor = host.constraints.first {
-            ($0.firstItem as? UIView) === bar && $0.firstAttribute == .bottom
-        }
-        guard let bottomAnchor else {
-            Issue.record("player bar has no bottom constraint on its host"); return
-        }
-        let target = bottomAnchor.secondItem
-        #expect(
-            target is UILayoutGuide
-                && (target as? UILayoutGuide)?.identifier == "UIViewSafeAreaLayoutGuide",
-            "player bar bottom must anchor to the safe area guide, got: \(String(describing: target))"
-        )
-    }
-
     // MARK: - 9. Expand animation source height (playlist list)
 
     /// The expand/collapse must animate from the card's CURRENT measured
@@ -642,7 +608,9 @@ struct UIFixRegressionTests {
             print("[uifix] seeded playlist empty; skipping"); return
         }
 
-        // Seed one deterministically TALL card at the END of the playlist.
+        // Seed one long-text card at the END of the playlist (it was a
+        // deterministically TALL card before the fixed-height plate; the
+        // fixture stays as a long-text probe).
         // The defect only reads on a card taller than the .estimated()
         // fallback (estimate < actual — the buggy animation ran estimate →
         // expanded instead of measured → expanded); the fixture's own
@@ -698,15 +666,14 @@ struct UIFixRegressionTests {
         collection.scrollToItem(at: target, at: .top, animated: false)
         try await Self.settle(window, seconds: 0.4)
         let targetBefore = itemHeight(target.item)
-        // The estimate-vs-actual gap is the defect condition — assert it,
-        // do not skip on it: the seeded row exists precisely to guarantee
-        // it.
-        guard targetBefore > EpisodeCardCell.cardRowHeight + 10 else {
-            Issue.record(
-                "seeded tall card measured \(targetBefore) — not above the .estimated() fallback \(EpisodeCardCell.cardRowHeight); the from-height probe cannot discriminate"
-            )
-            return
-        }
+        // The redesigned card plate is a fixed `cardRowHeight` tall, so the
+        // collapsed card measures exactly the `.estimated()` fallback and the
+        // estimate-vs-actual gap that originally exposed the global
+        // invalidation is no longer constructible. The from-height probe
+        // (presentation layer at t≈0), body stillness, neighbor stillness
+        // and the settled +stripHeight outcome below still discriminate
+        // the settle-before-invalidate and un-targeted-invalidation
+        // regressions.
         let neighbors = collection.indexPathsForVisibleItems
             .filter { $0.section == 0 && $0 != target }
             .sorted { $0.item < $1.item }
@@ -1218,6 +1185,50 @@ struct UIFixRegressionTests {
         try? await context.database.feedRepository().insertMany([episodeRow])
     }
 
+    // MARK: - Podcast tab shows shelf
+
+    @Test("Shows shelf: a cover opens its Channel; All shows opens the sheet and a show opens its Channel")
+    func showsShelfOpensChannelAndSheet() async throws {
+        guard let context = await Self.liveContext(),
+              let window = Self.keyWindow() else {
+            print("[uifix] shell not ready; skipping"); return
+        }
+        context.tabs.select(0)
+        try await Self.settle(window, seconds: 1.5)
+        guard let inbox = Self.find(InboxPageViewController.self, in: window.rootViewController),
+              let shelf = Self.firstView(in: inbox.view, where: { $0 is ShowsShelfView }) as? ShowsShelfView,
+              let cover = shelf.subviewsRecursive()
+                .first(where: { $0.accessibilityIdentifier == "shows-shelf-cover-0" }) as? UIControl,
+              let allShows = shelf.subviewsRecursive()
+                .first(where: { $0.accessibilityIdentifier == "shows-shelf-all" }) as? UIControl
+        else {
+            print("[uifix] seeded subscriptions missing; skipping"); return
+        }
+        defer { window.rootViewController?.dismiss(animated: false) }
+
+        cover.sendActions(for: .touchUpInside)
+        try await Self.settle(window, seconds: 1.5)
+        #expect(Self.find(ChannelViewController.self, in: window.rootViewController) != nil,
+                "a shelf cover did not open its Channel")
+        window.rootViewController?.dismiss(animated: false)
+        try await Self.settle(window, seconds: 0.8)
+
+        allShows.sendActions(for: .touchUpInside)
+        try await Self.settle(window, seconds: 1.5)
+        guard let sheet = Self.find(ShowsSheetViewController.self, in: window.rootViewController),
+              let grid = Self.firstView(in: sheet.view, where: { $0 is UICollectionView })
+                as? UICollectionView else {
+            Issue.record("All shows did not open the Shows sheet"); return
+        }
+        #expect(sheet.sheetPresentationController?.prefersGrabberVisible == true)
+        grid.delegate?.collectionView?(grid, didSelectItemAt: IndexPath(item: 0, section: 0))
+        try await Self.settle(window, seconds: 2.0)
+        #expect(Self.find(ShowsSheetViewController.self, in: window.rootViewController) == nil,
+                "the sheet did not dismiss after a show was picked")
+        #expect(Self.find(ChannelViewController.self, in: window.rootViewController) != nil,
+                "a show picked in the sheet did not open its Channel")
+    }
+
     // MARK: - Helpers
 
     private static func liveContext() async -> UIContext? {
@@ -1235,6 +1246,20 @@ struct UIFixRegressionTests {
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
             .first(where: \.isKeyWindow)
+    }
+
+    private static func sameOrigin(_ a: CGRect, _ b: CGRect) -> Bool {
+        abs(a.minX - b.minX) < 0.01 && abs(a.minY - b.minY) < 0.01
+    }
+
+    private static func titleFrame(of header: HeaderView, in space: UIView) -> CGRect {
+        let label = header.subviewsRecursive().first { $0.accessibilityIdentifier == "header-title" }
+        return label.map { $0.convert($0.bounds, to: space) } ?? .null
+    }
+
+    private static func settingsFrame(of header: HeaderView, in space: UIView) -> CGRect {
+        let button = header.subviewsRecursive().first { $0.accessibilityIdentifier == "header-settings" }
+        return button.map { $0.convert($0.bounds, to: space) } ?? .null
     }
 
     private static func settle(_ window: UIWindow, seconds: Double) async throws {
@@ -1291,16 +1316,6 @@ struct UIFixRegressionTests {
         let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(name).png")
         try? data.write(to: url)
         print("[uifix] wrote \(url.path)")
-    }
-
-    // MARK: - Subscribe capsule shape (8)
-
-    @Test("Subscribe capsule radius cannot exceed half its 40 pt height")
-    func subscribeButtonCapsuleShape() {
-        let button = SubscriptionCapsuleButton()
-        button.frame = CGRect(x: 0, y: 0, width: 160, height: 40)
-        #expect(button.layer.cornerRadius <= button.frame.height / 2 + 0.5,
-                "radius \(button.layer.cornerRadius) exceeds half the height — an oversized continuous radius renders as a pointed lens, not a capsule")
     }
 
 }

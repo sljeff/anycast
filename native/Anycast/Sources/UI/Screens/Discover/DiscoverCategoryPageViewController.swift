@@ -5,7 +5,7 @@ import AnycastKit
 /// `listChannelsByCategoryId` PodcastCard list with a loading spinner and
 /// the centered "Network Error" state. No pull-to-refresh (03 §3.3).
 @MainActor
-final class DiscoverCategoryPageViewController: UIViewController, UICollectionViewDataSource {
+final class DiscoverCategoryPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
 
     private let context: UIContext
     private let model: DiscoverCategoryPageModel
@@ -20,31 +20,21 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         self.context = context
         self.model = model
 
-        let layout = UICollectionViewCompositionalLayout { _, _ in
-            let item = NSCollectionLayoutItem(
-                layoutSize: NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(1),
-                    heightDimension: .estimated(PodcastCardCell.cardHeight)
-                )
-            )
-            let group = NSCollectionLayoutGroup.horizontal(
-                layoutSize: item.layoutSize, subitems: [item]
-            )
-            let section = NSCollectionLayoutSection(group: group)
-            // ListView.separated + PodcastCard margins (discover.dart:87-99):
-            // pageH 16 sides, gap 12 top, pageBottomSafe 88 bottom.
-            section.contentInsets = NSDirectionalEdgeInsets(
-                top: 12, leading: 16, bottom: 88, trailing: 16
-            )
-            section.interGroupSpacing = PodcastCardCell.spacing
-            return section
-        }
-        collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        // One grouped plate (discover.dart:87-99 margins: pageH 16 sides,
+        // gap 12 top, pageBottomSafe 88 bottom).
+        collectionView = UICollectionView(
+            frame: .zero, collectionViewLayout: PodcastCardCell.makeGroupedLayout()
+        )
         super.init(nibName: nil, bundle: nil)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    var edgeScrollView: UIScrollView { collectionView }
+    var topChromeInset: CGFloat = 0 {
+        didSet { collectionView.contentInset.top = topChromeInset }
+    }
 
     // MARK: - Lifecycle
 
@@ -89,7 +79,7 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         // Centered white "Network Error" (discover.dart:73-78).
         errorLabel.text = "Network Error"
         errorLabel.textColor = Theme.onSurfaceVariant
-        errorLabel.font = TypographyV2.headlineSmall.font()
+        errorLabel.font = TypographyV2.emphasis.font()
         errorLabel.adjustsFontForContentSizeCategory = true
         errorLabel.textAlignment = .center
         errorLabel.isHidden = true
@@ -150,6 +140,9 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         ) as! PodcastCardCell
         if model.channels.indices.contains(indexPath.item) {
             let channel = model.channels[indexPath.item]
+            cell.setPosition(
+                isFirst: indexPath.item == 0, isLast: indexPath.item == model.channels.count - 1
+            )
             cell.configure(
                 PodcastCardContent(
                     rssFeedURL: channel.rssFeedUrl ?? "",

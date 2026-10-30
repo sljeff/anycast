@@ -89,6 +89,8 @@ final class PlayerProgressBarView: UIControl {
     /// `Spacing.playerProgress` (6 pt).
     private static let trackHeight: CGFloat = 12
     private static let restScale: CGFloat = Spacing.playerProgress / trackHeight
+    /// Width of a chapter gap in the track.
+    private static let chapterGap: CGFloat = 2
 
     /// The bar layers live in their own corner-clipped container: the round
     /// head sticks past the track's leading cap at small fractions and must
@@ -99,6 +101,9 @@ final class PlayerProgressBarView: UIControl {
     private let trackLayer = CAShapeLayer()
     private let bufferedLayer = CAShapeLayer()
     private let playedLayer = CAShapeLayer()
+    /// Chapter starts cut thin gaps through the track (page ground colour).
+    private let chapterLayer = CAShapeLayer()
+    private var chapterStartsMilliseconds: [Int64] = []
     private let positionLabel = UILabel()
     private let remainingLabel = UILabel()
     /// The time bubble shown above the track while held.
@@ -124,6 +129,7 @@ final class PlayerProgressBarView: UIControl {
         trackLayer.fillColor = UIColor.white.withAlphaComponent(0.12).cgColor
         bufferedLayer.fillColor = UIColor.white.withAlphaComponent(0.24).cgColor
         playedLayer.fillColor = Theme.playerText.cgColor
+        chapterLayer.fillColor = Theme.playerBackground.cgColor
         barContainer.clipsToBounds = true
         barContainer.layer.cornerRadius = Self.trackHeight / 2
         barContainer.transform = CGAffineTransform(scaleX: 1, y: Self.restScale)
@@ -131,7 +137,7 @@ final class PlayerProgressBarView: UIControl {
         barContainer.isUserInteractionEnabled = false
         barContainer.translatesAutoresizingMaskIntoConstraints = false
         addSubview(barContainer)
-        for layer in [trackLayer, bufferedLayer, playedLayer] {
+        for layer in [trackLayer, bufferedLayer, playedLayer, chapterLayer] {
             barContainer.layer.addSublayer(layer)
         }
         NSLayoutConstraint.activate([
@@ -145,18 +151,14 @@ final class PlayerProgressBarView: UIControl {
 
         for label in [positionLabel, remainingLabel] {
             // Monospaced digits keep the ticking times from jittering.
-            label.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(
-                for: ThemeRegistry.current.typography.font(13, .regular, .text).monospacedDigits()
-            )
+            label.font = TypographyV2.meta.font().monospacedDigits()
             label.textColor = Theme.playerSecondary
             label.adjustsFontForContentSizeCategory = true
             label.translatesAutoresizingMaskIntoConstraints = false
             addSubview(label)
         }
 
-        timeBubbleLabel.font = UIFontMetrics(forTextStyle: .title3).scaledFont(
-            for: ThemeRegistry.current.typography.font(20, .semibold, .text).monospacedDigits()
-        )
+        timeBubbleLabel.font = TypographyV2.emphasis.font().monospacedDigits()
         timeBubbleLabel.adjustsFontForContentSizeCategory = true
         timeBubbleLabel.textColor = Theme.playerBackground
         timeBubbleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -224,6 +226,13 @@ final class PlayerProgressBarView: UIControl {
         render()
     }
 
+    /// Chapter starts to mark on the track (the first, at 0, is skipped).
+    func setChapterMarks(_ startsMilliseconds: [Int64]) {
+        guard startsMilliseconds != chapterStartsMilliseconds else { return }
+        chapterStartsMilliseconds = startsMilliseconds
+        render()
+    }
+
     /// Dart IgnorePointer + 0.48 opacity when the visual state disallows
     /// seeking; time labels hidden (timeLabelLocation .none).
     func setAllowsSeek(_ allows: Bool) {
@@ -282,6 +291,17 @@ final class PlayerProgressBarView: UIControl {
         // The played segment's rounded head is the position indicator.
         playedLayer.path = fillPath(width: x(forFraction: playedFraction))
 
+        let marks = UIBezierPath()
+        if duration > 0 {
+            for start in chapterStartsMilliseconds where start > 0 && start < duration {
+                let markX = x(forFraction: Double(start) / Double(duration))
+                marks.append(UIBezierPath(rect: CGRect(
+                    x: markX - Self.chapterGap / 2, y: 0, width: Self.chapterGap, height: Self.trackHeight
+                )))
+            }
+        }
+        chapterLayer.path = marks.cgPath
+
         positionLabel.text = PlayerProgressClock.positionText(effectivePosition)
         timeBubbleLabel.text = positionLabel.text
         timeBubbleCenterX.constant = x(forFraction: playedFraction)
@@ -302,7 +322,7 @@ final class PlayerProgressBarView: UIControl {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         let size = barContainer.bounds.size
-        for layer in [trackLayer, bufferedLayer, playedLayer] {
+        for layer in [trackLayer, bufferedLayer, playedLayer, chapterLayer] {
             layer.frame = CGRect(origin: .zero, size: size)
         }
         CATransaction.commit()

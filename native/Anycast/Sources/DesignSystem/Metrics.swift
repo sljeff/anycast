@@ -31,6 +31,8 @@ nonisolated enum Spacing {
     static let sheetTitleH: CGFloat = 64
     static let rowH: CGFloat = 70
     static let pageBottomSafe: CGFloat = 88
+    /// Content inset inside sheets: 54 − 28 = 26, the radius of a 52 pt capsule, so bottom controls sit concentric with the floating sheet corner.
+    static let sheetContent: CGFloat = 28
 }
 
 /// Anycast 2.0 corner radii (`AnycastRadius`).
@@ -84,6 +86,20 @@ nonisolated enum Motion {
         return overscroll < 0 ? -stretched : stretched
     }
 
+    // Card list motion: a first list rises in staggered, and an expanding
+    // card's action strip slides down out of the card (the card itself
+    // never moves).
+    /// Cards rise this far from below as they fade in.
+    static let cardEntranceOffset: CGFloat = 12
+    /// Per-card delay of the entrance stagger.
+    static let cardEntranceStagger: TimeInterval = 0.04
+    /// Cards beyond this index share the last stagger delay.
+    static let cardEntranceMaxStaggered = 8
+    /// The action strip slides down from the card by this much as it appears.
+    static let stripRevealOffset: CGFloat = 8
+    /// The action strip fades out this long before its height closes.
+    static let stripFadeOut: TimeInterval = 0.12
+
     static var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
 
     /// `UIView.animate` convenience with the standard v2 curve/duration.
@@ -105,14 +121,15 @@ extension UICollectionView {
     /// UIKit folds it into `adjustedContentInset` — so empty and error
     /// states hosted there would sit under the header or the floating
     /// mini player. Call from `viewDidLayoutSubviews` to feed the inset in
-    /// as layout margins.
+    /// as layout margins. `additionalTop` pushes the state below chrome that
+    /// scrolls with the list (the height of the rows above it).
     @MainActor
-    func alignBackgroundViewMargins() {
+    func alignBackgroundViewMargins(additionalTop: CGFloat = 0) {
         guard let backgroundView else { return }
         backgroundView.insetsLayoutMarginsFromSafeArea = false
         let inset = adjustedContentInset
         let margins = NSDirectionalEdgeInsets(
-            top: inset.top + Spacing.pageH,
+            top: inset.top + additionalTop + Spacing.pageH,
             leading: Spacing.pageH,
             bottom: inset.bottom + Spacing.pageH,
             trailing: Spacing.pageH

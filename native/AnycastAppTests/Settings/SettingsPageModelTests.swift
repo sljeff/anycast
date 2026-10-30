@@ -3,60 +3,117 @@ import Testing
 import AnycastKit
 @testable import Anycast
 
-/// T7 settings page model parity (05 §6.1 S16 / 03 §2.13): group/row
-/// structure, row copy, tooltip fixtures, option lists, locale derivation,
-/// and the deep links — asserted against data so the fixtures are
-/// independent of the live UI.
+/// Settings page model (05 §6.1 S16 / 03 §2.13, restrained 2.0 Settings
+/// direction 2026-10-21): group/row structure, row copy and trailing values,
+/// tooltip fixtures, option lists, locale derivation, and the deep links —
+/// asserted against data so the fixtures are independent of the live UI.
 @MainActor
 struct SettingsPageModelTests {
 
-    // MARK: - Group / row order parity (settings.dart:110-475)
+    // MARK: - Group / row order
 
-    @Test("Sections and rows mirror the Dart ListView order")
+    @Test("Sections and rows follow the 2.0 Settings grouping")
     func sectionRowOrder() {
-        let off = SettingsPageModel.sections(includeTargetLanguage: false)
-        #expect(off.map(\.header) == [
-            nil, "Transcript & Translation", "Podcast", "Other", "Contact", nil,
+        let sections = SettingsPageModel.sections(tier: .signedOut)
+        #expect(sections.map(\.header) == [
+            nil, "Downloads & Storage", "Subtitles & Translation",
+            "Content & Discovery", "Help", nil,
         ])
-        #expect(off.map(\.rows) == [
+        #expect(sections.map(\.rows) == [
             [.account],
-            [.country, .enableTranslation],
-            [.importExport, .history],
-            [.autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes],
+            [.cacheLimit],
+            [.enableTranslation, .targetLanguage],
+            [.country, .autoRefreshInterval, .maxFeedEpisodes,
+             .maxHistoryEpisodes, .importExport, .history],
             [.contactEmail],
             [.privacyPolicy, .termsOfUse],
         ])
-        // Only the trailing privacy links render outside a group card.
-        #expect(off.map(\.plainStyle) == [false, false, false, false, false, true])
-
-        let on = SettingsPageModel.sections(includeTargetLanguage: true)
-        #expect(on[1].rows == [.country, .enableTranslation, .targetLanguage])
+        // Only the trailing privacy links render outside a group plate.
+        #expect(sections.map(\.plainStyle) == [false, false, false, false, false, true])
     }
 
-    @Test("Target language row gates on a non-empty language (settings.dart:239)")
-    func languageVisibilityGating() {
+    @Test("The gold Upgrade plate follows the identity row for free users only")
+    func upgradePlateIsTierDependent() {
+        let free = SettingsPageModel.sections(tier: .free)
+        #expect(free.map(\.rows).prefix(3) == [[.account], [.plusUpgrade], [.cacheLimit]])
+        #expect(free.count == SettingsPageModel.sections(tier: .signedOut).count + 1)
+        #expect(free[1].header == nil)
+        #expect(free[1].plainStyle == false)
+
+        for tier in [AccountPageModel.Tier.signedOut, .plus] {
+            let rows = SettingsPageModel.sections(tier: tier).flatMap(\.rows)
+            #expect(!rows.contains(.plusUpgrade))
+        }
+        #expect(SettingsPageModel.identifier(for: .plusUpgrade) == "settings-row-plusUpgrade")
+    }
+
+    @Test("Translation is on while a target language is set (settings.dart:239)")
+    func translationGating() {
         #expect(SettingsPageModel.showsTargetLanguage(targetLanguage: "") == false)
         #expect(SettingsPageModel.showsTargetLanguage(targetLanguage: "ja") == true)
     }
 
-    @Test("Row labels match the Dart copy verbatim")
+    @Test("Row identifiers stay stable for existing rows")
+    func rowIdentifiers() {
+        #expect(SettingsPageModel.identifier(for: .account) == "settings-row-account")
+        #expect(SettingsPageModel.identifier(for: .country) == "settings-row-country")
+        #expect(SettingsPageModel.identifier(for: .enableTranslation) == "settings-row-enableTranslation")
+        #expect(SettingsPageModel.identifier(for: .autoRefreshInterval) == "settings-row-autoRefreshInterval")
+        #expect(SettingsPageModel.identifier(for: .cacheLimit) == "settings-row-cacheLimit")
+    }
+
+    @Test("Row titles and the switch subtitle")
     func rowLabels() {
         let expected: [SettingsPageModel.Row: String] = [
             .account: "Account",
-            .country: "Country",
-            .enableTranslation: "Enable Transcript Translation",
+            .plusUpgrade: "Anycast Plus",
+            .cacheLimit: "Cache Limit",
+            .enableTranslation: "Subtitle Translation",
             .targetLanguage: "Target Language",
-            .importExport: "Import / Export",
-            .history: "History",
-            .autoRefreshInterval: "Auto Refresh Interval",
-            .maxFeedEpisodes: "Max Episodes in Inbox",
-            .maxHistoryEpisodes: "Max Episodes in History",
-            .contactEmail: "kindjeff.com@gmail.com",
+            .country: "Discovery Region",
+            .autoRefreshInterval: "Auto Refresh",
+            .maxFeedEpisodes: "Inbox Limit",
+            .maxHistoryEpisodes: "History Limit",
+            .importExport: "Import & Export",
+            .history: "Listening History",
+            .contactEmail: "Contact Us",
             .privacyPolicy: "Privacy Policy",
             .termsOfUse: "Terms of Use (EULA)",
         ]
         for (row, title) in expected {
             #expect(SettingsPageModel.title(for: row) == title)
+        }
+        #expect(SettingsPageModel.subtitle(for: .enableTranslation) == "Translate generated text")
+        for row in expected.keys where row != .enableTranslation {
+            #expect(SettingsPageModel.subtitle(for: row) == nil)
+        }
+    }
+
+    @Test("Trailing values: stored value, 'Off' while translation is off, 'Email' on Contact Us")
+    func trailingValues() {
+        var settings = AppSettings.defaults(localeIdentifier: "en_US")
+        settings.countryCode = "JP"
+        settings.targetLanguage = "zh"
+        settings.autoRefreshInterval = 300
+        settings.maxFeedEpisodes = 200
+        settings.maxHistoryEpisodes = 50
+        settings.maxCacheCount = 20
+
+        #expect(SettingsPageModel.value(for: .country, settings: settings) == "日本")
+        #expect(SettingsPageModel.value(for: .targetLanguage, settings: settings) == "中文")
+        #expect(SettingsPageModel.value(for: .autoRefreshInterval, settings: settings) == "5 min")
+        #expect(SettingsPageModel.value(for: .maxFeedEpisodes, settings: settings) == "200 episodes")
+        #expect(SettingsPageModel.value(for: .maxHistoryEpisodes, settings: settings) == "50 episodes")
+        #expect(SettingsPageModel.value(for: .cacheLimit, settings: settings) == "20 episodes")
+        #expect(SettingsPageModel.value(for: .contactEmail, settings: settings) == "Email")
+
+        settings.targetLanguage = ""
+        #expect(SettingsPageModel.value(for: .targetLanguage, settings: settings) == "Off")
+
+        for row: SettingsPageModel.Row in [
+            .account, .plusUpgrade, .enableTranslation, .importExport, .history, .privacyPolicy, .termsOfUse,
+        ] {
+            #expect(SettingsPageModel.value(for: row, settings: settings) == nil)
         }
     }
 
@@ -76,7 +133,7 @@ struct SettingsPageModelTests {
             == "Limits the number of episodes in the history. Auto deleted if exceeded.")
 
         let withoutTooltip: [SettingsPageModel.Row] = [
-            .account, .enableTranslation, .importExport, .history,
+            .account, .plusUpgrade, .cacheLimit, .enableTranslation, .importExport, .history,
             .contactEmail, .privacyPolicy, .termsOfUse,
         ]
         for row in withoutTooltip {
@@ -154,12 +211,10 @@ struct SettingsPageModelTests {
 
     @Test("Contact mailto mirrors the shipped recipient quirk; privacy URLs exact")
     func deepLinks() {
-        #expect(SettingsPageModel.contactEmailDisplay == "kindjeff.com@gmail.com")
         #expect(SettingsPageModel.feedbackMailtoURL.absoluteString
             == "mailto:kindjeffcom@gmail.com?subject=Anycast%20Feedback")
         #expect(SettingsPageModel.privacyPolicyURL.absoluteString == "https://privacy.anycast.website")
         #expect(SettingsPageModel.termsOfUseURL.absoluteString
             == "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
-        #expect(SettingsPageModel.optionSheetTitle == "Select Country")
     }
 }

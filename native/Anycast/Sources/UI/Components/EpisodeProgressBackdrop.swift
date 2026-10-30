@@ -1,9 +1,9 @@
 import UIKit
 
-/// The position-driven progress-bar backdrop used by playlist cards and the
-/// mini player (03 §2.11 / §2.9): a backdrop whose FILLED width equals
-/// `fraction × own bounds`. The caller sizes the view (a 2pt strip along the
-/// card's bottom edge, or the mini player's full-height backdrop) — this
+/// The position-driven progress-bar backdrop used by playlist cards
+/// (03 §2.11): a backdrop whose FILLED width equals
+/// `fraction × own bounds`. The caller sizes the view (the card's 36 × 4
+/// inline meter) — this
 /// view fills whatever bounds it gets, driven purely by fraction, never by
 /// screen width (iOS 27 resizable-window rule, 07 §4), and updated through
 /// layers so per-tick updates never trigger a layout pass (08 §11.2).
@@ -20,6 +20,10 @@ final class EpisodeProgressBackdrop: UIView {
     var fillColor: UIColor = UIColor.white.withAlphaComponent(0.2) {
         didSet { applyColors() }
     }
+
+    /// Smallest visible fill while any progress exists, so a just-started
+    /// episode still reads as started (the card meter uses 3 pt).
+    var minimumFillWidth: CGFloat = 0
 
     private let trackLayer = CALayer()
     private let fillLayer = CALayer()
@@ -62,11 +66,8 @@ final class EpisodeProgressBackdrop: UIView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         trackLayer.frame = CGRect(x: 0, y: 0, width: bounds.width, height: bounds.height)
-        fillLayer.frame = CGRect(
-            x: 0, y: 0,
-            width: bounds.width * CGFloat(fraction),
-            height: bounds.height
-        )
+        let width = fraction > 0 ? max(bounds.width * CGFloat(fraction), minimumFillWidth) : 0
+        fillLayer.frame = CGRect(x: 0, y: 0, width: min(width, bounds.width), height: bounds.height)
         CATransaction.commit()
     }
 }

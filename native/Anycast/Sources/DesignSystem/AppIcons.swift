@@ -12,7 +12,7 @@ import UIKit
 ///   video_library_rounded    → play.rectangle.on.rectangle
 ///                               (videos.fill is not offered on iOS 18)
 ///   search / search_rounded  → magnifyingglass
-///   settings_rounded         → gearshape.fill
+///   settings_rounded         → gearshape (outline; filled only when selected)
 ///   round_settings           → gearshape
 ///   replay_10                → gobackward.10
 ///   forward_30               → goforward.30
@@ -54,8 +54,8 @@ import UIKit
 ///
 ///   icon_park_solid.check_one                → checkmark.circle.fill
 ///   ph.arrow_elbow_down_right_bold           → arrow.turn.down.right
-///   FluentIcons.mail_inbox_all_24_filled     → tray.fill
-///   FluentIcons.library_24_filled            → books.vertical.fill
+///   FluentIcons.mail_inbox_all_24_filled     → tray / tray.fill (selected)
+///   FluentIcons.library_24_filled            → books.vertical / .fill (selected)
 ///   MdiIcons.cloudSearch                     → safari (2.0: discover ≠ search)
 ///   Remix.forward_30_fill                    → goforward.30
 ///
@@ -66,12 +66,17 @@ nonisolated enum AppIcons {
     // Tab bar (03 §1.1)
     static let home = symbol("house.fill")
     static let playlist = symbol("play.rectangle.on.rectangle")
+    static let playlistSelected = symbol("play.rectangle.on.rectangle.fill")
     /// Compass: "discover", distinct from the header search field.
     static let discover = symbol("safari")
+    static let discoverSelected = symbol("safari.fill")
 
-    // PodcastsPage secondary tabs (03 §2.1)
-    static let inbox = symbol("tray.fill")
-    static let subscriptions = symbol("books.vertical.fill")
+    // PodcastsPage secondary tabs (03 §2.1): outline when unselected,
+    // filled when selected.
+    static let inbox = symbol("tray")
+    static let inboxSelected = symbol("tray.fill")
+    static let subscriptions = symbol("books.vertical")
+    static let subscriptionsSelected = symbol("books.vertical.fill")
 
     // Cards & actions (03 §2.11 / §2.2)
     static let play = symbol("play.fill")
@@ -86,15 +91,21 @@ nonisolated enum AppIcons {
     static let share = symbol("square.and.arrow.up")
     static let back = symbol("chevron.left")
 
+    // Channel subscription toggle: outline = not subscribed, filled = subscribed.
+    static let subscribe = symbol("bookmark")
+    static let subscribed = symbol("bookmark.fill")
+
     // Player (03 §2.10)
     static let replay10 = symbol("gobackward.10")
     static let forward30 = symbol("goforward.30")
-    static let playerSettings = symbol("gearshape")
+    static let playerEpisode = symbol("list.bullet")
+    static let sleepTimer = symbol("moon")
     static let playerMain = symbol("dot.radiowaves.left.and.right")
 
     // Settings & login (03 §2.13 / §2.14)
-    static let settings = symbol("gearshape.fill")
+    static let settings = symbol("gearshape")
     static let search = symbol("magnifyingglass")
+    static let recentSearch = symbol("clock.arrow.circlepath")
     static let close = symbol("xmark")
     static let delete = symbol("trash")
     static let check = symbol("checkmark")

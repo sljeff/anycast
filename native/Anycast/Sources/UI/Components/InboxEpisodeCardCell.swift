@@ -23,7 +23,7 @@ struct InboxCardContent {
 }
 
 /// The inbox card in the Anycast 2.0 UI kit form (`EpisodeCardCell`): the
-/// shared card plate (radius 32) carrying the title (20 pt, two lines,
+/// shared card plate (radius 32) carrying the title (emphasis, two lines,
 /// sentence case) over a two-line description, and a bottom row with the
 /// 36 pt circular show artwork — badged when the episode is playing or
 /// queued — the show name and date, and the `more` menu button. Whole-card
@@ -62,6 +62,9 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
     let moreButton = UIButton(type: .system)
 
     private var descriptionTask: Task<Void, Never>?
+    /// Guards the description resolve: a reconfigure with the same HTML must
+    /// not blank the text and restart the async parse each time.
+    private var renderedDescriptionHTML: String?
     /// Guards the cover load against reconfigure storms (an unconditional
     /// reload restarts an in-flight download).
     private var renderedCoverURL: URL?
@@ -78,41 +81,51 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         super.prepareForReuse()
         descriptionTask?.cancel()
         descriptionTask = nil
+        renderedDescriptionHTML = nil
         onCardTap = nil
         menuActions = []
+        // A reused cell must never inherit a card-entrance pose.
+        contentView.layer.removeAllAnimations()
+        contentView.alpha = 1
+        contentView.transform = .identity
     }
 
     // MARK: - Configure
 
     func configure(_ content: InboxCardContent) {
         titleLabel.text = content.title
-        // The UI kit's quiet lowercase show line; VoiceOver reads the name.
-        showNameLabel.text = content.showName.localizedLowercase
+        // The show line keeps the feed's own casing.
+        showNameLabel.text = content.showName
         showNameLabel.accessibilityLabel = content.showName
         metaLabel.text = content.metaText
         apply(status: content.status)
 
         if let plain = content.descriptionPlainText {
+            renderedDescriptionHTML = nil
             descriptionLabel.text = plain
         } else if let html = content.descriptionHTML {
-            descriptionTask?.cancel()
-            descriptionLabel.text = ""
-            descriptionTask = Task { [weak self] in
-                let text = await PlainTextHTMLCache.shared.plainText(for: html)
-                guard let self, !Task.isCancelled else { return }
-                self.descriptionLabel.text = text
-                // Resolve the label's frame in THIS turn — walk-based tests
-                // otherwise see "text but zero height" mid-flight; the
-                // follow-up tick covers text landing before the list
-                // section gave the cell its final frame.
-                self.invalidateIntrinsicContentSize()
-                self.setNeedsLayout()
-                self.layoutIfNeeded()
-                DispatchQueue.main.async { [weak self] in
-                    self?.layoutIfNeeded()
+            if html != renderedDescriptionHTML {
+                renderedDescriptionHTML = html
+                descriptionTask?.cancel()
+                descriptionLabel.text = ""
+                descriptionTask = Task { [weak self] in
+                    let text = await PlainTextHTMLCache.shared.plainText(for: html)
+                    guard let self, !Task.isCancelled else { return }
+                    self.descriptionLabel.text = text
+                    // Resolve the label's frame in THIS turn — walk-based
+                    // tests otherwise see "text but zero height" mid-flight;
+                    // the follow-up tick covers text landing before the list
+                    // section gave the cell its final frame.
+                    self.invalidateIntrinsicContentSize()
+                    self.setNeedsLayout()
+                    self.layoutIfNeeded()
+                    DispatchQueue.main.async { [weak self] in
+                        self?.layoutIfNeeded()
+                    }
                 }
             }
         } else {
+            renderedDescriptionHTML = nil
             descriptionLabel.text = ""
         }
 
@@ -153,7 +166,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
             UITapGestureRecognizer(target: self, action: #selector(cardTapped))
         )
 
-        titleLabel.font = TypographyV2.cardTitle.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.numberOfLines = 2
         titleLabel.lineBreakMode = .byTruncatingTail
@@ -163,7 +176,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         titleLabel.isAccessibilityElement = true
         titleLabel.accessibilityTraits = [.button]
 
-        descriptionLabel.font = TypographyV2.bodyCompact.font()
+        descriptionLabel.font = TypographyV2.meta.font()
         descriptionLabel.textColor = Theme.onSurfaceVariant
         descriptionLabel.numberOfLines = 2
         descriptionLabel.lineBreakMode = .byTruncatingTail
@@ -192,7 +205,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         statusBadge.isHidden = true
 
         for label in [showNameLabel, metaLabel] {
-            label.font = TypographyV2.caption.font()
+            label.font = TypographyV2.meta.font()
             label.textColor = Theme.onSurfaceVariant
             label.adjustsFontForContentSizeCategory = true
         }

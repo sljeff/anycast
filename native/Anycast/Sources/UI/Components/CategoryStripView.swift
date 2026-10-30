@@ -50,15 +50,8 @@ final class CategoryStripView: UIView {
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
             heightAnchor.constraint(equalToConstant: Self.chipHeight),
 
-            // Symmetric page margins: an overflowing strip gets 16 pt of
-            // scroll padding at both ends, and the first chip never hugs
-            // the screen edge (same edge treatment as ChipTabBarView).
-            stack.leadingAnchor.constraint(
-                equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Spacing.pageH
-            ),
-            stack.trailingAnchor.constraint(
-                equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Spacing.pageH
-            ),
+            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
             stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             stack.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
@@ -83,7 +76,7 @@ final class CategoryStripView: UIView {
             )
             config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
                 var outgoing = incoming
-                outgoing.font = TypographyV2.titleMedium.font()
+                outgoing.font = TypographyV2.emphasis.font()
                 return outgoing
             }
             let button = UIButton(configuration: config)
@@ -108,10 +101,9 @@ final class CategoryStripView: UIView {
 
     var currentSelection: String? { selectedValue }
 
-    /// The number of chips currently configured, the "All" chip included.
-    /// Below 2 the strip is nothing but the lone "All" chip — hosts hide
-    /// the whole row in that case (dead UI).
-    var chipsCount: Int { chips.count }
+    /// Whether the strip offers anything beyond the "All" chip; with only
+    /// "All" the page hides the strip entirely.
+    var hasFilters: Bool { chips.count > 1 }
 
     /// Silent selection update (programmatic moves).
     func select(_ value: String?, animated: Bool) {

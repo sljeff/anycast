@@ -7,11 +7,13 @@ extension EpisodeCardAction {
     static let addActionTag = 1
 }
 
-/// Shared wiring of `EpisodeCardCell` rows for the Channel and
-/// ChannelSearch lists (the two card lists of channel.dart:101-193 and
-/// 796-885): identical actions (play / add-to-playlist), the channel-page
-/// inPlaylist guard, the fly-in-then-insert order, Detail presentation on
-/// cover tap, and mutual exclusion through a `CardExpandCoordinator`.
+/// Shared episode wiring for the Channel and ChannelSearch lists (the two
+/// card lists of channel.dart:101-193 and 796-885): identical actions
+/// (play / add-to-playlist), the channel-page inPlaylist guard and Detail
+/// presentation. ChannelSearch renders `EpisodeCardCell` cards (strip,
+/// fly-in-then-insert, mutual exclusion through a `CardExpandCoordinator`);
+/// the Channel page renders grouped-plate rows whose tap opens Detail and
+/// whose long press offers the same actions (`menu(for:)`).
 @MainActor
 final class ChannelEpisodeListBinder {
 
@@ -45,9 +47,6 @@ final class ChannelEpisodeListBinder {
         self.viewModel = viewModel
         self.htmlRenderer = htmlRenderer
         self.expandCoordinator = expandCoordinator
-        self.expandCoordinator.onChange = { [weak self] _ in
-            self?.onListContentChanged?()
-        }
     }
 
     func startObservingPlayback() {
@@ -81,6 +80,30 @@ final class ChannelEpisodeListBinder {
         }
     }
 
+    // MARK: - Grouped rows (the Channel page)
+
+    func configure(row: ChannelEpisodeRowCell, episode: FeedEpisodeRow) {
+        row.configure(title: episode.title ?? "", meta: Self.rightText(for: episode))
+    }
+
+    /// The row's long-press menu: Play / Pause, then Add to playlist (or a
+    /// disabled "In playlist" — the channel-page inPlaylist guard).
+    func menu(for episode: FeedEpisodeRow) -> UIMenu {
+        let enclosureURL = episode.enclosureUrl ?? ""
+        let playing = !enclosureURL.isEmpty && context.playback.isPlayingEpisode(enclosureURL)
+        let inPlaylist = playlistMembers.contains(enclosureURL)
+        let play = UIAction(
+            title: playing ? "Pause" : "Play",
+            image: playing ? AppIcons.pause : AppIcons.play
+        ) { [weak self] _ in self?.playTapped(episode) }
+        let add = inPlaylist
+            ? UIAction(title: "In playlist", image: AppIcons.addedToList, attributes: .disabled) { _ in }
+            : UIAction(title: "Add to playlist", image: AppIcons.addToList) { [weak self] _ in
+                Task { await self?.insertIntoPlaylist(episode) }
+            }
+        return UIMenu(children: [play, add])
+    }
+
     // MARK: - Cell configuration
 
     func register(in collectionView: UICollectionView) {
@@ -97,7 +120,8 @@ final class ChannelEpisodeListBinder {
             channelTitle: episode.channelTitle ?? viewModel.channel.title ?? "",
             rightText: Self.rightText(for: episode),
             descriptionHTML: episode.description,
-            imageURL: episode.imageUrl
+            imageURL: episode.imageUrl,
+            showsChannel: false
         )
         cell.configure(content, actions: actions(for: episode, playing: playing, inPlaylist: inPlaylist, at: indexPath))
         cell.onCardTap = { [weak self] in
@@ -122,16 +146,13 @@ final class ChannelEpisodeListBinder {
         )
     }
 
-    /// Card right text: "{duration} • {relative datetime}"
-    /// (card.dart:50-51); nil pubDate degrades to 0 instead of the Dart
-    /// `pubDate!` crash (K4 family).
+    /// Card right text: "{relative date} · {duration}" (shared episode
+    /// meta); a nil pubDate omits the date instead of the Dart `pubDate!`
+    /// crash (K4 family).
     nonisolated static func rightText(for episode: FeedEpisodeRow) -> String {
-        let duration = TimeFormats.formatDuration(episode.duration ?? 0)
-        let date = TimeFormats.formatDatetime(
-            episode.pubDate ?? 0,
-            nowEpochMilliseconds: Int64(Date().timeIntervalSince1970 * 1000)
+        RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: episode.pubDate, durationMilliseconds: episode.duration
         )
-        return "\(duration) • \(date)"
     }
 
     // MARK: - Actions (channel.dart:137-186 / 831-880)
@@ -276,6 +297,7 @@ final class ChannelEpisodeListBinder {
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? viewModel.channel.title ?? "",
             pubDateMilliseconds: episode.pubDate,
+            durationMilliseconds: episode.duration,
             imageURL: episode.imageUrl,
             rssFeedURL: viewModel.rssFeedURL,
             enclosureURL: enclosureURL,

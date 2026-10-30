@@ -24,6 +24,32 @@ struct HTMLContentRendererTests {
         #expect(color === Theme.onSurface)
     }
 
+    @Test("Non-break markup in a plain (non-'<') payload stays literal")
+    func plainPayloadKeepsStrayMarkupLiteral() async {
+        let renderer = HTMLContentRenderer()
+        let result = await renderer.attributedString(
+            for: "Listen to <em>Planet Money</em>", cacheKey: "k-stray"
+        )
+        #expect(result.string == "Listen to <em>Planet Money</em>")
+    }
+
+    @Test("Spacer paragraphs and stacked line breaks collapse to one blank line")
+    func blankLineRunsCollapse() async throws {
+        let renderer = HTMLContentRenderer()
+        let htmls = [
+            "<p>a</p><p><br></p><p><br></p><p>&nbsp;</p><p>b</p>",
+            "<p>a<br><br><br><br>b</p>",
+        ]
+        let newlineRun = try NSRegularExpression(pattern: "[\\n\\r\u{2028}\u{2029}]{3,}")
+        for (index, html) in htmls.enumerated() {
+            let result = await renderer.attributedString(for: html, cacheKey: "episode-gap-\(index)")
+            let text = result.string
+            #expect(newlineRun.firstMatch(in: text, range: NSRange(location: 0, length: text.utf16.count)) == nil)
+            #expect(text.contains("a"))
+            #expect(text.contains("b"))
+        }
+    }
+
     @Test("Sanitization-empty HTML falls back to htmlToText")
     func sanitizeEmptyFallback() async {
         let renderer = HTMLContentRenderer()
@@ -69,7 +95,7 @@ struct HTMLContentRendererTests {
         let color = result.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
         #expect(color === Theme.onSurface)
         let font = result.attribute(.font, at: 0, effectiveRange: nil) as? UIFont
-        #expect(font?.pointSize == Typography.htmlBody.font().pointSize)
+        #expect(font?.pointSize == TypographyV2.body.font().pointSize)
     }
 
     @Test("Links are tinted with the app link green")
@@ -100,7 +126,7 @@ struct HTMLContentRendererTests {
             for: "<h1>A giant machine-generated heading</h1><p>Body text</p>",
             cacheKey: "episode-h1"
         )
-        let bodySize = Typography.htmlBody.font().pointSize
+        let bodySize = TypographyV2.body.font().pointSize
         var headingSize: CGFloat?
         var bodySawUnclamped = false
         result.enumerateAttribute(.font, in: NSRange(location: 0, length: result.length)) { value, range, _ in

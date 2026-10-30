@@ -69,6 +69,9 @@ public final class PlaybackService {
     /// from the subtitle/translation pollers (the Dart removeTop cascaded
     /// into both controllers).
     public var onEpisodeRemoved: ((String) -> Void)?
+    /// Asked once per completed episode; true holds the next episode paused
+    /// even with continuous play on (the sleep timer's "End of episode").
+    public var shouldStopAtEpisodeEnd: (() -> Bool)?
 
     /// The enclosure URL of the source the engine currently holds (the Dart
     /// `mediaItem.value?.id` comparison in seekAndPlayByEpisode).
@@ -351,6 +354,9 @@ public final class PlaybackService {
         trackStoreWrite { try await self.store.persistSpeed(Double(value)) }
     }
 
+    /// Whether the next episode starts by itself after one completes.
+    public var continuousPlaying: Bool { settings.continuousPlaying }
+
     public func setContinuousPlaying(_ value: Bool) {
         settings.continuousPlaying = value
         trackStoreWrite { try await self.store.persistContinuousPlaying(value) }
@@ -419,6 +425,7 @@ public final class PlaybackService {
         // its completed state).
         guard currentPlaylistId != nil else { return }
         guard let url = queue.first?.enclosureUrl else { return }
+        let stopHere = shouldStopAtEpisodeEnd?() ?? false
 
         queue.removeFirst()
         try? await store.removeEpisodeCascade(enclosureURL: url)
@@ -433,7 +440,7 @@ public final class PlaybackService {
         }
 
         await playByEpisode(queue[0])
-        if !settings.continuousPlaying {
+        if !settings.continuousPlaying || stopHere {
             pauseEngineOnly()
             initProgress()
         }

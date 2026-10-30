@@ -2,14 +2,29 @@ import UIKit
 import UniformTypeIdentifiers
 import AnycastKit
 
-/// Import/export dialog (lib/widgets/import_export.dart:22-264, 03 §2.15):
-/// the centered AlertDialog — Import (document picker → parse → progress
-/// ring → toast), Export (OPML from subscriptions → UIActivityViewController),
-/// a manual RSS-URL field (invalid → red "Invalid RSS Feed URL" alert), and
-/// the top-right help button opening Feeds' ImportInstructions sheet.
-/// Settings and the Inbox empty state present this controller by name.
-final class ImportExportDialogViewController: DialogBaseViewController,
+/// Import/export sheet (lib/widgets/import_export.dart:22-264, 03 §2.15):
+/// Import (document picker → parse → progress ring → toast), Export (OPML
+/// from subscriptions → UIActivityViewController), a manual RSS-URL field
+/// (invalid → red "Invalid RSS Feed URL" alert), and the title-row help
+/// button opening Feeds' ImportInstructions sheet. The Dart AlertDialog is a
+/// floating fit-content sheet here (one custom detent, no grabber; the
+/// system draws the 8 pt inset and the corners on iOS 26): content sits 28 pt
+/// in, the primary Import and tonal Export capsules rest at the bottom in
+/// thumb reach and ride above the keyboard while it is up. Settings and the
+/// Inbox empty state present this controller by name.
+final class ImportExportDialogViewController: UIViewController,
     UIDocumentPickerDelegate {
+
+    private enum Layout {
+        static let inset: CGFloat = 28
+        static let minimumDetentHeight: CGFloat = 350
+        static let controlHeight: CGFloat = 52
+        static let titleRowHeight: CGFloat = 44
+        static let fieldHeight: CGFloat = 48
+        static let titleGap: CGFloat = 16
+        static let minimumGroupGap: CGFloat = 24
+        static let buttonGap: CGFloat = 12
+    }
 
     private let context: UIContext
     private lazy var importer = PodcastImporter(database: context.database)
@@ -17,9 +32,13 @@ final class ImportExportDialogViewController: DialogBaseViewController,
     private let urlField = UITextField()
     private var progressOverlay: ImportProgressOverlayController?
 
-    /// Get.dialog presentation (import_export.dart:22): a centered dimmed
-    /// card over the current screen. NOT a page sheet — routing this through
-    /// AppSheets.presentForm clips the card to the medium detent.
+    /// While an import runs the sheet cannot be swiped away (the Dart
+    /// barrier technically stayed dismissible, but dismissing mid-import
+    /// desynced the Get.back pairing — closed as a crash-family fix).
+    var isBusy = false {
+        didSet { isModalInPresentation = isBusy }
+    }
+
     static func present(from presenter: UIViewController, context: UIContext) {
         presenter.present(ImportExportDialogViewController(context: context), animated: true)
     }
@@ -27,8 +46,18 @@ final class ImportExportDialogViewController: DialogBaseViewController,
     init(context: UIContext) {
         self.context = context
         super.init(nibName: nil, bundle: nil)
-        modalPresentationStyle = .overFullScreen
-        modalTransitionStyle = .crossDissolve
+        modalPresentationStyle = .pageSheet
+        if let sheet = sheetPresentationController {
+            // One fit-content detent (the content is fixed-height and
+            // shorter than the 350 pt floor); no grabber, swiping down
+            // dismisses.
+            sheet.detents = [
+                .custom(identifier: .init("import-export.fit")) { context in
+                    min(Layout.minimumDetentHeight, context.maximumDetentValue)
+                }
+            ]
+            sheet.prefersGrabberVisible = false
+        }
     }
 
     @available(*, unavailable)
@@ -36,28 +65,30 @@ final class ImportExportDialogViewController: DialogBaseViewController,
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        constrainCardWidth(constant: 300)   // SizedBox(width: 300, height: 200)
+        view.backgroundColor = Theme.surface
         buildContent()
     }
 
     // MARK: - Layout
 
     private func buildContent() {
-        // Title row: 'Import/Export' + help IconButton (help_outline_rounded).
+        // Title row: 'Import & Export' + help IconButton (help_outline_rounded).
         let titleLabel = UILabel()
-        titleLabel.text = "Import/Export"
-        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.text = "Import & Export"
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.numberOfLines = 0
+        titleLabel.numberOfLines = 1
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.accessibilityTraits = .header
 
         let helpButton = UIButton(type: .system)
         helpButton.setImage(AppIcons.help, for: .normal)
         helpButton.tintColor = Theme.onSurfaceVariant
         helpButton.isAccessibilityElement = true
         helpButton.accessibilityLabel = "Import help"
-        helpButton.widthAnchor.constraint(equalToConstant: 44).isActive = true
-        helpButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        helpButton.widthAnchor.constraint(equalToConstant: Layout.titleRowHeight).isActive = true
+        helpButton.heightAnchor.constraint(equalToConstant: Layout.titleRowHeight).isActive = true
         helpButton.addAction(
             UIAction { [weak self] _ in
                 // showModalBottomSheet(ImportInstructions) over the dialog
@@ -72,47 +103,19 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         titleRow.axis = .horizontal
         titleRow.alignment = .center   // Row default (center) — the Dart icon centered against the title
         titleRow.spacing = 8
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        // Import: filled inverseSurface button (dark theme: light surface,
-        // dark label).
-        let importButton = UIButton(type: .system)
-        var importConfiguration = UIButton.Configuration.filled()
-        importConfiguration.title = "Import"
-        importConfiguration.baseBackgroundColor = Theme.onSurface
-        importConfiguration.baseForegroundColor = Theme.background
-        importConfiguration.cornerStyle = .capsule
-        importConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 12, leading: 32, bottom: 12, trailing: 32
-        )
-        importButton.configuration = importConfiguration
-        importButton.titleLabel?.font = TypographyV2.bodyMedium.font()
-        importButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        // Import: primary capsule; Export: secondary (tonal) capsule.
+        let importButton = AnycastButton.make(.primary, title: "Import")
         importButton.addAction(
             UIAction { [weak self] _ in self?.pickOPMLFile() },
             for: .touchUpInside
         )
-
-        // Export: plain text button on primary.
-        let exportButton = UIButton(type: .system)
-        var exportConfiguration = UIButton.Configuration.plain()
-        exportConfiguration.title = "Export"
-        exportConfiguration.baseForegroundColor = Theme.primary
-        exportConfiguration.cornerStyle = .capsule
-        exportConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 12, leading: 32, bottom: 12, trailing: 32
-        )
-        exportButton.configuration = exportConfiguration
-        exportButton.titleLabel?.font = TypographyV2.bodyMedium.font()
-        exportButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        let exportButton = AnycastButton.make(.secondary, title: "Export")
         exportButton.addAction(
             UIAction { [weak self] _ in self?.exportSubscriptions() },
             for: .touchUpInside
         )
-
-        let buttonColumn = UIStackView(arrangedSubviews: [importButton, exportButton])
-        buttonColumn.axis = .vertical
-        buttonColumn.alignment = .center
-        buttonColumn.spacing = 12
 
         // Manual RSS URL field (hint 'RSS Feed URL', URL keyboard). Custom
         // surface instead of `.roundedRect` — the system style paints pure
@@ -128,30 +131,46 @@ final class ImportExportDialogViewController: DialogBaseViewController,
         urlField.isAccessibilityElement = true
         urlField.accessibilityLabel = "RSS Feed URL"
 
-        let column = UIStackView(arrangedSubviews: [titleRow, buttonColumn, urlField])
-        column.axis = .vertical
-        column.alignment = .fill
-        column.spacing = 24
-        column.translatesAutoresizingMaskIntoConstraints = false
-        column.isLayoutMarginsRelativeArrangement = true
-        column.directionalLayoutMargins = NSDirectionalEdgeInsets(
-            top: 24, leading: 24, bottom: 24, trailing: 24
+        for item in [titleRow, urlField, importButton, exportButton] {
+            item.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(item)
+        }
+
+        // The buttons rest 28 pt above the sheet bottom (the safe area wins
+        // when larger, Detail's rule) or above the keyboard while it is up:
+        // the system lifts the sheet only partway, so the content rides the
+        // keyboard guide. The guide ignores the bottom safe area, so its top
+        // is the sheet bottom while the keyboard is hidden.
+        view.keyboardLayoutGuide.usesBottomSafeArea = false
+        let exportBottom = exportButton.bottomAnchor.constraint(
+            equalTo: view.keyboardLayoutGuide.topAnchor, constant: -Layout.inset
         )
-        cardView.addSubview(column)
+        exportBottom.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
-            // Pin the content to the card — without edge constraints the
-            // stack resolves at an arbitrary origin and the card's height is
-            // ambiguous (AlertDialog wraps its content).
-            column.topAnchor.constraint(equalTo: cardView.topAnchor),
-            column.leadingAnchor.constraint(equalTo: cardView.leadingAnchor),
-            column.trailingAnchor.constraint(equalTo: cardView.trailingAnchor),
-            column.bottomAnchor.constraint(equalTo: cardView.bottomAnchor),
+            titleRow.topAnchor.constraint(equalTo: view.topAnchor, constant: Layout.inset),
+            titleRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.inset),
+            titleRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.inset),
+            titleRow.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.titleRowHeight),
 
-            titleRow.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
-            importButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
-            exportButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
-            urlField.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            urlField.topAnchor.constraint(equalTo: titleRow.bottomAnchor, constant: Layout.titleGap),
+            urlField.leadingAnchor.constraint(equalTo: titleRow.leadingAnchor),
+            urlField.trailingAnchor.constraint(equalTo: titleRow.trailingAnchor),
+            urlField.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.fieldHeight),
+
+            importButton.topAnchor.constraint(
+                greaterThanOrEqualTo: urlField.bottomAnchor, constant: Layout.minimumGroupGap
+            ),
+            importButton.leadingAnchor.constraint(equalTo: titleRow.leadingAnchor),
+            importButton.trailingAnchor.constraint(equalTo: titleRow.trailingAnchor),
+            importButton.heightAnchor.constraint(equalToConstant: Layout.controlHeight),
+
+            exportButton.topAnchor.constraint(equalTo: importButton.bottomAnchor, constant: Layout.buttonGap),
+            exportButton.leadingAnchor.constraint(equalTo: titleRow.leadingAnchor),
+            exportButton.trailingAnchor.constraint(equalTo: titleRow.trailingAnchor),
+            exportButton.heightAnchor.constraint(equalToConstant: Layout.controlHeight),
+            exportButton.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
+            exportBottom,
         ])
     }
 
@@ -307,11 +326,11 @@ final class ImportExportDialogViewController: DialogBaseViewController,
             title: ImportCopy.invalidFeedURLTitle, message: nil, preferredStyle: .alert
         )
         let title = NSAttributedString(string: ImportCopy.invalidFeedURLTitle, attributes: [
-            .font: TypographyV2.headlineSmall.font(),
+            .font: TypographyV2.emphasis.font(),
             .foregroundColor: UIColor.systemRed,
         ])
         let body = NSAttributedString(string: message, attributes: [
-            .font: Typography.htmlBody.font(),
+            .font: TypographyV2.body.font(),
             .foregroundColor: UIColor.systemRed,
         ])
         // Isolated KVC: UIAlertController exposes no public attributed

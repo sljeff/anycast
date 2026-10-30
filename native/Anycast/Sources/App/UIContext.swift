@@ -139,10 +139,10 @@ final class UIContext {
     /// Builds a mini player bar bound to the playback service; opening the
     /// full-screen player is pre-wired through the responder chain, so
     /// hosts only position the bar (tab accessory, or floating above a
-    /// screen's bottom content). Sheet bottom bars use the default
-    /// `.standalone` style; the shell's iOS 26+ tab accessory passes
+    /// screen's bottom content). Sheet bottom bars pass `.capsule` (the v2
+    /// floating capsule); the shell's iOS 26+ tab accessory passes
     /// `.systemAccessory` so the system glass capsule is the only chrome.
-    func makePlayerBar(style: PlayerBarView.HostingStyle = .standalone) -> PlayerBarView {
+    func makePlayerBar(style: PlayerBarView.HostingStyle) -> PlayerBarView {
         let bar = PlayerBarView(playback: playback, style: style)
         bar.onOpenPlayer = { [weak bar, weak self] in
             guard let bar, let self else { return }

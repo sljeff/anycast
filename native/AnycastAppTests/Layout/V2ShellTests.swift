@@ -4,8 +4,8 @@ import AnycastKit
 @testable import Anycast
 
 /// The V2 shell pieces (09 §10 V2): the header component, the category
-/// projection, the mini player capsule chrome, and the subscriptions status
-/// line. Color values are asserted with an explicit dark resolution
+/// projection, the mini player capsule chrome, and the Inbox status line.
+/// Color values are asserted with an explicit dark resolution
 /// (09 §9a).
 @MainActor
 struct V2ShellTests {
@@ -14,11 +14,11 @@ struct V2ShellTests {
 
     // MARK: - HeaderView (09 §3.8, Figma 624:30831)
 
-    @Test("Header paints the display title, status, search field, and settings action")
+    @Test("Header paints the display title, Meta status and the settings action")
     func headerBasics() {
         let header = HeaderView()
         header.configure(HeaderView.Configuration(
-            title: "Podcast", statusText: "updated just now - 100 unlistened"
+            title: "Podcast", statusText: "updated just now · 100 unlistened"
         ))
         header.frame = CGRect(x: 0, y: 0, width: 440, height: 160)
         header.layoutIfNeeded()
@@ -32,31 +32,27 @@ struct V2ShellTests {
         let status = header.subviews.compactMap { $0 as? UIStackView }.first?
             .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-status" }
-        #expect(status?.text == "updated just now - 100 unlistened")
+        #expect(status?.text == "updated just now · 100 unlistened")
         #expect(status?.isHidden == false)
         #expect(
             status?.textColor.resolvedColor(with: dark)
-                == AnycastColor.sand9.resolvedColor(with: dark),
-            "status caption paints sand9"
+                == Theme.onSurfaceVariant.resolvedColor(with: dark),
+            "status line paints the Meta color"
         )
+        #expect(status?.font.pointSize == 15, "status line is Meta 15")
 
-        let search = header.subviews.compactMap { $0 as? UITextField }
-            .first { $0.accessibilityIdentifier == "header-search-field" }
-        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }
-            .first { $0.accessibilityIdentifier == "header-settings" }
-        #expect(search?.accessibilityLabel == "Search")
-        #expect(search?.placeholder == "Shows, episodes, and more")
-        #expect(settings?.accessibilityIdentifier == "header-settings")
+        let buttons = header.subviews.compactMap { $0 as? AnycastIconButton }
+        #expect(buttons.map(\.accessibilityIdentifier) == ["header-settings"], "Settings is the only action")
+        let settings = buttons.first
         #expect(settings?.isHidden == false)
+        #expect(header.subviews.contains { $0 is UITextField } == false, "no inline search field")
+        if let settings {
+            #expect(settings.frame.maxX == header.bounds.maxX - Spacing.pageH, "settings sits at the trailing margin")
+        }
 
-        var submittedQuery: String?
         var settingsTaps = 0
-        header.onSearch = { submittedQuery = $0 }
         header.onSettings = { settingsTaps += 1 }
-        search?.text = "  news  "
-        if let search { _ = header.textFieldShouldReturn(search) }
         settings?.sendActions(for: .touchUpInside)
-        #expect(submittedQuery == "news")
         #expect(settingsTaps == 1)
     }
 
@@ -74,9 +70,9 @@ struct V2ShellTests {
             .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-title" }
         let titleColumn = title?.superview
-        let actions = header.subviews.compactMap { $0 as? AnycastIconButton }.first
+        let actionLeft = header.subviews.compactMap { $0 as? AnycastIconButton }
+            .map(\.frame.minX).min() ?? 0
         let titleRight = titleColumn?.frame.maxX ?? .infinity
-        let actionLeft = actions?.frame.minX ?? 0
 
         #expect((title?.font.pointSize ?? 0) > 48)
         #expect(titleRight <= actionLeft)
@@ -93,10 +89,8 @@ struct V2ShellTests {
             .arrangedSubviews.compactMap { $0 as? UILabel }
             .first { $0.accessibilityIdentifier == "header-status" }
         #expect(status?.isHidden == true)
-        let search = header.subviews.compactMap { $0 as? UITextField }
-            .first { $0.accessibilityIdentifier == "header-search-field" }
-        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }.first
-        #expect(search?.isHidden == false)
+        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }
+            .first { $0.accessibilityIdentifier == "header-settings" }
         #expect(settings?.isHidden == true)
     }
 
@@ -145,19 +139,10 @@ struct V2ShellTests {
         let text = InboxPageViewController.headerStatusText(
             lastRefresh: justNow, episodeCount: 12, now: now
         )
-        #expect(text == "updated just now - 12 unlistened", "got: \(text)")
+        #expect(text == "updated just now · 12 unlistened", "got: \(text)")
 
         let never = InboxPageViewController.headerStatusText(lastRefresh: nil, episodeCount: 0, now: now)
-        #expect(never == "updated — - 0 unlistened", "got: \(never)")
-    }
-
-    // MARK: - Library status line (09 §3.3)
-
-    @Test("Subscriptions status pluralizes the show count")
-    func subscriptionsStatusText() {
-        #expect(LibraryViewController.statusText(showCount: 0) == "0 shows")
-        #expect(LibraryViewController.statusText(showCount: 1) == "1 show")
-        #expect(LibraryViewController.statusText(showCount: 7) == "7 shows")
+        #expect(never == "updated — · 0 unlistened", "got: \(never)")
     }
 
     // MARK: - Mini player capsule chrome (09 §3.6 state c, Figma 83:2562)
@@ -191,24 +176,27 @@ struct V2ShellTests {
         #expect(labels.first?.accessibilityIdentifier == "mini-player-title")
     }
 
-    // MARK: - Welcome / SignUp smoke (V2 scope: UI lands, auth stays TODO)
-
-    @Test("Welcome and SignUp expose their entry identifiers")
-    func authScreensSmoke() async {
+    @Test("Mini player has no progress line in any hosting style and keeps its content centred")
+    func miniPlayerHasNoProgressLine() async {
         guard let context = await Self.liveUIContext() else {
-            print("[v2shell] shell not ready; skipping auth smoke"); return
+            print("[v2shell] shell not ready; skipping mini player progress test"); return
         }
-        let welcome = WelcomeViewController(context: context)
-        welcome.loadViewIfNeeded()
-        #expect(welcome.view.subviews.contains { $0 is UIStackView })
-        #expect(welcome.view.backgroundColor == Theme.background)
+        for style in [PlayerBarView.HostingStyle.systemAccessory, .capsule] {
+            let bar = context.makePlayerBar(style: style)
+            bar.frame = CGRect(x: 0, y: 0, width: 408, height: PlayerBarView.barHeight)
+            bar.layoutIfNeeded()
+            #expect(!bar.containsView(ofType: EpisodeProgressBackdrop.self), "\(style): progress line present")
 
-        let signUp = SignUpViewController(context: context)
-        signUp.loadViewIfNeeded()
-        let identifiers = signUp.view.recursiveAccessibilityIdentifiers()
-        #expect(identifiers.contains("signup-back"))
-        #expect(identifiers.contains("signup-submit"))
-        #expect(identifiers.contains("signup-wordmark"))
+            guard let capsule = bar.subviews.first else {
+                Issue.record("\(style): capsule container missing"); continue
+            }
+            for content in capsule.subviews {
+                #expect(
+                    abs(content.center.y - capsule.bounds.midY) < 0.5,
+                    "\(style): \(type(of: content)) is not vertically centred"
+                )
+            }
+        }
     }
 
     // MARK: - Helpers
@@ -226,6 +214,10 @@ struct V2ShellTests {
 }
 
 private extension UIView {
+    func containsView<T: UIView>(ofType type: T.Type) -> Bool {
+        self is T || subviews.contains { $0.containsView(ofType: type) }
+    }
+
     func recursiveAccessibilityIdentifiers() -> [String] {
         var found = accessibilityIdentifier.map { [$0] } ?? []
         for subview in subviews {

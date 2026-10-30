@@ -35,16 +35,46 @@ struct SubtitlesDemoSmokeTests {
         #expect(controller.demoIsRenderingLyrics)
 
         // The lyrics collection is embedded and laid out with lines:
-        // 5 demo segments × (start + end spacer) = 10 rows.
+        // 60 demo segments (+ end spacer rows) — well past one viewport.
         let collection = Self.firstCollectionView(in: controller.view)
         #expect(collection != nil)
         if let collection {
             #expect(collection.numberOfSections == 1)
-            #expect(collection.numberOfItems(inSection: 0) == 10)
+            #expect(collection.numberOfItems(inSection: 0) >= 60)
             #expect(collection.visibleCells.count > 0)
         }
 
         controller.dismiss(animated: false)
+    }
+
+    @Test("Tapping a line shows Playing from + Undo; blank spacer rows are inert")
+    func tapLineOffersUndo() async throws {
+        guard let context = await Self.liveUIContext(),
+              let presenter = await Self.rootPresenter()
+        else {
+            print("App environment not ready; skipping tap smoke")
+            return
+        }
+        let controller = SubtitlesPageViewController(context: context)
+        controller.modalPresentationStyle = .fullScreen
+        controller.activateDemoDocument()
+        let host = await Self.settledTopPresenter() ?? presenter
+        host.present(controller, animated: false)
+        defer { controller.dismiss(animated: false) }
+        try await Task.sleep(for: .milliseconds(500))
+
+        #expect(controller.demoCapsuleID == "following")
+        let lines = controller.demoLines
+        if let blank = lines.firstIndex(where: { $0.text.trimmingCharacters(in: .whitespaces).isEmpty }) {
+            controller.demoTapLine(blank)
+            #expect(controller.demoCapsuleID == "following", "a spacer row is not a jump target")
+        }
+        let target = try #require(lines.indices.last { !lines[$0].text.isEmpty })
+        controller.demoTapLine(target)
+        #expect(controller.demoCapsuleID == "undo-\(lines[target].startMilliseconds)")
+        // Survives the position ticks that follow the seek.
+        try await Task.sleep(for: .milliseconds(1500))
+        #expect(controller.demoCapsuleID == "undo-\(lines[target].startMilliseconds)")
     }
 
     // MARK: - Helpers

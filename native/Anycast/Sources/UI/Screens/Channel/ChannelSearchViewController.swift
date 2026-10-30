@@ -3,22 +3,22 @@ import AnycastKit
 
 /// The in-channel search sheet (lib/pages/channel.dart:750-895, 03 §1.3
 /// row 8): a nested expand sheet over the Channel sheet listing the
-/// channel's episodes filtered by the submitted text (`contains` over
-/// titles, in-memory — channel.dart:781-785). The Dart page has NO search
-/// field of its own — the Channel page's field owns the query — and it DOES
-/// host `PlayerBar(bottomSafe: true)` (channel.dart:767).
+/// channel's episodes filtered live by its own search field (`contains` over
+/// titles, in-memory — channel.dart:781-785). It hosts
+/// `PlayerBar(bottomSafe: true)` (channel.dart:767).
 @MainActor
 final class ChannelSearchViewController: UIViewController {
 
     private let context: UIContext
-    private let searchText: String
+    private var query: String
+    private let searchField = UITextField()
     private var viewModel: ChannelViewModel?
 
     private let collectionView: UICollectionView
     private let playerBar: PlayerBarView
     private let playerBarHeight: NSLayoutConstraint
-    private let grabber = SheetGrabberView()
     private let noResultsLabel = UILabel()
+    private var noResultsCenterY: NSLayoutConstraint!
 
     private let expandCoordinator = CardExpandCoordinator()
     private var binder: ChannelEpisodeListBinder?
@@ -32,14 +32,14 @@ final class ChannelSearchViewController: UIViewController {
 
     init(context: UIContext) {
         self.context = context
-        self.searchText = ""
+        self.query = ""
         (collectionView, playerBar, playerBarHeight) = Self.makeCoreViews(context: context)
         super.init(nibName: nil, bundle: nil)
     }
 
     init(context: UIContext, rssFeedURL: String, searchText: String) {
         self.context = context
-        self.searchText = searchText
+        self.query = searchText
         (collectionView, playerBar, playerBarHeight) = Self.makeCoreViews(context: context)
         configuredRSSFeedURL = rssFeedURL
         super.init(nibName: nil, bundle: nil)
@@ -50,7 +50,7 @@ final class ChannelSearchViewController: UIViewController {
 
     private var configuredRSSFeedURL: String?
 
-    /// Present factory (channel.dart:682-690 — the nested sheet on submit).
+    /// Present factory (channel.dart:682-690 — the nested sheet).
     static func present(
         from presenter: UIViewController,
         context: UIContext,
@@ -85,7 +85,7 @@ final class ChannelSearchViewController: UIViewController {
         collectionView.keyboardDismissMode = .interactive
         collectionView.translatesAutoresizingMaskIntoConstraints = false
 
-        let playerBar = context.makePlayerBar()
+        let playerBar = context.makePlayerBar(style: .capsule)
         playerBar.translatesAutoresizingMaskIntoConstraints = false
         let height = playerBar.heightAnchor.constraint(equalToConstant: 58)
         return (collectionView, playerBar, height)
@@ -96,8 +96,7 @@ final class ChannelSearchViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
-        // Custom grabber below; the header band taps to close.
-        sheetPresentationController?.prefersGrabberVisible = false
+        sheetPresentationController?.prefersGrabberVisible = true
 
         buildViewHierarchy()
         resolveViewModel()
@@ -130,53 +129,86 @@ final class ChannelSearchViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         binder?.refreshPlaylistMembership()
+        // Opened without a query: go straight to typing.
+        if query.isEmpty { searchField.becomeFirstResponder() }
     }
 
     private func buildViewHierarchy() {
-        grabber.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(grabber)
-
-        // Grabber-band tap closes (05 §6.3 A2 header-tap adaptation, applied
-        // to this nested sheet like SearchPage).
-        let headerTap = UITapGestureRecognizer(target: self, action: #selector(closeTapped))
-        headerTap.delegate = self
-        view.addGestureRecognizer(headerTap)
+        // clearButtonMode must be set first: the style only installs the
+        // right spacer when it is .never.
+        searchField.clearButtonMode = .whileEditing
+        searchField.applyAnycastStyle(placeholder: "Search episodes", icon: AppIcons.search)
+        // A capsule like the Search tab's field (height Spacing.xxl).
+        searchField.layer.cornerRadius = Spacing.xxl / 2
+        searchField.returnKeyType = .search
+        searchField.autocorrectionType = .no
+        searchField.text = query
+        searchField.accessibilityLabel = "Search episodes"
+        searchField.translatesAutoresizingMaskIntoConstraints = false
+        searchField.addTarget(self, action: #selector(queryChanged), for: .editingChanged)
+        searchField.addAction(
+            UIAction { [weak self] _ in self?.searchField.resignFirstResponder() },
+            for: .primaryActionTriggered
+        )
+        view.addSubview(searchField)
 
         noResultsLabel.text = "No results"
-        noResultsLabel.font = TypographyV2.headlineMedium.font()
+        noResultsLabel.font = TypographyV2.emphasis.font()
         noResultsLabel.adjustsFontForContentSizeCategory = true
         noResultsLabel.textColor = Theme.onSurface
         noResultsLabel.isHidden = true
         noResultsLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(noResultsLabel)
+        noResultsCenterY = noResultsLabel.centerYAnchor.constraint(
+            equalTo: collectionView.centerYAnchor, constant: 60
+        )
 
         view.addSubview(collectionView)
         view.addSubview(playerBar)
 
-        NSLayoutConstraint.activate([
-            // 8 pt of breathing room below the sheet's top edge.
-            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            grabber.widthAnchor.constraint(equalToConstant: 42),
-            grabber.heightAnchor.constraint(equalToConstant: 6),
+        // Scrim behind the capsule so rows are not hard-cut by it (G-7).
+        let bottomFade = ScrollEdgeFade(edge: .bottom)
+        view.insertSubview(bottomFade, belowSubview: playerBar)
 
+        NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.topAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 18
-            ),
-            collectionView.bottomAnchor.constraint(equalTo: playerBar.topAnchor),
+            // Runs under the search field (and the sheet's top edge); the top
+            // inset set in `viewDidLayoutSubviews` keeps the first row where
+            // it sat below the field.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
+            // Runs under the floating capsule; the section's 88 pt bottom
+            // inset (plus the safe-area content inset) clears it.
+            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            playerBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            // Below the system grabber.
+            searchField.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+            searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            searchField.heightAnchor.constraint(equalToConstant: Spacing.xxl),
+
+            playerBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
+            playerBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            playerBar.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.xs
+            ),
             playerBarHeight,
 
-            noResultsLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            noResultsLabel.centerYAnchor.constraint(
-                equalTo: collectionView.centerYAnchor, constant: 60
+            bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomFade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomFade.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            bottomFade.topAnchor.constraint(
+                equalTo: playerBar.topAnchor, constant: -ScrollEdgeFade.fadeLength
             ),
+
+            noResultsLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            noResultsCenterY,
         ])
+
+        ScrollEdgeChrome.attachTopBand(
+            to: collectionView, in: view, below: searchField.bottomAnchor, restingGap: Spacing.md
+        )
+        view.bringSubviewToFront(searchField)
 
         collectionView.dataSource = self
         collectionView.delegate = self
@@ -206,7 +238,32 @@ final class ChannelSearchViewController: UIViewController {
 
     private var filteredEpisodes: [FeedEpisodeRow] {
         guard let viewModel else { return [] }
-        return ChannelSearchFilter.apply(searchText, to: viewModel.showEpisodes)
+        return ChannelSearchFilter.apply(query, to: viewModel.showEpisodes)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let top = searchField.frame.maxY + Spacing.md
+        if collectionView.contentInset.top != top {
+            let wasAtTop = collectionView.contentOffset.y <= -collectionView.contentInset.top + 0.5
+            collectionView.contentInset.top = top
+            collectionView.verticalScrollIndicatorInsets.top = top
+            noResultsCenterY.constant = 60 + top / 2   // centered in the room below the field
+            if wasAtTop { collectionView.contentOffset.y = -top }
+        }
+    }
+
+    /// The collection view ignores automatic inset adjustment, so the home
+    /// indicator clearance is applied by hand.
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        collectionView.contentInset.bottom = view.safeAreaInsets.bottom
+        collectionView.verticalScrollIndicatorInsets.bottom = view.safeAreaInsets.bottom
+    }
+
+    @objc private func queryChanged() {
+        query = searchField.text ?? ""
+        render()
     }
 
     // MARK: - Rendering
@@ -240,10 +297,6 @@ final class ChannelSearchViewController: UIViewController {
             binder?.configure(cell: cell, episode: filtered[path.item], at: path, in: collectionView)
         }
     }
-
-    @objc private func closeTapped() {
-        dismiss(animated: true)
-    }
 }
 
 // MARK: - UICollectionViewDataSource / Delegate
@@ -265,15 +318,5 @@ extension ChannelSearchViewController: UICollectionViewDataSource, UICollectionV
             binder?.configure(cell: cell, episode: filtered[indexPath.item], at: indexPath, in: collectionView)
         }
         return cell
-    }
-}
-
-/// Only the grabber band acts as the close affordance (Detail pattern).
-extension ChannelSearchViewController: UIGestureRecognizerDelegate {
-    func gestureRecognizer(
-        _ gestureRecognizer: UIGestureRecognizer,
-        shouldReceive touch: UITouch
-    ) -> Bool {
-        touch.location(in: view).y <= view.safeAreaInsets.top + 20
     }
 }

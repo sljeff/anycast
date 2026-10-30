@@ -42,8 +42,8 @@ final class LoginPromptCoordinator {
         self?.context?.auth.currentUID == nil
     }
 
-    /// Presents `LoginViewController` as a full-height expand sheet
-    /// (03 §1.3 #7: expand true / threshold 0.9 → A2/A3 system sheet).
+    /// Presents the login sheet for an expired session (`.reauth`: the
+    /// account's last-used provider leads).
     func presentLogin() {
         guard let anchor = presentingAnchor, let context else { return }
         if let currentLogin, currentLogin.view.window != nil { return }
@@ -51,11 +51,12 @@ final class LoginPromptCoordinator {
         guard Date().timeIntervalSince(lastAttempt) >= 1 else { return }
         lastAttempt = Date()
         let top = anchor.topMostPresented()
-        let login = LoginViewController(context: context)
+        let login = LoginSheetViewController.present(
+            from: top, context: context, source: .reauth,
+            completion: { [weak self] sheet in self?.attachDismissalAdapter(to: sheet) }
+        )
+        login.onCancelled = { [weak self] in self?.rollbackLoginGatedProcessing() }
         currentLogin = login
-        AppSheets.presentExpand(login, from: top) { [weak self, weak login] in
-            self?.attachDismissalAdapter(to: login)
-        }
     }
 
     /// Attaches the interactive-dismiss signal in the present completion,
@@ -75,28 +76,25 @@ final class LoginPromptCoordinator {
     /// generates: signed-out `processing` entries are unpollable local
     /// state, so rolling them back frees the Generate button and removes
     /// the URLs from the 15 s poll set — the poller stops re-401-ing and
-    /// re-presenting this sheet every round. NOTE the sheet's lifecycle: a
-    /// successful sign-in does NOT dismiss the sheet —
-    /// `LoginViewController.refreshState` flips it to the signed-in card
-    /// and keeps it on screen, so the user's later swipe-down fires the
-    /// SAME interactive-dismiss callback with `currentUID != nil`. The
-    /// `isSignedOut` check below is therefore load-bearing: it is the only
-    /// thing keeping a post-sign-in dismissal from rolling back genuinely
-    /// in-flight server-side processing entries.
+    /// re-presenting this sheet every round. Both cancel paths land here:
+    /// the interactive swipe-down (via the dismissal adapter) and the
+    /// sheet's close button (`onCancelled`). A successful sign-in dismisses
+    /// the sheet programmatically and fires neither, but the `isSignedOut`
+    /// check stays as the guard that keeps a signed-in dismissal from
+    /// rolling back genuinely in-flight server-side processing entries.
     private func rollbackLoginGatedProcessing() {
         guard isSignedOut(), let context else { return }
         context.subtitles.cancelLoginGatedProcessing()
     }
 
     /// `currentLogin` only dedupes sheets this coordinator presented. The
-    /// Settings "Account" row presents LoginViewController directly, and
-    /// that sheet's own signed-out /api/user returns loginRequired —
-    /// without this chain walk the 401 stacked a second login sheet on
-    /// the first (the sheet's `.loginRequired` handler routes back here).
+    /// Settings "Account" row presents the login sheet directly, and a
+    /// 401 can still arrive while it is up — without this chain walk the
+    /// 401 stacked a second login sheet on the first.
     private func presentedChainContainsLogin(from anchor: UIViewController) -> Bool {
         var current: UIViewController? = anchor.topMostPresented()
         while let controller = current {
-            if controller is LoginViewController, !controller.isBeingDismissed {
+            if controller is LoginSheetViewController, !controller.isBeingDismissed {
                 return true
             }
             current = controller.presentingViewController

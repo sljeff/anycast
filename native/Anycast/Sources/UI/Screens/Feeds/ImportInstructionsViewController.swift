@@ -59,11 +59,15 @@ enum ImportInstructionsContent {
 
 /// The import-instructions sheet (import_export.dart:249-343, 03 §2.15 /
 /// §3.4): a DraggableScrollableSheet at 0.7 initial / 0.6 min — custom
-/// fraction detents, scroll-linked shrink — whose grabber has NO
-/// tap-to-close (unlike Detail). The five instruction sections render as
+/// fraction detents, scroll-linked shrink — with the system
+/// grabber. The five instruction sections render as
 /// disclosure rows; several may stay open at once (ExpansionTile keeps no
 /// exclusivity).
 final class ImportInstructionsViewController: UIViewController {
+
+    /// Sheet content inset: the title, the rows and the chevrons share it.
+    private static let contentInset: CGFloat = 28
+    private static let titleGap: CGFloat = 8
 
     private enum SectionKind {
         static let header = "ImportInstructionsHeader"
@@ -71,6 +75,7 @@ final class ImportInstructionsViewController: UIViewController {
     }
 
     private let collectionView: UICollectionView
+    private let titleLabel = UILabel()
     private var expandedSections: Set<Int> = []
 
     // MARK: - Present (showModalBottomSheet + DraggableScrollableSheet 0.7/0.6)
@@ -90,8 +95,7 @@ final class ImportInstructionsViewController: UIViewController {
             }
         }
         sheet?.detents = [fractionDetent(0.7), fractionDetent(0.6)]
-        sheet?.prefersGrabberVisible = false   // custom grabber below
-        sheet?.preferredCornerRadius = 20
+        sheet?.prefersGrabberVisible = true
         presenter.present(controller, animated: true)
     }
 
@@ -108,7 +112,7 @@ final class ImportInstructionsViewController: UIViewController {
             )
             let section = NSCollectionLayoutSection(group: group)
             section.contentInsets = NSDirectionalEdgeInsets(
-                top: 0, leading: 24, bottom: 16, trailing: 24
+                top: 0, leading: Self.contentInset, bottom: 16, trailing: Self.contentInset
             )
             _ = environment
             return section
@@ -126,14 +130,10 @@ final class ImportInstructionsViewController: UIViewController {
         super.viewDidLoad()
         Theme.installPageBase(on: view)
 
-        // Fixed header column (grabber + title) over the scrolling list —
-        // the Dart Column[Handler, title, Expanded(ListView)].
-        let grabber = SheetGrabberView()
-        grabber.translatesAutoresizingMaskIntoConstraints = false
-
-        let titleLabel = UILabel()
+        // Fixed title over the scrolling list — the Dart
+        // Column[Handler, title, Expanded(ListView)].
         titleLabel.text = ImportInstructionsContent.headerTitle
-        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -151,24 +151,31 @@ final class ImportInstructionsViewController: UIViewController {
         )
 
         view.addSubview(collectionView)
-        view.addSubview(grabber)
         view.addSubview(titleLabel)
 
         NSLayoutConstraint.activate([
-            grabber.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            grabber.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            grabber.widthAnchor.constraint(equalToConstant: 42),
-            grabber.heightAnchor.constraint(equalToConstant: 6),
-
-            titleLabel.topAnchor.constraint(equalTo: grabber.bottomAnchor, constant: 32),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Self.contentInset),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.contentInset),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -Self.contentInset),
 
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            // Runs under the title row and the sheet's bottom edge, fading
+            // out behind both; `viewDidLayoutSubviews` keeps the resting
+            // layout of a list that started below the title.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        ScrollEdgeChrome.attachTopBand(
+            to: collectionView, in: view, below: titleLabel.bottomAnchor, restingGap: Self.titleGap
+        )
+        ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view)
+        view.bringSubviewToFront(titleLabel)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        ScrollEdgeChrome.clearTop(of: collectionView, to: titleLabel.frame.maxY + Self.titleGap)
     }
 }
 
@@ -239,7 +246,7 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        titleLabel.font = TypographyV2.headlineSmall.font()
+        titleLabel.font = TypographyV2.body.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -255,11 +262,11 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
         accessibilityTraits = [.button]
 
         NSLayoutConstraint.activate([
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             titleLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: chevron.leadingAnchor, constant: -8),
 
-            chevron.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            chevron.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             chevron.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             chevron.widthAnchor.constraint(equalToConstant: 16),
             chevron.heightAnchor.constraint(equalToConstant: 16),
@@ -293,22 +300,22 @@ final class ImportSectionHeaderCell: UICollectionViewCell {
 }
 
 /// The numbered steps block under an open section (ExpansionTile children):
-/// left-indented small secondary text.
+/// secondary text on the rows' leading edge.
 final class ImportSectionStepsCell: UICollectionViewCell {
 
     private let stepsLabel = UILabel()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        stepsLabel.font = TypographyV2.bodySmall.font()
+        stepsLabel.font = TypographyV2.meta.font()
         stepsLabel.textColor = Theme.onSurfaceVariant
         stepsLabel.numberOfLines = 0
         stepsLabel.adjustsFontForContentSizeCategory = true
         stepsLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stepsLabel)
         NSLayoutConstraint.activate([
-            stepsLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
-            stepsLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -8),
+            stepsLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            stepsLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor),
             stepsLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
             stepsLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
         ])

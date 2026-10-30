@@ -48,11 +48,27 @@ extension UIImageView {
     /// failure (no spinners or generic glyphs).
     @MainActor
     func setArtwork(_ url: URL?, title: String?) {
+        applyArtworkHairline()
         let placeholder = ArtworkPlaceholder.image(for: title)
         kf.setImage(
             with: url,
             placeholder: placeholder,
             options: [.transition(.none), .onFailureImage(placeholder)]
         )
+    }
+
+    /// The cover's 0.5 pt inner hairline (`sandAlpha4`). Content casts no
+    /// shadow, so this is what keeps a pale cover from melting into its
+    /// ground. The layer border draws over the image and follows the corner
+    /// radius; it is set up once per view and re-resolved on appearance
+    /// changes.
+    @MainActor
+    func applyArtworkHairline() {
+        guard layer.borderWidth == 0 else { return }
+        layer.borderWidth = 0.5
+        layer.borderColor = AnycastColor.sandAlpha4.resolvedColor(with: traitCollection).cgColor
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: UIImageView, _: UITraitCollection) in
+            view.layer.borderColor = AnycastColor.sandAlpha4.resolvedColor(with: view.traitCollection).cgColor
+        }
     }
 }

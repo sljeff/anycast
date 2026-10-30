@@ -8,53 +8,78 @@ import UIKit
 ///   main text), so a bilingual pair is a single selectable row;
 /// - main 14 pt grey[200] → active 16 pt greenAccent; translation
 ///   greenAccent → grey[300] when active (reversed colors, 03 §2.10);
-/// - `lineGap` 12, content padding top 100 / sides 20 / bottom 20,
+/// - `lineGap` 12, content padding top 100 / sides 20 / bottom 100,
 ///   anchor 0.5 (active line vertically centered);
-/// - scroll animation 240 ms easeOutCubic, 500 ms ≥500 pt, 1 s ≥1000 pt;
-/// - top/bottom 80 pt fade (LyricStyles.default1 `fadeRange`);
-/// - drag → manual scroll + centered time bar (widget #2); no auto re-follow
-///   until the 3 s active-line resume fires (`neverResume`,
-///   LyricsFollowStateMachine);
-/// - tapping a line is a play/pause toggle (the morph overlay belongs to
-///   the page controller).
+/// - scroll animation 240 ms easeOutCubic, 500 ms ≥500 pt; longer than the
+///   viewport jumps without animation (no empty list in flight);
+/// - top/bottom soft edges as an alpha-gradient mask on a NON-scrolling
+///   wrapper (`fadeHost`). The page backdrop is a gradient, so
+///   `ScrollEdgeChrome`'s solid page-colour scrim would show as dark bands,
+///   and the fade must never live on the scrolling layer: a UIScrollView's
+///   layer bounds origin is its contentOffset, so a mask there stays at the
+///   content top and blanks every line once the list scrolls a viewport;
+/// - a user drag stops following for good (`LyricsFollowStateMachine`);
+///   `returnToNow()` scrolls back to the active line and resumes it;
+/// - tapping a line reports it (the page seeks); the list itself never
+///   scrolls for a tap, so the touched line stays put and only the
+///   highlight moves;
+/// - long-pressing a line shows a context menu with a preview of the line.
 final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDelegate {
 
     // Dart _lyricStyle values (player.dart:981-986 over default1).
     static let lineGap: CGFloat = 12
     static let horizontalPadding: CGFloat = 20
     static let topPadding: CGFloat = 100
-    static let bottomPadding: CGFloat = 20
+    static let bottomPadding: CGFloat = 100
     static let lineHeightMultiple: CGFloat = 1.35
-    static let fadeRange: CGFloat = 80
+    /// Length of the top/bottom fade ramps.
+    static let edgeLength: CGFloat = 48
+    /// How long after a tap-jump position ticks that still report the old
+    /// line are ignored (the seek is asynchronous).
+    private static let jumpGraceSeconds: TimeInterval = 1.5
 
-    /// Line tap → caller toggles playback (Dart setOnTapLineCallback).
+    /// Line tap → the page seeks to the line's start.
     var onTapLine: ((Int) -> Void)?
-    /// Time-bar play button → caller seeks to the selected line's stamp.
-    var onSeekLine: ((_ milliseconds: Int) -> Void)?
+    /// Fires when following starts or stops (true = following).
+    var onFollowingChanged: ((Bool) -> Void)?
+    /// Builds the long-press menu for a line; nil = no menu for that line.
+    var contextMenuProvider: ((Int) -> UIMenu?)?
 
     private(set) var lines: [LyricLine] = []
     private(set) var activeIndex: Int = 0
-    private var selectedIndex: Int = 0
     private var follow = LyricsFollowStateMachine()
-    private var resumeTimer: Timer?
     private var scrollAnimator: UIViewPropertyAnimator?
+    /// The line a tap just jumped to, until a position tick confirms it.
+    private var pendingJump: (index: Int, deadline: Date)?
 
-    /// flutter_lyric anchors (player.dart `_lyricStyle`): the selection bar
-    /// sits at `selectionAnchorPosition` — the app's `anchorPosition: 0.5`
-    /// copyWith overrides ONLY the selection anchor; `activeAnchorPosition`
-    /// keeps default1's 0.48 (lyric_style.dart:168).
-    static let selectionAnchorFraction: CGFloat = 0.5
+    var isFollowing: Bool { follow.mode == .following }
+
+    /// The text of the active line (empty for spacer lines).
+    var activeLineText: String? {
+        guard lines.indices.contains(activeIndex) else { return nil }
+        let text = lines[activeIndex].text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
+    /// flutter_lyric `activeAnchorPosition` (default1's 0.48,
+    /// lyric_style.dart:168): the active line centers slightly above the
+    /// viewport middle.
     static let activeAnchorFraction: CGFloat = 0.48
 
     private let layout = LyricsLinearLayout()
-    private let collectionView: UICollectionView
+    private let fadeHost = UIView()
+    private let fadeMask = CAGradientLayer()
+    /// Internal for the hosted regression tests (visibility checks).
+    let collectionView: UICollectionView
     private var cellRegistration: UICollectionView.CellRegistration<LyricLineCell, Int>?
-    private let timeBar = LyricsTimeBarView()
 
     init() {
         collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         super.init(frame: .zero)
 
+        // The player is always dark; the line context menu and its preview
+        // follow this view's traits.
+        overrideUserInterfaceStyle = .dark
         layout.view = self
 
         collectionView.backgroundColor = .clear
@@ -65,27 +90,23 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
         collectionView.delaysContentTouches = false
         collectionView.canCancelContentTouches = true
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(collectionView)
-
-        timeBar.isHidden = true
-        timeBar.translatesAutoresizingMaskIntoConstraints = false
-        timeBar.onPlayTapped = { [weak self] in self?.timeBarPlayTapped() }
-        addSubview(timeBar)
+        fadeHost.translatesAutoresizingMaskIntoConstraints = false
+        fadeHost.layer.mask = fadeMask
+        fadeMask.startPoint = CGPoint(x: 0.5, y: 0)
+        fadeMask.endPoint = CGPoint(x: 0.5, y: 1)
+        fadeMask.colors = [UIColor.clear, .white, .white, UIColor.clear].map(\.cgColor)
+        addSubview(fadeHost)
+        fadeHost.addSubview(collectionView)
 
         NSLayoutConstraint.activate([
-            collectionView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            collectionView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            collectionView.topAnchor.constraint(equalTo: topAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: bottomAnchor),
-
-            timeBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            timeBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            // The bar is pinned to the selection anchor — a FIXED position at
-            // 0.5 × viewport height (lyric_selected_progress.dart renders it
-            // `Positioned(top: state.centerY)` + `FractionalTranslation(0,-0.5)`
-            // where centerY = anchorPositionNotifier = selectionAnchorPosition,
-            // NOT the selected line's center).
-            timeBar.centerYAnchor.constraint(equalTo: centerYAnchor),
+            fadeHost.leadingAnchor.constraint(equalTo: leadingAnchor),
+            fadeHost.trailingAnchor.constraint(equalTo: trailingAnchor),
+            fadeHost.topAnchor.constraint(equalTo: topAnchor),
+            fadeHost.bottomAnchor.constraint(equalTo: bottomAnchor),
+            collectionView.leadingAnchor.constraint(equalTo: fadeHost.leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: fadeHost.trailingAnchor),
+            collectionView.topAnchor.constraint(equalTo: fadeHost.topAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: fadeHost.bottomAnchor),
         ])
 
         cellRegistration = UICollectionView.CellRegistration<LyricLineCell, Int> {
@@ -94,13 +115,10 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
             cell.configure(
                 line: self.lines[indexPath.item],
                 isActive: indexPath.item == self.activeIndex,
-                isSelected: self.follow.mode == .selecting && indexPath.item == self.selectedIndex,
                 traits: self.traitCollection
             )
             cell.onActivate = { [weak self] in self?.onTapLine?(indexPath.item) }
         }
-
-        installFadeMask()
 
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) {
             (view: LyricsView, _: UITraitCollection) in
@@ -111,16 +129,35 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let height = bounds.height
+        guard height > 0 else { return }
+        let ramp = min(Self.edgeLength / height, 0.5)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        fadeMask.frame = fadeHost.bounds
+        fadeMask.locations = [0, NSNumber(value: ramp), NSNumber(value: 1 - ramp), 1]
+        CATransaction.commit()
+    }
+
     // MARK: - Document / progress
 
+    /// Replaces the lines. Follows the active line when following; a
+    /// detached list keeps its place (clamped to the new content).
     func updateDocument(lines: [LyricLine], positionMilliseconds: Int = 0) {
         self.lines = lines
         activeIndex = LyricDocument.activeLineIndex(lines: lines, positionMilliseconds: positionMilliseconds)
-        selectedIndex = activeIndex
+        pendingJump = nil
         layout.invalidateLayout()
         collectionView.reloadData()
         collectionView.layoutIfNeeded()
-        scrollToActiveLine(animated: false)
+        if isFollowing {
+            scrollToActiveLine(animated: false)
+        } else {
+            let clamped = min(max(collectionView.contentOffset.y, 0), maxOffset)
+            collectionView.setContentOffset(CGPoint(x: 0, y: clamped), animated: false)
+        }
     }
 
     /// `ever(positionData)` → `setProgress` (player.dart:1019-1021). The
@@ -128,6 +165,16 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     /// this only renders what arrives.
     func setProgress(positionMilliseconds: Int) {
         let index = LyricDocument.activeLineIndex(lines: lines, positionMilliseconds: positionMilliseconds)
+        if let pendingJump {
+            // A tap just moved the highlight; the seek lands a moment
+            // later, and ticks that still report the old line must not
+            // pull the highlight (and the list) back.
+            if index == pendingJump.index || Date() >= pendingJump.deadline {
+                self.pendingJump = nil
+            } else {
+                return
+            }
+        }
         guard index != activeIndex else { return }
         activeIndex = index
         reconfigureVisibleCells()
@@ -136,9 +183,38 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
         // frames, which must already carry the new active line's (taller)
         // measurement — without this the scroll lands a few points off.
         collectionView.layoutIfNeeded()
-        if follow.mode == .following {
+        if isFollowing {
             scrollToActiveLine(animated: true)
         }
+    }
+
+    /// Moves the highlight to a tapped line without scrolling: the touched
+    /// line stays exactly where it is and only the highlight changes.
+    func jump(toLine index: Int) {
+        guard lines.indices.contains(index) else { return }
+        pendingJump = (index, Date().addingTimeInterval(Self.jumpGraceSeconds))
+        guard index != activeIndex else { return }
+        activeIndex = index
+        reconfigureVisibleCells()
+        layout.invalidateLayout()
+        collectionView.layoutIfNeeded()
+    }
+
+    /// "Back to now": scrolls to the active line and resumes following.
+    func returnToNow() {
+        setFollow(.backToNowRequested)
+        scrollToActiveLine(animated: true)
+    }
+
+    /// A fresh document starts out following again.
+    func resetFollowing() {
+        setFollow(.backToNowRequested)
+    }
+
+    private func setFollow(_ event: LyricsFollowStateMachine.Event) {
+        let was = isFollowing
+        follow.handle(event)
+        if was != isFollowing { onFollowingChanged?(isFollowing) }
     }
 
     // MARK: - UICollectionViewDataSource / Delegate
@@ -158,106 +234,45 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
         onTapLine?(indexPath.item)
     }
 
-    // MARK: - UIScrollViewDelegate (drag selection)
+    func collectionView(
+        _ collectionView: UICollectionView,
+        contextMenuConfigurationForItemAt indexPath: IndexPath,
+        point: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        let index = indexPath.item
+        guard lines.indices.contains(index),
+              !lines[index].text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let menu = contextMenuProvider?(index)
+        else { return nil }
+        let line = lines[index]
+        let width = bounds.width - Self.horizontalPadding * 2
+        return UIContextMenuConfiguration(
+            identifier: indexPath as NSCopying,
+            previewProvider: { LyricLinePreviewViewController(line: line, width: width) },
+            actionProvider: { _ in menu }
+        )
+    }
+
+    // MARK: - UIScrollViewDelegate (drag detaches)
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        // A user drag must win over an in-flight follow/selection scroll:
-        // stop the running animator where it currently is and cancel the
-        // collection view's residual scrolling, so the drag starts from
-        // under the finger instead of fighting the animator.
+        // A user drag must win over an in-flight follow scroll: stop the
+        // running animator where it currently is and cancel the collection
+        // view's residual scrolling, so the drag starts from under the
+        // finger instead of fighting the animator.
         if scrollAnimator?.state == .active {
             scrollAnimator?.stopAnimation(true)
             scrollAnimator?.finishAnimation(at: .current)
         }
         scrollAnimator = nil
         scrollView.setContentOffset(scrollView.contentOffset, animated: false)
-        schedule(.dragBegan)
-    }
-
-    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        // The fling keeps selecting; its end schedules the resume.
-        if !decelerate { schedule(.dragEnded) }
-    }
-
-    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-        schedule(.dragEnded)
-    }
-
-    func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard follow.mode == .selecting else { return }
-        // Painter rule: the selected line is the FIRST line whose bottom
-        // edge (+ half the gap) has crossed the selection anchor; when no
-        // line crosses, the selection keeps its previous value.
-        guard let index = layout.selectedLineIndex(
-            anchorY: scrollView.contentOffset.y,
-            viewportHeight: bounds.height
-        ) else { return }
-        guard index != selectedIndex else { return }
-        selectedIndex = index
-        reconfigureVisibleCells()
-        if lines.indices.contains(index) {
-            timeBar.updateTime(milliseconds: lines[index].startMilliseconds)
-        }
-    }
-
-    // MARK: - Selection control
-
-    private func timeBarPlayTapped() {
-        // stopSelection() + seek(state.duration) (player.dart:1107-1110).
-        schedule(.stopSelectionRequested)
-        if lines.indices.contains(selectedIndex) {
-            onSeekLine?(lines[selectedIndex].startMilliseconds)
-        }
-    }
-
-    private func schedule(_ event: LyricsFollowStateMachine.Event) {
-        if event == .activeResumeTimerFired {
-            // One-shot timer already fired; drop the stale reference.
-            resumeTimer = nil
-        }
-        let action = follow.handle(event)
-        switch action {
-        case .cancel:
-            resumeTimer?.invalidate()
-            resumeTimer = nil
-        case .startActiveResume:
-            resumeTimer?.invalidate()
-            let timer = Timer(
-                timeInterval: TimeInterval(LyricsFollowStateMachine.activeLineResumeMilliseconds) / 1000,
-                repeats: false
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.schedule(.activeResumeTimerFired)
-                }
-            }
-            RunLoop.main.add(timer, forMode: .common)
-            resumeTimer = timer
-        case .none:
-            break
-        }
-        switch event {
-        case .dragBegan:
-            timeBar.isHidden = false
-            if lines.indices.contains(selectedIndex) {
-                timeBar.updateTime(milliseconds: lines[selectedIndex].startMilliseconds)
-            }
-            // isSelecting flipped: the anchor line repaints in selectedColor.
-            reconfigureVisibleCells()
-        case .activeResumeTimerFired, .stopSelectionRequested:
-            if follow.mode == .following {
-                timeBar.isHidden = true
-                reconfigureVisibleCells()
-                scrollToActiveLine(animated: true)
-            }
-        case .dragEnded:
-            break
-        }
+        setFollow(.dragBegan)
     }
 
     // MARK: - Follow scrolling
 
     /// Center the active line on the 0.48 active anchor. Duration ladder from
-    /// default1 `scrollDurations` (240 / 500 / 1000 ms) on easeOutCubic.
+    /// default1 `scrollDurations` (240 / 500 ms) on easeOutCubic.
     private func scrollToActiveLine(animated: Bool) {
         guard collectionView.bounds.height > 0 else { return }
         let target = layout.targetOffset(
@@ -274,12 +289,14 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
             return
         }
         let distance = abs(collectionView.contentOffset.y - clamped)
-        if distance < 0.1 {
+        // A property-animated contentOffset only lays out cells for the
+        // final bounds, so a scroll longer than the viewport shows an empty
+        // list in flight (a far seek, Back to now): jump instead.
+        if distance < 0.1 || distance > collectionView.bounds.height {
             collectionView.setContentOffset(CGPoint(x: 0, y: clamped), animated: false)
             return
         }
-        let duration: TimeInterval =
-            distance >= 1000 ? 1.0 : (distance >= 500 ? 0.5 : 0.24)
+        let duration: TimeInterval = distance >= 500 ? 0.5 : 0.24
         let animator = UIViewPropertyAnimator(
             duration: duration,
             timingParameters: UICubicTimingParameters(
@@ -295,7 +312,11 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     }
 
     private var maxOffset: CGFloat {
-        max(0, layout.collectionViewContentSize.height - collectionView.bounds.height)
+        max(
+            0,
+            layout.collectionViewContentSize.height + collectionView.contentInset.bottom
+                - collectionView.bounds.height
+        )
     }
 
     // MARK: - Traits / cells
@@ -313,38 +334,8 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
         scrollToActiveLine(animated: false)
     }
 
-    private func installFadeMask() {
-        let mask = CAGradientLayer()
-        mask.colors = [
-            UIColor.clear.cgColor,
-            UIColor.white.cgColor,
-            UIColor.white.cgColor,
-            UIColor.clear.cgColor,
-        ]
-        mask.locations = [0, 0.15, 0.85, 1]
-        mask.startPoint = CGPoint(x: 0.5, y: 0)
-        mask.endPoint = CGPoint(x: 0.5, y: 1)
-        collectionView.layer.mask = mask
-        fadeMask = mask
-    }
-
-    private var fadeMask: CAGradientLayer? {
-        didSet { setNeedsLayout() }
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // Absolute fade range (default1 fadeRange 80/80), not proportional.
-        if let fadeMask {
-            let topRatio = bounds.height > 0 ? min(Self.fadeRange / bounds.height, 0.5) : 0
-            fadeMask.frame = bounds
-            fadeMask.locations = [0, NSNumber(value: topRatio), NSNumber(value: 1 - topRatio), 1]
-        }
-    }
-
     deinit {
         MainActor.assumeIsolated {
-            resumeTimer?.invalidate()
             scrollAnimator?.stopAnimation(true)
         }
     }
@@ -360,7 +351,7 @@ final class LyricLineCell: UICollectionViewCell {
 
     private let label = UILabel()
 
-    /// VoiceOver double-tap on the line — the same tap-to-pause the
+    /// VoiceOver double-tap on the line — the same jump-to-line the
     /// collection view's didSelectItemAt serves for touch. Deliberately NO
     /// `.button` trait: the line's semantics stay "text with selection
     /// state"; only the activation hook is added.
@@ -391,56 +382,58 @@ final class LyricLineCell: UICollectionViewCell {
         return true
     }
 
-    func configure(line: LyricLine, isActive: Bool, isSelected: Bool, traits: UITraitCollection?) {
+    func configure(line: LyricLine, isActive: Bool, traits: UITraitCollection?) {
         label.attributedText = LyricsTextStyling.attributedText(
-            for: line, isActive: isActive, isSelected: isSelected, traits: traits
+            for: line, isActive: isActive, traits: traits
         )
         accessibilityLabel = [line.text, line.translation ?? ""]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
         accessibilityTraits = isActive ? [.staticText, .selected] : .staticText
+        accessibilityHint = "Plays from this line"
     }
 }
 
 // MARK: - Text styling
 
-/// Lyric typography: `Typography.lyricMain/.lyricActive/.lyricTranslation`
-/// (03 §2.10) with `height: 1.35` paragraphs; the follow highlight is
-/// brightness only (Anycast 2.0 transcript).
+/// Lyric typography: `TypographyV2.body` for the line and `TypographyV2.meta`
+/// for its translation, with `height: 1.35` paragraphs; the follow highlight
+/// is brightness only (Anycast 2.0 transcript).
 enum LyricsTextStyling {
 
     /// The active line's translation: one step below the active main line.
     static let activeTranslationColor = Theme.playerSecondary
 
-    /// `isSelected` = the painter's `isSelecting && isInAnchorArea`: the line
-    /// under the selection anchor repaints EVERYTHING in `selectedColor`
-    /// (white) for as long as the time bar is visible (lyric_painter.dart:231).
+    /// The inactive line's translation: dimmer than the main line.
+    static let translationColor = Theme.playerSecondary.withAlphaComponent(0.55)
+
     static func attributedText(
         for line: LyricLine,
         isActive: Bool,
-        isSelected: Bool = false,
         traits: UITraitCollection?
     ) -> NSAttributedString {
-        let mainStyle: Typography.Style = isActive ? .lyricActive : .lyricMain
+        let mainColor = isActive ? Theme.playerText : Theme.playerSecondary
         let translationColor = isActive
             ? activeTranslationColor
-            : Typography.lyricTranslation.color
+            : Self.translationColor
 
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineHeightMultiple = LyricsView.lineHeightMultiple
         paragraph.paragraphSpacing = Self.translationParagraphSpacing
 
         let attributed = NSMutableAttributedString()
-        var mainAttributes = mainStyle.attributes(traits: traits)
-        mainAttributes[.paragraphStyle] = paragraph
-        if isSelected {
-            mainAttributes[.foregroundColor] = UIColor.white
-        }
+        let mainAttributes: [NSAttributedString.Key: Any] = [
+            .font: TypographyV2.body.font(traits: traits),
+            .foregroundColor: mainColor,
+            .paragraphStyle: paragraph,
+        ]
         attributed.append(NSAttributedString(string: line.text, attributes: mainAttributes))
         if let translation = line.translation, !translation.isEmpty {
-            var translationAttributes = Typography.lyricTranslation.attributes(traits: traits)
-            translationAttributes[.paragraphStyle] = paragraph
-            translationAttributes[.foregroundColor] = isSelected ? UIColor.white : translationColor
+            let translationAttributes: [NSAttributedString.Key: Any] = [
+                .font: TypographyV2.meta.font(traits: traits),
+                .foregroundColor: translationColor,
+                .paragraphStyle: paragraph,
+            ]
             attributed.append(NSAttributedString(string: "\n"))
             attributed.append(NSAttributedString(string: translation, attributes: translationAttributes))
         }
@@ -536,21 +529,6 @@ final class LyricsLinearLayout: UICollectionViewLayout {
         return frames[index].midY - viewportHeight * LyricsView.activeAnchorFraction
     }
 
-    /// The painter's anchor selection (lyric_painter.dart:69-75): the FIRST
-    /// line whose bottom edge plus half the gap reaches the selection anchor
-    /// (0.5 × viewport). Returns nil when no line has crossed it — the
-    /// painter leaves the notifier untouched in that case, so the caller
-    /// keeps the previous selection.
-    func selectedLineIndex(anchorY offsetY: CGFloat, viewportHeight: CGFloat) -> Int? {
-        guard !frames.isEmpty else { return nil }
-        let anchorY = offsetY + viewportHeight * LyricsView.selectionAnchorFraction
-        for (index, frame) in frames.enumerated()
-        where frame.maxY + LyricsView.lineGap / 2 >= anchorY {
-            return index
-        }
-        return nil
-    }
-
     private func attributes(at index: Int, frame: CGRect) -> UICollectionViewLayoutAttributes {
         let attributes = UICollectionViewLayoutAttributes(forCellWith: IndexPath(item: index, section: 0))
         attributes.frame = frame
@@ -558,104 +536,71 @@ final class LyricsLinearLayout: UICollectionViewLayout {
     }
 }
 
-// MARK: - Time bar (widget #2)
+// MARK: - Long-press preview
 
-/// The drag-selection bar (player.dart:1061-1130): [mm:ss comfortaa 20 pt
-/// white with shadow] — [2 pt white line with shadow] — [36×36 translucent
-/// circle with a play glyph; tap stops selection and seeks].
-final class LyricsTimeBarView: UIView {
+/// The context-menu preview of one line: its timestamp in Meta over the
+/// line text (and translation), on the player surface.
+final class LyricLinePreviewViewController: UIViewController {
 
-    var onPlayTapped: (() -> Void)?
+    private let line: LyricLine
+    private let width: CGFloat
 
-    private let timeLabel = UILabel()
-    private let separator = UIView()
-    private let playButton = UIButton(type: .custom)
-
-    private static let timeStyle = Typography.Style(
-        postScriptName: "Comfortaa-Bold",
-        size: 20,
-        kern: 0,
-        color: .white,
-        scalingTextStyle: .title2
-    )
-
-    init() {
-        super.init(frame: .zero)
-
-        timeLabel.textAlignment = .left
-        timeLabel.adjustsFontForContentSizeCategory = true
-        timeLabel.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(timeLabel)
-
-        separator.backgroundColor = .white
-        separator.layer.shadowColor = UIColor.black.withAlphaComponent(0.26).cgColor
-        separator.layer.shadowOpacity = 1
-        separator.layer.shadowRadius = 2
-        separator.layer.shadowOffset = .zero
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(separator)
-
-        playButton.layer.cornerRadius = 18
-        playButton.layer.cornerCurve = .continuous
-        playButton.backgroundColor = UIColor.white.withAlphaComponent(0.34)
-        playButton.setImage(AppIcons.play, for: .normal)
-        playButton.tintColor = Theme.primary
-        playButton.isAccessibilityElement = true
-        playButton.accessibilityLabel = "Play from selected line"
-        playButton.translatesAutoresizingMaskIntoConstraints = false
-        playButton.addAction(
-            UIAction { [weak self] _ in self?.onPlayTapped?() },
-            for: .touchUpInside
-        )
-        addSubview(playButton)
-
-        NSLayoutConstraint.activate([
-            timeLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
-            timeLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            separator.leadingAnchor.constraint(equalTo: timeLabel.trailingAnchor, constant: 12),
-            separator.centerYAnchor.constraint(equalTo: centerYAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 2),
-
-            playButton.leadingAnchor.constraint(equalTo: separator.trailingAnchor, constant: 12),
-            playButton.trailingAnchor.constraint(equalTo: trailingAnchor),
-            // The button's edges define the bar's height: every other
-            // subview pins only centerY, so without these Auto Layout
-            // leaves the bar zero-height — it still paints (views don't
-            // clip) but every touch on the 36 pt button falls outside
-            // bounds, making drag-to-seek's play control untappable.
-            playButton.topAnchor.constraint(equalTo: topAnchor),
-            playButton.bottomAnchor.constraint(equalTo: bottomAnchor),
-            playButton.widthAnchor.constraint(equalToConstant: 36),
-            playButton.heightAnchor.constraint(equalToConstant: 36),
-        ])
+    init(line: LyricLine, width: CGFloat) {
+        self.line = line
+        self.width = max(width, 1)
+        super.init(nibName: nil, bundle: nil)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    func updateTime(milliseconds: Int) {
-        let totalSeconds = milliseconds / 1000
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        let text = String(format: "%02d:%02d", minutes, seconds)
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        overrideUserInterfaceStyle = .dark
+        view.backgroundColor = Theme.playerBackground
 
-        // Dart titleLarge + tabular figures + black54 (1,1) blur-4 shadow.
-        let shadow = NSShadow()
-        shadow.shadowColor = UIColor.black.withAlphaComponent(0.54)
-        shadow.shadowOffset = CGSize(width: 1, height: 1)
-        shadow.shadowBlurRadius = 4
-        var attributes = Self.timeStyle.attributes()
-        attributes[.shadow] = shadow
-        if let base = attributes[.font] as? UIFont {
-            let descriptor = base.fontDescriptor.addingAttributes([
-                .featureSettings: [[
-                    UIFontDescriptor.FeatureKey.type: kNumberSpacingType,
-                    UIFontDescriptor.FeatureKey.selector: kMonospacedNumbersSelector,
-                ]],
-            ])
-            attributes[.font] = UIFont(descriptor: descriptor, size: base.pointSize)
-        }
-        timeLabel.attributedText = NSAttributedString(string: text, attributes: attributes)
+        let timeLabel = UILabel()
+        timeLabel.font = TypographyV2.meta.font()
+        timeLabel.textColor = Theme.playerSecondary
+        timeLabel.text = LyricsTimestamp.string(milliseconds: line.startMilliseconds)
+
+        let textLabel = UILabel()
+        textLabel.numberOfLines = 0
+        textLabel.attributedText = LyricsTextStyling.attributedText(
+            for: line, isActive: true, traits: traitCollection
+        )
+
+        let stack = UIStackView(arrangedSubviews: [timeLabel, textLabel])
+        stack.axis = .vertical
+        stack.spacing = Spacing.xs
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
+        let inset = Spacing.gap
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: inset),
+            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -inset),
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: inset),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -inset),
+        ])
+
+        let fitting = view.systemLayoutSizeFitting(
+            CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        )
+        preferredContentSize = CGSize(width: width, height: fitting.height)
+    }
+}
+
+/// `mm:ss` (or `h:mm:ss`) stamp for a line start.
+enum LyricsTimestamp {
+    static func string(milliseconds: Int) -> String {
+        let total = max(milliseconds, 0) / 1000
+        let hours = total / 3600
+        let minutes = (total / 60) % 60
+        let seconds = total % 60
+        return hours > 0
+            ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
+            : String(format: "%02d:%02d", minutes, seconds)
     }
 }

@@ -30,13 +30,65 @@ struct SettingsLanguageChangeApplier {
     }
 }
 
-/// Settings sheet (lib/pages/settings.dart, 03 §2.13): an inset-grouped list
-/// mirroring the Dart groups, in the Anycast 2.0 settings language — a page
-/// title, surface plates on the sand page, values trailing their labels,
-/// chevrons on rows that open something. Presented via
-/// AppSheets.presentExpand from the shell's gear button; children
-/// (Login/ImportExport/History) are presented from here.
+/// Stepper writes (Auto Refresh / Inbox / History / Cache limits): maps a
+/// stepper row to its coordinator mutation. Extracted so tests can verify
+/// each row writes through the coordinator.
+struct SettingsStepWriter {
+
+    let coordinator: SettingsCoordinator
+
+    func write(_ value: Int64, for row: SettingsPageModel.Row) async {
+        switch row {
+        case .autoRefreshInterval: await coordinator.updateAutoRefreshInterval(value)
+        case .maxFeedEpisodes: await coordinator.updateMaxFeedEpisodes(value)
+        case .maxHistoryEpisodes: await coordinator.updateMaxHistoryEpisodes(value)
+        case .cacheLimit: await coordinator.updateMaxCacheCount(value)
+        default: break
+        }
+    }
+}
+
+/// Settings sheet (lib/pages/settings.dart, 03 §2.13) in the restrained 2.0
+/// Settings direction adopted 2026-10-21: grouped plates on the container
+/// page, rows with values and chevrons, in-row steppers for the numeric
+/// limits instead of the Dart scroll-wheel pickers, and a sand-tinted switch.
+/// Presented via AppSheets.presentExpand from the shell's gear button;
+/// children (Login/ImportExport/History) are presented from here.
 final class SettingsViewController: UIViewController {
+
+    /// What the account rows render from. Signed-in vs signed-out is read
+    /// synchronously; the subscription, entitlement and quota fields fill in
+    /// as their async sources answer.
+    private struct AccountInfo {
+        var snapshot = LoginPageModel.AccountSnapshot(uid: nil, email: nil, providerID: nil)
+        /// Nil until RevenueCat has answered, so a Plus user never flashes
+        /// the free state.
+        var isSubscribed: Bool?
+        var plus: AccountPageModel.PlusStatus?
+        var remaining: Int?
+
+        var tier: AccountPageModel.Tier {
+            AccountPageModel.tier(signedIn: snapshot.signedIn, isSubscribed: isSubscribed ?? false)
+        }
+
+        /// Tier that drives the section list: the Upgrade plate waits for a
+        /// definite free answer.
+        var sectionTier: AccountPageModel.Tier {
+            snapshot.signedIn && isSubscribed == nil ? .plus : tier
+        }
+    }
+
+    /// The layout provider is built before `self` exists and must always see
+    /// the current sections, so it reads them through this box.
+    private final class SectionStore {
+        var sections: [SettingsPageModel.Section] = []
+    }
+
+    private let sectionStore: SectionStore
+    private var accountInfo = AccountInfo()
+    private var accountTask: Task<Void, Never>?
+
+    private var sections: [SettingsPageModel.Section] { sectionStore.sections }
 
     private let context: UIContext
     private var languageApplier: SettingsLanguageChangeApplier
@@ -46,6 +98,7 @@ final class SettingsViewController: UIViewController {
     private var settings: AppSettings
 
     private let collectionView: UICollectionView
+    private let titleLabel = UILabel()
     private var dataSource: UICollectionViewDiffableDataSource<Int, SettingsPageModel.Row>?
 
     private let longPressRecognizer = UILongPressGestureRecognizer()
@@ -58,38 +111,59 @@ final class SettingsViewController: UIViewController {
             translations: context.translations,
             coordinator: context.settingsCoordinator
         )
+        let store = SectionStore()
+        store.sections = SettingsPageModel.sections(tier: .signedOut)
+        self.sectionStore = store
         self.collectionView = UICollectionView(
             frame: .zero,
-            collectionViewLayout: Self.makeLayout(box: context.settingsBox)
+            collectionViewLayout: Self.makeLayout(store: store)
         )
 
         super.init(nibName: nil, bundle: nil)
     }
 
-    /// Per-section list layout: inset-grouped everywhere except the trailing
-    /// Privacy links, which sit outside any group card in Dart (a centered
-    /// column, settings.dart privacy.dart) — plain appearance, no separators.
-    private static func makeLayout(box: SettingsBox) -> UICollectionViewCompositionalLayout {
+    /// Per-section list layout: inset-grouped plates 16 from the screen
+    /// edges with 24-inset `sandAlpha4` separators; the trailing Privacy
+    /// links sit outside any plate — plain appearance, no separators.
+    private static func makeLayout(store: SectionStore) -> UICollectionViewCompositionalLayout {
         UICollectionViewCompositionalLayout { sectionIndex, environment in
-            let sections = SettingsPageModel.sections(
-                includeTargetLanguage: SettingsPageModel.showsTargetLanguage(
-                    targetLanguage: box.current.targetLanguage
+            let sections = store.sections
+            let section = sections.indices.contains(sectionIndex) ? sections[sectionIndex] : nil
+            if section?.plainStyle == true {
+                var config = UICollectionLayoutListConfiguration(appearance: .plain)
+                config.backgroundColor = .clear
+                config.showsSeparators = false
+                let layoutSection = NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
+                layoutSection.contentInsets = NSDirectionalEdgeInsets(
+                    top: Spacing.pageHeader, leading: Spacing.pageH,
+                    bottom: Spacing.pageHeader, trailing: Spacing.pageH
                 )
-            )
-            let plain = sections.indices.contains(sectionIndex) && sections[sectionIndex].plainStyle
-            var config = UICollectionLayoutListConfiguration(
-                appearance: plain ? .plain : .insetGrouped
-            )
-            // The page paints the sand base; the list default would lay the
-            // system grouped gray over it.
-            config.backgroundColor = .clear
-            if sections.indices.contains(sectionIndex) {
-                config.headerMode = sections[sectionIndex].header == nil ? .none : .supplementary
-                if plain {
-                    config.showsSeparators = false
-                }
+                return layoutSection
             }
-            return NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
+            var config = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
+            // The page paints the container base; the list default would lay
+            // the system grouped gray over it.
+            config.backgroundColor = .clear
+            config.headerMode = section?.header == nil ? .none : .supplementary
+            // The gold Upgrade plate sits 12 below the identity row.
+            let isUpgradePlate = section?.rows == [.plusUpgrade]
+            config.headerTopPadding = sectionIndex == 0
+                ? Spacing.md : (isUpgradePlate ? Spacing.gap : Spacing.pageHeader)
+            config.itemSeparatorHandler = { _, proposed in
+                var separator = proposed
+                separator.color = AnycastColor.sandAlpha4
+                let insets = NSDirectionalEdgeInsets(
+                    top: 0, leading: SettingsRowCell.horizontalInset,
+                    bottom: 0, trailing: SettingsRowCell.horizontalInset
+                )
+                separator.topSeparatorInsets = insets
+                separator.bottomSeparatorInsets = insets
+                return separator
+            }
+            let layoutSection = NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
+            layoutSection.contentInsets.leading = Spacing.pageH
+            layoutSection.contentInsets.trailing = Spacing.pageH
+            return layoutSection
         }
     }
 
@@ -98,13 +172,13 @@ final class SettingsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        Theme.installPageBase(on: view)
+        view.backgroundColor = Theme.surfaceContainer
 
+        refreshAccount()
         configureDataSource()
 
-        let titleLabel = UILabel()
         titleLabel.text = "Settings"
-        titleLabel.font = TypographyV2.headlineLarge.font()
+        titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.accessibilityTraits = .header
@@ -113,18 +187,30 @@ final class SettingsViewController: UIViewController {
 
         collectionView.delegate = self
         collectionView.backgroundColor = .clear
+        collectionView.contentInset.bottom = Spacing.pageHeader
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionView)
+        // The title lines up with the row text: plate inset + row inset.
+        let textInset = Spacing.pageH + SettingsRowCell.horizontalInset
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: textInset),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -textInset),
 
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: Spacing.xs),
+            // Runs under the title row and the sheet's bottom edge, fading
+            // out behind both; `viewDidLayoutSubviews` keeps the resting
+            // layout of a list that started below the title.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        ScrollEdgeChrome.attachTopBand(
+            to: collectionView, in: view, below: titleLabel.bottomAnchor,
+            fadeColor: Theme.surfaceContainer, restingGap: Spacing.xs
+        )
+        ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view, fadeColor: Theme.surfaceContainer)
+        view.bringSubviewToFront(titleLabel)
 
         longPressRecognizer.minimumPressDuration = 0.5
         longPressRecognizer.addTarget(self, action: #selector(handleLongPress(_:)))
@@ -152,7 +238,13 @@ final class SettingsViewController: UIViewController {
         }
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        ScrollEdgeChrome.clearTop(of: collectionView, to: titleLabel.frame.maxY + Spacing.xs)
+    }
+
     deinit {
+        accountTask?.cancel()
         // UI teardown runs on the main thread; the observer tokens are not
         // Sendable so the access goes through an isolated assertion.
         MainActor.assumeIsolated {
@@ -165,7 +257,7 @@ final class SettingsViewController: UIViewController {
     // MARK: - Data source
 
     private func configureDataSource() {
-        let rowRegistration = UICollectionView.CellRegistration<UICollectionViewListCell, SettingsPageModel.Row> {
+        let rowRegistration = UICollectionView.CellRegistration<SettingsRowCell, SettingsPageModel.Row> {
             [weak self] cell, _, row in
             self?.configure(cell, for: row)
         }
@@ -173,17 +265,31 @@ final class SettingsViewController: UIViewController {
             [weak self] cell, _, row in
             self?.configureSwitchCell(cell, for: row)
         }
+        let stepperRegistration = UICollectionView.CellRegistration<SettingsStepperRowCell, SettingsPageModel.Row> {
+            [weak self] cell, _, row in
+            self?.configureStepperCell(cell, for: row)
+        }
+
+        let identityRegistration = UICollectionView.CellRegistration<SettingsIdentityRowCell, SettingsPageModel.Row> {
+            [weak self] cell, _, row in
+            self?.configureIdentityCell(cell, for: row)
+        }
 
         let headerRegistration = UICollectionView.SupplementaryRegistration<UICollectionViewListCell>(
             elementKind: UICollectionView.elementKindSectionHeader
-        ) { header, _, indexPath in
-            let sections = SettingsPageModel.sections(includeTargetLanguage: true)
-            guard sections.indices.contains(indexPath.section),
+        ) { [weak self] header, _, indexPath in
+            guard let sections = self?.sections, sections.indices.contains(indexPath.section),
                   let title = sections[indexPath.section].header else { return }
             var config = header.defaultContentConfiguration()
             config.text = title
             config.textProperties.color = Theme.onSurfaceVariant
-            config.textProperties.font = TypographyV2.bodyMedium.font()
+            config.textProperties.font = TypographyV2.meta.font()
+            config.textProperties.adjustsFontForContentSizeCategory = true
+            // Text lines up with the row text, 8 above the plate.
+            config.directionalLayoutMargins = NSDirectionalEdgeInsets(
+                top: 0, leading: SettingsRowCell.horizontalInset,
+                bottom: Spacing.md, trailing: SettingsRowCell.horizontalInset
+            )
             header.contentConfiguration = config
             header.backgroundConfiguration = .clear()
         }
@@ -191,23 +297,24 @@ final class SettingsViewController: UIViewController {
         let dataSource = UICollectionViewDiffableDataSource<Int, SettingsPageModel.Row>(
             collectionView: collectionView
         ) { collectionView, indexPath, row in
-            let cell: UICollectionViewListCell
-            if row == .enableTranslation {
-                cell = collectionView.dequeueConfiguredReusableCell(
+            switch row {
+            case .account, .plusUpgrade:
+                return collectionView.dequeueConfiguredReusableCell(
+                    using: identityRegistration, for: indexPath, item: row
+                )
+            case .enableTranslation:
+                return collectionView.dequeueConfiguredReusableCell(
                     using: switchRegistration, for: indexPath, item: row
                 )
-            } else {
-                cell = collectionView.dequeueConfiguredReusableCell(
+            case .cacheLimit, .autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes:
+                return collectionView.dequeueConfiguredReusableCell(
+                    using: stepperRegistration, for: indexPath, item: row
+                )
+            default:
+                return collectionView.dequeueConfiguredReusableCell(
                     using: rowRegistration, for: indexPath, item: row
                 )
             }
-            // v2 surface token instead of the system insetGrouped gray —
-            // the default material is not part of the palette and halved
-            // the card/background contrast step (09 audit).
-            var background = UIBackgroundConfiguration.clear()
-            background.backgroundColor = Theme.surface
-            cell.backgroundConfiguration = background
-            return cell
         }
         dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
             collectionView.dequeueConfiguredReusableSupplementary(
@@ -219,11 +326,6 @@ final class SettingsViewController: UIViewController {
     }
 
     private func applySnapshot() {
-        let sections = SettingsPageModel.sections(
-            includeTargetLanguage: SettingsPageModel.showsTargetLanguage(
-                targetLanguage: settings.targetLanguage
-            )
-        )
         var snapshot = NSDiffableDataSourceSnapshot<Int, SettingsPageModel.Row>()
         for (index, section) in sections.enumerated() {
             snapshot.appendSections([index])
@@ -254,113 +356,110 @@ final class SettingsViewController: UIViewController {
 
     // MARK: - Cell configuration
 
-    /// Underlined link text (privacy.dart / the contact row keep the Dart
-    /// `TextDecoration.underline` treatment).
-    private static func underlined(_ title: String, color: UIColor, font: UIFont) -> NSAttributedString {
-        NSAttributedString(string: title, attributes: [
-            .font: font,
-            .foregroundColor: color,
-            .underlineStyle: NSUnderlineStyle.single.rawValue,
-        ])
+    private var translationIsOn: Bool {
+        SettingsPageModel.showsTargetLanguage(targetLanguage: settings.targetLanguage)
     }
 
-    private func configure(_ cell: UICollectionViewListCell, for row: SettingsPageModel.Row) {
-        // Value rows: the current value trails the label (UI kit settings).
-        var config = UIListContentConfiguration.valueCell()
-        config.textProperties.color = Theme.onSurface
-        config.textProperties.font = TypographyV2.bodyLarge.font()
-        config.textProperties.adjustsFontForContentSizeCategory = true
-        config.secondaryTextProperties.color = Theme.onSurfaceVariant
-        config.secondaryTextProperties.font = TypographyV2.bodyLarge.font()
-        config.secondaryTextProperties.adjustsFontForContentSizeCategory = true
-
-        var accessibilityValue: String?
-        // Chevrons only on rows that open something in the app.
+    private func configure(_ cell: SettingsRowCell, for row: SettingsPageModel.Row) {
+        let title = SettingsPageModel.title(for: row)
         switch row {
-        case .contactEmail, .privacyPolicy, .termsOfUse, .enableTranslation:
-            cell.accessories = []
-        default:
-            cell.accessories = [.disclosureIndicator(options: .init(tintColor: Theme.onSurfaceVariant))]
-        }
-
-        switch row {
-        case .account:
-            config.image = AppIcons.person
-            config.imageProperties.tintColor = Theme.onSurfaceVariant
-            config.text = SettingsPageModel.title(for: row)
-        case .country:
-            config.text = SettingsPageModel.title(for: row)
-            config.secondaryText = SettingsPageModel.countryName(forCode: settings.countryCode)
-            accessibilityValue = config.secondaryText
-        case .enableTranslation:
-            // Handled by configureSwitchCell (SettingsSwitchListCell).
-            break
-        case .targetLanguage:
-            // Indented sub-row: the Dart `arrow_elbow_down_right_bold` prefix
-            // (settings.dart:511-519) becomes a leading elbow icon + indent.
-            config.image = AppIcons.elbowIndent
-            config.imageProperties.tintColor = Theme.onSurfaceVariant
-            config.text = SettingsPageModel.title(for: row)
-            config.secondaryText = SettingsPageModel.languageName(forCode: settings.targetLanguage)
-            accessibilityValue = config.secondaryText
-            cell.indentationLevel = 1
-        case .importExport, .history:
-            config.text = SettingsPageModel.title(for: row)
-        case .autoRefreshInterval:
-            config.text = SettingsPageModel.title(for: row)
-            config.secondaryText = SettingsPageModel.autoRefreshDisplay(
-                seconds: settings.autoRefreshInterval
-            )
-            accessibilityValue = config.secondaryText
-        case .maxFeedEpisodes:
-            config.text = SettingsPageModel.title(for: row)
-            config.secondaryText = SettingsPageModel.maxEpisodesDisplay(count: settings.maxFeedEpisodes)
-            accessibilityValue = config.secondaryText
-        case .maxHistoryEpisodes:
-            config.text = SettingsPageModel.title(for: row)
-            config.secondaryText = SettingsPageModel.maxEpisodesDisplay(count: settings.maxHistoryEpisodes)
-            accessibilityValue = config.secondaryText
-        case .contactEmail:
-            config.attributedText = Self.underlined(
-                SettingsPageModel.title(for: row),
-                color: Theme.primary,
-                font: TypographyV2.bodySmall.font()
-            )
         case .privacyPolicy, .termsOfUse:
-            config.attributedText = Self.underlined(
-                SettingsPageModel.title(for: row),
-                color: Theme.primary,
-                font: TypographyV2.bodySmall.font()
+            cell.configureLink(title: title)
+        default:
+            // Target Language is inert while translation is off.
+            let isDimmed = row == .targetLanguage && !translationIsOn
+            let opensSomething: Set<SettingsPageModel.Row> = [
+                .targetLanguage, .country, .importExport, .history,
+            ]
+            cell.configure(
+                title: title,
+                subtitle: SettingsPageModel.subtitle(for: row),
+                value: SettingsPageModel.value(for: row, settings: settings),
+                showsChevron: opensSomething.contains(row) && !isDimmed,
+                isDimmed: isDimmed
             )
+            cell.accessibilityTraits = isDimmed ? [.button, .notEnabled] : .button
         }
-
-        cell.contentConfiguration = config
-        cell.isAccessibilityElement = true
-        cell.accessibilityLabel = SettingsPageModel.title(for: row)
-        cell.accessibilityValue = accessibilityValue
         cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
         if let tooltip = SettingsPageModel.tooltip(for: row) {
             cell.accessibilityHint = tooltip
         }
     }
 
-    /// The translation switch row (settings.dart:205-235).
+    /// The identity row and the gold Upgrade plate.
+    private func configureIdentityCell(_ cell: SettingsIdentityRowCell, for row: SettingsPageModel.Row) {
+        if row == .plusUpgrade {
+            cell.configureUpgradePlate()
+        } else {
+            var content = AccountPageModel.identity(
+                tier: accountInfo.tier,
+                email: accountInfo.snapshot.email,
+                remaining: accountInfo.remaining,
+                plus: accountInfo.plus
+            )
+            // Hold the subtitle back until the tier is certain.
+            if accountInfo.snapshot.signedIn, accountInfo.isSubscribed == nil {
+                content.subtitle = ""
+            }
+            cell.configure(identity: content)
+        }
+        cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
+    }
+
+    /// The translation switch row.
     private func configureSwitchCell(_ cell: SettingsSwitchListCell, for row: SettingsPageModel.Row) {
-        let enabled = SettingsPageModel.showsTargetLanguage(targetLanguage: settings.targetLanguage)
-        cell.setTitle(SettingsPageModel.title(for: row))
+        let enabled = translationIsOn
+        cell.configure(
+            title: SettingsPageModel.title(for: row),
+            subtitle: SettingsPageModel.subtitle(for: row)
+        )
         cell.setOn(enabled, animated: false)
         cell.onSwitchChanged = { [weak self] isOn in
             self?.translationSwitchToggled(isOn: isOn)
         }
-        cell.isAccessibilityElement = true
         cell.accessibilityTraits = .button
-        cell.accessibilityLabel = SettingsPageModel.title(for: row)
         // Spoken words, not the stored encoding ("1"/"0" read as "one"/"zero").
         cell.accessibilityValue = enabled ? "On" : "Off"
         cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
     }
 
+    /// A numeric-limit row: title, value, and the − | + stepper.
+    private func configureStepperCell(_ cell: SettingsStepperRowCell, for row: SettingsPageModel.Row) {
+        guard let choices = SettingsPageModel.stepperChoices(for: row),
+              let current = SettingsPageModel.stepperValue(for: row, settings: settings),
+              let labels = SettingsPageModel.stepperAccessibilityLabels(for: row) else { return }
+        cell.configure(
+            title: SettingsPageModel.title(for: row),
+            value: SettingsPageModel.value(for: row, settings: settings) ?? "",
+            labels: labels,
+            canDecrease: SettingsPageModel.canDecrease(from: current, in: choices),
+            canIncrease: SettingsPageModel.canIncrease(from: current, in: choices)
+        )
+        cell.onStep = { [weak self] direction in
+            self?.step(row, direction)
+        }
+        cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
+        if let tooltip = SettingsPageModel.tooltip(for: row) {
+            cell.accessibilityHint = tooltip
+        }
+    }
+
     // MARK: - Actions
+
+    /// One stepper tap: write the neighbouring choice immediately, then
+    /// re-render the row.
+    private func step(_ row: SettingsPageModel.Row, _ direction: SettingsPageModel.StepDirection) {
+        let latest = context.settingsBox.current
+        guard let choices = SettingsPageModel.stepperChoices(for: row),
+              let current = SettingsPageModel.stepperValue(for: row, settings: latest) else { return }
+        let next = SettingsPageModel.steppedValue(from: current, direction, in: choices)
+        guard next != current else { return }
+        let writer = SettingsStepWriter(coordinator: context.settingsCoordinator)
+        Task {
+            await writer.write(next, for: row)
+            refreshFromBox()
+        }
+    }
 
     private func translationSwitchToggled(isOn: Bool) {
         // Dart settings.dart:216-229: off writes '', on derives the system
@@ -390,8 +489,82 @@ final class SettingsViewController: UIViewController {
 
     // MARK: - Child presentations
 
+    // MARK: Account
+
+    /// Re-reads the account rows' inputs: sign-in state synchronously, then
+    /// subscription, entitlement and quota asynchronously. Called on load
+    /// and whenever a child account sheet goes away (page sheets do not
+    /// trigger this page's `viewWillAppear`).
+    private func refreshAccount() {
+        accountTask?.cancel()
+        let snapshot = AuthAccountSnapshot.current(context: context)
+        let sameUser = snapshot.signedIn && snapshot.uid == accountInfo.snapshot.uid
+        accountInfo = sameUser
+            ? AccountInfo(snapshot: snapshot, isSubscribed: accountInfo.isSubscribed,
+                          plus: accountInfo.plus, remaining: accountInfo.remaining)
+            : AccountInfo(snapshot: snapshot)
+        applyAccountInfo()
+        guard snapshot.signedIn else { return }
+
+        let store = PaywallStore(purchases: context.purchases)
+        accountTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            async let subscribed = self.context.purchases.isSubscribed()
+            async let plus = store.plusStatus()
+            let isSubscribed = await subscribed
+            let status = await plus
+            guard !Task.isCancelled else { return }
+            self.accountInfo.isSubscribed = isSubscribed
+            self.accountInfo.plus = status
+            self.applyAccountInfo()
+
+            // A login-required answer is not escalated from Settings; the
+            // quota just stays unknown.
+            var remaining: Int?
+            if let result = try? await self.context.api.getUser(), case .user(let user) = result {
+                remaining = user.remaining
+            }
+            guard !Task.isCancelled else { return }
+            self.accountInfo.remaining = remaining
+            self.applyAccountInfo()
+        }
+    }
+
+    private func applyAccountInfo() {
+        sectionStore.sections = SettingsPageModel.sections(tier: accountInfo.sectionTier)
+        guard dataSource != nil else { return }
+        applySnapshot()
+        reconfigureVisible()
+    }
+
     private func presentAccount() {
-        AppSheets.presentExpand(LoginViewController(context: context), from: self)
+        if accountInfo.snapshot.signedIn {
+            let membership = MembershipViewController(
+                context: context,
+                isSubscribed: accountInfo.isSubscribed ?? false,
+                plus: accountInfo.plus,
+                remaining: accountInfo.remaining
+            )
+            membership.onAccountChanged = { [weak self] in self?.refreshAccount() }
+            presentAccountSheet(membership)
+        } else {
+            let login = LoginSheetViewController.present(
+                from: self, context: context, source: .settings
+            ) { [weak self] in self?.refreshAccount() }
+            login.presentationController?.delegate = self
+        }
+    }
+
+    private func presentUpgrade() {
+        let paywall = PaywallViewController.present(
+            from: self, context: context, variant: .standard
+        ) { [weak self] in self?.refreshAccount() }
+        paywall.presentationController?.delegate = self
+    }
+
+    private func presentAccountSheet(_ controller: UIViewController) {
+        AppSheets.presentExpand(controller, from: self)
+        controller.presentationController?.delegate = self
     }
 
     private func presentImportExport() {
@@ -404,7 +577,7 @@ final class SettingsViewController: UIViewController {
 
     private func presentCountrySheet() {
         let sheet = SettingsOptionSheetViewController(
-            title: SettingsPageModel.optionSheetTitle,
+            title: SettingsPageModel.title(for: .country),
             options: SettingsPageModel.sortedCountries.map { ($0.name, $0.code) },
             selectedCode: settings.countryCode
         )
@@ -415,12 +588,12 @@ final class SettingsViewController: UIViewController {
                 self.refreshFromBox()
             }
         }
-        AppSheets.presentForm(sheet, from: self)
+        sheet.present(from: self)
     }
 
     private func presentLanguageSheet() {
         let sheet = SettingsOptionSheetViewController(
-            title: SettingsPageModel.optionSheetTitle,
+            title: SettingsPageModel.title(for: .targetLanguage),
             options: SettingsPageModel.languages.map { ($0.name, $0.code) },
             selectedCode: settings.targetLanguage
         )
@@ -428,50 +601,7 @@ final class SettingsViewController: UIViewController {
             guard let self else { return }
             Task { await self.applyLanguageChange(code) }
         }
-        AppSheets.presentForm(sheet, from: self)
-    }
-
-    private func presentValuePicker(
-        choices: [String],
-        initialIndex: Int,
-        onIndex: @escaping (Int) async -> Void
-    ) {
-        let sheet = SettingsValuePickerSheetViewController(choices: choices, initialIndex: initialIndex)
-        sheet.onSelect = { index in Task { await onIndex(index) } }
-        sheet.modalPresentationStyle = .pageSheet
-        if let presentation = sheet.sheetPresentationController {
-            presentation.detents = [
-                .custom { _ in SettingsValuePickerSheetViewController.preferredSheetHeight() }
-            ]
-            presentation.prefersGrabberVisible = true
-        }
-        present(sheet, animated: true)
-    }
-
-    private func presentAutoRefreshPicker() {
-        presentValuePicker(
-            choices: SettingsCodec.autoRefreshChoicesSeconds.indices.map(SettingsPageModel.autoRefreshLabel),
-            initialIndex: SettingsPageModel.autoRefreshPickerIndex(seconds: settings.autoRefreshInterval),
-            onIndex: { [weak self] index in
-                guard let self else { return }
-                await self.context.settingsCoordinator.updateAutoRefreshInterval(
-                    SettingsPageModel.autoRefreshSeconds(at: index)
-                )
-                self.refreshFromBox()
-            }
-        )
-    }
-
-    private func presentMaxEpisodesPicker(current: Int64, update: @escaping (Int64) async -> Void) {
-        presentValuePicker(
-            choices: SettingsCodec.maxEpisodesChoices.indices.map(SettingsPageModel.maxEpisodesLabel),
-            initialIndex: SettingsPageModel.maxEpisodesPickerIndex(count: current),
-            onIndex: { [weak self] index in
-                guard let self else { return }
-                await update(SettingsPageModel.maxEpisodesCount(at: index))
-                self.refreshFromBox()
-            }
-        )
+        sheet.present(from: self)
     }
 
     private func openFeedbackMail() {
@@ -491,28 +621,54 @@ final class SettingsViewController: UIViewController {
 
 extension SettingsViewController: UICollectionViewDelegate {
 
+    /// Stepper rows (their controls own the taps) and the inert Target
+    /// Language row neither highlight nor select.
+    private func isInteractive(_ row: SettingsPageModel.Row) -> Bool {
+        switch row {
+        case .cacheLimit, .autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes:
+            return false
+        case .targetLanguage:
+            return translationIsOn
+        default:
+            return true
+        }
+    }
+
+    func collectionView(_ collectionView: UICollectionView, shouldHighlightItemAt indexPath: IndexPath) -> Bool {
+        dataSource?.itemIdentifier(for: indexPath).map(isInteractive) ?? false
+    }
+
+    func collectionView(_ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
+        dataSource?.itemIdentifier(for: indexPath).map(isInteractive) ?? false
+    }
+
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         collectionView.deselectItem(at: indexPath, animated: true)
         guard let row = dataSource?.itemIdentifier(for: indexPath) else { return }
         switch row {
         case .account: presentAccount()
+        case .plusUpgrade: presentUpgrade()
         case .country: presentCountrySheet()
-        case .enableTranslation: break // The switch accessory handles it.
+        case .enableTranslation:
+            (collectionView.cellForItem(at: indexPath) as? SettingsSwitchListCell)?.toggle()
         case .targetLanguage: presentLanguageSheet()
         case .importExport: presentImportExport()
         case .history: presentHistory()
-        case .autoRefreshInterval: presentAutoRefreshPicker()
-        case .maxFeedEpisodes:
-            presentMaxEpisodesPicker(current: settings.maxFeedEpisodes) { [weak self] value in
-                await self?.context.settingsCoordinator.updateMaxFeedEpisodes(value)
-            }
-        case .maxHistoryEpisodes:
-            presentMaxEpisodesPicker(current: settings.maxHistoryEpisodes) { [weak self] value in
-                await self?.context.settingsCoordinator.updateMaxHistoryEpisodes(value)
-            }
+        case .cacheLimit, .autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes: break
         case .contactEmail: openFeedbackMail()
         case .privacyPolicy: presentSafari(SettingsPageModel.privacyPolicyURL)
         case .termsOfUse: presentSafari(SettingsPageModel.termsOfUseURL)
         }
+    }
+}
+
+// MARK: - UIAdaptivePresentationControllerDelegate
+
+extension SettingsViewController: UIAdaptivePresentationControllerDelegate {
+
+    /// A swipe-dismissed Login or Membership sheet may have changed the
+    /// account: re-read it.
+    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+        refreshAccount()
     }
 }

@@ -21,17 +21,21 @@ final class ShellNavigationUITests: XCTestCase {
         XCTAssertTrue(inboxTab.waitForExistence(timeout: 20), "pill tab bar did not install")
         XCTAssertTrue(app.buttons["tab-1"].exists, "Playlist chip missing")
         XCTAssertTrue(app.buttons["tab-2"].exists, "Discover chip missing")
-        let searchField = app.textFields["header-search-field"]
-        XCTAssertTrue(searchField.exists, "header search field missing")
+        let searchTab = app.buttons["tab-search"]
+        XCTAssertTrue(searchTab.exists, "Search tab missing")
 
-        let inboxSection = app.buttons["podcast-section-0"]
-        let subscriptionsSection = app.buttons["podcast-section-1"]
-        XCTAssertTrue(inboxSection.exists, "Podcast Inbox section missing")
-        XCTAssertTrue(subscriptionsSection.exists, "Podcast Subscriptions section missing")
-        subscriptionsSection.tap()
-        XCTAssertTrue(subscriptionsSection.isSelected, "Subscriptions section did not become selected")
-        inboxSection.tap()
-        XCTAssertTrue(inboxSection.isSelected, "Inbox section did not become selected")
+        // The Podcast tab is the Inbox; with subscriptions its shows shelf
+        // ends in the All shows button, which opens the Shows sheet.
+        let allShows = app.buttons["shows-shelf-all"]
+        if allShows.waitForExistence(timeout: 8) {
+            allShows.tap()
+            XCTAssertTrue(
+                app.staticTexts["shows-sheet-title"].waitForExistence(timeout: 4),
+                "All shows did not open the Shows sheet"
+            )
+            app.swipeDown()
+            XCTAssertTrue(inboxTab.waitForExistence(timeout: 4))
+        }
 
         // Switch through every tab; children are prewarmed so this must
         // be instant (07 §2.1).
@@ -42,20 +46,24 @@ final class ShellNavigationUITests: XCTestCase {
         app.buttons["tab-0"].tap()
         XCTAssertTrue(app.buttons["tab-0"].isSelected, "Inbox chip did not become selected")
 
-        // The Flutter header field accepts input in place; submitting opens
-        // the same global search results sheet.
-        searchField.tap()
+        // The Search tab opens in its entry state with the field focused;
+        // submitting runs the search on the same page.
+        searchTab.tap()
+        let field = app.searchFields["search-page-field"].exists
+            ? app.searchFields["search-page-field"] : app.textFields["search-page-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8), "search field missing on the Search tab")
         guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
             throw XCTSkip("software keyboard unavailable — skipping search submission")
         }
-        searchField.typeText("news\n")
-        XCTAssertTrue(app.staticTexts["You are searching for"].waitForExistence(timeout: 8))
-        // The grabber band is the sheet's close affordance.
-        app.buttons["Close"].firstMatch.tap()
-        XCTAssertTrue(
-            app.staticTexts["You are searching for"].waitForNonExistence(timeout: 4),
-            "search results sheet did not close"
-        )
+        field.typeText("news\n")
+        XCTAssertTrue(app.buttons["Channels"].waitForExistence(timeout: 8), "search results did not appear")
+        // While search is active the bar collapses to one unnamed tab
+        // button; closing search brings the full bar back asynchronously,
+        // so wait for the chip instead of tapping into the collapsed bar.
+        app.buttons["Close"].tap()
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 3), "full tab bar did not come back after Close")
+        app.buttons["tab-0"].tap()
+        XCTAssertTrue(app.buttons["tab-0"].isSelected, "Podcast tab did not come back")
 
         // Mini player appears only when a queue was restored (db_smoke
         // seeding per native/README.md); skip visibly when unseeded.

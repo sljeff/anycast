@@ -710,15 +710,12 @@ final class QACrawlUITests: XCTestCase {
         return app.buttons["More episode actions"].waitForExistence(timeout: 6)
     }
 
-    /// Subscriptions is the second section within Podcast — tap it, then
-    /// the subscriptions collection must show rows.
+    /// The Podcast tab's shows shelf must show at least one cover.
     private func ensureSubscriptionsPage() -> Bool {
         closeSheet()
         currentTab = "tab-0"
         _ = tap(app.buttons["tab-0"], "Podcast chip")
-        _ = tap(app.buttons["podcast-section-1"], "Subscriptions section")
-        return app.collectionViews.firstMatch.waitForExistence(timeout: 4)
-            && app.collectionViews.firstMatch.cells.count > 0
+        return app.buttons["shows-shelf-cover-0"].waitForExistence(timeout: 4)
     }
 
     private func closeSheet(times: Int = 1) {
@@ -864,8 +861,8 @@ final class QACrawlUITests: XCTestCase {
                            s.closeSheet(times: 2)  // channel, then detail
                            s.currentTab = "tab-0"
                            guard s.tap(s.app.buttons["tab-0"], "Podcast chip") else { return false }
-                           guard s.tap(s.app.buttons["podcast-section-1"], "Subscriptions section") else { return false }
-                           return s.app.collectionViews.firstMatch.waitForExistence(timeout: 4)
+                           guard s.tap(s.app.buttons["shows-shelf-all"], "All shows button") else { return false }
+                           return s.app.staticTexts["shows-sheet-title"].waitForExistence(timeout: 4)
                        },
                        required: [],
                        probe: true, settle: 3),
@@ -873,28 +870,32 @@ final class QACrawlUITests: XCTestCase {
             Checkpoint(state: "channel",
                        action: { s in
                            guard s.ensureSubscriptionsPage() else { return false }
-                           let list = s.app.collectionViews.firstMatch
-                           guard list.exists, list.cells.count > 0 else {
+                           let cover = s.app.buttons["shows-shelf-cover-0"]
+                           guard cover.exists else {
                                s.markSkipped("channel", "subscription rows", "needs db_smoke")
                                return false
                            }
-                           s.tapElement(list.cells.firstMatch)
+                           s.tapElement(cover)
                            return s.app.buttons["Subscribe"].waitForExistence(timeout: 10)
                                || s.app.buttons["Unsubscribe"].waitForExistence(timeout: 3)
                                || s.app.buttons["Subscribing"].waitForExistence(timeout: 3)
                        },
-                       required: ["Copy RSS URL"],
+                       required: ["Share"],
                        probe: true, settle: 3),
 
             Checkpoint(state: "search",
                        action: { s in
                            s.closeSheet()
-                           s.currentTab = "tab-0"
-                           let field = s.app.textFields["header-search-field"]
+                           s.currentTab = "tab-search"
+                           let searchTab = s.app.buttons["tab-search"]
+                           guard searchTab.waitForExistence(timeout: 5) else { return false }
+                           s.tapElement(searchTab)
+                           let field = s.app.searchFields["search-page-field"].exists
+                               ? s.app.searchFields["search-page-field"]
+                               : s.app.textFields["search-page-field"]
                            guard field.waitForExistence(timeout: 5) else { return false }
-                           s.tapElement(field)
-                           // The native header field uses the standard
-                           // keyboard submit path into global results.
+                           // The Search tab opens focused; its field uses
+                           // the standard keyboard submit path into results.
                            guard s.audit else {
                                s.markSkipped("search", "keyboard submission",
                                              "reference capture does not drive text input")
@@ -912,23 +913,21 @@ final class QACrawlUITests: XCTestCase {
                                              "text field did not take focus on this app")
                                return false
                            }
-                           field.typeText("news")
-                           let searchKey = s.app.keyboards.buttons["search"]
-                           if searchKey.exists {
-                               s.tapPoint(CGPoint(x: searchKey.frame.midX,
-                                                  y: searchKey.frame.midY))
-                           } else {
-                               field.typeText("\n")
-                           }
-                           return s.app.staticTexts["You are searching for"]
+                           // Return submits; a "search" key lookup would
+                           // also match the Search tab button.
+                           field.typeText("news\n")
+                           return s.app.buttons["Channels"]
                                .waitForExistence(timeout: 8)
                        },
-                       required: ["You are searching for"],
+                       required: ["Channels"],
                        probe: true, settle: 3),
 
             Checkpoint(state: "playlists",
                        action: { s in
                            s.closeSheet()
+                           // Leaving active search restores the full tab bar.
+                           let closeSearch = s.app.buttons["Close"]
+                           if closeSearch.exists { s.tapElement(closeSearch) }
                            s.currentTab = "tab-1"
                            return s.tap(s.app.buttons["tab-1"], "Playlist chip")
                        },
@@ -1000,7 +999,7 @@ final class QACrawlUITests: XCTestCase {
                            s.closeSheet()
                            s.currentTab = "tab-0"
                            guard s.tap(s.app.buttons["tab-0"], "Podcast chip") else { return false }
-                           return s.tap(s.app.buttons["podcast-section-1"], "Subscriptions section")
+                           return s.app.buttons["shows-shelf-all"].waitForExistence(timeout: 4)
                        },
                        required: ["Settings"],
                        probe: true, settle: 3),
@@ -1018,12 +1017,19 @@ final class QACrawlUITests: XCTestCase {
                        required: [],
                        probe: true, settle: 3),
 
-            Checkpoint(state: "settings-picker",
+            Checkpoint(state: "settings-stepper",
                        action: { s in
-                           guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-autoRefreshInterval",
-                                          title: "Auto refresh") else { return false }
-                           return s.app.pickerWheels.firstMatch.waitForExistence(timeout: 6)
+                           guard s.ensureSettingsOpen() else { return false }
+                           let row = s.app.cells["settings-row-autoRefreshInterval"]
+                           guard row.waitForExistence(timeout: 6) else { return false }
+                           let longer = row.buttons["Longer auto refresh interval"]
+                           let shorter = row.buttons["Shorter auto refresh interval"]
+                           // Step once and back, so the crawl leaves the stored
+                           // interval as it found it.
+                           let (step, undo) = longer.isEnabled ? (longer, shorter) : (shorter, longer)
+                           guard step.exists, s.tap(step, "auto refresh stepper") else { return false }
+                           Thread.sleep(forTimeInterval: 0.5)
+                           return s.tap(undo, "auto refresh stepper back")
                        },
                        required: [],
                        probe: false, settle: 2),
@@ -1034,7 +1040,7 @@ final class QACrawlUITests: XCTestCase {
                            if close.exists { s.tapElement(close) ; Thread.sleep(forTimeInterval: 0.5) }
                            else { s.closeSheet() }
                            guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-country", title: "Country") else {
+                                 s.tapRow(identifier: "settings-row-country", title: "Discovery Region") else {
                                return false
                            }
                            return s.waitUntil(timeout: 6) {
@@ -1052,7 +1058,7 @@ final class QACrawlUITests: XCTestCase {
                            else { s.closeSheet() }
                            guard s.ensureSettingsOpen(),
                                  s.tapRow(identifier: "settings-row-importExport",
-                                          title: "Import / Export") else { return false }
+                                          title: "Import & Export") else { return false }
                            return s.app.textFields["RSS Feed URL"].waitForExistence(timeout: 6)
                                || s.app.buttons["Import help"].waitForExistence(timeout: 3)
                        },
@@ -1063,7 +1069,7 @@ final class QACrawlUITests: XCTestCase {
                        action: { s in
                            s.closeSheet()
                            guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-history", title: "History") else {
+                                 s.tapRow(identifier: "settings-row-history", title: "Listening History") else {
                                return false
                            }
                            return s.waitUntil(timeout: 6) {
@@ -1082,13 +1088,13 @@ final class QACrawlUITests: XCTestCase {
                                  s.tapRow(identifier: "settings-row-account", title: "Account") else {
                                return false
                            }
+                           // Signed out: the login sheet ("Sign In & Sync" with
+                           // "Continue with Apple"); signed in: the Membership page.
                            return s.waitUntil(timeout: 10) {
-                               s.app.buttons["Sign in with Apple"].exists
+                               s.app.buttons["login-apple"].exists
+                                   || s.app.buttons["Continue with Apple"].exists
                                    || s.app.staticTexts["User Info"].exists
                                    || s.app.staticTexts["Basic Plan"].exists
-                                   || s.app.staticTexts
-                                       .containing(NSPredicate(format: "label CONTAINS 'free audio transcriptions'"))
-                                       .firstMatch.exists
                            }
                        },
                        required: [],

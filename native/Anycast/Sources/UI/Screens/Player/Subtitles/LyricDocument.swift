@@ -64,6 +64,20 @@ enum LyricDocument {
         return result < 0 ? 0 : result
     }
 
+    /// Plain text of the transcript for "Copy transcript": blank spacer
+    /// lines dropped, each line's translation (when present) on the line
+    /// below it, and a blank line between bilingual pairs.
+    static func plainText(lines: [LyricLine]) -> String {
+        let entries = lines.compactMap { line -> String? in
+            let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            guard let translation = line.translation, !translation.isEmpty else { return text }
+            return "\(text)\n\(translation)"
+        }
+        let hasTranslation = lines.contains { !($0.translation ?? "").isEmpty }
+        return entries.joined(separator: hasTranslation ? "\n\n" : "\n")
+    }
+
     // MARK: - Parsing internals (Dart LrcParser)
 
     /// `^\[(\D*?):(.*?)\]` — a leading tag whose name holds no digits.

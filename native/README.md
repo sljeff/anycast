@@ -67,6 +67,31 @@ and are re-recorded against the seeded container below with
 the suite — the captures overwrite the committed references); M4 compares
 them with the Flutter build per OS — structural comparison, not pixel diffs.
 
+#### UI check
+
+`scripts/ui_check.sh` is the one-command local check: it builds once, seeds a
+simulator container, captures every screen and diffs the captures against the
+committed baselines (status bar masked; `same` below 0.5% changed pixels).
+
+```sh
+scripts/ui_check.sh [--os 27|18|both|auto] [--base <git-ref>] [--state <dir>] [--record] [--dry-run]
+```
+
+- `--os auto` (default) always runs iOS 27, and iOS 18 only when a file changed
+  against `--base` (default `HEAD`, working tree included) is an OS-version
+  seam: a source file with `#available(iOS 26` / `#unavailable(iOS 26`, or one
+  of the fixed shell/design-system files listed in the script. The seam check
+  prints first; `--dry-run` stops right after it.
+- `--state` is the seeded container snapshot (`Documents/`, `Library/`);
+  default `build/runs/audit/state-ios26`.
+- Outputs land in `build/runs/ui-check/<timestamp>/`: build and per-OS logs,
+  `.xcresult` bundles, `captures/`, and `compare/summary.txt` plus
+  `compare/changed.png` (baseline | capture for every changed or new screen).
+  The committed `__Snapshots__` are not touched.
+- `--record` is the explicit re-baseline mode: it writes the committed
+  `__Snapshots__` directories (no comparison) — review the diff before
+  committing. Network-fed screens (S4*, S8*, S9*) vary with live data.
+
 ### Manual runs in the simulator
 
 Seed the database with the generator's `db_smoke` bucket (player pointer set,

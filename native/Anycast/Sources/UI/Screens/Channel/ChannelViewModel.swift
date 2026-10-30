@@ -4,44 +4,65 @@ import AnycastKit
 
 // MARK: - Fold geometry (channel.dart:248-541, pure)
 
-/// Pure interpolation model of the pinned channel header — the exact
-/// arithmetic of `ChannelHeaderDelegate.build` as a function of
+/// Pure interpolation model of the pinned channel header as a function of
 /// `shrinkOffset`, so the scroll-driven fold stays testable and off the
 /// layout engine (07 §2.3: transforms/opacity only, per 08 §11.2).
+///
+/// The left-weighted header (design canvas ChannelRefined, adopted
+/// 2026-10-21): an 88 pt cover at the leading margin with the title and
+/// author beside it, the description below. Scrolling shrinks the cover to
+/// a 60 pt compact bar (title beside it, author fading out) while the
+/// description travels up 1:1 with the scroll and is clipped below that
+/// bar, so the list's first row always sits a constant gap under it.
 struct ChannelFoldGeometry: Equatable {
 
-    static let handlerHeight: CGFloat = 6
-    static let handlerGap: CGFloat = 16
-    static let buttonRowHeight: CGFloat = 40
-    static let coverTopGap: CGFloat = 16
-    static let expandedCoverSize: CGFloat = 120
+    /// Cover top below the safe area; clears the system sheet grabber.
+    static let coverTopGap: CGFloat = 24
+    static let expandedCoverSize: CGFloat = 88
     static let collapsedCoverSize: CGFloat = 60
-    static let collapsedCoverLeading: CGFloat = 16
     static let coverBottomGap: CGFloat = 12
-    static let titleBoxHeight: CGFloat = 58
-    static let maxTitleLeadingPadding: CGFloat = 84   // 60 + 24 (channel.dart:425)
-    static let headerBottomGap: CGFloat = 10
+    /// Gap between the cover and the title block beside it.
+    static let titleLeadingGap: CGFloat = 16
+    /// Title (Emphasis 22) + 4 + author (Meta 20).
+    static let titleBlockHeight: CGFloat = 46
+    static let titleLineHeight: CGFloat = 22
+    /// Gap between the description and the list's first row.
+    static let contentBottomGap: CGFloat = 16
+    /// Space under the compact cover that stays part of the compact bar.
+    static let collapsedBottomGap: CGFloat = 12
+    /// The clip line sits this far below the compact cover row.
+    static let clipLineInset: CGFloat = 4
+    /// Used until the real content block is measured (default Dynamic Type).
+    static let fallbackContentHeight: CGFloat = 40
 
     /// Top safe-area inset of the sheet's own view — never a fixed status
     /// bar number (07 §4: any window size must survive).
     var safeAreaTop: CGFloat
 
-    /// minExtent = statusBar + 6 + 16 + 40 + 16 + 60 + 10 (channel.dart:258).
-    var minExtent: CGFloat {
-        safeAreaTop + Self.handlerHeight + Self.handlerGap + Self.buttonRowHeight
-            + Self.coverTopGap + Self.collapsedCoverSize + Self.headerBottomGap
+    /// Height of the description block, measured from the real view at the
+    /// header width.
+    var contentHeight: CGFloat = ChannelFoldGeometry.fallbackContentHeight
+
+    /// Cover top edge inside the header — pinned for every shrink value.
+    var coverTop: CGFloat { safeAreaTop + Self.coverTopGap }
+
+    /// Top of the description in the expanded state (below the cover row).
+    var contentTop: CGFloat {
+        coverTop + Self.expandedCoverSize + Self.coverBottomGap
     }
 
-    /// maxExtent = statusBar + 460 (channel.dart:262).
-    var maxExtent: CGFloat { safeAreaTop + 460 }
+    /// The compact bar: cover row plus a small bottom gap.
+    var minExtent: CGFloat {
+        coverTop + Self.collapsedCoverSize + Self.collapsedBottomGap
+    }
+
+    var maxExtent: CGFloat { contentTop + contentHeight + Self.contentBottomGap }
 
     var maxShrink: CGFloat { maxExtent - minExtent }
 
-    /// Cover top edge inside the header — pinned at 78 + safe area for every
-    /// shrink value (channel.dart:311).
-    var coverTop: CGFloat {
-        safeAreaTop + Self.handlerHeight + Self.handlerGap + Self.buttonRowHeight
-            + Self.coverTopGap
+    /// Header-space y of the line the content block is clipped at.
+    var clipLine: CGFloat {
+        minExtent - Self.collapsedBottomGap + Self.clipLineInset
     }
 
     func clampedShrink(_ shrink: CGFloat) -> CGFloat {
@@ -53,41 +74,38 @@ struct ChannelFoldGeometry: Equatable {
         max(minExtent, maxExtent - clampedShrink(shrink))
     }
 
-    /// Cover edge = max(120 - shrinkOffset, 60).
+    /// Cover edge = max(88 - shrinkOffset, 60); it stays at the leading
+    /// margin, so its bottom rises with the description above it.
     func coverSize(shrink: CGFloat) -> CGFloat {
         max(Self.expandedCoverSize - clampedShrink(shrink), Self.collapsedCoverSize)
     }
 
-    /// Cover leading (padded-content coordinates) =
-    /// max(initLeft - shrinkOffset, 16), initLeft = paddedWidth/2 - 60.
-    func coverLeading(shrink: CGFloat, paddedWidth: CGFloat) -> CGFloat {
-        let initial = paddedWidth / 2 - Self.expandedCoverSize / 2
-        return max(initial - clampedShrink(shrink), Self.collapsedCoverLeading)
+    /// 0 expanded → 1 once the cover reaches its compact size; drives the
+    /// author's fade.
+    func compactProgress(shrink: CGFloat) -> CGFloat {
+        let travel = Self.expandedCoverSize - Self.collapsedCoverSize
+        return min(clampedShrink(shrink) / travel, 1)
     }
 
-    /// Title container leading padding = min(60 + 24, shrinkOffset).
-    func titleLeadingPadding(shrink: CGFloat) -> CGFloat {
-        min(Self.maxTitleLeadingPadding, clampedShrink(shrink))
+    /// Title block leading (padded-content coordinates): beside the cover.
+    func titleLeading(shrink: CGFloat) -> CGFloat {
+        coverSize(shrink: shrink) + Self.titleLeadingGap
     }
 
-    /// Secondary block opacity: solid 1 through the first 40% of the shrink
-    /// travel, then a linear fade to 0 across 40%–85%, and 0 from 85% on.
-    /// Keyed to `maxShrink` — the same travel the header geometry collapses
-    /// over — so the fade keeps pace with the collapsing header instead of
-    /// cutting out early and leaving an empty gradient band mid-fold.
-    /// Deliberate divergence from channel.dart:437-440 (maxExtent/4 cut).
-    func secondaryOpacity(shrink: CGFloat) -> CGFloat {
-        let s = clampedShrink(shrink)
-        let start = maxShrink * 0.4
-        let end = maxShrink * 0.85
-        return s <= start ? 1 : max(0, 1 - (s - start) / (end - start))
+    /// Title block top (header space): the visible text is centered on the
+    /// cover — title and author expanded, the title alone once the author
+    /// has faded out (its 4 + 20 pt leave the centering as it fades). With
+    /// no author the title alone is centered throughout.
+    func titleTop(shrink: CGFloat, hasAuthor: Bool = true) -> CGFloat {
+        let progress = hasAuthor ? compactProgress(shrink: shrink) : 1
+        let authorShare = (Self.titleBlockHeight - Self.titleLineHeight) * progress
+        let visibleHeight = Self.titleBlockHeight - authorShare
+        return coverTop + (coverSize(shrink: shrink) - visibleHeight) / 2
     }
 
-    /// Vertical rise of the title block (and everything below it) while the
-    /// two collapsing spacers above it shrink: min(120, s) + min(12, s).
-    func contentRise(shrink: CGFloat) -> CGFloat {
-        let s = clampedShrink(shrink)
-        return min(s, Self.expandedCoverSize) + min(s, Self.coverBottomGap)
+    /// Content block translation: 1:1 with the scroll.
+    func contentTranslation(shrink: CGFloat) -> CGFloat {
+        -clampedShrink(shrink)
     }
 
     /// Gradient top stop = dominant color at 30% over the page background
@@ -139,6 +157,19 @@ enum ChannelSubscriptionDisplay: Equatable {
             return .loading
         }
         return subscribed ? .unsubscribe : .subscribe
+    }
+}
+
+/// Header byline: a search-result seed often has no author, so the feed's
+/// `itunes:author` fills it; nil (no line shown) when neither has one.
+enum ChannelHeaderLogic {
+    static func author(seed: String?, feed: String?) -> String? {
+        for candidate in [seed, feed] {
+            if let trimmed = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+        return nil
     }
 }
 
@@ -295,6 +326,7 @@ final class ChannelViewModel {
             if (channel.imageUrl ?? "").isEmpty {
                 channel = podcast.subscription
             }
+            channel.author = ChannelHeaderLogic.author(seed: channel.author, feed: podcast.subscription.author)
         }
         isLoading = false
         await updatePalette()
@@ -315,11 +347,13 @@ final class ChannelViewModel {
             channel.lastUpdated = newest.pubDate
         }
         try? await subscriptions.addMany([channel])
+        NotificationCenter.default.post(name: ShowsShelfLayout.subscriptionsDidChange, object: nil)
     }
 
     func unsubscribe() async {
         subscribed = false
         try? await subscriptions.remove(channel)
+        NotificationCenter.default.post(name: ShowsShelfLayout.subscriptionsDidChange, object: nil)
     }
 }
 

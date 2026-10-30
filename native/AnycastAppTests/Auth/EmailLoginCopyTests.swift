@@ -2,35 +2,11 @@ import Foundation
 import Testing
 @testable import Anycast
 
-/// T8 EmailLogin copy + feedback mapping (05 §6.1 S18 / 03 §2.14): the
-/// register-not-supported contract and the Firebase error → dialog mapping
-/// (states/user.dart:219-252) — pure data, no auth calls.
+/// T8 EmailLogin feedback mapping (05 §6.1 S18 / 03 §2.14): the Firebase
+/// error → dialog mapping (states/user.dart:219-252) the login sheet's
+/// email form reuses — pure data, no auth calls.
 @MainActor
 struct EmailLoginCopyTests {
-
-    @Test("Registration stays disabled; the button answers with a dialog")
-    func registrationDisabled() {
-        // login.dart:867 — setLogin(false) is commented out; the register
-        // widget is unreachable and the Register button never switches modes.
-        #expect(LoginPageModel.EmailLogin.supportsRegistration == false)
-        #expect(LoginPageModel.EmailLogin.registerDialogTitle == "Sorry!")
-        #expect(
-            LoginPageModel.EmailLogin.registerDialogBody
-                == "Please sign in with Apple or Google.\n\n"
-                    + "We don't support email registration yet."
-        )
-    }
-
-    @Test("Field hints and button titles (login.dart:841-883)")
-    func fieldCopy() {
-        #expect(LoginPageModel.EmailLogin.emailHint == "Email")
-        #expect(LoginPageModel.EmailLogin.passwordHint == "Password")
-        #expect(LoginPageModel.EmailLogin.loginButtonTitle == "Login")
-        #expect(
-            LoginPageModel.EmailLogin.registerButtonTitle
-                == "Don't have an account? Register"
-        )
-    }
 
     @Test("user-not-found maps to the dedicated dialog (states/user.dart:227-230)")
     func userNotFound() {

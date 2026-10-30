@@ -5,9 +5,8 @@ import Testing
 /// The switch row folds its real UISwitch into the cell-level
 /// accessibility element, so activation must drive the switch:
 /// VoiceOver and Switch Control double-taps route through
-/// `accessibilityActivate`, while `didSelectItemAt` deliberately ignores
-/// the row. Without the override the translation toggle is unreachable
-/// without direct touch.
+/// `accessibilityActivate`, and a tap anywhere on the row (`didSelectItemAt`)
+/// calls the same `toggle()`.
 @MainActor
 struct SettingsSwitchAccessibilityTests {
 
@@ -24,5 +23,19 @@ struct SettingsSwitchAccessibilityTests {
 
         #expect(cell.accessibilityActivate() == true)
         #expect(cell.isOn == true, "a second activation flips back")
+    }
+
+    @Test("toggle() — the row-tap path — flips with the same report as a real toggle")
+    func rowTapToggles() {
+        let cell = SettingsSwitchListCell(frame: .zero)
+        cell.setOn(false, animated: false)
+        var reports: [Bool] = []
+        cell.onSwitchChanged = { reports.append($0) }
+
+        cell.toggle()
+        cell.toggle()
+
+        #expect(reports == [true, false])
+        #expect(cell.isOn == false)
     }
 }

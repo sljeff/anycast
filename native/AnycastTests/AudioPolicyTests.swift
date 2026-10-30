@@ -199,6 +199,28 @@ struct AudioPolicyTests {
         #expect(timer.countdownMinutes == 60, "index 6 = 1 hour (G9 slider values)")
     }
 
+    @Test("sleep timer End of episode: exclusive with the countdown and one-shot")
+    func sleepTimerEndOfEpisode() {
+        let timer = SleepTimerController(isPlaying: { true })
+        #expect(timer.consumeEpisodeEnd() == false, "OFF never stops at the episode end")
+
+        timer.setCountdown(minutes: 30)
+        timer.setStopAtEpisodeEnd()
+        #expect(timer.remainingMilliseconds == nil, "End of episode replaces the countdown")
+        #expect(timer.stopsAtEpisodeEnd)
+
+        #expect(timer.consumeEpisodeEnd())
+        #expect(timer.stopsAtEpisodeEnd == false)
+        #expect(timer.consumeEpisodeEnd() == false, "fires once")
+
+        timer.setStopAtEpisodeEnd()
+        timer.setCountdown(minutes: 10)
+        #expect(timer.stopsAtEpisodeEnd == false, "a countdown replaces End of episode")
+        timer.setStopAtEpisodeEnd()
+        timer.stop()
+        #expect(timer.stopsAtEpisodeEnd == false, "Off clears it")
+    }
+
     // MARK: - K19 artwork fallback order
 
     @Test("K19: artwork resolves the old cover cache first, then network, then memory")

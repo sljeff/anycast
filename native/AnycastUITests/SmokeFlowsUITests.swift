@@ -33,23 +33,48 @@ final class SmokeFlowsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["tab-1"].exists, "Playlist chip missing")
         XCTAssertTrue(app.buttons["tab-2"].exists, "Discover chip missing")
 
-        for tab in ["tab-1", "tab-2", "tab-0"] {
-            app.buttons[tab].tap()
-            XCTAssertTrue(app.buttons[tab].isSelected, "\(tab) chip did not become selected")
-            // Scroll the tab's first list when it has content (seeded runs);
-            // on a bare simulator the empty state has nothing to scroll.
+        /// iOS 26+ minimizes the bar while a list scrolls down
+        /// (`tabBarMinimizeBehavior = .onScrollDown`). The minimized bar
+        /// exposes only a synthesized pill for the selected tab — no `tab-N`
+        /// identifier, value "Collapsed" — plus Search. Give the scroll-back
+        /// a moment to re-expand the bar, else tap the pill. iOS 18 never
+        /// minimizes, so there the first lookup always succeeds.
+        func expandedTab(_ identifier: String) -> XCUIElement {
+            let tab = app.buttons[identifier]
+            if tab.waitForExistence(timeout: 2) { return tab }
+            let pill = app.tabBars.buttons
+                .matching(NSPredicate(format: "selected == true"))
+                .firstMatch
+            XCTAssertTrue(pill.exists, "\(identifier) missing and no minimized tab bar pill to expand")
+            pill.tap()
+            XCTAssertTrue(
+                tab.waitForExistence(timeout: 3),
+                "minimized tab bar did not expand to show \(identifier)"
+            )
+            return tab
+        }
+
+        for identifier in ["tab-1", "tab-2", "tab-0"] {
+            let tab = expandedTab(identifier)
+            tab.tap()
+            waitUntil(timeout: 3) { tab.isSelected }
+            XCTAssertTrue(tab.isSelected, "\(identifier) chip did not become selected")
+            // Scroll the tab's first list when it has content: seeded runs,
+            // and Discover whenever the runner has network.
             let list = app.collectionViews.firstMatch
             if list.exists, list.cells.count > 0 {
-                // Upper-half coordinate drags only: element swipes compute
-                // their press point from the element frame, and with the v2
-                // floating mini player capsule (~y 654-712) the press can
-                // land ON it — its any-direction pan-open quirk (03 §2.9)
-                // then presents the player sheet over the whole shell.
-                let mid = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
-                let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
-                let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-                mid.press(forDuration: 0.05, thenDragTo: upper)
-                upper.press(forDuration: 0.05, thenDragTo: lower)
+                // App-coordinate drags in a fixed band: below Discover's
+                // category strip (y 131-175 on an 874 pt screen, which sits
+                // in front of the list, so a press on it never reaches the
+                // list) and above the iOS 18 floating mini player capsule
+                // (~y 654-712), whose any-direction pan-open quirk (03 §2.9)
+                // would present the player sheet over the whole shell.
+                // Element swipes are avoided: their press point comes from
+                // the element frame.
+                let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+                let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
+                lower.press(forDuration: 0.05, thenDragTo: upper)   // scroll down
+                upper.press(forDuration: 0.05, thenDragTo: lower)   // scroll back
             }
         }
     }
@@ -61,24 +86,24 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        let field = app.textFields["header-search-field"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5), "page header search field missing")
-        field.tap()
+        let searchTab = app.buttons["tab-search"]
+        XCTAssertTrue(searchTab.waitForExistence(timeout: 5), "Search tab missing")
+        searchTab.tap()
+        let field = app.searchFields["search-page-field"].exists
+            ? app.searchFields["search-page-field"] : app.textFields["search-page-field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "search field missing on the Search tab")
         guard app.keyboards.firstMatch.waitForExistence(timeout: 3) else {
             // A connected hardware keyboard suppresses the software one; the
             // typing steps cannot run on such a runner (CI runners are fine).
             throw XCTSkip("software keyboard unavailable — skipping the submit flow")
         }
-        field.typeText("news")
-        if app.keyboards.buttons["search"].exists {
-            app.keyboards.buttons["search"].tap()
-        } else {
-            field.typeText("\n")
-        }
+        // Return submits; a "search" key lookup would also match the
+        // Search tab button.
+        field.typeText("news\n")
 
-        // The results sheet's own copy is the stable marker — do not weaken
+        // The results sheet's tab strip is the stable marker — do not weaken
         // with a collection-view fallback (one is always behind the sheet).
-        let marker = app.staticTexts["You are searching for"]
+        let marker = app.buttons["Channels"]
         XCTAssertTrue(
             marker.waitForExistence(timeout: 8),
             "search sheet did not open after submitting"
@@ -92,13 +117,24 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
+        // The Auto Refresh row is a stepper row: its text block carries the
+        // value, and the − | + halves are separate buttons.
+        func intervalValue(_ row: XCUIElement) -> String? {
+            row.otherElements["Auto Refresh"].value as? String
+        }
+        let shorter = "Shorter auto refresh interval"
+        let longer = "Longer auto refresh interval"
+
         app.buttons["Settings"].tap()
         let intervalRow = app.cells["settings-row-autoRefreshInterval"]
         guard intervalRow.waitForExistence(timeout: 8) else {
             XCTFail("settings sheet did not list the auto refresh row")
             return
         }
-        let before = intervalRow.value as? String
+        let before = intervalValue(intervalRow)
+        // Step up unless already at the longest interval.
+        let forward = intervalRow.buttons[longer].isEnabled ? longer : shorter
+        let back = forward == longer ? shorter : longer
         // Restore the original interval no matter how the test exits — the
         // change is persisted to the simulator database and would otherwise
         // leak into later runs on this device. (The steps live in a nested
@@ -110,40 +146,17 @@ final class SmokeFlowsUITests: XCTestCase {
             guard app.buttons["tab-0"].waitForExistence(timeout: 20) else { return }
             app.buttons["Settings"].tap()
             let row = app.cells["settings-row-autoRefreshInterval"]
-            guard row.waitForExistence(timeout: 8) else { return }
-            row.tap()
-            let wheel = app.pickerWheels.firstMatch
-            guard wheel.waitForExistence(timeout: 8) else { return }
-            wheel.adjust(toPickerWheelValue: original)
-            if app.buttons["Close"].exists { app.buttons["Close"].tap() }
-            else { app.swipeDown() }
+            guard row.waitForExistence(timeout: 8), intervalValue(row) != original else { return }
+            row.buttons[back].tap()
         }
         defer { restoreOriginalInterval() }
-        intervalRow.tap()
 
-        let picker = app.pickerWheels.firstMatch
-        guard picker.waitForExistence(timeout: 8) else {
-            XCTFail("value picker did not appear")
+        intervalRow.buttons[forward].tap()
+        waitUntil(timeout: 5) { intervalValue(intervalRow) != before }
+        guard let target = intervalValue(intervalRow), target != before else {
+            XCTFail("settings row did not change from \(before ?? "nil")")
             return
         }
-        // Pick a different option than the current one.
-        let choices = ["1 min", "3 min", "5 min", "10 min", "30 min"]
-        let current = picker.value as? String
-        guard let target = choices.first(where: { $0 != current }) else {
-            XCTFail("picker exposed no alternative choice")
-            return
-        }
-        picker.adjust(toPickerWheelValue: target)
-
-        // Close the picker sheet; the settings row reflects the new value
-        // through its accessibilityValue.
-        if app.buttons["Close"].exists { app.buttons["Close"].tap() }
-        else { app.swipeDown() }
-        waitUntil(timeout: 5) { (intervalRow.value as? String) == target }
-        XCTAssertEqual(
-            intervalRow.value as? String, target,
-            "settings row did not update to \(target)"
-        )
 
         // Relaunch: the value must come back from the database.
         app.terminate()
@@ -153,7 +166,7 @@ final class SmokeFlowsUITests: XCTestCase {
         let reopened = app.cells["settings-row-autoRefreshInterval"]
         XCTAssertTrue(reopened.waitForExistence(timeout: 8), "settings sheet did not reopen")
         XCTAssertEqual(
-            reopened.value as? String, target,
+            intervalValue(reopened), target,
             "auto refresh interval did not persist (was \(before ?? "nil"))"
         )
     }
@@ -165,14 +178,12 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        // Subscriptions is the second section within the Podcast destination.
-        app.buttons["podcast-section-1"].tap()
-
-        let list = app.collectionViews.firstMatch
-        guard list.waitForExistence(timeout: 8), list.cells.count > 0 else {
+        // The first cover on the Podcast tab's shows shelf opens its Channel.
+        let cover = app.buttons["shows-shelf-cover-0"]
+        guard cover.waitForExistence(timeout: 8) else {
             throw XCTSkip("no seeded subscriptions — channel flow needs db_smoke")
         }
-        list.cells.firstMatch.tap()
+        cover.tap()
 
         // The tristate capsule is the channel sheet's stable marker.
         let subscribe = app.buttons["Subscribe"]
@@ -184,9 +195,9 @@ final class SmokeFlowsUITests: XCTestCase {
                 || subscribing.waitForExistence(timeout: 2),
             "channel sheet did not expose the subscription button"
         )
-        // The copy-RSS affordance confirms the header rendered (the old
+        // The share button confirms the header rendered (the old
         // `|| staticTexts.count > 3` fallback was true on almost any screen).
-        XCTAssertTrue(app.buttons["Copy RSS URL"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["Share"].waitForExistence(timeout: 4))
     }
 
     // MARK: - 5. Player: mini player → pages → speed (seeded runs)
@@ -463,55 +474,45 @@ final class SmokeFlowsUITests: XCTestCase {
 
     // MARK: - 9. Login sheet opens from Settings (sandbox UI is not touched)
 
-    /// Regression: tapping Account once must yield exactly one login sheet
-    /// (user report: the login window popped up twice). The account row
-    /// presents LoginViewController directly; the sheet's own signed-out
-    /// /api/user returns loginRequired, which routes to
-    /// LoginPromptCoordinator — before the coordinator deduped against the
-    /// whole presentation chain, that 401 stacked a second sheet on the
-    /// first. Two stacked sheets expose two "Sign in with Apple" buttons.
+    /// Regression: tapping the signed-out account row once must yield exactly
+    /// one login sheet (user report: the login window popped up twice). The
+    /// row presents the login sheet directly; a 401 from a background poller
+    /// routes to LoginPromptCoordinator, whose chain walk must swallow it.
+    /// Two stacked sheets expose two "Continue with Apple" buttons.
     func testLoginSheetOpens() throws {
         let app = XCUIApplication()
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         app.buttons["Settings"].tap()
-        let account = app.staticTexts["Account"]
+        let account = app.cells["settings-row-account"]
         guard account.waitForExistence(timeout: 8) else {
-            XCTFail("settings sheet did not list the Account row")
+            XCTFail("settings sheet did not list the account row")
             return
         }
         account.tap()
 
-        // Logged-out copy or the logged-in subscription card — either way the
-        // login sheet itself must be on screen.
-        let signedOut = app.staticTexts.containing(
-            NSPredicate(format: "label CONTAINS 'free audio transcriptions'")
-        ).firstMatch
+        // Signed out: the login sheet. Signed in: the Membership page.
+        let signedOut = app.buttons["login-apple"]
         let signedIn = app.staticTexts["Basic Plan"]
         let plus = app.staticTexts["Anycast Plus"]
         XCTAssertTrue(
             signedOut.waitForExistence(timeout: 10)
                 || signedIn.waitForExistence(timeout: 1)
                 || plus.waitForExistence(timeout: 1)
-                || app.buttons["Sign in with Apple"].waitForExistence(timeout: 2)
                 || app.staticTexts["User Info"].waitForExistence(timeout: 2),
             "login sheet did not appear"
         )
 
-        // Exactly one sheet: when the logged-out column rendered, a second
-        // stacked sheet would surface a second matching button. Wait out the
-        // reflux 401 window (the old double present landed ~1 s after the
-        // sheet appeared) before counting.
-        let appleButtons = app.buttons.matching(
-            NSPredicate(format: "label == %@", "Sign in with Apple")
-        )
+        // Exactly one sheet: wait out the 401 window (the old double present
+        // landed ~1 s after the sheet appeared) before counting.
+        let appleButtons = app.buttons.matching(identifier: "login-apple")
         if appleButtons.firstMatch.exists {
             Thread.sleep(forTimeInterval: 2)
             let stacked = appleButtons.count
             XCTAssertTrue(
                 stacked == 1,
-                "login sheet presented \(stacked) times for one Account tap"
+                "login sheet presented \(stacked) times for one account tap"
             )
         }
     }

@@ -1,5 +1,26 @@
 import UIKit
 
+/// A page hosted by `DiscoverPagingContainer` whose vertical list should
+/// drive the bars' scroll edge effect.
+@MainActor
+protocol ScrollEdgePage: AnyObject {
+    var edgeScrollView: UIScrollView { get }
+    /// Height of the chrome the list runs under at its top; the list rests
+    /// its first row below it and content fades out behind it as it scrolls.
+    var topChromeInset: CGFloat { get set }
+}
+
+extension UIViewController {
+    /// Tells UIKit which scroll view sits under the tab bar and its bottom
+    /// accessory (the mini player) so the iOS 26 scroll edge effect blurs
+    /// content behind them. Lists nested in a paging container are invisible
+    /// to the automatic lookup. No-op before iOS 26.
+    func setBottomEdgeScrollView(_ scrollView: UIScrollView?) {
+        guard #available(iOS 26.0, *) else { return }
+        setContentScrollView(scrollView, for: .bottom)
+    }
+}
+
 /// Resident child pages in a horizontal paging scroll view — the
 /// DefaultTabController TabBarView equivalent for the Discover category
 /// pages and the SearchPage tabs (03 §2.6/§3.5): all page slots exist up
@@ -15,6 +36,21 @@ final class DiscoverPagingContainer: UIViewController, UIScrollViewDelegate {
     var onSwipeSelect: ((Int) -> Void)?
     /// The nearest page changed while the user is dragging toward it.
     var onScrub: ((Int) -> Void)?
+    /// The chrome the pages' lists run under (the chip strip above the
+    /// container); pushed to every installed page.
+    var topChromeInset: CGFloat = 0 {
+        didSet {
+            for page in installedPages.values { (page as? ScrollEdgePage)?.topChromeInset = topChromeInset }
+        }
+    }
+
+    /// The selected page, or its list, changed (see `selectedPageScrollView`).
+    var onSelectedPageScrollViewChange: (() -> Void)?
+
+    /// The selected page's vertical list, if that page is installed.
+    var selectedPageScrollView: UIScrollView? {
+        (installedPages[selectedIndex] as? ScrollEdgePage)?.edgeScrollView
+    }
 
     private let scrollView = UIScrollView()
     private var slots: [UIView] = []
@@ -97,6 +133,7 @@ final class DiscoverPagingContainer: UIViewController, UIScrollViewDelegate {
     func install(_ page: UIViewController, at index: Int) {
         guard slots.indices.contains(index), installedPages[index] == nil else { return }
         installedPages[index] = page
+        (page as? ScrollEdgePage)?.topChromeInset = topChromeInset
         addChild(page)
         let slot = slots[index]
         slot.addSubview(page.view)
@@ -108,12 +145,25 @@ final class DiscoverPagingContainer: UIViewController, UIScrollViewDelegate {
             page.view.bottomAnchor.constraint(equalTo: slot.bottomAnchor),
         ])
         page.didMove(toParent: self)
+        if index == selectedIndex { onSelectedPageScrollViewChange?() }
+    }
+
+    /// Swaps the page at `index` for a fresh one (a new search rebuilds both
+    /// tabs' pages around a new view model).
+    func replace(_ page: UIViewController, at index: Int) {
+        if let old = installedPages.removeValue(forKey: index) {
+            old.willMove(toParent: nil)
+            old.view.removeFromSuperview()
+            old.removeFromParent()
+        }
+        install(page, at: index)
     }
 
     func select(_ index: Int, animated: Bool) {
         guard slots.indices.contains(index) else { return }
         selectedIndex = index
         lastScrubIndex = index
+        onSelectedPageScrollViewChange?()
         guard scrollView.bounds.width > 0 else { return }
         let target = CGPoint(x: CGFloat(index) * scrollView.bounds.width, y: 0)
         isProgrammaticScroll = true
@@ -169,6 +219,7 @@ final class DiscoverPagingContainer: UIViewController, UIScrollViewDelegate {
         // still owes a settle event so the strip lands on the real page.
         selectedIndex = index
         lastScrubIndex = index
+        onSelectedPageScrollViewChange?()
         onSwipeSelect?(index)
     }
 }

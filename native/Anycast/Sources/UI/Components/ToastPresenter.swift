@@ -23,7 +23,7 @@ final class ToastPresenter {
 
         let label = UILabel()
         label.text = message
-        label.font = TypographyV2.bodySmall.font()
+        label.font = TypographyV2.body.font()
         // Inverse pair: readable over any page in both appearances.
         label.textColor = Theme.surface
         label.textAlignment = .center

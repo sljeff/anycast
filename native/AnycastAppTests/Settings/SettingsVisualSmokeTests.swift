@@ -24,14 +24,14 @@ struct SettingsVisualSmokeTests {
         let originalLanguage = context.settingsBox.current.targetLanguage
 
         func runCaptures() async throws {
-            // Translation off: '' hides the Target Language row.
+            // Translation off: '' shows Target Language as an inert "Off".
             await context.settingsCoordinator.updateTargetLanguage("")
             let controller = SettingsViewController(context: context)
             AppSheets.presentExpand(controller, from: presenter)
             try await Task.sleep(for: .seconds(2))
             await Self.captureWindow(name: "t7-settings-translation-off")
 
-            // Translation on: the row appears (writes go through the
+            // Translation on: the row shows the language (writes go through the
             // coordinator, exactly like a user toggling the switch).
             await context.settingsCoordinator.updateTargetLanguage("zh")
             try await Task.sleep(for: .milliseconds(800))

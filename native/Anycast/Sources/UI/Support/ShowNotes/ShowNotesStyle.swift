@@ -2,8 +2,8 @@ import UIKit
 
 /// Visual definition for the show-notes rich-text pipeline — deliberately
 /// ONE tier. Machine-generated show notes get no typographic hierarchy
-/// beyond a single heading step: bodyLarge for everything, headlineMedium
-/// (semibold) for every heading level, system mono at the surrounding size.
+/// beyond a single heading step: the app's `body` style for everything,
+/// `emphasis` (semibold) for every heading level, system mono at the surrounding size.
 /// The v1 WebKit pipeline reached the same place by post-hoc normalization
 /// (`HTMLContentRenderer.rebasedFont`); this style states it up front.
 ///
@@ -15,12 +15,12 @@ struct ShowNotesStyle {
 
     // MARK: Type
 
-    /// Body text — v2 bodyLarge (17 pt regular, onSurface, `.body` scaling).
-    var body: TypographyV2.Style = .bodyLarge
+    /// Body text — the app-wide `body` text style (reading text).
+    var body: TypographyV2.Style = .body
 
-    /// THE heading tier — v2 headlineMedium (22 pt semibold). h1–h6 all
+    /// THE heading tier — the app-wide `emphasis` style (semibold). h1–h6 all
     /// collapse here; there is intentionally no second heading size.
-    var heading: TypographyV2.Style = .headlineMedium
+    var heading: TypographyV2.Style = .emphasis
 
     // MARK: Color
 

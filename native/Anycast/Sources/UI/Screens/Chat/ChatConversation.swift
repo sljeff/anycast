@@ -9,10 +9,17 @@ struct ChatMessage: Equatable, Sendable {
         case ai
     }
 
+    /// Only human messages ever fail; AI messages are always `.sent`.
+    enum DeliveryState: Equatable, Sendable {
+        case sent
+        case failed
+    }
+
     let id: UUID
     let author: Author
     let createdAt: Date
     let text: String
+    var deliveryState: DeliveryState = .sent
 }
 
 /// How a failed request must surface (K8: an error is NEVER inserted as an
@@ -88,7 +95,8 @@ final class APIClientChatTransport: ChatTransport {
 /// The message-list state machine of states/chat.dart, non-streaming:
 /// send → append the user message → build the G13 history → append the
 /// "..." AI placeholder → POST → on success replace the placeholder with
-/// the reply; on failure remove it and signal the error (K8).
+/// the reply; on failure remove it, mark the user message failed (it stays
+/// in the list for a resend) and signal the error (K8).
 @MainActor
 final class ChatConversation {
 
@@ -96,7 +104,7 @@ final class ChatConversation {
     enum MessagesChange: Equatable {
         case appended(count: Int)
         case replaced(index: Int)
-        case removedPlaceholder(index: Int)
+        case removed(index: Int)
         case cleared
     }
 
@@ -107,7 +115,11 @@ final class ChatConversation {
     }
 
     private(set) var messages: [ChatMessage] = []
-    private(set) var isLoading = false
+    private(set) var isLoading = false {
+        didSet {
+            if isLoading != oldValue { onLoadingChanged?(isLoading) }
+        }
+    }
 
     /// Equivalent of `_currentAiMessageId`: the placeholder the next reply
     /// replaces.
@@ -123,6 +135,12 @@ final class ChatConversation {
     /// never carries message content.
     var onError: ((ChatErrorPresentation) -> Void)?
     var onMessagesChanged: ((MessagesChange) -> Void)?
+    var onLoadingChanged: ((Bool) -> Void)?
+
+    /// The newest message that failed to send, if any.
+    var lastFailedMessage: ChatMessage? {
+        messages.last { $0.author == .human && $0.deliveryState == .failed }
+    }
 
     init(transport: ChatTransport) {
         self.transport = transport
@@ -135,11 +153,15 @@ final class ChatConversation {
         guard !isLoading else { return }
         isLoading = true
 
+        let humanID = UUID()
         messages.append(
-            ChatMessage(id: UUID(), author: .human, createdAt: .now, text: text)
+            ChatMessage(id: humanID, author: .human, createdAt: .now, text: text)
         )
+        // Earlier failed messages are not part of the conversation the
+        // server knows about.
         let history = ChatHistory.build(
-            messages.map { ChatHistory.Message(authorID: $0.author.rawValue, text: $0.text) }
+            messages.filter { $0.deliveryState == .sent }
+                .map { ChatHistory.Message(authorID: $0.author.rawValue, text: $0.text) }
         )
 
         let placeholderID = UUID()
@@ -153,10 +175,11 @@ final class ChatConversation {
         let outcome = await transport.chat(
             enclosureURL: enclosureURL, input: text, history: history
         )
-        defer { isLoading = false }
 
-        // Dismissed/cleared mid-flight: the conversation is gone; drop it.
+        // Cleared mid-flight (New chat): the conversation is gone; drop it.
+        // `clear()` already reset `isLoading`, and a newer send may own it.
         guard generation == generationAtSend else { return }
+        defer { isLoading = false }
 
         switch outcome {
         case .reply(let reply):
@@ -173,13 +196,31 @@ final class ChatConversation {
             else { return }
             messages.remove(at: index)
             currentAiMessageID = nil
-            onMessagesChanged?(.removedPlaceholder(index: index))
+            onMessagesChanged?(.removed(index: index))
+            // The question stays visible, marked failed, so it can be resent.
+            if let humanIndex = messages.firstIndex(where: { $0.id == humanID }) {
+                messages[humanIndex].deliveryState = .failed
+                onMessagesChanged?(.replaced(index: humanIndex))
+            }
             onError?(presentation)
         }
     }
 
-    /// clearMessages (trash button) and the PopScope close hook: wipes the
-    /// conversation. Unlike the Dart line, an in-flight request no longer
+    /// Resends a failed message: the failed entry is replaced (removed, then
+    /// sent again as the newest question), never duplicated.
+    func resend(messageID: UUID, enclosureURL: String) async {
+        guard !isLoading,
+              let index = messages.firstIndex(where: {
+                  $0.id == messageID && $0.deliveryState == .failed
+              })
+        else { return }
+        let text = messages[index].text
+        messages.remove(at: index)
+        onMessagesChanged?(.removed(index: index))
+        await send(text, enclosureURL: enclosureURL)
+    }
+
+    /// "New chat": wipes the conversation. An in-flight request no longer
     /// wedges `isLoading` — its outcome is dropped and sending re-enables.
     func clear() {
         generation += 1

@@ -30,6 +30,7 @@ final class RootViewController: UIViewController {
         context.tabs.tabBarController = shell
         context.loginPrompt.presentingAnchor = self
         context.flyInEndpointProvider.tabBarProvider = { [weak shell] in shell?.tabBar }
+        context.flyInEndpointProvider.playlistTabProvider = { [weak shell] in shell?.playlistTab }
 
         addChild(shell)
         view.addSubview(shell.view)

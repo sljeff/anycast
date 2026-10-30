@@ -34,7 +34,7 @@ enum AnycastButton {
         )
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var outgoing = incoming
-            outgoing.font = TypographyV2.labelLarge.font()
+            outgoing.font = TypographyV2.emphasis.font()
             return outgoing
         }
         return configuration

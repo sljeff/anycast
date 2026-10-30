@@ -17,6 +17,9 @@ public final class SleepTimerController {
 
     /// Remaining milliseconds; nil = OFF (the Dart `noCountdown` sentinel).
     public private(set) var remainingMilliseconds: Int64?
+    /// "End of episode": playback stops when the playing episode completes
+    /// instead of after a countdown. Exclusive with the countdown.
+    public private(set) var stopsAtEpisodeEnd = false
     /// Pauses playback when the countdown expires.
     public var onExpired: (() -> Void)?
 
@@ -45,11 +48,27 @@ public final class SleepTimerController {
     }
 
     public func setCountdown(minutes: Int) {
+        stopsAtEpisodeEnd = false
         remainingMilliseconds = Int64(minutes) * 60_000
         startTimerIfNeeded()
     }
 
+    /// Replaces any countdown with "stop when this episode ends".
+    public func setStopAtEpisodeEnd() {
+        stop()
+        stopsAtEpisodeEnd = true
+    }
+
+    /// Called by playback when an episode completes: true means stop there.
+    /// The mode is one-shot, so it switches OFF as it fires.
+    public func consumeEpisodeEnd() -> Bool {
+        guard stopsAtEpisodeEnd else { return false }
+        stopsAtEpisodeEnd = false
+        return true
+    }
+
     public func stop() {
+        stopsAtEpisodeEnd = false
         remainingMilliseconds = nil
         timer?.invalidate()
         timer = nil

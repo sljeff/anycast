@@ -24,13 +24,16 @@ import AnycastKit
 /// - persistence goes through `PlaylistRepository.insertOrUpdateByIndex`
 ///   with the K26-fixed move math (gesture-space target index).
 @MainActor
-final class PlaylistEpisodeListViewController: UIViewController {
+final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage {
 
     private let context: UIContext
     let playlistId: Int64
 
     private(set) var episodes: [PlaylistEpisodeRow] = []
     private var isLoading = true
+    /// The first non-empty list rises in once per instance
+    /// (`CardEntranceAnimator`); later reloads and reorders never replay it.
+    private var didPlayEntrance = false
 
     private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
     private(set) var binder: PlaylistEpisodeListBinder!
@@ -38,9 +41,20 @@ final class PlaylistEpisodeListViewController: UIViewController {
     private let queueObservation = ObservationLoop()
 
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
+    var edgeScrollView: UIScrollView { collectionView }
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyState = EmptyStateView()
     private let emptyExploreButton = UIButton(type: .system)
+    private var emptyTopConstraint: NSLayoutConstraint?
+    private var spinnerCenterConstraint: NSLayoutConstraint?
+
+    /// Height of the pinned chrome this list runs under (set by the host;
+    /// 0 when nothing overlaps). It pushes the first row, the empty state
+    /// and the spinner back below the chrome, so the resting layout is the
+    /// one the list had when it started under the chrome.
+    var topChromeInset: CGFloat = 0 {
+        didSet { applyTopChromeInset(from: oldValue) }
+    }
 
     /// The 150 ms whole-card drag starter
     /// (MyReorderableDelayedDragStartListener, playlists.dart:127-129).
@@ -92,6 +106,11 @@ final class PlaylistEpisodeListViewController: UIViewController {
         Task { await reloadEpisodes() }
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        playEntranceIfNeeded()
+    }
+
     // MARK: - Build
 
     private func buildCollectionView() {
@@ -121,6 +140,7 @@ final class PlaylistEpisodeListViewController: UIViewController {
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
         binder.register(in: collectionView)
+        collectionView.contentInset.top = topChromeInset
     }
 
     private func buildSpinner() {
@@ -128,10 +148,23 @@ final class PlaylistEpisodeListViewController: UIViewController {
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
+        let centerY = spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: topChromeInset / 2)
+        spinnerCenterConstraint = centerY
         NSLayoutConstraint.activate([
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            centerY,
         ])
+    }
+
+    private func applyTopChromeInset(from previous: CGFloat) {
+        guard isViewLoaded else { return }
+        let wasAtTop = collectionView.contentOffset.y <= -collectionView.adjustedContentInset.top + 0.5
+        collectionView.contentInset.top = topChromeInset
+        if wasAtTop, previous != topChromeInset {
+            collectionView.contentOffset.y = -collectionView.adjustedContentInset.top
+        }
+        emptyTopConstraint?.constant = topChromeInset
+        spinnerCenterConstraint?.constant = topChromeInset / 2
     }
 
     /// AnycastEmptyState (playlists.dart:71-84): "All caught up? Explore new
@@ -151,10 +184,14 @@ final class PlaylistEpisodeListViewController: UIViewController {
             actions: [emptyExploreButton]
         ))
 
+        let top = emptyState.topAnchor.constraint(
+            equalTo: view.safeAreaLayoutGuide.topAnchor, constant: topChromeInset
+        )
+        emptyTopConstraint = top
         NSLayoutConstraint.activate([
             emptyState.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             emptyState.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            emptyState.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            top,
             emptyState.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
         ])
     }
@@ -235,6 +272,16 @@ final class PlaylistEpisodeListViewController: UIViewController {
         snapshot.appendItems(episodes.compactMap(\.enclosureUrl))
         dataSource.apply(snapshot, animatingDifferences: false)
         renderLoadingState()
+        playEntranceIfNeeded()
+    }
+
+    /// Plays the entrance right after the list was applied. The first load
+    /// can land before the view is in a window (no layout, nothing to
+    /// animate), so that case is retried from `viewDidAppear`.
+    private func playEntranceIfNeeded() {
+        guard !didPlayEntrance, view.window != nil, !isLoading, !episodes.isEmpty else { return }
+        didPlayEntrance = true
+        CardEntranceAnimator.play(in: collectionView)
     }
 
     private func renderLoadingState() {

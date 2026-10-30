@@ -127,8 +127,8 @@ struct ShowNotesBuilderTests {
         let heading = style.headingFont(traits: traits)
 
         // The style pins the spec tiers.
-        #expect(style.body.size == TypographyV2.bodyLarge.size)
-        #expect(style.heading.size == TypographyV2.headlineMedium.size)
+        #expect(style.body.size == TypographyV2.body.size)
+        #expect(style.heading.size == TypographyV2.emphasis.size)
         #expect(style.heading.weight == .semibold)
 
         // Every heading level renders the identical tier, distinct from body.

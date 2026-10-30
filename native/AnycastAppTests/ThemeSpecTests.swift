@@ -61,7 +61,7 @@ struct ThemeSpecTests {
         let display = TypographyV2.displayLarge.font(traits: UITraitCollection(preferredContentSizeCategory: .large))
         let expected = active.typography.font(48, .black, .display)
         #expect(display.fontName == expected.fontName)
-        #expect(TypographyV2.bodyMedium.role == .text)
+        #expect(TypographyV2.body.role == .text)
     }
 
     @Test("Launch-argument theme selection accepts only known names")

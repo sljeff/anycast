@@ -3,21 +3,16 @@ import Testing
 @testable import Anycast
 
 /// One specimen snapshot proving the L4 baseline infrastructure (05 §6.1):
-/// a dark-theme composition of an EpisodeCardCell + ChipTabBarView +
-/// GradientTextLabel, recorded per iOS major version. Later M3 tasks grow
+/// a dark-theme composition of an EpisodeCardCell + ChipTabBarView,
+/// recorded per iOS major version. Later M3 tasks grow
 /// this suite screen by screen (S1–S21).
 @MainActor
 struct SpecimenSnapshotTests {
 
-    @Test("Specimen: card + underline tab bar + gradient title")
+    @Test("Specimen: card + underline tab bar")
     func specimen() throws {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 320))
         Theme.installPlayerBase(on: container)
-
-        let title = GradientTextLabel()
-        title.text = "Anycast"
-        title.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(title)
 
         let tabBar = ChipTabBarView(titles: ["Inbox", "Subscriptions"])
         tabBar.translatesAutoresizingMaskIntoConstraints = false
@@ -48,11 +43,9 @@ struct SpecimenSnapshotTests {
         container.addSubview(card)
 
         NSLayoutConstraint.activate([
-            title.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
-            title.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
             tabBar.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
             tabBar.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
-            tabBar.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 12),
+            tabBar.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
         ])
 
         container.setNeedsLayout()

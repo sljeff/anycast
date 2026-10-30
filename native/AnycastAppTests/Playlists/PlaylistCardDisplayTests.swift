@@ -2,10 +2,9 @@ import Testing
 import AnycastKit
 @testable import Anycast
 
-/// Playlist card right-text and progress-backdrop reducers
-/// (card.dart:50-82) — the "xx remaining" minute format delegates to the
-/// golden-pinned `TimeFormats`; these tests pin the SOURCE selection and
-/// clamping.
+/// Playlist card time-text and progress reducers (card.dart:50-82) — the
+/// minute math delegates to the golden-pinned `TimeFormats`; these tests
+/// pin the SOURCE selection, the "left" wording and clamping.
 @MainActor
 struct PlaylistCardDisplayTests {
 
@@ -37,11 +36,11 @@ struct PlaylistCardDisplayTests {
         // switches to h+m at ≥100 minutes (formatters.dart:66-70).
         #expect(PlaylistCardDisplay.rightText(input(
             isCurrent: true, livePosition: 30 * 60_000, liveDuration: 2 * 3_600_000
-        )) == "90m remaining")
+        )) == "90m left")
         // 2h30m total, 30m in → exactly 120 minutes remaining → h+m form.
         #expect(PlaylistCardDisplay.rightText(input(
             isCurrent: true, livePosition: 30 * 60_000, liveDuration: 150 * 60_000
-        )) == "2h 0m remaining")
+        )) == "2h 0m left")
         // Played nothing yet: bare minutes.
         #expect(PlaylistCardDisplay.rightText(input(
             isCurrent: true, livePosition: 0, liveDuration: 73 * 60_000
@@ -55,26 +54,48 @@ struct PlaylistCardDisplayTests {
         // 90 minutes remaining < 100 → bare minutes (formatters.dart:66-70).
         #expect(PlaylistCardDisplay.rightText(input(
             played: 30 * 60_000, duration: 2 * 3_600_000
-        )) == "90m remaining")
+        )) == "90m left")
         #expect(PlaylistCardDisplay.rightText(input(
             played: 15 * 60_000, duration: 45 * 60_000
-        )) == "30m remaining")
+        )) == "30m left")
     }
 
-    @Test("Unplayed rows keep the generic duration • date meta")
+    @Test("Unplayed rows show the duration only")
     func unplayedRightText() {
-        // 73-minute duration, pubDate 2 minutes before `now` → "2m ago"
-        // via timeago en_short (90 s ≤ elapsed < 45 min).
         let now: Int64 = 1_800_000_000_000
         let text = PlaylistCardDisplay.rightText(input(
             played: 0, duration: 73 * 60_000, pubDate: now - 120_000, now: now
         ))
-        #expect(text == "73m • 2m ago")
-        // Zero duration degrades to the empty duration segment.
+        #expect(text == "73m")
+        // Unknown duration → empty (the card then drops the separator).
         let zero = PlaylistCardDisplay.rightText(input(
             played: 0, duration: 0, pubDate: now - 120_000, now: now
         ))
-        #expect(zero == " • 2m ago")
+        #expect(zero == "")
+    }
+
+    // MARK: - Detail Play capsule label
+
+    @Test("Detail Play label: resume with time left, else play with the duration")
+    func detailPlayLabel() {
+        let resume = DetailViewController.PlayLabel.make(
+            durationMilliseconds: 80 * 60_000, playedMilliseconds: 48 * 60_000
+        )
+        #expect(resume.title == "Resume · 32m left")
+        #expect(abs(resume.fraction - 0.6) < 0.001)
+
+        let fresh = DetailViewController.PlayLabel.make(durationMilliseconds: 80 * 60_000, playedMilliseconds: nil)
+        #expect(fresh == DetailViewController.PlayLabel(title: "Play · 80m", fraction: 0))
+
+        let unknown = DetailViewController.PlayLabel.make(durationMilliseconds: nil, playedMilliseconds: 5_000)
+        #expect(unknown == DetailViewController.PlayLabel(title: "Play", fraction: 0))
+
+        // Played past the end clamps to a full capsule.
+        let over = DetailViewController.PlayLabel.make(
+            durationMilliseconds: 30 * 60_000, playedMilliseconds: 35 * 60_000
+        )
+        #expect(over.title == "Resume · 0m left")
+        #expect(over.fraction == 1)
     }
 
     // MARK: - Progress fraction (playbackProgress, formatters.dart:80-87)

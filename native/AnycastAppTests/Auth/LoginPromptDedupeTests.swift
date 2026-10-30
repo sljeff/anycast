@@ -2,9 +2,8 @@ import UIKit
 import Testing
 @testable import Anycast
 
-/// Regression: the Settings "Account" row presents LoginViewController
-/// directly — never through LoginPromptCoordinator — and that sheet's own
-/// signed-out /api/user returns loginRequired, which routes back to
+/// Regression: the Settings "Account" row presents the login sheet directly
+/// — never through LoginPromptCoordinator — and a background 401 routes to
 /// `context.presentLogin()`. The coordinator must recognize a login sheet
 /// already in the presentation chain and swallow the request instead of
 /// stacking a second sheet on the first (the reported double login window).
@@ -20,13 +19,11 @@ struct LoginPromptDedupeTests {
         try await Self.waitForNoLogin(under: presenter)
 
         // Settings' presentAccount(): direct sheet, coordinator uninvolved.
-        AppSheets.presentExpand(LoginViewController(context: context), from: presenter)
-        // Let the sheet's own reloadSubscriptionData 401 land (synthetic
-        // when signed out — no network involved) plus the sheet transition.
+        LoginSheetViewController.present(from: presenter, context: context, source: .settings)
+        // Let the sheet transition finish.
         try await Task.sleep(for: .milliseconds(800))
 
-        // The exact call the sheet's .loginRequired handlers make
-        // (LoginViewController reloadSubscriptionData / presentErrorSignal).
+        // The call a background 401 makes.
         context.presentLogin()
         try await Task.sleep(for: .milliseconds(600))
 
@@ -99,12 +96,9 @@ struct LoginPromptDedupeTests {
         try await Self.waitForNoLogin(under: presenter)
     }
 
-    /// The signed-in dismissal must NOT roll back: after a successful
-    /// sign-in `LoginViewController.refreshState` flips the sheet to the
-    /// signed-in card and KEEPS it on screen, so the user's later
-    /// swipe-down fires the SAME interactive-dismiss callback with
-    /// `currentUID != nil`. The coordinator's signed-out check is the only
-    /// thing making that a no-op — verified here by overriding the
+    /// The signed-in dismissal must NOT roll back: the coordinator's
+    /// signed-out check is what makes a dismissal callback a no-op once an
+    /// account is signed in — verified here by overriding the
     /// coordinator's `isSignedOut` seam to report signed-in.
     @Test("interactive dismissal while signed in does not roll back processing")
     func interactiveDismissalWhileSignedInKeepsProcessing() async throws {
@@ -153,7 +147,7 @@ struct LoginPromptDedupeTests {
         var count = 0
         var current: UIViewController? = presenter
         while let controller = current {
-            if controller is LoginViewController { count += 1 }
+            if controller is LoginSheetViewController { count += 1 }
             current = controller.presentedViewController
         }
         return count
@@ -178,7 +172,7 @@ struct LoginPromptDedupeTests {
         for _ in 0..<20 {
             var current: UIViewController? = presenter
             while let controller = current {
-                if let login = controller as? LoginViewController,
+                if let login = controller as? LoginSheetViewController,
                    !login.isBeingDismissed,
                    let sheet = login.sheetPresentationController,
                    sheet.delegate != nil {

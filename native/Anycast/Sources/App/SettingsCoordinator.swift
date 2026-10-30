@@ -20,6 +20,7 @@ final class SettingsCoordinator {
     static let autoRefreshIntervalKey = "autoRefreshIntervalSeconds"
     static let maxFeedEpisodesKey = "maxFeedEpisodes"
     static let maxHistoryEpisodesKey = "maxHistoryEpisodes"
+    static let maxCacheCountKey = "maxCacheCount"
 
     private let repository: SettingsRepository
     private let settingsBox: SettingsBox
@@ -117,6 +118,22 @@ final class SettingsCoordinator {
             }
         ) {
             try await repository.setMaxHistoryEpisodes(count)
+        }
+    }
+
+    /// Audio cache capacity (episodes). The playback stack reads the box's
+    /// `maxCacheCount` at eviction time, so the refreshed box applies it.
+    func updateMaxCacheCount(_ count: Int64) async {
+        await performPersist(
+            notify: {
+                center.post(
+                    name: Self.limitsDidChange,
+                    object: nil,
+                    userInfo: [Self.maxCacheCountKey: count]
+                )
+            }
+        ) {
+            try await repository.setMaxCacheCount(count)
         }
     }
 

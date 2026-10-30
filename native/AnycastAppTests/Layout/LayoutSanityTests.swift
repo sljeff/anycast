@@ -152,28 +152,6 @@ struct LayoutSanityTests {
                 try await Self.settleLayout(window)
             }
         }
-
-        // LoginViewController is HOSTED, not presented: instantiating it in
-        // a signed-out container fires its own 401 → the global login
-        // funnel → a coordinator sheet over the app chain, which parallel
-        // suites count. Parking the coordinator's anchor for the duration
-        // keeps the funnel silent; hosting the view still exercises the
-        // layout assertions.
-        let loginAnchor = context.loginPrompt.presentingAnchor
-        context.loginPrompt.presentingAnchor = nil
-        let login = LoginViewController(context: context)
-        window.addSubview(login.view)
-        login.view.frame = CGRect(x: 0, y: 0, width: window.bounds.width, height: min(window.bounds.height, 700))
-        try await Self.settleLayout(window)
-        let loginSize = login.view.bounds.size
-        #expect(loginSize.width > 0 && loginSize.height > 0, "LoginViewController collapsed")
-        #expect(
-            login.view.frame.height <= window.bounds.height + 1,
-            "LoginViewController is taller than the window"
-        )
-        login.view.removeFromSuperview()
-        context.loginPrompt.presentingAnchor = loginAnchor
-        try await Self.settleLayout(window)
     }
 
     /// The M3 review found the playlist list hidden with items loaded —
@@ -315,14 +293,59 @@ struct LayoutSanityTests {
         let desc = labels.first { $0.accessibilityIdentifier == "episode-card-description" }
         #expect(desc?.text == "A description line that also wraps a little")
         #expect(desc?.bounds.height ?? 0 > 0, "v2 description label collapsed")
-        // Sentence-case title, quiet lowercase show line (UI kit card).
+        // Sentence-case title, show line in the feed's own casing.
         #expect(labels.contains { $0.text == "An episode title that wraps" }, "title recased")
-        #expect(labels.contains { $0.text == "just pod" }, "show name not lowercased")
+        #expect(labels.contains { $0.text == "Just pod" }, "show name was recased")
         // The more button gets its menu from the mirrored payload.
         cell.menuActions = [
             EpisodeCardAction(icon: UIImage(), accessibilityLabel: "Play") {},
         ]
         #expect(cell.moreButton.menu?.children.count == 1, "more menu not built")
+    }
+
+    /// Reconfigure storms (expand taps, playback ticks, membership refresh)
+    /// must not blank an already-resolved description: configuring again
+    /// with the same HTML keeps the text synchronously.
+    @Test("episode card keeps a resolved description across same-HTML reconfigure")
+    func cardDescriptionSurvivesReconfigure() async throws {
+        let cell = EpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 354, height: 104))
+        let content = EpisodeCardContent(
+            title: "Episode", channelTitle: "Channel", rightText: "1:00",
+            descriptionHTML: "<p>Same description</p>", imageURL: nil
+        )
+        cell.configure(content, actions: [])
+        let desc = try #require(Self.subviewsRecursive(in: cell)
+            .compactMap { $0 as? UILabel }
+            .first { $0.accessibilityIdentifier == "episode-card-description" })
+        try await Self.waitForText(desc)
+        let resolved = desc.text
+        cell.configure(content, actions: [])
+        #expect(desc.text == resolved, "same-HTML reconfigure blanked the description")
+    }
+
+    @Test("inbox card keeps a resolved description across same-HTML reconfigure")
+    func inboxCardDescriptionSurvivesReconfigure() async throws {
+        let cell = InboxEpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 370, height: 200))
+        let content = InboxCardContent(
+            title: "Episode", showName: "Show", metaText: "1 min",
+            descriptionHTML: "<p>Same description</p>", imageURL: nil
+        )
+        cell.configure(content)
+        let desc = try #require(Self.subviewsRecursive(in: cell)
+            .compactMap { $0 as? UILabel }
+            .first { $0.accessibilityIdentifier == "episode-card-description" })
+        try await Self.waitForText(desc)
+        let resolved = desc.text
+        cell.configure(content)
+        #expect(desc.text == resolved, "same-HTML reconfigure blanked the description")
+    }
+
+    /// Polls until the async description resolve lands in `label`.
+    private static func waitForText(_ label: UILabel) async throws {
+        for _ in 0..<100 where (label.text ?? "").isEmpty {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        try #require(!(label.text ?? "").isEmpty, "description never resolved")
     }
 
     // MARK: - Helpers
@@ -425,5 +448,212 @@ struct LayoutSanityTests {
             try? await Task.sleep(for: .milliseconds(500))
         }
         return nil
+    }
+}
+
+// MARK: - Card motion (entrance rise-in, action-strip reveal)
+
+/// A window hosting a plain card list, so the motion helpers run against
+/// real cells without the app shell.
+@MainActor
+private final class CardListHost: UIViewController, UICollectionViewDataSource {
+
+    let collectionView: UICollectionView
+    let window: UIWindow
+    private let count: Int
+
+    init(count: Int) {
+        self.count = count
+        let item = NSCollectionLayoutItem(layoutSize: NSCollectionLayoutSize(
+            widthDimension: .fractionalWidth(1),
+            heightDimension: .estimated(EpisodeCardCell.cardRowHeight)
+        ))
+        let group = NSCollectionLayoutGroup.horizontal(layoutSize: item.layoutSize, subitems: [item])
+        let section = NSCollectionLayoutSection(group: group)
+        section.interGroupSpacing = EpisodeCardCell.spacing
+        collectionView = UICollectionView(
+            frame: .zero, collectionViewLayout: UICollectionViewCompositionalLayout(section: section)
+        )
+        window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+        super.init(nibName: nil, bundle: nil)
+        collectionView.dataSource = self
+        collectionView.register(EpisodeCardCell.self, forCellWithReuseIdentifier: EpisodeCardCell.reuseIdentifier)
+        collectionView.frame = window.bounds
+        view.addSubview(collectionView)
+        window.rootViewController = self
+        window.isHidden = false
+        window.layoutIfNeeded()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int { count }
+
+    func collectionView(
+        _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
+    ) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: EpisodeCardCell.reuseIdentifier, for: indexPath
+        ) as! EpisodeCardCell
+        cell.configure(
+            EpisodeCardContent(
+                title: "Episode \(indexPath.item)", channelTitle: "Channel", rightText: "1:00",
+                imageURL: nil, descriptionPlainText: "Plain description"
+            ),
+            actions: []
+        )
+        return cell
+    }
+
+    func cardCells() -> [EpisodeCardCell] {
+        collectionView.visibleCells
+            .compactMap { $0 as? EpisodeCardCell }
+            .sorted { $0.frame.minY < $1.frame.minY }
+    }
+
+    func tearDown() {
+        window.isHidden = true
+        window.rootViewController = nil
+    }
+}
+
+@MainActor
+@Suite
+struct CardMotionTests {
+
+    private static func drawer(of cell: EpisodeCardCell) -> UIView? {
+        var stack = cell.subviews
+        while let view = stack.popLast() {
+            if view is CapsuleView { return view }
+            stack.append(contentsOf: view.subviews)
+        }
+        return nil
+    }
+
+    /// Animations on the view's layer that would move or resize it.
+    private static func frameAnimationKeys(of view: UIView) -> [String] {
+        (view.layer.animationKeys() ?? []).filter { key in
+            ["position", "bounds", "transform"].contains { key.localizedCaseInsensitiveContains($0) }
+        }
+    }
+
+    @Test("entrance parks the cards at the start pose, then rests them at identity")
+    func entranceEndsAtRest() async throws {
+        let host = CardListHost(count: 6)
+        defer { host.tearDown() }
+        host.collectionView.reloadData()
+        CardEntranceAnimator.play(in: host.collectionView, reduceMotion: false)
+
+        let cells = host.cardCells()
+        try #require(cells.count >= 3)
+        // Every card is animating (rise + fade) the moment `play` returns —
+        // the model values are already final, so nothing can stay offset.
+        for cell in cells {
+            let keys = cell.contentView.layer.animationKeys() ?? []
+            #expect(!keys.isEmpty, "card has no entrance animation")
+        }
+        try await Task.sleep(for: .milliseconds(1200))
+        for cell in cells {
+            #expect(cell.contentView.alpha == 1)
+            #expect(cell.contentView.transform == .identity)
+            #expect(cell.contentView.layer.animationKeys() == nil, "entrance animation never finished")
+        }
+    }
+
+    @Test("reduce-motion entrance fades only")
+    func reducedEntranceDoesNotTranslate() async throws {
+        let host = CardListHost(count: 4)
+        defer { host.tearDown() }
+        host.collectionView.reloadData()
+        CardEntranceAnimator.play(in: host.collectionView, reduceMotion: true)
+        for cell in host.cardCells() {
+            #expect(cell.contentView.transform == .identity)
+            let keys = cell.contentView.layer.animationKeys() ?? []
+            #expect(!keys.contains { $0.localizedCaseInsensitiveContains("transform")
+                || $0.localizedCaseInsensitiveContains("position") }, "reduce motion moved a card: \(keys)")
+        }
+        try await Task.sleep(for: .milliseconds(800))
+        for cell in host.cardCells() {
+            #expect(cell.contentView.alpha == 1)
+        }
+    }
+
+    @Test("a reused cell never keeps an entrance pose")
+    func reuseResetsEntrancePose() {
+        let cell = EpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 354, height: 112))
+        cell.contentView.alpha = 0
+        cell.contentView.transform = CGAffineTransform(translationX: 0, y: 12)
+        cell.prepareForReuse()
+        #expect(cell.contentView.alpha == 1)
+        #expect(cell.contentView.transform == .identity)
+    }
+
+    @Test("expand then collapse leaves the strip hidden, closed and ready for the next reveal")
+    func stripStateStaysConsistent() async throws {
+        let host = CardListHost(count: 4)
+        defer { host.tearDown() }
+        host.collectionView.reloadData()
+        host.collectionView.layoutIfNeeded()
+        let path = IndexPath(item: 1, section: 0)
+        let cell = try #require(host.collectionView.cellForItem(at: path) as? EpisodeCardCell)
+        let closedHeight = cell.bounds.height
+        let coordinator = CardExpandCoordinator()
+        // The card plate is the stack's first row; only the strip may move.
+        let plate = try #require((cell.contentView.subviews.first as? UIStackView)?.arrangedSubviews.first)
+        let plateFrame = plate.frame
+
+        coordinator.toggle(at: path)
+        CardExpandAnimator.refresh(expandedPath: coordinator.expandedIndexPath, in: host.collectionView)
+        #expect(cell.isStripExpanded)
+        // The strip target lands before the item resizes: the plate must
+        // already sit at its own frame and carry no frame animation (the
+        // headless host has no presentation layer to sample mid-flight).
+        #expect(plate.frame == plateFrame, "card plate resized or moved when the strip opened")
+        #expect(Self.frameAnimationKeys(of: plate).isEmpty, "card plate animated when the strip opened")
+        let drawer = try #require(Self.drawer(of: cell))
+        // The reveal's model values are final at once.
+        #expect(drawer.alpha == 1 && drawer.transform == .identity)
+        try await Task.sleep(for: .milliseconds(700))
+        #expect(cell.bounds.height - closedHeight == EpisodeCardCell.stripHeight, "item did not grow by the strip")
+
+        coordinator.toggle(at: path)
+        CardExpandAnimator.refresh(expandedPath: coordinator.expandedIndexPath, in: host.collectionView)
+        try await Task.sleep(for: .milliseconds(Int(Motion.stripFadeOut * 1000) + 60))
+        #expect(plate.frame == plateFrame, "card plate resized or moved when the strip closed")
+        #expect(Self.frameAnimationKeys(of: plate).isEmpty, "card plate animated when the strip closed")
+        try await Task.sleep(for: .milliseconds(700))
+        #expect(!cell.isStripExpanded)
+        #expect(cell.bounds.height == closedHeight, "item did not close with the strip")
+        #expect(drawer.alpha == 1 && drawer.transform == .identity, "drawer not reset for the next reveal")
+    }
+
+    @Test("a collapse fade interrupted by a new toggle ends open and fully visible")
+    func interruptedCollapseEndsConsistent() async throws {
+        let host = CardListHost(count: 4)
+        defer { host.tearDown() }
+        host.collectionView.reloadData()
+        host.collectionView.layoutIfNeeded()
+        let path = IndexPath(item: 1, section: 0)
+        let cell = try #require(host.collectionView.cellForItem(at: path) as? EpisodeCardCell)
+        let closedHeight = cell.bounds.height
+        let drawer = try #require(Self.drawer(of: cell))
+        let coordinator = CardExpandCoordinator()
+
+        coordinator.toggle(at: path)
+        CardExpandAnimator.refresh(expandedPath: coordinator.expandedIndexPath, in: host.collectionView)
+        try await Task.sleep(for: .milliseconds(700))
+
+        // Collapse starts its fade; a second toggle lands before it ends.
+        coordinator.toggle(at: path)
+        CardExpandAnimator.refresh(expandedPath: coordinator.expandedIndexPath, in: host.collectionView)
+        try await Task.sleep(for: .milliseconds(40))
+        coordinator.toggle(at: path)
+        CardExpandAnimator.refresh(expandedPath: coordinator.expandedIndexPath, in: host.collectionView)
+        try await Task.sleep(for: .milliseconds(700))
+
+        #expect(cell.isStripExpanded)
+        #expect(drawer.alpha == 1 && drawer.transform == .identity, "strip left half-faded")
+        #expect(cell.bounds.height - closedHeight == EpisodeCardCell.stripHeight)
     }
 }

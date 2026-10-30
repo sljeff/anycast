@@ -17,6 +17,7 @@ final class DiscoverViewController: UIViewController {
 
     // Body
     private var categoryStrip: ChipTabBarView?
+    private var didAttachStripEdge = false
     private var pagingContainer: DiscoverPagingContainer?
     private let bodySpinner = UIActivityIndicatorView(style: .large)
     private let networkErrorLabel = UILabel()
@@ -88,7 +89,6 @@ final class DiscoverViewController: UIViewController {
 
     private func buildHeader() {
         header.configure(HeaderView.Configuration(title: "Discover"))
-        header.onSearch = { [weak self] query in self?.openSearch(query) }
         header.onSettings = { [weak self] in self?.openSettings() }
         header.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(header)
@@ -98,12 +98,6 @@ final class DiscoverViewController: UIViewController {
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
         ])
-    }
-
-    private func openSearch(_ query: String) {
-        SearchPageViewController.present(
-            from: topMostPresented(), context: context, searchText: query
-        )
     }
 
     private func openSettings() {
@@ -122,7 +116,7 @@ final class DiscoverViewController: UIViewController {
         // (discover.dart:73-78 applied at page level).
         networkErrorLabel.text = "Network Error"
         networkErrorLabel.textColor = Theme.onSurfaceVariant
-        networkErrorLabel.font = TypographyV2.headlineSmall.font()
+        networkErrorLabel.font = TypographyV2.emphasis.font()
         networkErrorLabel.adjustsFontForContentSizeCategory = true
         networkErrorLabel.textAlignment = .center
         networkErrorLabel.isHidden = true
@@ -160,6 +154,19 @@ final class DiscoverViewController: UIViewController {
         container.onSwipeSelect = { [weak self] index in
             self?.selectCategory(index, animatedPages: false)
         }
+        container.topChromeInset = ChipTabBarView.chipHeight
+        container.onSelectedPageScrollViewChange = { [weak self] in
+            guard let self else { return }
+            let list = self.pagingContainer?.selectedPageScrollView
+            self.setBottomEdgeScrollView(list)
+            guard let list else { return }
+            if self.didAttachStripEdge {
+                ScrollEdgeChrome.retarget(chrome: strip, to: list, edge: .top)
+            } else {
+                self.didAttachStripEdge = true
+                ScrollEdgeChrome.attach(chrome: strip, to: list, edge: .top, in: self.view)
+            }
+        }
         container.onScrub = { [weak self] index in
             // Mid-drag materialization — the PageView builds the page it is
             // being dragged toward; the strip indicator tracks the drag
@@ -176,9 +183,12 @@ final class DiscoverViewController: UIViewController {
 
             container.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             container.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            container.view.topAnchor.constraint(equalTo: strip.bottomAnchor),
+            // The lists run under the strip (content fades out behind it);
+            // `topChromeInset` keeps the first row below it.
+            container.view.topAnchor.constraint(equalTo: strip.topAnchor),
             container.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        view.bringSubviewToFront(strip)   // the pages now run under it
 
         categoryStrip = strip
         pagingContainer = container

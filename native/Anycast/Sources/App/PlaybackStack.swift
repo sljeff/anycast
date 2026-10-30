@@ -146,6 +146,9 @@ final class PlaybackStack {
 
         // K38: the countdown expiring pauses.
         sleepTimer.onExpired = { [weak playback] in playback?.pause() }
+        playback.shouldStopAtEpisodeEnd = { [weak sleepTimer] in
+            sleepTimer?.consumeEpisodeEnd() ?? false
+        }
 
         // K3 cascade: a removed queue entry drops out of both pollers.
         playback.onEpisodeRemoved = { [weak subtitles, weak translations] url in

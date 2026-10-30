@@ -18,6 +18,8 @@ final class PlaylistsPageViewController: UIViewController {
     private var pages: [Int64: PlaylistEpisodeListViewController] = [:]
 
     private let header = HeaderView()
+    private var topChromeInset: CGFloat = 0
+    private var didAttachHeaderEdge = false
 
     init(context: UIContext) {
         self.context = context
@@ -37,6 +39,16 @@ final class PlaylistsPageViewController: UIViewController {
         Task { await reloadPlaylists() }
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // The lists run under the pinned header; this inset puts their first
+        // row back below it (same gap as before they extended).
+        let inset = header.bounds.height + Spacing.xs
+        guard inset != topChromeInset else { return }
+        topChromeInset = inset
+        for list in pages.values { list.topChromeInset = inset }
+    }
+
     // MARK: - v2 header (09 §3.8)
 
     private func buildHeader() {
@@ -44,12 +56,6 @@ final class PlaylistsPageViewController: UIViewController {
         header.onSettings = { [weak self] in
             guard let self else { return }
             AppSheets.presentExpand(SettingsViewController(context: self.context), from: self.topMostPresented())
-        }
-        header.onSearch = { [weak self] query in
-            guard let self else { return }
-            SearchPageViewController.present(
-                from: self.topMostPresented(), context: self.context, searchText: query
-            )
         }
         header.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(header)
@@ -73,13 +79,14 @@ final class PlaylistsPageViewController: UIViewController {
         addChild(pageController)
         view.addSubview(pageController.view)
         pageController.didMove(toParent: self)
+        // The pages were added after the header; keep the header on top.
+        view.bringSubviewToFront(header)
 
         NSLayoutConstraint.activate([
             pageController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             pageController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            pageController.view.topAnchor.constraint(
-                equalTo: header.bottomAnchor, constant: Spacing.xs
-            ),
+            // Under the header: the lists fade out behind it.
+            pageController.view.topAnchor.constraint(equalTo: view.topAnchor),
             pageController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
     }
@@ -99,14 +106,29 @@ final class PlaylistsPageViewController: UIViewController {
             let direction: UIPageViewController.NavigationDirection =
                 pageModel.currentIndex >= previous.currentIndex ? .forward : .reverse
             pageController.setViewControllers([page], direction: direction, animated: false)
+            focusScrollView(page.edgeScrollView)
         }
         // An empty playlist table cannot occur with the schema's guaranteed
         // default row (K31 idempotent INSERT OR IGNORE at open).
     }
 
+    /// The visible list drives both the bar edge effect and the header's.
+    private func focusScrollView(_ scrollView: UIScrollView) {
+        setBottomEdgeScrollView(scrollView)
+        if didAttachHeaderEdge {
+            ScrollEdgeChrome.retarget(chrome: header, to: scrollView, edge: .top)
+        } else {
+            didAttachHeaderEdge = true
+            ScrollEdgeChrome.attach(
+                chrome: header, to: scrollView, edge: .top, in: view, reach: view.topAnchor
+            )
+        }
+    }
+
     private func page(for playlistID: Int64) -> PlaylistEpisodeListViewController {
         if let cached = pages[playlistID] { return cached }
         let page = PlaylistEpisodeListViewController(context: context, playlistId: playlistID)
+        page.topChromeInset = topChromeInset
         pages[playlistID] = page
         return page
     }
@@ -161,5 +183,6 @@ extension PlaylistsPageViewController: UIPageViewControllerDelegate {
               let index = pageModel.playlistIDs.firstIndex(of: list.playlistId)
         else { return }
         pageModel.currentIndex = index
+        focusScrollView(list.edgeScrollView)
     }
 }

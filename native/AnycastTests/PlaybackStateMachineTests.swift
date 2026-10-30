@@ -396,6 +396,26 @@ struct PlaybackStateMachineTests {
                 "initProgress shows the new head's playedDuration")
     }
 
+    @Test("sleep timer End of episode: with continuous play on, the next head loads paused once")
+    func completionStopsAtEpisodeEnd() async throws {
+        let harness = try await makeHarness()
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        await restore(harness)
+        let sleepTimer = SleepTimerController()
+        sleepTimer.setStopAtEpisodeEnd()
+        harness.service.shouldStopAtEpisodeEnd = { sleepTimer.consumeEpisodeEnd() }
+
+        await harness.service.playByEpisode(harness.service.queue.first!)
+        harness.engine.emit(.playingChanged(true))
+        harness.engine.emit(.completed)
+
+        await waitUntil { harness.service.currentEpisode?.enclosureUrl == "https://x.example/ep2.mp3" }
+        await waitUntil { harness.service.isPlaying == false }
+        #expect(harness.engine.pauseCount >= 1)
+        #expect(sleepTimer.stopsAtEpisodeEnd == false, "one-shot: the mode switches off as it fires")
+    }
+
     @Test("continuousPlaying off: the transition pause never persists the pre-seek ~0 over the new head")
     func completionPauseKeepsHeadProgress() async throws {
         var settings = AppSettings.defaults(localeIdentifier: "en_US")
