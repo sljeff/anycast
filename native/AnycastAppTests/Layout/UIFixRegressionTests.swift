@@ -1,5 +1,6 @@
 import UIKit
 import Testing
+import Lottie
 import AnycastKit
 @testable import Anycast
 
@@ -47,6 +48,12 @@ import AnycastKit
 ///     the title's leading edge (one artwork-gap clear of the cover),
 ///     trailing at the play/pause glyph's VISIBLE trailing edge (the 44 pt
 ///     hit slot's edge would outrun the glyph and break the rounded cap).
+/// 13. Playlist strip AI processing robot rendering roughly half its
+///     neighbors' glyph size — the 1920×1080 lottie canvas was
+///     letterboxed into a square 24×24 slot (24×13.5); the slot now
+///     follows the canvas aspect at the full 24 pt height.
+/// 14. Playlist fly-in animating its full flight under Reduce Motion —
+///     the reduced branch keeps the haptic and completes synchronously.
 ///
 /// Runs against the live shell with the seeded fixture; skips when the
 /// shell or the seed is absent. Serialized: the suite drives the SHARED
@@ -1227,6 +1234,64 @@ struct UIFixRegressionTests {
                 "the sheet did not dismiss after a show was picked")
         #expect(Self.find(ChannelViewController.self, in: window.rootViewController) != nil,
                 "a show picked in the sheet did not open its Channel")
+    }
+
+    // MARK: - 13. AI processing robot lottie slot (playlist strip)
+
+    /// The processing-state robot lottie slot must match its canvas aspect
+    /// (1920×1080) at the full 24 pt height — a square 24×24 slot
+    /// aspect-fits that wide scene down to 24×13.5 and the robot renders
+    /// roughly half the neighboring play/remove glyph sizes. The explicit
+    /// width also keeps the PR #9 anti-blow-up guarantee (no center +
+    /// height-only pinning) and the overlay must stay inside its button.
+    @Test("Playlist strip: AI robot lottie slot follows its 16:9 canvas at 24 pt height")
+    func aiRobotLottieSlotMatchesCanvasAspect() {
+        guard let canvas = LottieAnimationView(name: "robot_loading").animation?.size else {
+            Issue.record("robot_loading.json is missing from the bundle"); return
+        }
+        let button = UIButton(type: .system)
+        button.frame = CGRect(x: 0, y: 0, width: 96, height: 48)
+        let robot = PlaylistEpisodeListBinder.installRobotOverlay(on: button)
+        button.layoutIfNeeded()
+
+        #expect(abs(robot.frame.height - 24) < 0.5,
+                "robot height \(robot.frame.height) ≠ 24")
+        let expectedWidth = 24 * canvas.width / canvas.height
+        #expect(abs(robot.frame.width - expectedWidth) < 0.5,
+                "robot width \(robot.frame.width) ≠ canvas-derived \(expectedWidth) (canvas \(canvas))")
+        #expect(robot.frame.width > 30,
+                "robot slot collapsed to a square — the 16:9 scene letterboxes to 24×13.5 and renders half-size")
+        #expect(robot.frame.minX >= button.bounds.minX && robot.frame.maxX <= button.bounds.maxX,
+                "robot overlay escapes its button (\(robot.frame) in \(button.bounds))")
+    }
+
+    // MARK: - 14. Fly-in Reduce Motion (PlaylistFlyInAnimator)
+
+    /// Reduce Motion keeps the haptic (not asserted here — the reduced
+    /// branch calls Haptics before returning) and completes synchronously
+    /// WITHOUT mounting the flight overlay — the callers insert either
+    /// after awaiting the flight or in its completion, so both shapes
+    /// must stay correct with an immediate completion. The animated
+    /// branch must not complete synchronously.
+    @Test("Fly-in: reduce motion completes synchronously with no overlay")
+    func flyInHonorsReduceMotion() {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let animator = PlaylistFlyInAnimator(endpointProvider: WindowCenterBottomEndpointProvider())
+
+        var reducedCompleted = false
+        animator.fly(from: CGPoint(x: 100, y: 100), in: window, reduceMotion: true) {
+            reducedCompleted = true
+        }
+        #expect(reducedCompleted, "reduce motion did not complete synchronously")
+        #expect(window.subviews.isEmpty, "reduce motion mounted the flight overlay anyway")
+
+        var animatedCompleted = false
+        animator.fly(from: CGPoint(x: 100, y: 100), in: window, reduceMotion: false) {
+            animatedCompleted = true
+        }
+        #expect(!animatedCompleted, "the animated flight completed synchronously — the guard is inverted")
+        #expect(!window.subviews.isEmpty, "the animated flight mounted no overlay")
+        window.subviews.forEach { $0.removeFromSuperview() }
     }
 
     // MARK: - Helpers

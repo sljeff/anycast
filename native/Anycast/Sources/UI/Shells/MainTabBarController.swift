@@ -28,11 +28,16 @@ protocol TabZeroTopRefresh: AnyObject {
     func tabZeroReTapped()
 }
 
-/// The mini player visibility rule (03 §2.9): with an empty queue the whole
-/// bar collapses (`SizedBox.shrink` — bottom_nav_bar.dart:86-88).
+/// The mini player visibility rule (bottom_nav_bar.dart:86-88): the bar
+/// renders only while a CURRENT EPISODE exists
+/// (`playlistEpisode.value.enclosureUrl == null` → `SizedBox.shrink`) —
+/// NOT while the queue has rows. Removing the playing episode clears the
+/// current episode while the list keeps its remaining rows, and the bar
+/// hides until something plays again (player.clear(), playlists.dart:187).
 enum MiniPlayerVisibility {
-    static func isVisible(queueCount: Int) -> Bool {
-        queueCount > 0
+    static func isVisible(currentEnclosureURL: String?) -> Bool {
+        guard let url = currentEnclosureURL else { return false }
+        return !url.isEmpty
     }
 }
 
@@ -161,7 +166,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         observePlaybackError()
         updateMiniPlayerVisibility(animated: false)
         visibilityObservation.track(
-            read: { [weak self] in _ = self?.context.playback.queue },
+            read: { [weak self] in _ = self?.context.playback.currentEpisode },
             onChange: { [weak self] in self?.updateMiniPlayerVisibility(animated: true) }
         )
     }
@@ -272,11 +277,29 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         floatingFade = fade
     }
 
-    /// The mini player shows while the queue has episodes (03 §2.9). On
-    /// iOS 26 the system accessory carries it and adjusts content insets
-    /// itself; the iOS 18 capsule makes the pages avoid it explicitly.
+    /// The mini player shows while a current episode exists
+    /// (bottom_nav_bar.dart:86-88). On iOS 26 the system accessory carries
+    /// it and adjusts content insets itself; the iOS 18 capsule makes the
+    /// pages avoid it explicitly. The observation fires on every
+    /// currentEpisode mutation (progress persistence rewrites
+    /// playedDuration every 2 s), so an unchanged verdict returns early —
+    /// the iOS 18 branch would otherwise re-animate and re-inset the pages
+    /// on each tick.
+    /// Dedup for `updateMiniPlayerVisibility`: the observation fires on
+    /// every currentEpisode mutation (progress persistence rewrites
+    /// playedDuration every 2 s), so an unchanged verdict returns early.
+    private var lastMiniPlayerVisible: Bool?
+
+    /// The mini player shows while a current episode exists
+    /// (bottom_nav_bar.dart:86-88). On iOS 26 the system accessory carries
+    /// it and adjusts content insets itself; the iOS 18 capsule makes the
+    /// pages avoid it explicitly.
     private func updateMiniPlayerVisibility(animated: Bool) {
-        let visible = MiniPlayerVisibility.isVisible(queueCount: context.playback.queue.count)
+        let visible = MiniPlayerVisibility.isVisible(
+            currentEnclosureURL: context.playback.currentEpisode?.enclosureUrl
+        )
+        if lastMiniPlayerVisible == visible { return }
+        lastMiniPlayerVisible = visible
         if #available(iOS 26.0, *) {
             if visible, bottomAccessory == nil {
                 setBottomAccessory(UITabAccessory(contentView: playerBar), animated: animated)

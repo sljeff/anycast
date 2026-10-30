@@ -131,6 +131,43 @@ public struct PlaylistRepository: Sendable {
         }
     }
 
+    /// Move-only variant of `insertOrUpdateByIndex`: the row must already
+    /// exist IN THIS PLAYLIST, and the existence check plus the move run in
+    /// ONE write transaction. The reorder path must never resurrect a row a
+    /// completion cascaded away mid-drag — the add-or-move entry would take
+    /// its INSERT branch for such a row — and a check-then-write split
+    /// still leaves that window open. Returns false (no writes) when the
+    /// row is gone or lives in another playlist; the caller resyncs from
+    /// the database.
+    @concurrent
+    public func moveExisting(
+        byEnclosureURL enclosureUrl: String,
+        playlistId: Int64,
+        index: Int
+    ) async throws -> Bool {
+        try await database.queue.write { db in
+            let ordered = try PlaylistEpisodeRow.fetchAll(
+                db,
+                sql: "SELECT * FROM playlistEpisode WHERE playlistId = ? ORDER BY position ASC",
+                arguments: [playlistId]
+            )
+            guard let existingIndex = ordered.firstIndex(where: { $0.enclosureUrl == enclosureUrl })
+            else { return false }
+
+            let positions = ordered.map(\.position)
+            let result = PlaylistPositioning.movePosition(
+                from: existingIndex, to: index, orderedPositions: positions
+            )
+            var moved = ordered[existingIndex]
+            moved.position = result.position
+            try moved.update(db)
+            if result.needsReorder {
+                try renumber(db: db, playlistId: playlistId)
+            }
+            return true
+        }
+    }
+
     private func renumber(db: Database, playlistId: Int64) throws {
         let ordered = try PlaylistEpisodeRow.fetchAll(
             db,

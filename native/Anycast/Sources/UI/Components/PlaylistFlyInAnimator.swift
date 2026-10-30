@@ -37,10 +37,22 @@ final class PlaylistFlyInAnimator {
 
     /// Runs the animation in `window`, from `startPoint` (the plus button's
     /// center in window coordinates). `completion` fires when the overlay is
-    /// removed (the Dart onAnimationComplete — the actual list insertion
-    /// happens there at the call sites).
-    func fly(from startPoint: CGPoint, in window: UIWindow, completion: (() -> Void)? = nil) {
+    /// removed (the Dart onAnimationComplete — callers either await the
+    /// flight before their next step or insert in its completion, so a
+    /// synchronous completion is safe on both shapes). Reduce Motion keeps
+    /// the haptic (reduced, not cancelled, feedback) and completes
+    /// synchronously without the flight.
+    func fly(
+        from startPoint: CGPoint,
+        in window: UIWindow,
+        reduceMotion: Bool = Motion.reduceMotion,
+        completion: (() -> Void)? = nil
+    ) {
         Haptics.queueAdded()
+        guard !reduceMotion else {
+            completion?()
+            return
+        }
         let endpoint = endpointProvider.playlistFlyInEndpoint(in: window)
 
         let startSize = CGSize(width: 200, height: 48)

@@ -295,7 +295,8 @@ final class PlayerMainPageViewController: UIViewController {
         titleBlock.update(
             title: episode?.title ?? "",
             channelTitle: episode?.channelTitle ?? "",
-            rssFeedURL: episode?.rssFeedUrl
+            rssFeedURL: episode?.rssFeedUrl,
+            hasEpisode: episode != nil
         ) { [weak self] rss in
             guard let self else { return }
             Task { await self.fetchChannel(rssFeedURL: rss) }
@@ -303,6 +304,10 @@ final class PlayerMainPageViewController: UIViewController {
 
         // K6: error surfaced by the shell toast; this is the manual retry.
         retryRow.isHidden = context.playback.playbackError == nil
+
+        let shareEnabled = Self.shareAvailable(episode)
+        shareButton.isEnabled = shareEnabled
+        shareButton.alpha = shareEnabled ? 1 : 0.38
 
         let parsed = EpisodeChapters.chapters(description: episode?.description, cacheKey: episode?.enclosureUrl)
         if parsed != chapters {
@@ -349,6 +354,15 @@ final class PlayerMainPageViewController: UIViewController {
             sleepButton.configuration?.baseForegroundColor = timer.stopsAtEpisodeEnd ? Theme.primary : Theme.playerText
             sleepButton.accessibilityValue = timer.stopsAtEpisodeEnd ? "End of episode" : "Off"
         }
+    }
+
+    /// The share action needs the shortlink inputs — an episode with both
+    /// a feed URL and an enclosure URL. Everything else on the transport
+    /// dims to 38% with no episode; share matches that affordance (the
+    /// tap guard alone would leave it looking usable on a drained queue).
+    static func shareAvailable(_ episode: PlaylistEpisodeRow?) -> Bool {
+        guard let episode else { return false }
+        return !(episode.rssFeedUrl ?? "").isEmpty && !(episode.enclosureUrl ?? "").isEmpty
     }
 
     // MARK: - Menus
@@ -464,7 +478,8 @@ final class PlayerMainPageViewController: UIViewController {
     /// player.dart:175-224 — spinner → /api/shortlink → system share panel
     /// with "title\n\nurl" (shortlink failure degrades to the full URL).
     private func shareTapped() {
-        guard let episode = context.playback.currentEpisode,
+        guard Self.shareAvailable(context.playback.currentEpisode),
+              let episode = context.playback.currentEpisode,
               let rss = episode.rssFeedUrl, let enclosure = episode.enclosureUrl,
               let url = URL(string: ShareURL.player(rssFeedURL: rss, enclosureURL: enclosure))
         else { return }
@@ -549,11 +564,16 @@ private final class PlayerTitleBlockView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     /// Pushes the current episode; `loadChannel` kicks the subscription
-    /// fetch (authoritative show name) once per rss URL.
+    /// fetch (authoritative show name) once per rss URL. The fetch-sourced
+    /// name deliberately does NOT enter `lastEpisodeChannelTitle` — that
+    /// field mirrors the EPISODE-side name so the per-tick non-empty
+    /// branch cannot roll the fetched name back on every progress render.
+    /// Clearing is driven by `hasEpisode` instead.
     func update(
         title: String,
         channelTitle: String,
         rssFeedURL: String?,
+        hasEpisode: Bool,
         loadChannel: @MainActor (String) -> Void
     ) {
         if titleLabel.text != title {
@@ -572,6 +592,14 @@ private final class PlayerTitleBlockView: UIView {
             // and clear the identity so an in-flight fetch for the previous
             // episode cannot land on the current one.
             channelURLString = ""
+        }
+        // The queue drained while the sheet is open: the previous episode's
+        // show name must not keep rendering under an empty title — whether
+        // it came from the row or from the channel fetch. A row that merely
+        // lacks a feed URL keeps its title (`hasEpisode` stays true).
+        if !hasEpisode {
+            lastEpisodeChannelTitle = ""
+            setChannelTitle("")
         }
     }
 

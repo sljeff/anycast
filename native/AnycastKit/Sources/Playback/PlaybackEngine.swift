@@ -39,6 +39,12 @@ public protocol PlaybackEngine: AnyObject {
 
     func pause()
 
+    /// Detach the current item entirely. The Dart handler had no such call —
+    /// its player kept the finished/removed source forever, so remote
+    /// commands could still reach a zombie item; a cleared player must not
+    /// leave one behind.
+    func unload()
+
     /// Seek with zero tolerance (progress-bar / ±10s semantics).
     func seek(toMilliseconds: Int64)
 

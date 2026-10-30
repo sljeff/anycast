@@ -443,6 +443,106 @@ struct L0DatabaseTests {
                 "upward move survives reopen")
     }
 
+    @Test("moveExisting: moves only, never inserts — the reorder resurrection guard")
+    func moveExistingNeverInserts() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-move-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("anycast.db")
+        let database = try await AppDatabase.openAt(url)
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
+
+        func episode(_ name: String) -> PlaylistEpisodeRow {
+            PlaylistEpisodeRow(
+                title: name, enclosureUrl: "https://x.example/\(name).mp3", playlistId: 1
+            )
+        }
+        let repository = database.playlistRepository()
+        for (index, name) in ["A", "B", "C"].enumerated() {
+            try await repository.insertOrUpdateByIndex(episode(name), playlistId: 1, index: index)
+        }
+
+        // A row a completion cascaded away mid-drag: the reorder must drop,
+        // not resurrect it with the stale in-memory copy.
+        try await repository.removeEpisodeCascade(byEnclosureURL: "https://x.example/B.mp3")
+        let movedGone = try await repository.moveExisting(
+            byEnclosureURL: "https://x.example/B.mp3", playlistId: 1, index: 0
+        )
+        #expect(movedGone == false)
+        var rows = try await repository.listEpisodes(playlistId: 1)
+        #expect(rows.compactMap(\.title) == ["A", "C"], "a cascaded-away row was resurrected")
+
+        // A real move matches insertOrUpdateByIndex's drag convention.
+        let movedReal = try await repository.moveExisting(
+            byEnclosureURL: "https://x.example/A.mp3", playlistId: 1, index: 2
+        )
+        #expect(movedReal == true)
+        rows = try await repository.listEpisodes(playlistId: 1)
+        #expect(rows.compactMap(\.title) == ["C", "A"])
+
+        // The same URL in ANOTHER playlist is not dragged over: the row
+        // stays where it is and this playlist is untouched.
+        var other = episode("D")
+        other.playlistId = 2
+        try await repository.insertOrUpdateByIndex(other, playlistId: 2, index: 0)
+        let movedForeign = try await repository.moveExisting(
+            byEnclosureURL: "https://x.example/D.mp3", playlistId: 1, index: 0
+        )
+        #expect(movedForeign == false)
+        rows = try await repository.listEpisodes(playlistId: 1)
+        #expect(rows.compactMap(\.title) == ["C", "A"], "a foreign-playlist row was pulled in")
+        let playlist2 = try await repository.listEpisodes(playlistId: 2)
+        #expect(playlist2.compactMap(\.title) == ["D"], "the foreign-playlist row moved")
+    }
+
+    @Test("moveExisting matches insertOrUpdateByIndex's move semantics across directions")
+    func moveExistingMatchesAddOrMove() async throws {
+        // Differential: identical seeds, one entry each, every (from, to)
+        // — the reorder path must not drift from the K26-pinned move.
+        for (from, to) in [(0, 2), (2, 0), (1, 3), (3, 1), (0, 1), (2, 3)] {
+            let viaMove = try await Self.movedList(entry: .moveExisting, from: from, to: to)
+            let viaAddOrMove = try await Self.movedList(entry: .insertOrUpdateByIndex, from: from, to: to)
+            #expect(viaMove == viaAddOrMove, "moveExisting(\(from), \(to)) diverged: \(viaMove) vs \(viaAddOrMove)")
+        }
+    }
+
+    private enum MoveEntry {
+        case moveExisting, insertOrUpdateByIndex
+    }
+
+    private static func movedList(entry: MoveEntry, from: Int, to: Int) async throws -> [String] {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-move-diff-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("anycast.db")
+        let database = try await AppDatabase.openAt(url)
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
+
+        func episode(_ name: String) -> PlaylistEpisodeRow {
+            PlaylistEpisodeRow(
+                title: name, enclosureUrl: "https://x.example/\(name).mp3", playlistId: 1
+            )
+        }
+        let repository = database.playlistRepository()
+        for (index, name) in ["A", "B", "C", "D"].enumerated() {
+            try await repository.insertOrUpdateByIndex(episode(name), playlistId: 1, index: index)
+        }
+
+        let movedName = ["A", "B", "C", "D"][from]
+        switch entry {
+        case .moveExisting:
+            try await repository.moveExisting(
+                byEnclosureURL: "https://x.example/\(movedName).mp3", playlistId: 1, index: to
+            )
+        case .insertOrUpdateByIndex:
+            try await repository.insertOrUpdateByIndex(
+                episode(movedName), playlistId: 1, index: to
+            )
+        }
+        let rows = try await repository.listEpisodes(playlistId: 1)
+        return rows.compactMap(\.title)
+    }
+
     // MARK: - §2.3 write-back loop
 
     @Test("Write-back: progress to queue head, removeTop cascade, trims, history re-insert, K31 reopen")

@@ -22,6 +22,7 @@ struct PlaybackStateMachineTests {
         private(set) var pauseCount = 0
         private(set) var seeks: [Int64] = []
         private(set) var speeds: [Float] = []
+        private(set) var unloadCount = 0
 
         var hasItem = false
         var positionMilliseconds: Int64 = 0
@@ -34,6 +35,14 @@ struct PlaybackStateMachineTests {
         /// applies the position synchronously; load-window races flip this.
         var appliesInitialPositionSynchronously = true
 
+        /// Real AVPlayer parks timeControlStatus at .paused via ASYNC KVO
+        /// after replaceCurrentItem(nil) — i.e. the playingChanged(false)
+        /// usually arrives AFTER the service's clear ran. The fake fires it
+        /// synchronously by default; tests that assert the clear's OWN
+        /// transport resets turn this off so the fake's event cannot mask
+        /// them (and lateEvents covers the post-clear arrival).
+        var emitsOnUnload = true
+
         func load(url: URL, initialPositionMilliseconds: Int64) {
             loads.append((url, initialPositionMilliseconds))
             hasItem = true
@@ -43,6 +52,14 @@ struct PlaybackStateMachineTests {
 
         func playImmediately() { playCount += 1 }
         func pause() { pauseCount += 1 }
+        func unload() {
+            unloadCount += 1
+            hasItem = false
+            positionMilliseconds = 0
+            if emitsOnUnload {
+                events?(.playingChanged(false))
+            }
+        }
         func seek(toMilliseconds: Int64) {
             seeks.append(toMilliseconds)
             positionMilliseconds = toMilliseconds
@@ -481,6 +498,189 @@ struct PlaybackStateMachineTests {
 
         // Queue drained → the session deactivates politely (K18).
         #expect(harness.sessionBackend.calls.contains(.deactivate))
+        // …the engine keeps no playable item and the system card is gone
+        // (the old app left a zombie lock-screen entry).
+        #expect(harness.engine.hasItem == false)
+        #expect(harness.engine.unloadCount == 1)
+        #expect(harness.service.nowPlaying.isPublishing == false)
+    }
+
+    // MARK: - Manual clear (remove of the playing head)
+
+    @Test("manual clear (remove of the playing head): full teardown, remaining rows survive")
+    func manualClearTearsDownWithoutZombie() async throws {
+        let harness = try await makeHarness()
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        await restore(harness)
+
+        await harness.service.playByEpisode(harness.service.queue.first!)
+        harness.engine.emit(.playingChanged(true))
+        // A mid-playback failure leaves stale error state the clear below
+        // must sweep (the player retry row dies with the player). Re-raise
+        // the transport flags afterwards so the clear's OWN resets are
+        // what the assertions observe — not leftovers of the failure path.
+        harness.engine.emit(.failed("stale failure"))
+        harness.engine.emit(.playingChanged(true))
+        harness.engine.emit(.loadingChanged(true))
+        harness.engine.emitsOnUnload = false
+        #expect(harness.service.isPlaying == true)
+        #expect(harness.service.isLoading == true)
+        await harness.service.flushStoreWrites()
+        #expect(harness.service.nowPlaying.currentInfo[MPMediaItemPropertyTitle] as? String == "Ep 1")
+
+        // The binder's remove-of-head sequence: cascade the row away
+        // FIRST, then clear the player (playlists.dart:185-188).
+        try await harness.database.playlistRepository()
+            .removeEpisodeCascade(byEnclosureURL: "https://x.example/ep1.mp3")
+        await harness.service.clear()
+
+        // No zombie: episode, queue, pointer, engine item, Now Playing all
+        // gone; the session hands audio focus back; the stale failure
+        // state dies with the player (the retry row must not survive).
+        #expect(harness.service.currentEpisode == nil)
+        #expect(harness.service.queue.isEmpty)
+        #expect(harness.service.currentPlaylistId == nil)
+        #expect(harness.service.positionData == .zero)
+        #expect(harness.service.playbackError == nil)
+        #expect(harness.service.isPlaying == false)
+        #expect(harness.service.isLoading == false)
+        #expect(harness.engine.hasItem == false)
+        #expect(harness.service.nowPlaying.isPublishing == false)
+        #expect(harness.sessionBackend.calls.contains(.deactivate))
+        await harness.service.flushStoreWrites()
+        let pointer = try await harness.database.playerRepository().loadPointer()
+        #expect(pointer?.currentPlaylistId == nil)
+
+        // The non-head row stays in the database — the playlist screen's
+        // reload re-reads it; only the player forgot the queue.
+        let remaining = try await harness.database.playlistRepository().listEpisodes(playlistId: 1)
+        #expect(remaining.map(\.enclosureUrl) == ["https://x.example/ep2.mp3"])
+
+        // A cleared player ignores the lock-screen transport: resuming
+        // replays nothing instead of resurrecting the removed episode.
+        await harness.service.play()
+        #expect(harness.engine.playCount == 1, "play() on no current episode never reaches the engine again")
+    }
+
+    @Test("late engine events after clear do not resurrect the Now Playing card")
+    func lateEventsDoNotResurrectCard() async throws {
+        let harness = try await makeHarness()
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        await restore(harness)
+        await harness.service.playByEpisode(harness.service.queue.first!)
+        #expect(harness.service.nowPlaying.currentInfo.isEmpty == false)
+
+        await harness.service.clear()
+        #expect(harness.service.nowPlaying.isPublishing == false)
+
+        // Production ordering: the async KVO of replaceCurrentItem(nil), a
+        // trailing periodic tick, and a speed change can all land AFTER the
+        // clear — the publish gate must keep the card gone.
+        harness.engine.emit(.playingChanged(false))
+        harness.engine.emit(.positionTick(
+            positionMilliseconds: 42_000, bufferedMilliseconds: 60_000,
+            durationMilliseconds: 600_000
+        ))
+        harness.service.setSpeed(1.5)
+        #expect(harness.service.nowPlaying.isPublishing == false,
+                "a late event republished the cleared card")
+
+        // A new episode reopens the gate and republishes normally (the
+        // in-memory queue emptied with the clear — take the row the
+        // playlist screen would re-read from the database).
+        let ep2 = try await harness.database.playlistRepository()
+            .episode(byEnclosureURL: "https://x.example/ep2.mp3")
+        await harness.service.playByEpisode(try #require(ep2))
+        #expect(harness.service.nowPlaying.currentInfo[MPMediaItemPropertyTitle] as? String == "Ep 2")
+    }
+
+    @Test("zombie completion after a head removal must not cascade the next episode away")
+    func removedHeadCompletionSparesTheNextEpisode() async throws {
+        let harness = try await makeHarness()
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        await restore(harness)
+        await harness.service.playByEpisode(harness.service.queue.first!)
+        harness.engine.emit(.playingChanged(true))
+
+        // Remove the playing head (binder sequence — including its own
+        // cache eviction), then the zombie item plays to its end on a real
+        // device (or any late completed event arrives) — historically
+        // handleCompleted took queue.first (= the NEXT episode) and
+        // cascade-deleted its rows, subtitle, translation and cache.
+        try await harness.database.playlistRepository()
+            .removeEpisodeCascade(byEnclosureURL: "https://x.example/ep1.mp3")
+        await harness.cache.remove(url: "https://x.example/ep1.mp3")
+        await harness.service.clear()
+        // The screen resync after a removal reloads the queue: a no-op on
+        // the fixed clear (no current playlist), but the exact step that
+        // re-armed [ep2] in the pre-fix sequence.
+        await harness.service.reloadQueue()
+        harness.engine.emit(.completed)
+        // The completion is fire-and-forget in production; flushStoreWrites
+        // tracks it, so the assertions below cannot beat it.
+        await harness.service.flushStoreWrites()
+
+        // Ep 2 — never removed by the user — survives entirely.
+        let remaining = try await harness.database.playlistRepository().listEpisodes(playlistId: 1)
+        #expect(remaining.map(\.enclosureUrl) == ["https://x.example/ep2.mp3"],
+                "the zombie completion cascade-deleted the next episode")
+        let cacheRemovals = await harness.cache.removed
+        #expect(cacheRemovals == ["https://x.example/ep1.mp3"],
+                "the zombie completion evicted the next episode's cache")
+    }
+
+    @Test("cleared player: a trailing tick writes no progress anywhere")
+    func clearedTickWritesNothing() async throws {
+        let harness = try await makeHarness()
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        await restore(harness)
+        await harness.service.playByEpisode(harness.service.queue.first!)
+        harness.engine.emit(.playingChanged(true))
+
+        try await harness.database.playlistRepository()
+            .removeEpisodeCascade(byEnclosureURL: "https://x.example/ep1.mp3")
+        await harness.service.clear()
+
+        harness.clock.advance(3_000)
+        harness.engine.emit(.positionTick(
+            positionMilliseconds: 90_000, bufferedMilliseconds: 120_000,
+            durationMilliseconds: 600_000
+        ))
+        await harness.service.flushStoreWrites()
+
+        // K11: the progress UI must not move on a cleared player and no
+        // episode may come back for a later write to act on.
+        #expect(harness.service.positionData == .zero)
+        #expect(harness.service.currentEpisode == nil)
+    }
+
+    @Test("clear during an in-flight play does not re-activate audio or load a stale source")
+    func clearDuringInFlightPlay() async throws {
+        let gate = GatedCache()
+        let harness = try await makeHarness(cacheOverride: gate)
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        await restore(harness)
+
+        // Park the play inside its cache lookup…
+        let playTask = Task { await harness.service.playByEpisode(harness.service.queue.first!) }
+        await waitUntil { await gate.parkedURLs.contains("https://x.example/ep1.mp3") }
+        // …clear the player while it is suspended, then let the lookup land.
+        await harness.service.clear()
+        await gate.resolve(url: "https://x.example/ep1.mp3", result: nil)
+        await playTask.value
+
+        #expect(harness.engine.loads.isEmpty, "the stale play loaded a source after the clear")
+        #expect(harness.engine.playCount == 0)
+        // The clear releases the session only when it held it; either way
+        // the stale play must not (re)claim audio focus afterwards.
+        #expect(!harness.sessionBackend.calls.contains(.activate),
+                "the stale play re-activated the audio session after the clear")
+        #expect(harness.service.currentEpisode == nil)
     }
 
     // MARK: - §5.1 seek paths
@@ -509,6 +709,32 @@ struct PlaybackStateMachineTests {
         harness.engine.durationMilliseconds = nil
         harness.service.seekByRelative(1_000_000)
         #expect(harness.engine.seeks.last == 1_000_000)
+    }
+
+    @Test("seekByRelative is a no-op without a current episode (zombie lock-screen guard)")
+    func relativeSeekRequiresEpisode() async throws {
+        let harness = try await makeHarness(seed: false)
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        // No restore → currentEpisode == nil, as on a fresh install.
+        harness.service.seekByRelative(10_000)
+        #expect(harness.engine.seeks.isEmpty)
+
+        // And after a real clear mid-playback.
+        try await harness.database.playlistRepository().insertOrUpdateByIndex(
+            PlaylistEpisodeRow(title: "Ep only", duration: 600_000,
+                               enclosureUrl: "https://x.example/only.mp3",
+                               channelTitle: "Channel", rssFeedUrl: "https://x.example/feed.xml",
+                               playlistId: 1, playedDuration: 0),
+            playlistId: 1, index: 0
+        )
+        await restore(harness)
+        await harness.service.playByEpisode(harness.service.queue.first!)
+        harness.service.seekByRelative(10_000)
+        #expect(harness.engine.seeks == [10_000])
+        await harness.service.clear()
+        harness.service.seekByRelative(10_000)
+        #expect(harness.engine.seeks == [10_000], "no further seek once cleared")
     }
 
     @Test("seek on the loaded episode: pause → seek → play, and NO extra history insert")

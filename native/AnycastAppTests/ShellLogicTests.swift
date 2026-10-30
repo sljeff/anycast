@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import AnycastKit
 @testable import Anycast
 
 /// T0b shell logic: the pure pieces of the tab shell, mini player, player
@@ -58,13 +59,28 @@ struct ShellLogicTests {
         #expect(TabZeroRetap.action(hasClient: true, isAtTop: false) == .scrollToTop)
     }
 
-    // MARK: - Mini player visibility (03 §2.9)
+    // MARK: - Mini player visibility (bottom_nav_bar.dart:86-88)
 
-    @Test("Mini player collapses only when the queue is empty")
+    @Test("Mini player renders only while a current episode exists")
     func miniPlayerVisibility() {
-        #expect(MiniPlayerVisibility.isVisible(queueCount: 0) == false)
-        #expect(MiniPlayerVisibility.isVisible(queueCount: 1) == true)
-        #expect(MiniPlayerVisibility.isVisible(queueCount: 12) == true)
+        #expect(MiniPlayerVisibility.isVisible(currentEnclosureURL: nil) == false)
+        #expect(MiniPlayerVisibility.isVisible(currentEnclosureURL: "") == false)
+        #expect(MiniPlayerVisibility.isVisible(currentEnclosureURL: "https://x.example/ep.mp3") == true)
+    }
+
+    // MARK: - Player share affordance
+
+    @Test("Share needs an episode with both a feed URL and an enclosure URL")
+    func playerShareAvailability() {
+        func row(rss: String?, enclosure: String?) -> PlaylistEpisodeRow {
+            PlaylistEpisodeRow(title: "Ep", duration: 1, enclosureUrl: enclosure,
+                               channelTitle: "Ch", rssFeedUrl: rss, playlistId: 1,
+                               playedDuration: 0)
+        }
+        #expect(PlayerMainPageViewController.shareAvailable(nil) == false)
+        #expect(PlayerMainPageViewController.shareAvailable(row(rss: nil, enclosure: "e")) == false)
+        #expect(PlayerMainPageViewController.shareAvailable(row(rss: "f", enclosure: nil)) == false)
+        #expect(PlayerMainPageViewController.shareAvailable(row(rss: "f", enclosure: "e")) == true)
     }
 }
 

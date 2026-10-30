@@ -147,6 +147,13 @@ public final class AVPlayerEngine: PlaybackEngine {
         player.pause()
     }
 
+    public func unload() {
+        // The item-scoped status observation must not outlive its item.
+        statusObservation?.invalidate()
+        statusObservation = nil
+        player.replaceCurrentItem(with: nil)
+    }
+
     public func seek(toMilliseconds: Int64) {
         let target = CMTime(value: CMTimeValue(max(0, toMilliseconds)), timescale: 1000)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)

@@ -150,6 +150,11 @@ public final class PlaybackService {
         trackStoreWrite { try await self.store.savePointer(playlistId: playlistId) }
 
         await setByEpisodeInner(episode)
+        // A clear() while the cache lookup inside setByEpisodeInner was
+        // suspended already emptied the player; the load was dropped by the
+        // identity guard there. Do not re-activate the audio session for an
+        // episode that is no longer current.
+        guard currentEpisode?.enclosureUrl == episode.enclosureUrl else { return }
         await session.activateForPlayback()
         playbackError = nil
         engine.playImmediately()
@@ -307,8 +312,11 @@ public final class PlaybackService {
 
     /// ±10 s (lock screen, K1) and −10 s/+30 s (full-screen controls):
     /// clamped to [0, duration] — a nil duration no longer crashes (K4),
-    /// it simply skips the upper clamp.
+    /// it simply skips the upper clamp. No current episode (a drained or
+    /// cleared player) is a no-op, matching the controller-level seek
+    /// guard — a zombie card must not time-travel.
     public func seekByRelative(_ deltaMilliseconds: Int64) {
+        guard currentEpisode?.enclosureUrl != nil else { return }
         var target = engine.positionMilliseconds + deltaMilliseconds
         if target < 0 { target = 0 }
         if let duration = engine.durationMilliseconds, target > duration {
@@ -378,14 +386,21 @@ public final class PlaybackService {
         case let .positionTick(position, buffered, duration):
             handleTick(position: position, buffered: buffered, duration: duration)
         case .completed:
-            Task { await handleCompleted() }
+            // Tracked like a store write so `flushStoreWrites` (tests,
+            // graceful quit) can await the fire-and-forget completion.
+            trackStoreWrite { await self.handleCompleted() }
         case let .failed(message):
             // K6: a failure ends the loading attempt — clear the transport
             // flags so the loading lottie stops and the controls re-enable.
             // (The engine may never follow up with loadingChanged(false).)
             isLoading = false
             isPlaying = false
-            playbackError = message
+            // A status observation from the just-unloaded item can still
+            // deliver its failure after a clear — no error toast for a
+            // player that no longer has an episode.
+            if currentEpisode?.enclosureUrl != nil {
+                playbackError = message
+            }
             nowPlaying.updatePlaybackState(
                 positionMilliseconds: engine.positionMilliseconds,
                 speed: speed,
@@ -434,7 +449,9 @@ public final class PlaybackService {
         onEpisodeRemoved?(url)
 
         if queue.isEmpty {
-            pause()
+            // The completed-transition pause never persists (see
+            // pauseEngineOnly); the row is being cascaded away below.
+            pauseEngineOnly()
             await clearPlaybackState()
             return
         }
@@ -446,10 +463,31 @@ public final class PlaybackService {
         }
     }
 
+    /// Manual removal of the current track (the playlist remove of the
+    /// queue head, playlists.dart:185-188 → `PlayerController.clear()`):
+    /// pause WITHOUT persisting (the row is being deleted), then the full
+    /// teardown. Remaining queue rows stay in the database — the caller's
+    /// list reload resyncs them; the in-memory queue empties with the
+    /// pointer that scoped it, so the mini player hides (the Dart bar is
+    /// episode-driven, not queue-driven). Deliberate divergence from Dart:
+    /// `unload()` also detaches the engine item and the Now Playing card
+    /// so remote commands cannot resurrect the removed episode.
+    public func clear() async {
+        pauseEngineOnly()
+        await clearPlaybackState()
+    }
+
     private func clearPlaybackState() async {
         currentEpisode = nil
         positionData = .zero
         currentPlaylistId = nil
+        queue = []
+        loadedEnclosureURL = nil
+        playbackError = nil
+        isPlaying = false
+        isLoading = false
+        engine.unload()
+        nowPlaying.clear()
         try? await store.clearPointer()
         await session.deactivate()
     }

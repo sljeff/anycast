@@ -301,6 +301,20 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     /// playback + reload steps strictly in commit order.
     private var reorderChain: Task<Void, Never>?
 
+    /// A queue-changing read landed mid-drag and was dropped
+    /// (`reloadEpisodes`); the gesture's end replays it so completions and
+    /// cross-screen removals cannot linger as ghost cards.
+    private var needsReloadAfterDrag = false
+
+    /// Reorder commits whose chain task has not finished (persist + resync).
+    /// While any is in flight, `reloadEpisodes` drops its read: it would
+    /// race the move write and land the PRE-move order after the drop's
+    /// visual state (cards jumping back, then forward again when the
+    /// chain's own tail reload lands). Includes the replayed mid-drag
+    /// reload and queue-observation reloads triggered by the 2 s progress
+    /// tick during a long drag.
+    private var pendingReorderCount = 0
+
     /// URL → row index for the cell provider (rebuilt whenever `episodes`
     /// is assigned as a whole — the only mutation pattern this screen uses).
     private var episodeByURL: [String: PlaylistEpisodeRow] = [:]
@@ -322,11 +336,40 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         // pre-reorder database order and silently discard the drop's
         // reorder; the drag's own commit applies and persists the new
         // order, so the reload's result is dropped instead.
-        guard liftedCell == nil else { return }
+        guard liftedCell == nil else {
+            // A completion that cascaded a row away while the drag was in
+            // flight leaves a ghost card when the user drops in place or
+            // cancels — `movedIndex` never fires and nothing else resyncs.
+            needsReloadAfterDrag = true
+            return
+        }
+        // Same for an in-flight reorder commit: the chain task's tail
+        // reload is the authoritative resync.
+        guard pendingReorderCount == 0 else { return }
+        // Captured after the awaits and guards, in the same main-actor turn
+        // as the assignment — a reorder landing mid-read must not make the
+        // reshape comparison run against a stale sequence.
+        let previousURLs = episodes.compactMap(\.enclosureUrl)
         episodes = rows
         rebuildEpisodeIndex()
         isLoading = false
+        // The expanded strip's IndexPath is a POSITION, not an identity
+        // (CardExpandCoordinator contract): any reshape — a K3 completion
+        // emptying the head, a removal, a cross-screen add — shifts it
+        // onto the wrong card. Collapse whenever the row sequence changed;
+        // an unchanged sequence (the viewWillAppear resync) keeps the
+        // user's strip open.
+        let reshaped = rows.compactMap(\.enclosureUrl) != previousURLs
+        let hadExpandedStrip = expandCoordinator.expandedIndexPath != nil
+        if reshaped, hadExpandedStrip {
+            expandCoordinator.close()
+        }
         applySnapshot()
+        if reshaped, hadExpandedStrip {
+            // Cells the snapshot kept by identity still render their old
+            // strip state; the animator collapses whatever is stale.
+            binder.refreshExpandedState(in: collectionView)
+        }
         await refreshDiskCacheState()
     }
 
@@ -411,6 +454,10 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         UIView.animate(withDuration: 0.15, delay: 0, options: [.curveEaseInOut]) {
             cell?.transform = .identity
         }
+        if needsReloadAfterDrag {
+            needsReloadAfterDrag = false
+            Task { await reloadEpisodes() }
+        }
     }
 
     // MARK: - Reorder commit (states/playlist_episode.dart:93-122)
@@ -472,9 +519,17 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
 
         episodes = reordered
         rebuildEpisodeIndex()
+        // The snapshot shift invalidates the expanded strip's positional
+        // IndexPath. The drag path closed at gesture start; the VoiceOver
+        // Move up/down actions land here directly — close for both, then
+        // collapse whatever stale strip state identity-kept cells render.
+        let hadExpandedStrip = expandCoordinator.expandedIndexPath != nil
+        expandCoordinator.close()
         applySnapshot()
+        if hadExpandedStrip {
+            binder.refreshExpandedState(in: collectionView)
+        }
 
-        let movedRow = reordered[arrayTo]
         // Final → gesture space, full-row coordinates (the repository takes
         // the unadjusted gesture slot; it re-applies the adjustment).
         let repositoryIndex = arrayTo > arrayFrom ? arrayTo + 1 : arrayTo
@@ -489,11 +544,25 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         // chained tasks keep the database's final order matching the last
         // visual state instead of racing two writes.
         let predecessor = reorderChain
+        pendingReorderCount += 1
         reorderChain = Task { [weak self] in
             await predecessor?.value
-            try? await repository.insertOrUpdateByIndex(
-                movedRow, playlistId: playlistId, index: repositoryIndex
-            )
+            // Move-only, and atomic with its existence check: a completion
+            // that cascaded this row away mid-drag must not be resurrected
+            // by an INSERT branch with stale progress — drop the reorder
+            // and resync from the database instead.
+            let persisted = (try? await repository.moveExisting(
+                byEnclosureURL: movedURL, playlistId: playlistId, index: repositoryIndex
+            )) ?? false
+            guard persisted, let self else {
+                // Release the hold BEFORE the resync read, or the read
+                // drops itself (the guard in reloadEpisodes).
+                if let self {
+                    self.pendingReorderCount -= 1
+                    await self.reloadEpisodes()
+                }
+                return
+            }
             // The Dart sequence: pause, (100 ms sleep — dropped, 08 §11.4),
             // setByEpisode on the post-reorder head.
             for step in steps {
@@ -509,7 +578,9 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             if playback.currentPlaylistId == playlistId {
                 await playback.reloadQueue()
             }
-            await self?.reloadEpisodes()
+            // Release the hold BEFORE the resync read (see above).
+            self.pendingReorderCount -= 1
+            await self.reloadEpisodes()
         }
     }
 }

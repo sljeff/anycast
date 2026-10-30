@@ -352,11 +352,15 @@ final class PlaylistEpisodeListBinder: NSObject {
         }
     }
 
-    /// Remove (playlists.dart:182-190): K3 — removing the head also stops
-    /// playback and clears the player state.
+    /// Remove (playlists.dart:182-190): K3 — removing the playing episode
+    /// also stops playback and clears the player state. The current-track
+    /// check is BY IDENTITY, captured before the first await (a reload
+    /// landing mid-task would reshuffle indexes; a positional check can
+    /// also misfire across playlists).
     func removeTapped(_ episode: PlaylistEpisodeRow) {
         guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return }
         Haptics.queueRemoved()
+        let wasCurrent = context.playback.currentEpisode?.enclosureUrl == enclosureURL
         Task { [weak self] in
             guard let self else { return }
             let repository = self.context.database.playlistRepository()
@@ -365,22 +369,27 @@ final class PlaylistEpisodeListBinder: NSObject {
             await self.context.subtitles.remove(url: enclosureURL)
             await self.context.translations.remove(url: enclosureURL)
             await self.context.cacheStore.remove(url: enclosureURL)
-            if self.episodeSource?.index(of: episode)?.item == 0 {
-                await self.clearPlaybackState()
+            if wasCurrent {
+                // The episode may have completed and advanced the queue on
+                // its own while the awaits above ran — only clear when THIS
+                // row is still what is playing (a positional recheck here
+                // would stop the newly-started head instead).
+                let stillCurrent = self.context.playback.currentEpisode?.enclosureUrl == enclosureURL
+                if stillCurrent {
+                    await self.context.playback.clear()
+                } else {
+                    await self.context.playback.reloadQueue()
+                }
+            } else if self.context.playback.currentPlaylistId == self.playlistId {
+                // A non-head removal must reach the in-memory queue too, or
+                // the playing head's completion later pulls this now-dead
+                // row back out of the stale queue (Channel/Search/Inbox all
+                // reload the queue after their writes; the Dart list was
+                // mutated in place).
+                await self.context.playback.reloadQueue()
             }
             self.onListContentChanged?()
         }
-    }
-
-    /// Dart `PlayerController.clear()` (states/player.dart:317-325): pause,
-    /// empty the current episode, delete the pointer row. PlaybackService
-    /// has no public full-clear yet (its private clearPlaybackState is the
-    /// queue-empty path); the pointer delete + reload is the closest
-    /// public-API equivalent — flagged for the player task.
-    private func clearPlaybackState() async {
-        context.playback.pause()
-        try? await context.database.playerRepository().clear()
-        await context.playback.reloadQueue()
     }
 
     // MARK: - Live overlays (PlayIcon / AIIcon, play_icon.dart)
@@ -447,23 +456,7 @@ final class PlaylistEpisodeListBinder: NSObject {
             if let robot = button.subviews.compactMap({ $0 as? LottieAnimationView }).first {
                 if !robot.isAnimationPlaying { robot.play() }
             } else {
-                let robot = LottieAnimationView(name: "robot_loading")
-                robot.contentMode = .scaleAspectFit
-                robot.loopMode = .loop
-                robot.translatesAutoresizingMaskIntoConstraints = false
-                robot.isUserInteractionEnabled = false
-                button.addSubview(robot)
-                NSLayoutConstraint.activate([
-                    robot.centerXAnchor.constraint(equalTo: button.centerXAnchor),
-                    robot.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-                    robot.heightAnchor.constraint(equalToConstant: 24),
-                    // Width too: a lottie pinned only by center + height lets
-                    // its animation canvas stretch the view horizontally —
-                    // the same class of blow-up as the play overlay (PR #9
-                    // device regression).
-                    robot.widthAnchor.constraint(equalToConstant: 24),
-                ])
-                robot.play()
+                Self.installRobotOverlay(on: button).play()
             }
         default:
             // Strip any previous lottie overlay.
@@ -475,6 +468,34 @@ final class PlaylistEpisodeListBinder: NSObject {
             button.tintColor = display.tintColor
         }
         button.accessibilityLabel = Self.aiAccessibilityLabel(for: display)
+    }
+
+    /// Installs the processing-state robot lottie centered in a strip
+    /// button, pinned to the animation's own canvas aspect: height 24,
+    /// width derived. The canvas is 1920×1080 — a square 24×24 slot
+    /// aspect-fits that wide scene down to 24×13.5, and the robot renders
+    /// roughly half the neighboring glyph sizes. An explicit width also
+    /// stays mandatory: a lottie pinned only by center + height lets its
+    /// animation canvas stretch the view horizontally — the same class of
+    /// blow-up as the play overlay (PR #9 device regression). Internal for
+    /// the UIFixRegressionTests slot guard.
+    static func installRobotOverlay(on button: UIButton) -> LottieAnimationView {
+        let robot = LottieAnimationView(name: "robot_loading")
+        robot.contentMode = .scaleAspectFit
+        robot.loopMode = .loop
+        robot.translatesAutoresizingMaskIntoConstraints = false
+        robot.isUserInteractionEnabled = false
+        button.addSubview(robot)
+        let canvas = robot.animation?.size ?? CGSize(width: 24, height: 24)
+        NSLayoutConstraint.activate([
+            robot.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+            robot.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            robot.heightAnchor.constraint(equalToConstant: 24),
+            robot.widthAnchor.constraint(
+                equalToConstant: 24 * canvas.width / canvas.height
+            ),
+        ])
+        return robot
     }
 
     private static func aiAccessibilityLabel(for display: AITranscriptDisplay) -> String {

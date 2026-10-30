@@ -67,6 +67,14 @@ public final class NowPlayingController {
     private var currentPositionSeconds: Double = 0
     private var commandsAttached = false
     private var artworkLoadTask: Task<Void, Never>?
+    /// The cleared state: while false, every publish path is a no-op — the
+    /// card must stay gone even when late engine events (the async KVO of
+    /// `unload()`, one more tick, a speed change) arrive after `clear()`.
+    /// Without the gate those would resurrect an empty-title, rate-0 card.
+    /// Starts closed: nothing publishes before the first `update(metadata:)`
+    /// — the engine's `.initial` KVO on a cold start must not emit an
+    /// empty card for a player that never loaded.
+    private var isActive = false
 
     public init(artworkProvider: ArtworkProviding) {
         self.artworkProvider = artworkProvider
@@ -117,6 +125,7 @@ public final class NowPlayingController {
         currentSpeed = speed
         currentlyPlaying = playing
         currentPositionSeconds = Double(positionMilliseconds) / 1000
+        isActive = true
         publishNowPlayingInfo(artwork: nil)
 
         // K19: resolve artwork asynchronously, local-first; publish again
@@ -149,6 +158,28 @@ public final class NowPlayingController {
         MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
     }
 
+    /// Whether this controller currently owns a Now Playing card. Tests
+    /// assert THIS instead of the process-global `MPNowPlayingInfoCenter`
+    /// (other suites may legitimately write that global concurrently).
+    public var isPublishing: Bool { isActive }
+
+    /// Player cleared (queue drained / the playing head removed): drop the
+    /// system card entirely. The shipped app never cleared its mediaItem —
+    /// the lock screen kept the finished episode with live-but-useless
+    /// controls; here the card goes away with the playback state.
+    public func clear() {
+        artworkLoadTask?.cancel()
+        artworkLoadTask = nil
+        cachedArtworkURL = nil
+        currentMetadata = Metadata(title: "", channelTitle: nil,
+                                   durationMilliseconds: nil, artworkURL: nil)
+        currentSpeed = 1.0
+        currentlyPlaying = false
+        currentPositionSeconds = 0
+        isActive = false
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
     /// MediaPlayer invokes the request handler on its OWN queue — the
     /// closure must not inherit MainActor isolation (a raw UIImage capture
     /// would isolate it and trip the queue assertion).
@@ -163,6 +194,7 @@ public final class NowPlayingController {
     }
 
     private func publishNowPlayingInfo(artwork: MPMediaItemArtwork?) {
+        guard isActive else { return }
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: currentMetadata.title,
             MPMediaItemPropertyAlbumTitle: currentMetadata.channelTitle ?? "",
