@@ -117,7 +117,14 @@ final class DetailViewController: UIViewController {
     private let artwork = UIImageView()
     private var artworkSide: NSLayoutConstraint!
     private var headerStack: UIStackView!
+    private var infoStack: UIStackView!
     private var channelButton: UIButton!
+    /// Draws the channel name at accessibility sizes. A UIButton title stays
+    /// one line tall and clips the wrap; this label is the text, and the
+    /// button stays the hit target.
+    private let channelNameLabel = UILabel()
+    private var channelHitPins: [NSLayoutConstraint] = []
+    private var metaLabel: UILabel!
     private let titleLabel = UILabel()
     /// One shot after the first layout, and again when the text size changes,
     /// so the medium detent can grow instead of clipping an accessibility-size header.
@@ -359,7 +366,10 @@ final class DetailViewController: UIViewController {
         super.viewDidLayoutSubviews()
         if traitCollection.preferredContentSizeCategory.isAccessibilityCategory, headerStack != nil {
             let transcriptHeight = transcriptSlot.isHidden ? 0 : transcriptSlot.bounds.height
-            let measured = Layout.inset + headerStack.bounds.height + Layout.rowGap
+            // The scroll view's bottom fade covers its last 40 pt. Add that
+            // much so the channel name and date sit above the fade instead
+            // of dissolving into the transcript row.
+            let measured = Layout.inset + headerStack.bounds.height + Layout.fadeHeight + Layout.rowGap
                 + transcriptHeight + Spacing.md + actionRow.bounds.height + Layout.inset
             if !didMeasureAccessibilityDetent || abs(measured - accessibilityDetentHeight) > 1 {
                 didMeasureAccessibilityDetent = true
@@ -427,8 +437,17 @@ final class DetailViewController: UIViewController {
             label.setContentHuggingPriority(.required, for: .vertical)
         }
         hostButton.setContentHuggingPriority(.required, for: .vertical)
+        meta.setContentCompressionResistancePriority(.required, for: .vertical)
+        metaLabel = meta
+        channelNameLabel.textColor = TypographyV2.meta.color
+        channelNameLabel.adjustsFontForContentSizeCategory = true
+        channelNameLabel.clipsToBounds = false
+        channelNameLabel.isAccessibilityElement = false
+        channelNameLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        channelNameLabel.setContentHuggingPriority(.required, for: .vertical)
         let info = UIStackView(arrangedSubviews: [titleLabel, hostButton, meta, trailingSpacer])
         info.axis = .vertical
+        infoStack = info
         // Fill gives the title the column width, so it wraps on word
         // boundaries instead of laying out at its one-line intrinsic width.
         info.alignment = .fill
@@ -519,11 +538,10 @@ final class DetailViewController: UIViewController {
             titleLabel.numberOfLines = 0
             titleLabel.lineBreakMode = .byWordWrapping
             titleLabel.lineBreakStrategy = .pushOut
-            var channelConfig = channelButton.configuration
-            channelConfig?.titleLineBreakMode = .byWordWrapping
-            channelButton.configuration = channelConfig
-            channelButton.titleLabel?.numberOfLines = 0
-            channelButton.titleLabel?.lineBreakMode = .byWordWrapping
+            showWrappingChannelName()
+            metaLabel.numberOfLines = 0
+            metaLabel.lineBreakMode = .byWordWrapping
+            metaLabel.lineBreakStrategy = .pushOut
         } else {
             headerStack.axis = .horizontal
             headerStack.alignment = .top
@@ -532,12 +550,78 @@ final class DetailViewController: UIViewController {
             titleLabel.numberOfLines = isLarge ? 4 : 3
             titleLabel.lineBreakMode = .byTruncatingTail
             titleLabel.lineBreakStrategy = .standard
-            var channelConfig = channelButton.configuration
-            channelConfig?.titleLineBreakMode = .byTruncatingTail
-            channelButton.configuration = channelConfig
-            channelButton.titleLabel?.numberOfLines = 1
-            channelButton.titleLabel?.lineBreakMode = .byTruncatingTail
+            showSingleLineChannelButton()
+            metaLabel.numberOfLines = 1
+            metaLabel.lineBreakMode = .byTruncatingTail
+            metaLabel.lineBreakStrategy = .standard
         }
+    }
+
+    /// Accessibility sizes: a label wraps the show name on word boundaries
+    /// and reports its full height. The button is only the hit target, so
+    /// it cannot clip the glyphs or swallow the date line below.
+    private func showWrappingChannelName() {
+        channelNameLabel.font = TypographyV2.meta.font(traits: traitCollection)
+        channelNameLabel.textColor = TypographyV2.meta.color
+        channelNameLabel.text = episode.channelTitle
+        channelNameLabel.numberOfLines = 0
+        channelNameLabel.lineBreakMode = .byWordWrapping
+        channelNameLabel.lineBreakStrategy = .pushOut
+        channelNameLabel.textAlignment = .natural
+        channelNameLabel.isHidden = false
+        if channelNameLabel.superview !== infoStack {
+            let index = (infoStack.arrangedSubviews.firstIndex(of: titleLabel) ?? 0) + 1
+            infoStack.insertArrangedSubview(channelNameLabel, at: min(index, infoStack.arrangedSubviews.count))
+        }
+        if channelButton.superview !== channelNameLabel {
+            NSLayoutConstraint.deactivate(channelHitPins)
+            channelButton.removeFromSuperview()
+            channelButton.translatesAutoresizingMaskIntoConstraints = false
+            channelNameLabel.addSubview(channelButton)
+            channelHitPins = [
+                channelButton.topAnchor.constraint(equalTo: channelNameLabel.topAnchor),
+                channelButton.bottomAnchor.constraint(equalTo: channelNameLabel.bottomAnchor),
+                channelButton.leadingAnchor.constraint(equalTo: channelNameLabel.leadingAnchor),
+                channelButton.trailingAnchor.constraint(equalTo: channelNameLabel.trailingAnchor),
+            ]
+            NSLayoutConstraint.activate(channelHitPins)
+        }
+        var config = UIButton.Configuration.plain()
+        config.title = nil
+        config.baseForegroundColor = TypographyV2.meta.color
+        config.contentInsets = .zero
+        config.background.backgroundColor = .clear
+        channelButton.configuration = config
+        channelButton.contentHorizontalAlignment = .leading
+        channelButton.setContentHuggingPriority(.defaultLow, for: .vertical)
+        channelButton.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+    }
+
+    /// Default sizes: the original one-line truncating button, and no label.
+    private func showSingleLineChannelButton() {
+        NSLayoutConstraint.deactivate(channelHitPins)
+        channelHitPins = []
+        channelNameLabel.isHidden = true
+        channelNameLabel.removeFromSuperview()
+        if channelButton.superview !== infoStack {
+            channelButton.removeFromSuperview()
+            let index = (infoStack.arrangedSubviews.firstIndex(of: titleLabel) ?? 0) + 1
+            infoStack.insertArrangedSubview(channelButton, at: min(index, infoStack.arrangedSubviews.count))
+        }
+        channelButton.isHidden = false
+        channelButton.setContentHuggingPriority(.required, for: .vertical)
+        var config = UIButton.Configuration.plain()
+        config.title = episode.channelTitle
+        config.baseForegroundColor = TypographyV2.meta.color
+        config.contentInsets = .zero
+        config.titleLineBreakMode = .byTruncatingTail
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.meta.font()
+            return outgoing
+        }
+        channelButton.configuration = config
+        channelButton.contentHorizontalAlignment = .leading
     }
 
     /// Height of the medium detent at an accessibility size: the header, the
