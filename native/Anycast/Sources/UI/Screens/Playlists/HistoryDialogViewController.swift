@@ -331,42 +331,45 @@ final class HistoryDialogViewController: UIViewController {
         let animateRows = hadRows && view.window != nil && !Motion.reduceMotion
         if !episodes.isEmpty { didApplyItems = true }
 
-        let finish: () -> Void = { [weak self] in
-            guard let self else { return }
-            guard revealEmpty else {
-                self.renderStates()
-                return
-            }
-            // The row animation (if any) has finished. Hide the list without
-            // another jump, then fade the empty state in and the footer out.
-            self.renderEmptyState()
-            self.emptyView.alpha = 0
-            self.emptyView.isHidden = false
-            UIView.performWithoutAnimation {
-                self.collectionView.isHidden = true
-                self.spinner.stopAnimating()
-                self.spinner.isHidden = true
-            }
-            UIView.animate(
-                withDuration: Motion.quick,
-                delay: 0,
-                options: [.curveEaseOut, .allowUserInteraction]
-            ) {
-                self.emptyView.alpha = 1
-                self.footerStack.alpha = 0
-                self.bottomFade.alpha = 0
-            } completion: { _ in
-                self.renderStates()
-                self.footerStack.alpha = 1
-                self.bottomFade.alpha = 1
-            }
-        }
-
         if animateRows {
-            dataSource.apply(snapshot, animatingDifferences: true, completion: finish)
+            dataSource.apply(snapshot, animatingDifferences: true) { [weak self] in
+                self?.finishHistorySnapshot(revealEmpty: revealEmpty)
+            }
         } else {
             dataSource.apply(snapshot, animatingDifferences: false)
-            finish()
+            finishHistorySnapshot(revealEmpty: revealEmpty)
+        }
+    }
+
+    /// Shows the empty state after a deleting snapshot. Called once the row
+    /// animation has finished, or immediately when that animation is skipped.
+    private func finishHistorySnapshot(revealEmpty: Bool) {
+        guard revealEmpty else {
+            renderStates()
+            return
+        }
+        // The row animation (if any) has finished. Hide the list without
+        // another jump, then fade the empty state in and the footer out.
+        renderEmptyState()
+        emptyView.alpha = 0
+        emptyView.isHidden = false
+        UIView.performWithoutAnimation {
+            self.collectionView.isHidden = true
+            self.spinner.stopAnimating()
+            self.spinner.isHidden = true
+        }
+        UIView.animate(
+            withDuration: Motion.quick,
+            delay: 0,
+            options: [.curveEaseOut, .allowUserInteraction]
+        ) {
+            self.emptyView.alpha = 1
+            self.footerStack.alpha = 0
+            self.bottomFade.alpha = 0
+        } completion: { _ in
+            self.renderStates()
+            self.footerStack.alpha = 1
+            self.bottomFade.alpha = 1
         }
     }
 

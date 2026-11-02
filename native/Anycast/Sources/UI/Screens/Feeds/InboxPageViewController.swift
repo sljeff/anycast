@@ -880,7 +880,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             if let tailSection {
                 self.collectionView.deleteSections(IndexSet(integer: tailSection))
             }
-        } completion: completion
+        } completion: { finished in
+            completion(finished)
+        }
     }
 
     /// The cards section's provider index in the current section set.
