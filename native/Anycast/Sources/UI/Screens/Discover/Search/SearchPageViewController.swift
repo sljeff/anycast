@@ -22,7 +22,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     static let fieldPlaceholder = "Shows, episodes, and more"
 
     private let context: UIContext
-    private var viewModel: SearchPageViewModel
+    var viewModel: SearchPageViewModel
 
     private let header = HeaderView()
     /// iOS 18 field under the header.
@@ -42,18 +42,21 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
     /// Guards double activation when a scrub is followed by its settle.
     private var lastActivatedTab = -1
-    /// Transport for the next search. Production uses `context.api`; tests
-    /// replace it so a result state does not depend on the network.
-    private var fetchChannels: @Sendable (String) async throws -> [SubscriptionRow]
-    private var fetchEpisodes: @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
+    /// Transport for the next search. Production uses `context.api`. The
+    /// debug testing extension can replace it.
+    var fetchChannels: @Sendable (String) async throws -> [SubscriptionRow]
+    var fetchEpisodes: @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
     private var recentObservation = ObservationLoop()
     /// This search has already written its query to Recent.
     private var didRecordThisSearch = false
     /// Both-empty focus runs once per search. Switching back to the other
     /// segment keeps the sentence and leaves the keyboard down.
     private(set) var didOfferBothEmptyFocus = false
+    #if DEBUG
     /// How many times this page has tried to focus the field for both-empty.
+    /// Debug builds only; tests read it.
     private(set) var bothEmptyFocusCount = 0
+    #endif
 
     // MARK: - Construction
 
@@ -80,23 +83,6 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
         super.init(nibName: nil, bundle: nil)
         bindPages()
-    }
-
-    /// The field the both-empty state returns focus to.
-    var searchFieldForTests: UITextField { activeSearchField }
-
-    /// The two segments' phases. Tests and snapshot captures read this.
-    var segmentPhases: (channels: SearchListPhase, episodes: SearchListPhase) {
-        (viewModel.channelsPhase, viewModel.episodesPhase)
-    }
-
-    /// Replaces the transport used by later `search` calls.
-    func setSearchTransport(
-        channels: @escaping @Sendable (String) async throws -> [SubscriptionRow],
-        episodes: @escaping @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
-    ) {
-        fetchChannels = channels
-        fetchEpisodes = episodes
     }
 
     @available(*, unavailable)
@@ -155,11 +141,16 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     /// Runs `text` as a new search: the view model's text is immutable, so
     /// both tabs get a fresh model and fresh pages. Recent is not written
     /// here; `recordRecentHitIfNeeded` writes it once a segment has rows.
+    func search(_ text: String) {
+        performSearch(text, channels: nil, episodes: nil)
+    }
+
     /// `channels` and `episodes` override the transport for this search only.
-    func search(
+    /// The debug testing extension is the caller that passes a script.
+    func performSearch(
         _ text: String,
-        channels: (@Sendable (String) async throws -> [SubscriptionRow])? = nil,
-        episodes: (@Sendable (String) async throws -> [APIClient.EpisodeWithChannel])? = nil
+        channels: (@Sendable (String) async throws -> [SubscriptionRow])?,
+        episodes: (@Sendable (String) async throws -> [APIClient.EpisodeWithChannel])?
     ) {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
@@ -184,7 +175,9 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         lastActivatedTab = -1
         didRecordThisSearch = false
         didOfferBothEmptyFocus = false
+        #if DEBUG
         bothEmptyFocusCount = 0
+        #endif
         watchForRecentHit()
         activateTabIfNeeded(0)
     }
@@ -220,16 +213,10 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         viewModel.activate(tab: index)
     }
 
-    private func showSegment(_ index: Int) {
+    func showSegment(_ index: Int) {
         tabStrip.select(index, animated: true)
         pagingContainer.select(index, animated: true)
         activateTabIfNeeded(index)
-    }
-
-    /// Selects a segment the way the tab strip does. Snapshot and unit tests
-    /// use it; the buttons and the strip are the production paths.
-    func selectSegmentForTests(_ index: Int) {
-        showSegment(index)
     }
 
     private func bindPages() {
@@ -258,10 +245,14 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         case .focusSearchField:
             guard !didOfferBothEmptyFocus else { return }
             didOfferBothEmptyFocus = true
+            #if DEBUG
             bothEmptyFocusCount += 1
+            #endif
             // Announce before moving focus, or VoiceOver only speaks the field.
+            // A main-actor task hops to the next turn without leaving the actor
+            // (DispatchQueue.main is not MainActor-isolated).
             UIAccessibility.post(notification: .announcement, argument: presentation.spokenTitle)
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 self?.focusSearchFieldSelectingQuery()
             }
         case .showOtherSegment, .retry:
@@ -269,7 +260,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         }
     }
 
-    private var activeSearchField: UITextField {
+    var activeSearchField: UITextField {
         if #available(iOS 26.0, *) {
             return searchController.searchBar.searchTextField
         }
@@ -280,7 +271,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     /// keystroke replaces it.
     private func focusSearchFieldSelectingQuery() {
         let field = activeSearchField
-        let select = {
+        let select: @MainActor () -> Void = {
             field.selectAll(nil)
             if let range = field.textRange(from: field.beginningOfDocument, to: field.endOfDocument) {
                 field.selectedTextRange = range
@@ -289,7 +280,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         if field.becomeFirstResponder() || field.isFirstResponder {
             select()
         }
-        DispatchQueue.main.async { [weak field] in
+        Task { @MainActor [weak field] in
             guard let field else { return }
             if !field.isFirstResponder { field.becomeFirstResponder() }
             field.selectAll(nil)

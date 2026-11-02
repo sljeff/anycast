@@ -124,6 +124,7 @@ final class SearchSegmentStatusView: UIView {
         let width = scrollView.bounds.width
         guard width > 1 else { return }
         let accessibilitySize = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        applyTitleLineLimit()
         emptyState.setExpandsToReadableWidth(accessibilitySize)
         let content = emptyState.contentHeight(fittingWidth: width)
         let viewport = scrollView.bounds.height
@@ -156,8 +157,15 @@ final class SearchSegmentStatusView: UIView {
             message: nil,
             actions: presentation.actionTitle == nil ? [] : [actionButton],
             titleAccessibilityLabel: presentation.spokenTitle,
-            titleIsHeader: true,
-            wrapsTitleByCharacter: true
+            titleIsHeader: true
         ))
+        applyTitleLineLimit()
+    }
+
+    /// Three lines at the default sizes. Accessibility sizes keep every line
+    /// and scroll instead.
+    private func applyTitleLineLimit() {
+        let limit = traitCollection.preferredContentSizeCategory.isAccessibilityCategory ? 0 : 3
+        emptyState.setTitleLineLimit(limit)
     }
 }

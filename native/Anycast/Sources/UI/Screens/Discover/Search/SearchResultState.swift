@@ -43,6 +43,11 @@ enum SearchResultState {
     static let echoLimit = 60
     private static let echoHead = 40
     private static let echoTail = 15
+    /// An unbroken query at least this long gets a break opportunity between
+    /// characters. Shorter tokens, and every other word in the sentence,
+    /// stay on word boundaries. "No channels for “" is already most of a
+    /// line at the default size, so the query is what runs out of room.
+    private static let unbrokenQueryBreakLength = 12
 
     /// Visible and spoken forms of `query` after trimming. The spoken form
     /// is the whole query; the visible form drops the middle past `echoLimit`
@@ -53,6 +58,16 @@ enum SearchResultState {
         guard spoken.count > echoLimit else { return (spoken, spoken) }
         let visible = "\(spoken.prefix(echoHead))…\(spoken.suffix(echoTail))"
         return (visible, spoken)
+    }
+
+    /// The query as drawn inside the sentence. A long query with no spaces
+    /// gains zero-width break opportunities so the label can stay
+    /// word-wrapped: "results" and "another" still wrap whole, and the query
+    /// can break when it does not fit. The spoken sentence does not use this.
+    static func displayedQuery(_ visible: String) -> String {
+        guard visible.count >= unbrokenQueryBreakLength,
+              !visible.contains(where: \.isWhitespace) else { return visible }
+        return visible.map(String.init).joined(separator: "\u{200B}")
     }
 
     static func searchingAnnouncement(query: String) -> String {
@@ -67,7 +82,7 @@ enum SearchResultState {
         query: String
     ) -> SearchResultPresentation? {
         let echo = echoedQuery(query)
-        let visibleQuote = "“\(echo.visible)”"
+        let visibleQuote = "“\(displayedQuery(echo.visible))”"
         let spokenQuote = "“\(echo.spoken)”"
         switch phase {
         case .loading, .loaded:

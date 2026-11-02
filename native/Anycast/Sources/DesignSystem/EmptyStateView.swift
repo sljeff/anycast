@@ -19,9 +19,6 @@ class EmptyStateView: UIView {
         var titleAccessibilityLabel: String? = nil
         /// The search result sentence is a heading; other empty states are not.
         var titleIsHeader = false
-        /// Break a long unbroken query by character so the sentence is never
-        /// clipped. Other empty states keep word wrapping.
-        var wrapsTitleByCharacter = false
     }
 
     private let disc = UIView()
@@ -30,11 +27,13 @@ class EmptyStateView: UIView {
     private let titleLabel = UILabel()
     private let messageLabel = UILabel()
     private let actionColumn = UIStackView()
-    private let column: UIStackView
-    private let centersContent: NSLayoutConstraint
-    private let pinsContentToTop: NSLayoutConstraint
-    private let widthCap: NSLayoutConstraint
-    private let widthFill: NSLayoutConstraint
+    /// Assigned after `super.init`: the constraints refer to this view, and a
+    /// `let` cannot be filled in once `super.init` has returned.
+    private var column: UIStackView!
+    private var centersContent: NSLayoutConstraint!
+    private var pinsContentToTop: NSLayoutConstraint!
+    private var widthCap: NSLayoutConstraint!
+    private var widthFill: NSLayoutConstraint!
 
     private static let discSize: CGFloat = 64
     private static let glyphSize: CGFloat = 28
@@ -132,7 +131,6 @@ class EmptyStateView: UIView {
         disc.isHidden = !content.showsSpinner && content.icon == nil
         if content.showsSpinner { spinner.startAnimating() } else { spinner.stopAnimating() }
         titleLabel.text = content.title
-        titleLabel.lineBreakMode = content.wrapsTitleByCharacter ? .byCharWrapping : .byWordWrapping
         titleLabel.isHidden = content.title == nil
         titleLabel.accessibilityLabel = content.titleAccessibilityLabel
         titleLabel.accessibilityTraits = content.titleIsHeader ? [.staticText, .header] : .staticText
@@ -152,6 +150,13 @@ class EmptyStateView: UIView {
 
     /// The sentence label, for a VoiceOver layout-changed notification.
     func accessibilityTitleView() -> UIView { titleLabel }
+
+    /// `0` means as many lines as the text needs. Search uses 3 at the
+    /// default sizes and 0 at accessibility sizes; other empty states stay
+    /// unlimited.
+    func setTitleLineLimit(_ lines: Int) {
+        titleLabel.numberOfLines = lines > 0 ? lines : 0
+    }
 
     /// Accessibility sizes pin the block to the top and let it grow to the
     /// readable width. Default through xxxLarge stays centered and capped.

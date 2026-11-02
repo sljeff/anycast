@@ -436,8 +436,8 @@ struct ScreenBaselineCaptureTests {
             let script = SnapshotSearchScript(channels: .success([]), episodes: .success([]))
             search.search(
                 "xyzqqqnotaword123",
-                channels: { try await script.fetchChannels($0) },
-                episodes: { try await script.fetchEpisodes($0) }
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
             )
         }
     }
@@ -448,8 +448,8 @@ struct ScreenBaselineCaptureTests {
             let script = SnapshotSearchScript(channels: .success([]), episodes: .success([]))
             search.search(
                 "xyzqqqnotaword123",
-                channels: { try await script.fetchChannels($0) },
-                episodes: { try await script.fetchEpisodes($0) }
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
             )
             guard await Self.waitForResultTitle(in: search.view, containing: "No channels") else { return }
             search.selectSegmentForTests(1)
@@ -465,8 +465,8 @@ struct ScreenBaselineCaptureTests {
             )
             search.search(
                 "decoder",
-                channels: { try await script.fetchChannels($0) },
-                episodes: { try await script.fetchEpisodes($0) }
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
             )
         }
     }

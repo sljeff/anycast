@@ -88,8 +88,8 @@ struct SearchEntryStateTests {
 
         let script = ScriptedSearch(channels: .success([ScriptedSearch.channel("Second")]))
         page.setSearchTransport(
-            channels: { try await script.fetchChannels($0) },
-            episodes: { try await script.fetchEpisodes($0) }
+            channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+            episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
         )
         page.entryPage.activate(.recent("second"))
         #expect(page.isShowingResults)
@@ -105,8 +105,8 @@ struct SearchEntryStateTests {
         let script = ScriptedSearch(channels: .success([ScriptedSearch.channel("Planet Money")]))
         let page = SearchPageViewController(context: context, recentStore: store, loadCategories: { [] })
         page.setSearchTransport(
-            channels: { try await script.fetchChannels($0) },
-            episodes: { try await script.fetchEpisodes($0) }
+            channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+            episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
         )
         page.loadViewIfNeeded()
         page.search("  Planet Money ")
@@ -119,8 +119,8 @@ struct SearchEntryStateTests {
         guard let context = await Self.liveUIContext() else { return }
         let page = SearchPageViewController(context: context, recentStore: makeStore([]), loadCategories: { [] })
         page.setSearchTransport(
-            channels: { (_: String) async throws -> [SubscriptionRow] in [] },
-            episodes: { (_: String) async throws -> [APIClient.EpisodeWithChannel] in [] }
+            channels: { @Sendable (_: String) async throws -> [SubscriptionRow] in [] },
+            episodes: { @Sendable (_: String) async throws -> [APIClient.EpisodeWithChannel] in [] }
         )
         page.loadViewIfNeeded()
         page.search("news")
@@ -141,8 +141,8 @@ struct SearchEntryStateTests {
         let script = ScriptedSearch(channels: .success([ScriptedSearch.channel("news")]))
         let page = SearchPageViewController(context: context, recentStore: store, loadCategories: { [] })
         page.setSearchTransport(
-            channels: { try await script.fetchChannels($0) },
-            episodes: { try await script.fetchEpisodes($0) }
+            channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+            episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
         )
         page.loadViewIfNeeded()
         page.search("news")

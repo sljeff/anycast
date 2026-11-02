@@ -57,24 +57,31 @@ struct SearchResultStateTests {
         let query = "xyzqqqnotaword123"
         let unknown: [SearchListPhase] = [.loading, .loaded(count: 4), .networkError]
 
+        let drawn = SearchResultState.displayedQuery(query)
         for other in unknown {
             let channels = presentation(.channels, .noResults, other, query)
-            #expect(channels?.title == "No channels for “\(query)”")
-            #expect(channels?.spokenTitle == channels?.title)
+            #expect(channels?.title == "No channels for “\(drawn)”")
+            #expect(channels?.spokenTitle == "No channels for “\(query)”")
+            #expect(channels?.title?.hasPrefix("No channels for “") == true)
             #expect(channels?.action == .showOtherSegment)
             #expect(channels?.actionTitle == "Show episodes")
             #expect(channels?.actionAccessibilityLabel == "Show episodes for \(query)")
             #expect(channels?.showsButton == true)
 
             let episodes = presentation(.episodes, .noResults, other, query)
-            #expect(episodes?.title == "No episodes for “\(query)”")
+            #expect(episodes?.title == "No episodes for “\(drawn)”")
+            #expect(episodes?.spokenTitle == "No episodes for “\(query)”")
             #expect(episodes?.action == .showOtherSegment)
             #expect(episodes?.actionTitle == "Show channels")
             #expect(episodes?.actionAccessibilityLabel == "Show channels for \(query)")
         }
 
         let both = presentation(.episodes, .noResults, .noResults, query)
-        #expect(both?.title == "Nothing found for “\(query)”. Try another word.")
+        #expect(both?.title == "Nothing found for “\(drawn)”. Try another word.")
+        #expect(both?.spokenTitle == "Nothing found for “\(query)”. Try another word.")
+        #expect(both?.title?.hasSuffix(". Try another word.") == true)
+        #expect(both?.title?.contains("\u{200B}") == true)
+        #expect(both?.spokenTitle?.contains("\u{200B}") == false)
         #expect(both?.action == .focusSearchField)
         #expect(both?.showsButton == false)
         #expect(presentation(.channels, .noResults, .noResults, query) == both)
@@ -97,8 +104,9 @@ struct SearchResultStateTests {
         let query = String(repeating: "b", count: 80)
         let state = presentation(.channels, .noResults, .loading, query)
         let echo = SearchResultState.echoedQuery(query)
-        #expect(state?.title == "No channels for “\(echo.visible)”")
+        #expect(state?.title == "No channels for “\(SearchResultState.displayedQuery(echo.visible))”")
         #expect(state?.spokenTitle == "No channels for “\(echo.spoken)”")
+        #expect(state?.spokenTitle?.contains("\u{200B}") == false)
         #expect(state?.spokenTitle.contains(query) == true)
         #expect(state?.actionAccessibilityLabel == "Show episodes for \(query)")
     }
@@ -234,8 +242,8 @@ struct SearchResultStateTests {
         let script = ScriptedSearch(channels: .success([]), episodes: .success([]))
         let page = SearchPageViewController(context: context, recentStore: store, loadCategories: { [] })
         page.setSearchTransport(
-            channels: { try await script.fetchChannels($0) },
-            episodes: { try await script.fetchEpisodes($0) }
+            channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+            episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
         )
         page.loadViewIfNeeded()
 
@@ -274,8 +282,8 @@ struct SearchResultStateTests {
         let script = ScriptedSearch(channels: .success([ScriptedSearch.channel()]))
         let page = SearchPageViewController(context: context, recentStore: store, loadCategories: { [] })
         page.setSearchTransport(
-            channels: { try await script.fetchChannels($0) },
-            episodes: { (_: String) async throws -> [APIClient.EpisodeWithChannel] in [] }
+            channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+            episodes: { @Sendable (_: String) async throws -> [APIClient.EpisodeWithChannel] in [] }
         )
         page.loadViewIfNeeded()
         page.search(query)
@@ -289,8 +297,8 @@ struct SearchResultStateTests {
         let script = ScriptedSearch(channels: .success([]), episodes: .success([]))
         let page = SearchPageViewController(context: context, recentStore: Self.makeStore([]), loadCategories: { [] })
         page.setSearchTransport(
-            channels: { try await script.fetchChannels($0) },
-            episodes: { try await script.fetchEpisodes($0) }
+            channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+            episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
         )
         let host = Self.wrap(page)
         let previous = UIApplication.shared.connectedScenes
@@ -467,8 +475,8 @@ final class ScriptedSearch: @unchecked Sendable {
     func makeModel(_ query: String) -> SearchPageViewModel {
         SearchPageViewModel(
             searchText: query,
-            fetchChannels: { try await self.fetchChannels($0) },
-            fetchEpisodes: { try await self.fetchEpisodes($0) }
+            fetchChannels: { @Sendable [self] keyword in try await self.fetchChannels(keyword) },
+            fetchEpisodes: { @Sendable [self] keyword in try await self.fetchEpisodes(keyword) }
         )
     }
 
