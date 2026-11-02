@@ -815,12 +815,12 @@ struct ScreenBaselineCaptureTests {
 
 }
 
-/// One-shot search responses for the S9c–S9e captures. Fetch methods are
-/// nonisolated so they satisfy the view model's `@Sendable` transport.
-private final class SnapshotSearchScript: @unchecked Sendable {
-    nonisolated(unsafe) private let lock = NSLock()
-    nonisolated(unsafe) private let channels: Result<[SubscriptionRow], Error>
-    nonisolated(unsafe) private let episodes: Result<[APIClient.EpisodeWithChannel], Error>
+/// One-shot search responses for the S9c–S9e captures. Not actor-isolated,
+/// so the fetch methods can be the view model's `@Sendable` transport.
+/// The results do not change, so there is no lock to take.
+private nonisolated final class SnapshotSearchScript: @unchecked Sendable {
+    private let channels: Result<[SubscriptionRow], Error>
+    private let episodes: Result<[APIClient.EpisodeWithChannel], Error>
 
     init(
         channels: Result<[SubscriptionRow], Error>,
@@ -830,14 +830,12 @@ private final class SnapshotSearchScript: @unchecked Sendable {
         self.episodes = episodes
     }
 
-    nonisolated func fetchChannels(_ keyword: String) async throws -> [SubscriptionRow] {
-        lock.lock(); defer { lock.unlock() }
-        return try channels.get()
+    func fetchChannels(_ keyword: String) async throws -> [SubscriptionRow] {
+        try channels.get()
     }
 
-    nonisolated func fetchEpisodes(_ keyword: String) async throws -> [APIClient.EpisodeWithChannel] {
-        lock.lock(); defer { lock.unlock() }
-        return try episodes.get()
+    func fetchEpisodes(_ keyword: String) async throws -> [APIClient.EpisodeWithChannel] {
+        try episodes.get()
     }
 }
 

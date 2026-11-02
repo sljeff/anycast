@@ -67,7 +67,6 @@ class EmptyStateView: UIView {
         for label in [titleLabel, messageLabel] {
             label.textAlignment = .center
             label.numberOfLines = 0
-            label.lineBreakMode = .byWordWrapping
             label.adjustsFontForContentSizeCategory = true
         }
 
@@ -153,9 +152,11 @@ class EmptyStateView: UIView {
 
     /// `0` means as many lines as the text needs. Search uses 3 at the
     /// default sizes and 0 at accessibility sizes; other empty states stay
-    /// unlimited.
+    /// unlimited. Also word-wraps the title. Playlist and History never call
+    /// this, so they keep the label's default truncating break mode.
     func setTitleLineLimit(_ lines: Int) {
         titleLabel.numberOfLines = lines > 0 ? lines : 0
+        titleLabel.lineBreakMode = .byWordWrapping
     }
 
     /// Accessibility sizes pin the block to the top and let it grow to the

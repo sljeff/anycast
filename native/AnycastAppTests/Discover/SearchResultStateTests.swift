@@ -62,7 +62,7 @@ struct SearchResultStateTests {
             let channels = presentation(.channels, .noResults, other, query)
             #expect(channels?.title == "No channels for “\(drawn)”")
             #expect(channels?.spokenTitle == "No channels for “\(query)”")
-            #expect(channels?.title?.hasPrefix("No channels for “") == true)
+            #expect(channels?.title.hasPrefix("No channels for “") == true)
             #expect(channels?.action == .showOtherSegment)
             #expect(channels?.actionTitle == "Show episodes")
             #expect(channels?.actionAccessibilityLabel == "Show episodes for \(query)")
@@ -79,9 +79,9 @@ struct SearchResultStateTests {
         let both = presentation(.episodes, .noResults, .noResults, query)
         #expect(both?.title == "Nothing found for “\(drawn)”. Try another word.")
         #expect(both?.spokenTitle == "Nothing found for “\(query)”. Try another word.")
-        #expect(both?.title?.hasSuffix(". Try another word.") == true)
-        #expect(both?.title?.contains("\u{200B}") == true)
-        #expect(both?.spokenTitle?.contains("\u{200B}") == false)
+        #expect(both?.title.hasSuffix(". Try another word.") == true)
+        #expect(both?.title.contains("\u{200B}") == true)
+        #expect(both?.spokenTitle.contains("\u{200B}") == false)
         #expect(both?.action == .focusSearchField)
         #expect(both?.showsButton == false)
         #expect(presentation(.channels, .noResults, .noResults, query) == both)
@@ -106,7 +106,7 @@ struct SearchResultStateTests {
         let echo = SearchResultState.echoedQuery(query)
         #expect(state?.title == "No channels for “\(SearchResultState.displayedQuery(echo.visible))”")
         #expect(state?.spokenTitle == "No channels for “\(echo.spoken)”")
-        #expect(state?.spokenTitle?.contains("\u{200B}") == false)
+        #expect(state?.spokenTitle.contains("\u{200B}") == false)
         #expect(state?.spokenTitle.contains(query) == true)
         #expect(state?.actionAccessibilityLabel == "Show episodes for \(query)")
     }
@@ -417,16 +417,17 @@ struct SearchResultStateTests {
 }
 
 /// Scripted channel and episode responses. Call counts are safe to read from
-/// the test after a phase has settled. The fetch methods are nonisolated so
-/// they can be the view model's `@Sendable` transport.
-final class ScriptedSearch: @unchecked Sendable {
+/// the test after a phase has settled. Not actor-isolated, so its fetch
+/// methods can be the view model's `@Sendable` transport. The lock is only
+/// taken in synchronous helpers: `NSLock` cannot be used directly in `async`.
+nonisolated final class ScriptedSearch: @unchecked Sendable {
     struct Failure: Error {}
 
-    nonisolated(unsafe) private let lock = NSLock()
-    nonisolated(unsafe) private var channelCalls = 0
-    nonisolated(unsafe) private var episodeCalls = 0
-    nonisolated(unsafe) private var channelResult: Result<[SubscriptionRow], Error>
-    nonisolated(unsafe) private var episodeResult: Result<[APIClient.EpisodeWithChannel], Error>
+    private let lock = NSLock()
+    private var channelCalls = 0
+    private var episodeCalls = 0
+    private var channelResult: Result<[SubscriptionRow], Error>
+    private var episodeResult: Result<[APIClient.EpisodeWithChannel], Error>
 
     init(
         channels: Result<[SubscriptionRow], Error> = .success([]),
@@ -436,42 +437,47 @@ final class ScriptedSearch: @unchecked Sendable {
         episodeResult = episodes
     }
 
-    nonisolated var channelCallCount: Int {
-        lock.lock(); defer { lock.unlock() }
-        return channelCalls
+    var channelCallCount: Int { withLock { channelCalls } }
+
+    var episodeCallCount: Int { withLock { episodeCalls } }
+
+    func setChannels(_ result: Result<[SubscriptionRow], Error>) {
+        withLock { channelResult = result }
     }
 
-    nonisolated var episodeCallCount: Int {
-        lock.lock(); defer { lock.unlock() }
-        return episodeCalls
+    func setEpisodes(_ result: Result<[APIClient.EpisodeWithChannel], Error>) {
+        withLock { episodeResult = result }
     }
 
-    nonisolated func setChannels(_ result: Result<[SubscriptionRow], Error>) {
-        lock.lock(); defer { lock.unlock() }
-        channelResult = result
+    func fetchChannels(_ keyword: String) async throws -> [SubscriptionRow] {
+        try reserveChannels().get()
     }
 
-    nonisolated func setEpisodes(_ result: Result<[APIClient.EpisodeWithChannel], Error>) {
-        lock.lock(); defer { lock.unlock() }
-        episodeResult = result
+    func fetchEpisodes(_ keyword: String) async throws -> [APIClient.EpisodeWithChannel] {
+        try reserveEpisodes().get()
     }
 
-    nonisolated func fetchChannels(_ keyword: String) async throws -> [SubscriptionRow] {
+    private func reserveChannels() -> Result<[SubscriptionRow], Error> {
+        withLock {
+            channelCalls += 1
+            return channelResult
+        }
+    }
+
+    private func reserveEpisodes() -> Result<[APIClient.EpisodeWithChannel], Error> {
+        withLock {
+            episodeCalls += 1
+            return episodeResult
+        }
+    }
+
+    private func withLock<T>(_ body: () -> T) -> T {
         lock.lock()
-        channelCalls += 1
-        let result = channelResult
-        lock.unlock()
-        return try result.get()
+        defer { lock.unlock() }
+        return body()
     }
 
-    nonisolated func fetchEpisodes(_ keyword: String) async throws -> [APIClient.EpisodeWithChannel] {
-        lock.lock()
-        episodeCalls += 1
-        let result = episodeResult
-        lock.unlock()
-        return try result.get()
-    }
-
+    @MainActor
     func makeModel(_ query: String) -> SearchPageViewModel {
         SearchPageViewModel(
             searchText: query,

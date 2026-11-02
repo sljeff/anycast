@@ -22,7 +22,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     static let fieldPlaceholder = "Shows, episodes, and more"
 
     private let context: UIContext
-    var viewModel: SearchPageViewModel
+    private var viewModel: SearchPageViewModel
 
     private let header = HeaderView()
     /// iOS 18 field under the header.
@@ -43,9 +43,9 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     /// Guards double activation when a scrub is followed by its settle.
     private var lastActivatedTab = -1
     /// Transport for the next search. Production uses `context.api`. The
-    /// debug testing extension can replace it.
-    var fetchChannels: @Sendable (String) async throws -> [SubscriptionRow]
-    var fetchEpisodes: @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
+    /// debug testing extension, in this file, can replace it.
+    private var fetchChannels: @Sendable (String) async throws -> [SubscriptionRow]
+    private var fetchEpisodes: @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
     private var recentObservation = ObservationLoop()
     /// This search has already written its query to Recent.
     private var didRecordThisSearch = false
@@ -146,8 +146,8 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     }
 
     /// `channels` and `episodes` override the transport for this search only.
-    /// The debug testing extension is the caller that passes a script.
-    func performSearch(
+    /// The debug testing extension in this file is the caller that passes a script.
+    private func performSearch(
         _ text: String,
         channels: (@Sendable (String) async throws -> [SubscriptionRow])?,
         episodes: (@Sendable (String) async throws -> [APIClient.EpisodeWithChannel])?
@@ -213,7 +213,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         viewModel.activate(tab: index)
     }
 
-    func showSegment(_ index: Int) {
+    private func showSegment(_ index: Int) {
         tabStrip.select(index, animated: true)
         pagingContainer.select(index, animated: true)
         activateTabIfNeeded(index)
@@ -260,7 +260,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         }
     }
 
-    var activeSearchField: UITextField {
+    private var activeSearchField: UITextField {
         if #available(iOS 26.0, *) {
             return searchController.searchBar.searchTextField
         }
@@ -889,3 +889,37 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         return cell
     }
 }
+
+#if DEBUG
+extension SearchPageViewController {
+
+    /// Runs this search against a script instead of `context.api`.
+    func search(
+        _ text: String,
+        channels: @escaping @Sendable (String) async throws -> [SubscriptionRow],
+        episodes: @escaping @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
+    ) {
+        performSearch(text, channels: channels, episodes: episodes)
+    }
+
+    /// Replaces the transport used by later `search` calls.
+    func setSearchTransport(
+        channels: @escaping @Sendable (String) async throws -> [SubscriptionRow],
+        episodes: @escaping @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
+    ) {
+        fetchChannels = channels
+        fetchEpisodes = episodes
+    }
+
+    var searchFieldForTests: UITextField { activeSearchField }
+
+    var segmentPhases: (channels: SearchListPhase, episodes: SearchListPhase) {
+        (viewModel.channelsPhase, viewModel.episodesPhase)
+    }
+
+    /// Selects a segment the way the tab strip does.
+    func selectSegmentForTests(_ index: Int) {
+        showSegment(index)
+    }
+}
+#endif
