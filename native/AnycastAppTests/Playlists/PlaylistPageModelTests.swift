@@ -107,7 +107,6 @@ struct AITranscriptDisplayTests {
         #expect(AITranscriptAction.action(display: .unknown) == AITranscriptAction.none)
         #expect(AITranscriptAction.action(display: .succeeded) == .toast("You can check the transcript when playing."))
         #expect(AITranscriptAction.action(display: .processing) == .toast("Generating transcript may take 2 ~ 5 minutes..."))
-        #expect(AITranscriptAction.failedToastMessage == "Transcript generation failed, please try again later.")
     }
 
     @Test("Icons: sparkle default, SF check/bubble for terminal states")

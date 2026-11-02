@@ -116,7 +116,17 @@ final class DetailViewController: UIViewController {
     private let descriptionTextView: ShowNotesTextView
     private let artwork = UIImageView()
     private var artworkSide: NSLayoutConstraint!
+    private var headerStack: UIStackView!
+    private var channelButton: UIButton!
     private let titleLabel = UILabel()
+    /// One shot after the first layout, and again when the text size changes,
+    /// so the medium detent can grow instead of clipping an accessibility-size header.
+    private var needsDetentRefresh = true
+    /// Laid-out height of the header plus the pinned chrome. The detent
+    /// closure reads this; it is updated from the views' bounds, not from a
+    /// nested fitting pass.
+    private var accessibilityDetentHeight: CGFloat = Layout.mediumHeight
+    private var didMeasureAccessibilityDetent = false
     /// Takes the slack below the meta line so the column stays top-aligned
     /// beside the cover at both detents.
     private let trailingSpacer = UIView()
@@ -174,8 +184,16 @@ final class DetailViewController: UIViewController {
             // Medium is the floating 460 pt card; the system draws its inset
             // and corners on iOS 26. Two detents, so the grabber shows.
             sheet.detents = [
-                .custom(identifier: mediumDetent) { context in
-                    min(Layout.mediumHeight, context.maximumDetentValue)
+                .custom(identifier: mediumDetent) { [weak controller] context in
+                    let cap = context.maximumDetentValue
+                    let base = min(Layout.mediumHeight, cap)
+                    guard let controller,
+                          controller.traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+                    else { return base }
+                    // Accessibility sizes: grow so the title, transcript row and
+                    // Play fit. Notes stay in the scroll view. Never below the
+                    // regular 460, never past the sheet.
+                    return min(max(controller.accessibilityMediumDetentHeight(maximum: cap), base), cap)
                 },
                 .large(),
             ]
@@ -330,8 +348,28 @@ final class DetailViewController: UIViewController {
         applyDetentLayout()
         applyActionRowMetrics()
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (self: Self, _) in
+            self.needsDetentRefresh = true
             self.applyActionRowMetrics()
+            self.applyDetentLayout()
+            self.sheetPresentationController?.invalidateDetents()
         }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if traitCollection.preferredContentSizeCategory.isAccessibilityCategory, headerStack != nil {
+            let transcriptHeight = transcriptSlot.isHidden ? 0 : transcriptSlot.bounds.height
+            let measured = Layout.inset + headerStack.bounds.height + Layout.rowGap
+                + transcriptHeight + Spacing.md + actionRow.bounds.height + Layout.inset
+            if !didMeasureAccessibilityDetent || abs(measured - accessibilityDetentHeight) > 1 {
+                didMeasureAccessibilityDetent = true
+                accessibilityDetentHeight = measured
+                needsDetentRefresh = true
+            }
+        }
+        guard needsDetentRefresh else { return }
+        needsDetentRefresh = false
+        sheetPresentationController?.invalidateDetents()
     }
 
     private func buildContent() -> UIView {
@@ -352,10 +390,13 @@ final class DetailViewController: UIViewController {
         titleLabel.text = episode.title
         titleLabel.textColor = TypographyV2.emphasis.color
         titleLabel.numberOfLines = 3
+        titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
 
         // The show: a Meta-styled link to the Channel sheet.
         let hostButton = ExpandedHitButton(type: .system)
+        channelButton = hostButton
         var hostConfig = UIButton.Configuration.plain()
         hostConfig.title = episode.channelTitle
         hostConfig.baseForegroundColor = TypographyV2.meta.color
@@ -388,13 +429,34 @@ final class DetailViewController: UIViewController {
         hostButton.setContentHuggingPriority(.required, for: .vertical)
         let info = UIStackView(arrangedSubviews: [titleLabel, hostButton, meta, trailingSpacer])
         info.axis = .vertical
-        info.alignment = .leading
+        // Fill gives the title the column width, so it wraps on word
+        // boundaries instead of laying out at its one-line intrinsic width.
+        info.alignment = .fill
         info.spacing = Spacing.xs
 
-        let header = UIStackView(arrangedSubviews: [artwork, info])
+        // The cover sits in a wrapper so an accessibility-size vertical header
+        // can be full width (the title wraps) while the image stays 120 pt.
+        // The wrapper's trailing pin is 999: a fill stack may widen the
+        // wrapper, and that pin yields instead of stretching the image.
+        let artworkWrap = UIView()
+        artworkWrap.translatesAutoresizingMaskIntoConstraints = false
+        artworkWrap.addSubview(artwork)
+        let artworkTrailing = artworkWrap.trailingAnchor.constraint(equalTo: artwork.trailingAnchor)
+        artworkTrailing.priority = UILayoutPriority(999)
+        artworkWrap.setContentHuggingPriority(.required, for: .horizontal)
+        artworkWrap.setContentCompressionResistancePriority(.required, for: .horizontal)
+        NSLayoutConstraint.activate([
+            artwork.topAnchor.constraint(equalTo: artworkWrap.topAnchor),
+            artwork.leadingAnchor.constraint(equalTo: artworkWrap.leadingAnchor),
+            artwork.bottomAnchor.constraint(equalTo: artworkWrap.bottomAnchor),
+            artworkTrailing,
+        ])
+
+        let header = UIStackView(arrangedSubviews: [artworkWrap, info])
         header.axis = .horizontal
         header.alignment = .top
         header.spacing = Spacing.pageH
+        headerStack = header
 
         // Show-notes pipeline wiring. The document arrives pre-styled from
         // ShowNotesStore (ShowNotesStyle owns fonts/colors), so the view
@@ -438,12 +500,52 @@ final class DetailViewController: UIViewController {
     }
 
     /// Large gives the cover 160 pt and the title four lines; medium is
-    /// 120 pt and three lines. Both keep the column top-aligned.
+    /// 120 pt and three lines. Both keep the column top-aligned. Accessibility
+    /// sizes stack the cover above a full-width title so a word is not broken
+    /// or clipped beside the artwork.
     private func applyDetentLayout() {
         let isLarge = sheetPresentationController?.selectedDetentIdentifier == .large
-        artworkSide.constant = isLarge ? Layout.artworkLarge : Layout.artworkMedium
-        titleLabel.numberOfLines = isLarge ? 4 : 3
+        applyHeaderMetrics(isLarge: isLarge)
         applyTranscriptVisibility(isLarge: isLarge)
+    }
+
+    private func applyHeaderMetrics(isLarge: Bool) {
+        let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        if accessibility {
+            headerStack.axis = .vertical
+            headerStack.alignment = .fill
+            headerStack.spacing = Spacing.gap
+            artworkSide.constant = Layout.artworkMedium
+            titleLabel.numberOfLines = 0
+            titleLabel.lineBreakMode = .byWordWrapping
+            titleLabel.lineBreakStrategy = .pushOut
+            var channelConfig = channelButton.configuration
+            channelConfig?.titleLineBreakMode = .byWordWrapping
+            channelButton.configuration = channelConfig
+            channelButton.titleLabel?.numberOfLines = 0
+            channelButton.titleLabel?.lineBreakMode = .byWordWrapping
+        } else {
+            headerStack.axis = .horizontal
+            headerStack.alignment = .top
+            headerStack.spacing = Spacing.pageH
+            artworkSide.constant = isLarge ? Layout.artworkLarge : Layout.artworkMedium
+            titleLabel.numberOfLines = isLarge ? 4 : 3
+            titleLabel.lineBreakMode = .byTruncatingTail
+            titleLabel.lineBreakStrategy = .standard
+            var channelConfig = channelButton.configuration
+            channelConfig?.titleLineBreakMode = .byTruncatingTail
+            channelButton.configuration = channelConfig
+            channelButton.titleLabel?.numberOfLines = 1
+            channelButton.titleLabel?.lineBreakMode = .byTruncatingTail
+        }
+    }
+
+    /// Height of the medium detent at an accessibility size: the header, the
+    /// transcript row and Play, from the last layout. Show notes stay in the
+    /// scroll view. Before that measurement, use the sheet maximum.
+    private func accessibilityMediumDetentHeight(maximum: CGFloat) -> CGFloat {
+        guard didMeasureAccessibilityDetent else { return maximum }
+        return accessibilityDetentHeight
     }
 
     /// The row is chrome, not scrolling content. Medium shows it unless the

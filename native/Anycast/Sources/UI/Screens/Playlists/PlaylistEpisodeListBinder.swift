@@ -340,15 +340,6 @@ final class PlaylistEpisodeListBinder: NSObject {
                     episode: Self.paywallEpisode(for: episode)
                 )
             }
-        case .removeStaleRecord:
-            Task { [weak self] in
-                await self?.context.subtitles.remove(url: enclosureURL)
-                if let window = self?.owner.view?.window {
-                    ToastPresenter.shared.show(
-                        AITranscriptAction.failedToastMessage, in: window, duration: 3
-                    )
-                }
-            }
         case .toast(let message):
             if let window = owner.view?.window {
                 ToastPresenter.shared.show(message, in: window, duration: 3)

@@ -76,7 +76,7 @@ struct DetailTranscriptRowSnapshotTests {
             top: Spacing.pageH, left: Spacing.pageH, bottom: Spacing.pageH, right: Spacing.pageH
         )
         var rows: [DetailTranscriptRow] = []
-        for content in states {
+        for _ in states {
             let row = DetailTranscriptRow()
             row.translatesAutoresizingMaskIntoConstraints = false
             column.addArrangedSubview(row)
