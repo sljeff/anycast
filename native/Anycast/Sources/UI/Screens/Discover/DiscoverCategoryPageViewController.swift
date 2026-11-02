@@ -12,6 +12,9 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
 
     private let collectionView: UICollectionView
     private let spinner = UIActivityIndicatorView(style: .large)
+    private let subtleSpinner = UIActivityIndicatorView(style: .medium)
+    private let skeleton = SkeletonListView(style: .channelRows)
+    private var skeletonTop: NSLayoutConstraint?
     private let errorLabel = UILabel()
     private let observation = ObservationLoop()
     private var lastChannelSignature: [String?] = []
@@ -76,6 +79,17 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
+        subtleSpinner.color = Theme.primary
+        subtleSpinner.hidesWhenStopped = true
+        subtleSpinner.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
+        subtleSpinner.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(subtleSpinner)
+
+        skeleton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(skeleton)
+        let skeletonTop = skeleton.topAnchor.constraint(equalTo: view.topAnchor)
+        self.skeletonTop = skeletonTop
+
         // Centered white "Network Error" (discover.dart:73-78).
         errorLabel.text = "Network Error"
         errorLabel.textColor = Theme.onSurfaceVariant
@@ -94,33 +108,62 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
 
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            subtleSpinner.topAnchor.constraint(equalTo: skeleton.topAnchor),
+            subtleSpinner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            skeletonTop,
+            skeleton.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            skeleton.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            skeleton.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             errorLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let top = collectionView.contentInset.top + Spacing.gap
+        if skeletonTop?.constant != top { skeletonTop?.constant = top }
+    }
+
     // MARK: - Rendering (plain no-animation rebuild, 08 §7.2)
 
     private func render() {
+        let hasContent = !model.channels.isEmpty
+        let loading = model.phase == .loading
+        let chrome = MotionLoading.chrome(isLoading: loading, hasContent: hasContent)
+        spinner.stopAnimating()
+        if chrome.showSubtleIndicator { subtleSpinner.startAnimating() } else { subtleSpinner.stopAnimating() }
         switch model.phase {
         case .loading:
-            spinner.startAnimating()
             errorLabel.isHidden = true
         case .networkError:
-            spinner.stopAnimating()
             errorLabel.isHidden = false
         case .loaded:
-            spinner.stopAnimating()
             errorLabel.isHidden = true
         }
 
+        let hadContent = !lastChannelSignature.isEmpty
         let signature = model.channels.map(\.rssFeedUrl)
-        if signature != lastChannelSignature {
+        let signatureChanged = signature != lastChannelSignature
+        if signatureChanged {
             lastChannelSignature = signature
             UIView.performWithoutAnimation {
                 collectionView.reloadData()
             }
+        }
+        let reveal = signatureChanged && !hadContent && !signature.isEmpty
+        if reveal {
+            MotionArrival.reveal(
+                in: collectionView,
+                cells: [],
+                skeleton: skeleton,
+                staggered: true
+            )
+        } else if chrome.showSkeleton {
+            skeleton.setShown(true)
+        } else if !skeleton.isDismissing {
+            skeleton.setShown(false)
         }
     }
 

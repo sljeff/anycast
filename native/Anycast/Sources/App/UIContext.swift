@@ -152,6 +152,12 @@ final class UIContext {
             guard let presenter else { return }
             self.openPlayerPage(from: presenter)
         }
+        bar.onVerticalPan = { [weak bar, weak self] gesture in
+            guard let bar, let self else { return }
+            let presenter = bar.containingViewController ?? self.topPresenter()
+            guard let presenter else { return }
+            PlayerInteractiveOpen.shared.handle(gesture, from: presenter, context: self)
+        }
         return bar
     }
 

@@ -31,6 +31,9 @@ final class ChannelViewController: UIViewController {
     private let playerBar: PlayerBarView
     private let playerBarHeight: NSLayoutConstraint
     private let episodeListSpinner = UIActivityIndicatorView(style: .large)
+    private let episodeSkeleton = SkeletonListView(style: .channelEpisodes)
+    private var episodeSkeletonTop: NSLayoutConstraint?
+    private var lastLatestLoading: Bool?
     private let fullPageSpinner = UIActivityIndicatorView(style: .large)
     private let emptyChannelLabel = UILabel()
 
@@ -189,6 +192,11 @@ final class ChannelViewController: UIViewController {
         episodeListSpinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(episodeListSpinner)
 
+        episodeSkeleton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(episodeSkeleton)
+        let skeletonTop = episodeSkeleton.topAnchor.constraint(equalTo: view.topAnchor)
+        episodeSkeletonTop = skeletonTop
+
         fullPageSpinner.color = Theme.primary
         fullPageSpinner.hidesWhenStopped = true
         fullPageSpinner.translatesAutoresizingMaskIntoConstraints = false
@@ -236,6 +244,10 @@ final class ChannelViewController: UIViewController {
             episodeListSpinner.centerYAnchor.constraint(
                 equalTo: collectionView.centerYAnchor, constant: 100
             ),
+            skeletonTop,
+            episodeSkeleton.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            episodeSkeleton.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            episodeSkeleton.bottomAnchor.constraint(equalTo: actionRow.topAnchor),
 
             fullPageSpinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             fullPageSpinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -313,10 +325,24 @@ final class ChannelViewController: UIViewController {
     /// The pinned supplementary's absolute height tracks the current safe
     /// area and the measured content block; extents never use fixed status
     /// bar numbers.
-    private func rebuildForGeometryChange() {
+    private func rebuildForGeometryChange(animated: Bool = false) {
         appliedSafeAreaTop = view.safeAreaInsets.top
         headerView?.updateGeometry(foldGeometry)
-        collectionView.setCollectionViewLayout(makeLayout(), animated: false)
+        let top = foldGeometry.maxExtent + ChannelBodyHeaderCell.fixedHeight
+        let move = animated && !Motion.reduceMotion
+        if move {
+            UIView.animate(
+                withDuration: Motion.standard,
+                delay: 0,
+                options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState]
+            ) {
+                self.episodeSkeletonTop?.constant = top
+                self.view.layoutIfNeeded()
+            }
+        } else {
+            episodeSkeletonTop?.constant = top
+        }
+        collectionView.setCollectionViewLayout(makeLayout(), animated: move)
         applyFold()
     }
 
@@ -325,7 +351,8 @@ final class ChannelViewController: UIViewController {
     private func contentHeightMeasured(_ height: CGFloat) {
         guard abs(height - contentBlockHeight) > 0.5 else { return }
         contentBlockHeight = height
-        DispatchQueue.main.async { [weak self] in self?.rebuildForGeometryChange() }
+        let animate = view.window != nil
+        DispatchQueue.main.async { [weak self] in self?.rebuildForGeometryChange(animated: animate) }
     }
 
     private func makeLayout() -> UICollectionViewCompositionalLayout {
@@ -389,8 +416,11 @@ final class ChannelViewController: UIViewController {
         renderActionRow()
 
         // Plain no-animation rebuild (08 §7.2 — the Flutter Obx rebuild).
+        // The first episode arrival fades in after the reload.
+        let hadEpisodes = !lastEpisodeSignature.isEmpty
         let signature = viewModel.showEpisodes.map(\.enclosureUrl)
-        if signature != lastEpisodeSignature {
+        let signatureChanged = signature != lastEpisodeSignature
+        if signatureChanged {
             lastEpisodeSignature = signature
             UIView.performWithoutAnimation {
                 collectionView.reloadData()
@@ -402,11 +432,21 @@ final class ChannelViewController: UIViewController {
         // the full-page spinner shows, the list spinner must not — one
         // loading affordance at a time.
         let showListSpinner = viewModel.episodes.isEmpty && viewModel.isLoading && viewModel.hasTitle
-        episodeListSpinner.isHidden = !showListSpinner
-        if showListSpinner {
-            episodeListSpinner.startAnimating()
-        } else {
-            episodeListSpinner.stopAnimating()
+        episodeListSpinner.stopAnimating()
+        let chrome = MotionLoading.chrome(isLoading: showListSpinner, hasContent: false)
+        let reveal = signatureChanged && !hadEpisodes && !signature.isEmpty
+        if reveal {
+            collectionView.layoutIfNeeded()
+            let rows = collectionView.visibleCells.filter { $0 is ChannelEpisodeRowCell }
+            if rows.isEmpty {
+                episodeSkeleton.dismissAnimated()
+            } else {
+                MotionArrival.reveal(in: collectionView, cells: rows, skeleton: episodeSkeleton, staggered: true)
+            }
+        } else if chrome.showSkeleton {
+            episodeSkeleton.setShown(true)
+        } else if !episodeSkeleton.isDismissing {
+            episodeSkeleton.setShown(false)
         }
 
         renderPlayerBar()
@@ -425,9 +465,13 @@ final class ChannelViewController: UIViewController {
     /// (bottom_nav_bar.dart:86-88).
     private func renderPlayerBar() {
         let visible = context.playback.currentEpisode != nil
-        playerBar.isHidden = !visible
-        playerBarHeight.constant = visible ? 58 : 0
-        updateListBottomInset()
+        MiniPlayerInsertion.apply(
+            visible: visible,
+            bar: playerBar,
+            height: playerBarHeight,
+            in: view,
+            alongside: { [weak self] in self?.updateListBottomInset() }
+        )
     }
 
     /// The list runs under the floating capsule (and the home indicator),
@@ -513,7 +557,23 @@ final class ChannelViewController: UIViewController {
         subscribeButton.accessibilityLabel = display.toggleAccessibilityLabel
         subscribeButton.isEnabled = display != .loading
         subscribeButton.alpha = display == .loading ? 0.5 : 1
-        latestButton.configuration = latestConfiguration(loading: viewModel?.isLoading ?? false)
+        let loading = viewModel?.isLoading ?? false
+        let configuration = latestConfiguration(loading: loading)
+        let crossfade = lastLatestLoading != nil
+            && lastLatestLoading != loading
+            && view.window != nil
+        if crossfade {
+            UIView.transition(
+                with: latestButton,
+                duration: Motion.reduceMotion ? 0 : Motion.quick,
+                options: .transitionCrossDissolve
+            ) {
+                self.latestButton.configuration = configuration
+            }
+        } else {
+            latestButton.configuration = configuration
+        }
+        lastLatestLoading = loading
     }
 
     // MARK: - Fold
@@ -867,7 +927,7 @@ final class ChannelHeaderView: UICollectionReusableView {
         coverView.kf.cancelDownloadTask()
         let imageURL = channel.imageUrl.flatMap(URL.init(string:))
             ?? URL(string: "https://placeholder.co/120.png?text=Waiting")
-        coverView.kf.setImage(with: imageURL, placeholder: nil, options: [.transition(.none)])
+        coverView.setCover(imageURL, placeholder: nil, failureImage: nil)
 
         titleLabel.text = channel.title ?? ""
         authorLabel.text = channel.author

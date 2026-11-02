@@ -805,10 +805,52 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             guard let url = row.enclosureUrl else { return true }
             return !urls.contains(url)
         }
-        // Animated deletion applies only while the rows were on screen AND
-        // the column keeps its structure: emptying the displayed list
-        // collapses every section into the ImportBlock empty state — that
-        // structural rebuild goes through the plain path.
+        // The last card leaves with a row animation. The shelf section is not
+        // part of the batch, so it stays put; only the tail section (the
+        // history pill) is removed with the card. A full reloadData here
+        // re-parents the shelf and flashes the header.
+        if view.window != nil, !removedPaths.isEmpty, displayedAfterRemoval.isEmpty {
+            let tailSection = sections.firstIndex(of: .tail)
+            let reduce = Motion.reduceMotion
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let completion: (Bool) -> Void = { _ in continuation.resume() }
+                if reduce {
+                    UIView.performWithoutAnimation {
+                        self.removeLastInboxCards(
+                            removedPaths,
+                            urls: urls,
+                            tailSection: tailSection,
+                            completion: completion
+                        )
+                    }
+                } else {
+                    self.removeLastInboxCards(
+                        removedPaths,
+                        urls: urls,
+                        tailSection: tailSection,
+                        completion: completion
+                    )
+                }
+            }
+            lastSignature = displayedEpisodes.map(\.enclosureUrl)
+            emptyStateView.alpha = 0
+            collectionView.backgroundView = emptyStateView
+            // Place the empty state under the shelf before it fades in, so
+            // the fade never covers the shelf or the header behind it.
+            collectionView.layoutIfNeeded()
+            view.layoutIfNeeded()
+            UIView.performWithoutAnimation {
+                self.refreshChromeStatus()
+            }
+            UIView.animate(
+                withDuration: Motion.quick,
+                delay: 0,
+                options: [.curveEaseOut, .allowUserInteraction]
+            ) {
+                self.emptyStateView.alpha = 1
+            }
+            return
+        }
         guard view.window != nil, !removedPaths.isEmpty, !displayedAfterRemoval.isEmpty else {
             episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
             renderList()
@@ -827,6 +869,35 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // have emptied the list while the delete animation ran.
         collectionView.backgroundView = displayedEpisodes.isEmpty ? emptyStateView : nil
         refreshChromeStatus()
+    }
+
+    /// Deletes the last inbox cards and the history tail without reloading
+    /// the shelf section. `completion` is escaping because UIKit's batch
+    /// completion is.
+    private func removeLastInboxCards(
+        _ removedPaths: [IndexPath],
+        urls: [String],
+        tailSection: Int?,
+        completion: @escaping (Bool) -> Void
+    ) {
+        let removedURLs = Set(urls)
+        collectionView.performBatchUpdates {
+            self.episodes.removeAll { episode in
+                guard let url = episode.enclosureUrl else { return false }
+                return removedURLs.contains(url)
+            }
+            self.sections = Self.sections(
+                hasShelf: !self.shows.isEmpty,
+                hasStrip: self.categoryStrip.hasFilters,
+                hasCards: false
+            )
+            self.collectionView.deleteItems(at: removedPaths)
+            if let tailSection {
+                self.collectionView.deleteSections(IndexSet(integer: tailSection))
+            }
+        } completion: { finished in
+            completion(finished)
+        }
     }
 
     /// The cards section's provider index in the current section set.

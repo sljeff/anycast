@@ -317,12 +317,60 @@ final class HistoryDialogViewController: UIViewController {
         return UICollectionViewCompositionalLayout.list(using: configuration)
     }
 
+    /// After the first populated apply, later diffs can animate.
+    private var didApplyItems = false
+
     private func applySnapshot() {
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(episodes.compactMap(\.enclosureUrl))
-        dataSource.apply(snapshot, animatingDifferences: false)
-        renderStates()
+        let hadRows = didApplyItems
+        let revealEmpty = episodes.isEmpty && hadRows && view.window != nil
+        // Animate the deleted row even when it is the last one. Reduce Motion
+        // removes it instantly; the empty state still fades in.
+        let animateRows = hadRows && view.window != nil && !Motion.reduceMotion
+        if !episodes.isEmpty { didApplyItems = true }
+
+        if animateRows {
+            dataSource.apply(snapshot, animatingDifferences: true) { [weak self] in
+                self?.finishHistorySnapshot(revealEmpty: revealEmpty)
+            }
+        } else {
+            dataSource.apply(snapshot, animatingDifferences: false)
+            finishHistorySnapshot(revealEmpty: revealEmpty)
+        }
+    }
+
+    /// Shows the empty state after a deleting snapshot. Called once the row
+    /// animation has finished, or immediately when that animation is skipped.
+    private func finishHistorySnapshot(revealEmpty: Bool) {
+        guard revealEmpty else {
+            renderStates()
+            return
+        }
+        // The row animation (if any) has finished. Hide the list without
+        // another jump, then fade the empty state in and the footer out.
+        renderEmptyState()
+        emptyView.alpha = 0
+        emptyView.isHidden = false
+        UIView.performWithoutAnimation {
+            self.collectionView.isHidden = true
+            self.spinner.stopAnimating()
+            self.spinner.isHidden = true
+        }
+        UIView.animate(
+            withDuration: Motion.quick,
+            delay: 0,
+            options: [.curveEaseOut, .allowUserInteraction]
+        ) {
+            self.emptyView.alpha = 1
+            self.footerStack.alpha = 0
+            self.bottomFade.alpha = 0
+        } completion: { _ in
+            self.renderStates()
+            self.footerStack.alpha = 1
+            self.bottomFade.alpha = 1
+        }
     }
 
     private func renderStates() {
