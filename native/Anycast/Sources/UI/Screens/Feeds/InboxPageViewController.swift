@@ -816,10 +816,20 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
                 let completion: (Bool) -> Void = { _ in continuation.resume() }
                 if reduce {
                     UIView.performWithoutAnimation {
-                        self.removeLastInboxCards(removedPaths, tailSection: tailSection, completion: completion)
+                        self.removeLastInboxCards(
+                            removedPaths,
+                            urls: urls,
+                            tailSection: tailSection,
+                            completion: completion
+                        )
                     }
                 } else {
-                    self.removeLastInboxCards(removedPaths, tailSection: tailSection, completion: completion)
+                    self.removeLastInboxCards(
+                        removedPaths,
+                        urls: urls,
+                        tailSection: tailSection,
+                        completion: completion
+                    )
                 }
             }
             lastSignature = displayedEpisodes.map(\.enclosureUrl)
@@ -866,11 +876,16 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// completion is.
     private func removeLastInboxCards(
         _ removedPaths: [IndexPath],
+        urls: [String],
         tailSection: Int?,
         completion: @escaping (Bool) -> Void
     ) {
+        let removedURLs = Set(urls)
         collectionView.performBatchUpdates {
-            self.episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
+            self.episodes.removeAll { episode in
+                guard let url = episode.enclosureUrl else { return false }
+                return removedURLs.contains(url)
+            }
             self.sections = Self.sections(
                 hasShelf: !self.shows.isEmpty,
                 hasStrip: self.categoryStrip.hasFilters,
