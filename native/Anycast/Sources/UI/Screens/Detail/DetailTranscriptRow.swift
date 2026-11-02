@@ -176,7 +176,6 @@ final class DetailTranscriptRow: UIView {
         accessibleColumn.alignment = .fill
         accessibleColumn.spacing = Spacing.xxs
         accessibleColumn.isLayoutMarginsRelativeArrangement = true
-        accessibleColumn.layoutMargins = Self.accessibilityMargins()
         accessibleColumn.addArrangedSubview(accessibleTitleRow)
 
         host.axis = .vertical

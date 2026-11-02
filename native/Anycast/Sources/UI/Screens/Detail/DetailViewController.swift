@@ -6,8 +6,12 @@ import AnycastKit
 /// at a 460 pt medium detent — on iOS 26 a floating card inset from the
 /// screen edges — and drags up to large. Content sits 28 pt in: the cover
 /// beside the title, the show (opens the Channel sheet ON TOP — 03 §10.1)
-/// and the date · duration line, then the HTML show notes. The actions stay
-/// at the bottom in thumb reach over a soft fade: a Play capsule that
+/// and the date · duration line, then the HTML show notes. At an
+/// accessibility size the title stays full width and the cover sits beside
+/// the channel line, shrunk so it does not grow with the text. The actions
+/// stay at the bottom in thumb reach over a soft fade — unless that identity
+/// still does not fit, in which case the header, transcript row and actions
+/// scroll together and the scroll indicator shows. A Play capsule
 /// carries the episode's progress ("Resume · 32m left") and a ••• menu with
 /// Add to playlist, Share episode, Copy link and the remaining actions.
 /// A transcript status row sits in the same thumb reach, just above the
@@ -118,6 +122,15 @@ final class DetailViewController: UIViewController {
     private var artworkSide: NSLayoutConstraint!
     private var headerStack: UIStackView!
     private var infoStack: UIStackView!
+    private var contentStack: UIStackView!
+    private var contentContainer: UIView!
+    private var artworkWrap: UIView!
+    /// Cover beside the channel name at accessibility sizes. Not in the
+    /// hierarchy at the default size.
+    private let identityRow = UIStackView()
+    /// Label plus the channel button, as siblings, so the label cannot
+    /// swallow the tap.
+    private let channelBlock = UIView()
     private var channelButton: UIButton!
     /// Draws the channel name at accessibility sizes. A UIButton title stays
     /// one line tall and clips the wrap; this label is the text, and the
@@ -147,7 +160,27 @@ final class DetailViewController: UIViewController {
     private var actionRowHeight: NSLayoutConstraint!
     private var actionLeading: NSLayoutConstraint!
     private var actionTrailing: NSLayoutConstraint!
+    private var actionSafeBottom: NSLayoutConstraint!
     private var rowBottom: NSLayoutConstraint!
+    private var transcriptLeading: NSLayoutConstraint!
+    private var transcriptTrailing: NSLayoutConstraint!
+    private var scrollAboveTranscript: NSLayoutConstraint!
+    private var scrollFullBottom: NSLayoutConstraint!
+    private var contentBottom: NSLayoutConstraint!
+    /// Active only while the actions scroll with the notes. They pin the
+    /// transcript row and Play inside the scroll content.
+    private var scrollTranscriptTop: NSLayoutConstraint!
+    private var scrollTranscriptLeading: NSLayoutConstraint!
+    private var scrollTranscriptTrailing: NSLayoutConstraint!
+    private var scrollActionLeading: NSLayoutConstraint!
+    private var scrollActionTrailing: NSLayoutConstraint!
+    private var scrollActionBottom: NSLayoutConstraint!
+    /// Accessibility sizes unpin Play when the title, channel and date do
+    /// not fit above it. They then scroll with the notes.
+    private var scrollsChrome = false
+    /// One flash after the actions join the scroll view, so a cut-off block
+    /// reads as more content rather than as the end of the text.
+    private var needsScrollHint = false
     private var transcriptGap: NSLayoutConstraint!
     private var transcriptSlotHeight: NSLayoutConstraint!
     private var transcriptRowPins: [NSLayoutConstraint] = []
@@ -311,6 +344,9 @@ final class DetailViewController: UIViewController {
         rowBottom.priority = .defaultHigh
         actionLeading = actionRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.inset)
         actionTrailing = actionRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.inset)
+        actionSafeBottom = actionRow.bottomAnchor.constraint(
+            lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor
+        )
         actionRowHeight = actionRow.heightAnchor.constraint(equalToConstant: Layout.actionHeight)
         // The slot hugs the row. Height 0 keeps the notes-to-actions gap
         // unchanged when the row is hidden.
@@ -318,12 +354,42 @@ final class DetailViewController: UIViewController {
             equalTo: actionRow.topAnchor, constant: -Spacing.md
         )
         transcriptSlotHeight = transcriptSlot.heightAnchor.constraint(equalToConstant: 0)
+        transcriptLeading = transcriptSlot.leadingAnchor.constraint(
+            equalTo: view.leadingAnchor, constant: Layout.inset
+        )
+        transcriptTrailing = transcriptSlot.trailingAnchor.constraint(
+            equalTo: view.trailingAnchor, constant: -Layout.inset
+        )
+        scrollAboveTranscript = scrollView.bottomAnchor.constraint(
+            equalTo: transcriptSlot.topAnchor, constant: -Layout.rowGap
+        )
+        scrollFullBottom = scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        // Used when the identity does not fit above the pinned actions. They
+        // stay inactive so the default size keeps Play pinned.
+        scrollTranscriptTop = transcriptSlot.topAnchor.constraint(
+            equalTo: contentStack.bottomAnchor, constant: Spacing.cardInner
+        )
+        scrollTranscriptLeading = transcriptSlot.leadingAnchor.constraint(
+            equalTo: contentContainer.leadingAnchor, constant: Layout.inset
+        )
+        scrollTranscriptTrailing = transcriptSlot.trailingAnchor.constraint(
+            equalTo: contentContainer.trailingAnchor, constant: -Layout.inset
+        )
+        scrollActionLeading = actionRow.leadingAnchor.constraint(
+            equalTo: contentContainer.leadingAnchor, constant: Layout.inset
+        )
+        scrollActionTrailing = actionRow.trailingAnchor.constraint(
+            equalTo: contentContainer.trailingAnchor, constant: -Layout.inset
+        )
+        scrollActionBottom = actionRow.bottomAnchor.constraint(
+            equalTo: contentContainer.bottomAnchor, constant: -Layout.inset
+        )
 
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: transcriptSlot.topAnchor, constant: -Layout.rowGap),
+            scrollAboveTranscript,
 
             content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             content.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
@@ -336,11 +402,11 @@ final class DetailViewController: UIViewController {
             actionLeading,
             actionTrailing,
             actionRowHeight,
-            actionRow.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
+            actionSafeBottom,
             rowBottom,
 
-            transcriptSlot.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.inset),
-            transcriptSlot.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.inset),
+            transcriptLeading,
+            transcriptTrailing,
             transcriptGap,
 
             bottomFade.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -Layout.fadeHeight),
@@ -370,11 +436,13 @@ final class DetailViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        if traitCollection.preferredContentSizeCategory.isAccessibilityCategory, headerStack != nil {
+        let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        if accessibility, headerStack != nil {
             let transcriptHeight = transcriptSlot.isHidden ? 0 : transcriptSlot.bounds.height
             // The scroll view's bottom fade covers its last 40 pt. Add that
-            // much so the channel name and date sit above the fade instead
-            // of dissolving into the transcript row.
+            // much so a pinned header clears the fade. The sheet still caps
+            // this at its maximum; updateChromeScrolling unpins when the cap
+            // leaves the date under the fade.
             let bottom = Self.actionEdgeMargin(accessibility: true)
             let measured = Layout.inset + headerStack.bounds.height + Layout.fadeHeight + Layout.rowGap
                 + transcriptHeight + Spacing.md + actionRow.bounds.height + bottom
@@ -383,10 +451,94 @@ final class DetailViewController: UIViewController {
                 accessibilityDetentHeight = measured
                 needsDetentRefresh = true
             }
+            updateScrollContentInsets()
+            updateChromeScrolling()
+            let overflows = scrollView.contentSize.height > scrollView.bounds.height + 1
+            scrollView.showsVerticalScrollIndicator = overflows || scrollsChrome
+        } else {
+            if scrollsChrome { setScrollsChrome(false) }
+            scrollView.showsVerticalScrollIndicator = false
+        }
+        if needsScrollHint, scrollView.contentSize.height > scrollView.bounds.height + 1 {
+            needsScrollHint = false
+            scrollView.flashScrollIndicators()
         }
         guard needsDetentRefresh else { return }
         needsDetentRefresh = false
         sheetPresentationController?.invalidateDetents()
+    }
+
+    /// Pins Play unless the title, channel and date would sit under the fade
+    /// or past the scroll view. The comparison uses the pinned chrome height,
+    /// not the live scroll-view frame, so turning scrolling on does not
+    /// immediately turn it back off.
+    private func updateChromeScrolling() {
+        guard view.bounds.height > 1, contentContainer.bounds.width > 1 else { return }
+        let transcriptHeight = transcriptSlot.isHidden ? 0 : transcriptSlot.bounds.height
+        let transcriptGapHeight = transcriptSlot.isHidden ? 0 : Spacing.md
+        let bottomInset = max(Self.actionEdgeMargin(accessibility: true), view.safeAreaInsets.bottom)
+        let chrome = Layout.rowGap + transcriptHeight + transcriptGapHeight
+            + actionRow.bounds.height + bottomInset
+        let visibleBottom = view.bounds.height - chrome - Layout.fadeHeight
+        let identityBottom = max(
+            bottom(of: metaLabel, in: contentContainer),
+            bottom(of: channelBlock, in: contentContainer)
+        )
+        guard identityBottom > 0 else { return }
+        let shouldScroll = identityBottom > visibleBottom + 0.5
+        guard shouldScroll != scrollsChrome else { return }
+        setScrollsChrome(shouldScroll)
+        needsDetentRefresh = true
+    }
+
+    private func bottom(of view: UIView, in container: UIView) -> CGFloat {
+        guard view.bounds.height > 0, view.superview != nil else { return 0 }
+        return view.convert(CGPoint(x: 0, y: view.bounds.maxY), to: container).y
+    }
+
+    private func setScrollsChrome(_ enabled: Bool) {
+        guard enabled != scrollsChrome else { return }
+        scrollsChrome = enabled
+        let pinned = [
+            scrollAboveTranscript, actionLeading, actionTrailing, actionSafeBottom,
+            rowBottom, transcriptLeading, transcriptTrailing, contentBottom,
+        ]
+        let flowing = [
+            scrollFullBottom, scrollTranscriptTop, scrollTranscriptLeading,
+            scrollTranscriptTrailing, scrollActionLeading, scrollActionTrailing,
+            scrollActionBottom,
+        ]
+        if enabled {
+            NSLayoutConstraint.deactivate(pinned)
+            updateScrollContentInsets()
+            contentContainer.addSubview(transcriptSlot)
+            contentContainer.addSubview(actionRow)
+            NSLayoutConstraint.activate(flowing)
+            bottomFade.isHidden = true
+            scrollView.contentInset.bottom = 0
+            scrollView.showsVerticalScrollIndicator = true
+            needsScrollHint = true
+        } else {
+            NSLayoutConstraint.deactivate(flowing)
+            view.addSubview(transcriptSlot)
+            view.addSubview(actionRow)
+            view.bringSubviewToFront(bottomFade)
+            view.bringSubviewToFront(actionRow)
+            view.bringSubviewToFront(transcriptSlot)
+            NSLayoutConstraint.activate(pinned)
+            bottomFade.isHidden = false
+            scrollView.showsVerticalScrollIndicator = false
+            scrollView.contentInset.bottom = Layout.fadeHeight
+        }
+    }
+
+    /// Side and bottom inset for Play once it scrolls with the notes. Matches
+    /// the pinned accessibility margin, and stays above the home indicator.
+    private func updateScrollContentInsets() {
+        let margin = max(Self.actionEdgeMargin(accessibility: true), view.safeAreaInsets.bottom)
+        scrollActionLeading.constant = margin
+        scrollActionTrailing.constant = -margin
+        scrollActionBottom.constant = -margin
     }
 
     private func buildContent() -> UIView {
@@ -450,8 +602,27 @@ final class DetailViewController: UIViewController {
         channelNameLabel.adjustsFontForContentSizeCategory = true
         channelNameLabel.clipsToBounds = false
         channelNameLabel.isAccessibilityElement = false
+        channelNameLabel.isUserInteractionEnabled = false
         channelNameLabel.setContentCompressionResistancePriority(.required, for: .vertical)
         channelNameLabel.setContentHuggingPriority(.required, for: .vertical)
+        // The label and the button are siblings. A label never turns on
+        // isUserInteractionEnabled, so a button inside it cannot receive the tap.
+        channelNameLabel.translatesAutoresizingMaskIntoConstraints = false
+        channelBlock.translatesAutoresizingMaskIntoConstraints = false
+        channelBlock.isUserInteractionEnabled = true
+        channelBlock.setContentHuggingPriority(.required, for: .vertical)
+        channelBlock.setContentCompressionResistancePriority(.required, for: .vertical)
+        channelBlock.addSubview(channelNameLabel)
+        NSLayoutConstraint.activate([
+            channelNameLabel.topAnchor.constraint(equalTo: channelBlock.topAnchor),
+            channelNameLabel.leadingAnchor.constraint(equalTo: channelBlock.leadingAnchor),
+            channelNameLabel.trailingAnchor.constraint(equalTo: channelBlock.trailingAnchor),
+            channelNameLabel.bottomAnchor.constraint(equalTo: channelBlock.bottomAnchor),
+        ])
+        identityRow.axis = .horizontal
+        identityRow.alignment = .top
+        identityRow.spacing = Spacing.pageH
+        identityRow.translatesAutoresizingMaskIntoConstraints = false
         let info = UIStackView(arrangedSubviews: [titleLabel, hostButton, meta, trailingSpacer])
         info.axis = .vertical
         infoStack = info
@@ -460,11 +631,11 @@ final class DetailViewController: UIViewController {
         info.alignment = .fill
         info.spacing = Spacing.xs
 
-        // The cover sits in a wrapper so an accessibility-size vertical header
-        // can be full width (the title wraps) while the image stays 120 pt.
-        // The wrapper's trailing pin is 999: a fill stack may widen the
-        // wrapper, and that pin yields instead of stretching the image.
-        let artworkWrap = UIView()
+        // The cover sits in a wrapper so the header can be full width while
+        // the image keeps its own side. The wrapper's trailing pin is 999:
+        // a fill stack may widen the wrapper, and that pin yields instead
+        // of stretching the image.
+        artworkWrap = UIView()
         artworkWrap.translatesAutoresizingMaskIntoConstraints = false
         artworkWrap.addSubview(artwork)
         let artworkTrailing = artworkWrap.trailingAnchor.constraint(equalTo: artwork.trailingAnchor)
@@ -512,12 +683,15 @@ final class DetailViewController: UIViewController {
         stack.spacing = Spacing.cardInner
         stack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(stack)
+        contentStack = stack
+        contentContainer = container
+        contentBottom = stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Layout.inset)
 
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: container.topAnchor, constant: Layout.inset),
             stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: Layout.inset),
             stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -Layout.inset),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Layout.inset),
+            contentBottom,
             artworkSide,
             artwork.heightAnchor.constraint(equalTo: artwork.widthAnchor),
             info.heightAnchor.constraint(greaterThanOrEqualTo: artwork.heightAnchor),
@@ -527,8 +701,8 @@ final class DetailViewController: UIViewController {
 
     /// Large gives the cover 160 pt and the title four lines; medium is
     /// 120 pt and three lines. Both keep the column top-aligned. Accessibility
-    /// sizes stack the cover above a full-width title so a word is not broken
-    /// or clipped beside the artwork.
+    /// sizes keep the title full width and put a smaller cover beside the
+    /// channel name and date, so the cover does not take a row of its own.
     private func applyDetentLayout() {
         let isLarge = sheetPresentationController?.selectedDetentIdentifier == .large
         applyHeaderMetrics(isLarge: isLarge)
@@ -538,35 +712,63 @@ final class DetailViewController: UIViewController {
     private func applyHeaderMetrics(isLarge: Bool) {
         let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
         if accessibility {
-            headerStack.axis = .vertical
-            headerStack.alignment = .fill
-            headerStack.spacing = Spacing.gap
-            artworkSide.constant = Layout.artworkMedium
+            artworkSide.constant = Spacing.sheetTitleH
             titleLabel.numberOfLines = 0
             titleLabel.lineBreakMode = .byWordWrapping
             titleLabel.lineBreakStrategy = .pushOut
-            showWrappingChannelName()
             metaLabel.numberOfLines = 0
             metaLabel.lineBreakMode = .byWordWrapping
             metaLabel.lineBreakStrategy = .pushOut
+            showWrappingChannelName()
+            arrange(headerStack, [titleLabel, identityRow])
+            arrange(identityRow, [artworkWrap, infoStack])
+            arrange(infoStack, [channelBlock, metaLabel, trailingSpacer])
+            headerStack.axis = .vertical
+            headerStack.alignment = .fill
+            headerStack.spacing = Spacing.xs
         } else {
-            headerStack.axis = .horizontal
-            headerStack.alignment = .top
-            headerStack.spacing = Spacing.pageH
             artworkSide.constant = isLarge ? Layout.artworkLarge : Layout.artworkMedium
             titleLabel.numberOfLines = isLarge ? 4 : 3
             titleLabel.lineBreakMode = .byTruncatingTail
             titleLabel.lineBreakStrategy = .standard
-            showSingleLineChannelButton()
             metaLabel.numberOfLines = 1
             metaLabel.lineBreakMode = .byTruncatingTail
             metaLabel.lineBreakStrategy = .standard
+            showSingleLineChannelButton()
+            arrange(headerStack, [artworkWrap, infoStack])
+            arrange(infoStack, [titleLabel, channelButton, metaLabel, trailingSpacer])
+            headerStack.axis = .horizontal
+            headerStack.alignment = .top
+            headerStack.spacing = Spacing.pageH
+            if scrollsChrome { setScrollsChrome(false) }
+        }
+    }
+
+    /// Moves `views` into `stack` in order and drops anything else. A matching
+    /// arrangement is left alone so a detent change does not rebuild it.
+    private func arrange(_ stack: UIStackView, _ views: [UIView]) {
+        let current = stack.arrangedSubviews
+        if current.count == views.count && zip(current, views).allSatisfy({ $0.0 === $0.1 }) {
+            return
+        }
+        for view in current where !views.contains(where: { $0 === view }) {
+            stack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        for (index, view) in views.enumerated() {
+            if stack.arrangedSubviews.contains(where: { $0 === view }) {
+                stack.removeArrangedSubview(view)
+            } else {
+                view.removeFromSuperview()
+            }
+            stack.insertArrangedSubview(view, at: min(index, stack.arrangedSubviews.count))
         }
     }
 
     /// Accessibility sizes: a label wraps the show name on word boundaries
-    /// and reports its full height. The button is only the hit target, so
-    /// it cannot clip the glyphs or swallow the date line below.
+    /// and reports its full height. The button is a sibling overlay on the
+    /// same block, so the label cannot swallow the tap, and it keeps the
+    /// default size's accessibility label and button trait.
     private func showWrappingChannelName() {
         channelNameLabel.font = TypographyV2.meta.font(traits: traitCollection)
         channelNameLabel.textColor = TypographyV2.meta.color
@@ -576,20 +778,19 @@ final class DetailViewController: UIViewController {
         channelNameLabel.lineBreakStrategy = .pushOut
         channelNameLabel.textAlignment = .natural
         channelNameLabel.isHidden = false
-        if channelNameLabel.superview !== infoStack {
-            let index = (infoStack.arrangedSubviews.firstIndex(of: titleLabel) ?? 0) + 1
-            infoStack.insertArrangedSubview(channelNameLabel, at: min(index, infoStack.arrangedSubviews.count))
-        }
-        if channelButton.superview !== channelNameLabel {
+        channelNameLabel.isUserInteractionEnabled = false
+        channelBlock.isHidden = false
+        channelBlock.isUserInteractionEnabled = true
+        if channelButton.superview !== channelBlock {
             NSLayoutConstraint.deactivate(channelHitPins)
             channelButton.removeFromSuperview()
             channelButton.translatesAutoresizingMaskIntoConstraints = false
-            channelNameLabel.addSubview(channelButton)
+            channelBlock.addSubview(channelButton)
             channelHitPins = [
-                channelButton.topAnchor.constraint(equalTo: channelNameLabel.topAnchor),
-                channelButton.bottomAnchor.constraint(equalTo: channelNameLabel.bottomAnchor),
-                channelButton.leadingAnchor.constraint(equalTo: channelNameLabel.leadingAnchor),
-                channelButton.trailingAnchor.constraint(equalTo: channelNameLabel.trailingAnchor),
+                channelButton.topAnchor.constraint(equalTo: channelBlock.topAnchor),
+                channelButton.bottomAnchor.constraint(equalTo: channelBlock.bottomAnchor),
+                channelButton.leadingAnchor.constraint(equalTo: channelBlock.leadingAnchor),
+                channelButton.trailingAnchor.constraint(equalTo: channelBlock.trailingAnchor),
             ]
             NSLayoutConstraint.activate(channelHitPins)
         }
@@ -601,7 +802,12 @@ final class DetailViewController: UIViewController {
         channelButton.configuration = config
         channelButton.contentHorizontalAlignment = .leading
         channelButton.setContentHuggingPriority(.defaultLow, for: .vertical)
+        channelButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
         channelButton.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        channelButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        channelButton.accessibilityLabel = "Open channel \(episode.channelTitle)"
+        channelButton.accessibilityTraits.insert(.button)
+        channelButton.isAccessibilityElement = true
     }
 
     /// Default sizes: the original one-line truncating button, and no label.
@@ -609,14 +815,15 @@ final class DetailViewController: UIViewController {
         NSLayoutConstraint.deactivate(channelHitPins)
         channelHitPins = []
         channelNameLabel.isHidden = true
-        channelNameLabel.removeFromSuperview()
-        if channelButton.superview !== infoStack {
+        channelBlock.isHidden = true
+        if channelButton.superview === channelBlock {
             channelButton.removeFromSuperview()
-            let index = (infoStack.arrangedSubviews.firstIndex(of: titleLabel) ?? 0) + 1
-            infoStack.insertArrangedSubview(channelButton, at: min(index, infoStack.arrangedSubviews.count))
         }
         channelButton.isHidden = false
         channelButton.setContentHuggingPriority(.required, for: .vertical)
+        channelButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        channelButton.setContentCompressionResistancePriority(.defaultHigh, for: .vertical)
+        channelButton.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
         var config = UIButton.Configuration.plain()
         config.title = episode.channelTitle
         config.baseForegroundColor = TypographyV2.meta.color
@@ -629,6 +836,9 @@ final class DetailViewController: UIViewController {
         }
         channelButton.configuration = config
         channelButton.contentHorizontalAlignment = .leading
+        channelButton.accessibilityLabel = "Open channel \(episode.channelTitle)"
+        channelButton.accessibilityTraits.insert(.button)
+        channelButton.isAccessibilityElement = true
     }
 
     /// Height of the medium detent at an accessibility size: the header, the
@@ -662,6 +872,7 @@ final class DetailViewController: UIViewController {
         actionLeading.constant = margin
         actionTrailing.constant = -margin
         rowBottom.constant = -margin
+        if multiline { updateScrollContentInsets() }
     }
 
     /// Default size keeps the 28 pt concentric inset. Accessibility sizes add
