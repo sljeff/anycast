@@ -165,10 +165,16 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         from presenter: UIViewController,
         context: UIContext,
         initialPage: Int = 1,
-        opensChat: Bool = false
+        opensChat: Bool = false,
+        browse: TranscriptBrowseTarget? = nil,
+        onPlayBrowsed: (() async -> Bool)? = nil
     ) {
         let controller = PlayerPageContainer(
-            context: context, openingPage: initialPage, opensChat: opensChat
+            context: context,
+            openingPage: initialPage,
+            opensChat: opensChat,
+            browse: browse,
+            onPlayBrowsed: onPlayBrowsed
         )
         controller.modalPresentationStyle = .pageSheet
         if let sheet = controller.sheetPresentationController {
@@ -180,7 +186,13 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         presenter.present(controller, animated: true)
     }
 
-    init(context: UIContext, openingPage: Int = 1, opensChat: Bool = false) {
+    init(
+        context: UIContext,
+        openingPage: Int = 1,
+        opensChat: Bool = false,
+        browse: TranscriptBrowseTarget? = nil,
+        onPlayBrowsed: (() async -> Bool)? = nil
+    ) {
         self.context = context
         self.opensChat = opensChat
         self.selection = PlayerPageSelection(pageCount: 3, initialIndex: 1)
@@ -195,6 +207,14 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
             .init(icon: AppIcons.topology ?? UIImage(), accessibilityLabel: "Player AI transcript"),
         ])
         super.init(nibName: nil, bundle: nil)
+        if let browse, let subtitles = pages[Self.transcriptPageIndex] as? SubtitlesPageViewController {
+            subtitles.pinTranscript(browse) {
+                if let onPlayBrowsed {
+                    return await onPlayBrowsed()
+                }
+                return false
+            }
+        }
         let opening = min(max(openingPage, 0), pages.count - 1)
         if opening != selection.selectedIndex {
             selection.select(opening)

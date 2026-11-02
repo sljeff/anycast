@@ -109,6 +109,8 @@ final class DetailViewController: UIViewController {
     private let now: () -> Date
     /// Nil only for callers that have no playback context (the row hides).
     private let transcript: DetailTranscriptCoordinator?
+    /// Snapshot stand-in. When set, the row paints this and does not read the account.
+    private let transcriptPreview: DetailTranscriptContent?
 
     private let scrollView = UIScrollView()
     private let descriptionTextView: ShowNotesTextView
@@ -153,6 +155,7 @@ final class DetailViewController: UIViewController {
         shortenURL: ((URL) async -> URL?)? = nil,
         isInPlaylist: Bool = false,
         transcript: DetailTranscriptCoordinator? = nil,
+        transcriptPreview: DetailTranscriptContent? = nil,
         now: @escaping () -> Date = { Date() }
     ) {
         let controller = DetailViewController(
@@ -163,6 +166,7 @@ final class DetailViewController: UIViewController {
             shortenURL: shortenURL,
             isInPlaylist: isInPlaylist,
             transcript: transcript,
+            transcriptPreview: transcriptPreview,
             now: now
         )
         controller.modalPresentationStyle = .pageSheet
@@ -190,6 +194,7 @@ final class DetailViewController: UIViewController {
         shortenURL: ((URL) async -> URL?)? = nil,
         isInPlaylist: Bool = false,
         transcript: DetailTranscriptCoordinator? = nil,
+        transcriptPreview: DetailTranscriptContent? = nil,
         now: @escaping () -> Date = { Date() }
     ) {
         self.episode = episode
@@ -199,6 +204,7 @@ final class DetailViewController: UIViewController {
         self.shortenURL = shortenURL
         self.isInPlaylist = isInPlaylist
         self.transcript = transcript
+        self.transcriptPreview = transcriptPreview
         self.now = now
         self.descriptionTextView = ShowNotesTextView()
         super.init(nibName: nil, bundle: nil)
@@ -443,7 +449,7 @@ final class DetailViewController: UIViewController {
     /// The row is chrome, not scrolling content. Medium shows it unless the
     /// policy keeps it for the large detent only.
     private func applyTranscriptVisibility(isLarge: Bool) {
-        let visible = transcript != nil
+        let visible = (transcript != nil || transcriptPreview != nil)
             && (DetailTranscriptPolicy.current.visibleAtMediumDetent || isLarge)
         transcriptRow.isHidden = !visible
         transcriptSlot.isHidden = !visible
@@ -563,6 +569,10 @@ final class DetailViewController: UIViewController {
     }
 
     private func startTranscript() {
+        if let transcriptPreview {
+            transcriptRow.apply(transcriptPreview, animated: false)
+            return
+        }
         guard let transcript else { return }
         transcript.onChange = { [weak self] in
             self?.renderTranscriptRow(animated: true)

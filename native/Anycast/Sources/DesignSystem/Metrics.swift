@@ -46,6 +46,8 @@ nonisolated enum Radius {
     static let modal = ThemeRegistry.current.shape.modal
     /// Capsules; clamp at draw time, this just exceeds any frame.
     static let pill: CGFloat = 999
+    /// A control inset by `Spacing.sheetContent` inside the floating sheet's 54 pt corner.
+    static let sheetConcentric: CGFloat = 54 - Spacing.sheetContent
 }
 
 /// Anycast 2.0 motion durations and curves (`AnycastMotion`).

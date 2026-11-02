@@ -179,6 +179,7 @@ final class AuthController {
     /// Order mirrors AuthController.signOut: RC logOut (offline-tolerant) →
     /// Firebase signOut → Google signOut. Local data is never touched.
     func signOut(purchases: RevenueCatController) async {
+        TranscriptAllowanceCache.shared.invalidate()
         await purchases.logOut()
         if isFirebaseConfigured {
             try? Auth.auth().signOut()

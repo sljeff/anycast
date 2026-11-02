@@ -97,12 +97,17 @@ enum TranscriptRequests {
         context: UIContext,
         cache: TranscriptAllowanceCache = .shared
     ) async -> TranscriptAllowance? {
+        let uid = AuthAccountSnapshot.current(context: context).uid
+        guard let uid else { return nil }
         let subscribed = await context.purchases.isSubscribed()
+        // The account may have changed while the entitlement read was in flight.
+        guard AuthAccountSnapshot.current(context: context).uid == uid else { return nil }
         guard let result = try? await context.api.getUser(), case .user(let user) = result else {
             return nil
         }
+        guard AuthAccountSnapshot.current(context: context).uid == uid else { return nil }
         let allowance = TranscriptAllowance(remaining: user.remaining, isSubscribed: subscribed)
-        cache.store(allowance)
+        cache.store(allowance, uid: uid)
         return allowance
     }
 
@@ -117,9 +122,7 @@ enum TranscriptRequests {
         Task { @MainActor in
             let wasSignedIn = AuthAccountSnapshot.current(context: context).signedIn
             let signal = await context.subtitles.add(url: enclosureURL)
-            if signal == nil {
-                noteAccepted(context: context, url: enclosureURL, wasSignedIn: wasSignedIn, cache: cache)
-            } else {
+            if let signal {
                 await presentFailure(
                     signal: signal,
                     context: context,
@@ -127,6 +130,8 @@ enum TranscriptRequests {
                     episode: episode,
                     cache: cache
                 )
+            } else {
+                noteAccepted(context: context, url: enclosureURL, wasSignedIn: wasSignedIn, cache: cache)
             }
             onSettled?()
         }
@@ -174,7 +179,8 @@ final class DetailTranscriptCoordinator {
     let enclosureURL: String
     let paywallEpisode: PaywallModel.Episode
     /// Inserts the episode into the playback queue the way Play does, and
-    /// returns the stored row. Not called when this episode is already current.
+    /// returns the stored row. Not called when this episode is already
+    /// current, or while a different episode is playing.
     let prepareEpisode: () async -> PlaylistEpisodeRow?
 
     private let cache: TranscriptAllowanceCache
@@ -215,8 +221,14 @@ final class DetailTranscriptCoordinator {
         self.prepareEpisode = prepareEpisode
         self.cache = cache
         self.policy = policy
-        self.signedIn = AuthAccountSnapshot.current(context: context).signedIn
-        self.allowance = signedIn ? cache.current() : nil
+        let account = AuthAccountSnapshot.current(context: context)
+        self.signedIn = account.signedIn
+        self.allowance = account.uid.flatMap { signedIn ? cache.current(uid: $0) : nil }
+    }
+
+    private func cachedAllowance() -> TranscriptAllowance? {
+        guard signedIn, let uid = AuthAccountSnapshot.current(context: context).uid else { return nil }
+        return cache.current(uid: uid)
     }
 
     func content() -> DetailTranscriptContent {
@@ -238,7 +250,7 @@ final class DetailTranscriptCoordinator {
             onChange?()
             return
         }
-        if let cached = cache.current() {
+        if let cached = cachedAllowance() {
             allowance = cached
             onChange?()
             return
@@ -289,7 +301,7 @@ final class DetailTranscriptCoordinator {
         ) { [weak self] in
             guard let self else { return }
             self.signedIn = AuthAccountSnapshot.current(context: self.context).signedIn
-            self.allowance = self.signedIn ? self.cache.current() : nil
+            self.allowance = self.cachedAllowance()
             self.onChange?()
         }
     }
@@ -299,22 +311,53 @@ final class DetailTranscriptCoordinator {
             from: presenter.topMostPresented(),
             context: context,
             variant: .quota(paywallEpisode)
-        )
+        ) { [weak self] in
+            self?.cache.invalidate()
+            Task { await self?.refreshAllowanceIfNeeded() }
+        }
     }
 
-    /// Makes this episode the current one (Play's queue preparation, without
-    /// starting audio unless the policy says so), closes the detail sheet,
-    /// and opens the player on the transcript page.
+    /// Opens the transcript page. A different episode that is playing keeps
+    /// playing: this one is not inserted and not removed from Inbox. Nothing
+    /// playing can load this episode paused. Preparation failure does not
+    /// open the player on the other episode.
     private func openPlayer(askAI: Bool, from presenter: UIViewController) {
+        let context = self.context
+        let prepare = prepareEpisode
+        let enclosureURL = self.enclosureURL
+        let policy = self.policy
+        let browse = TranscriptBrowseTarget(
+            enclosureURL: enclosureURL,
+            title: paywallEpisode.title,
+            channelTitle: paywallEpisode.showName,
+            imageURL: paywallEpisode.artworkURL?.absoluteString
+        )
         Task { @MainActor in
-            await ensureCurrentEpisode()
+            let plan = TranscriptOpenPlan.make(
+                enclosureURL: enclosureURL,
+                currentURL: context.playback.currentEpisode?.enclosureUrl,
+                isPlaying: context.playback.isPlaying
+            )
+            if plan.requiresSuccessfulPrepare {
+                guard await Self.loadPrepared(
+                    prepare: prepare, context: context, autoplay: policy.autoplayWhenOpeningTranscript
+                ) else {
+                    Self.showOpenFailure(from: presenter)
+                    return
+                }
+            }
             let anchor = presenter.presentingViewController ?? presenter
+            let adopt: () async -> Bool = {
+                await Self.loadPrepared(prepare: prepare, context: context, autoplay: true)
+            }
             let present = {
                 PlayerPageContainer.present(
                     from: anchor.topMostPresented(),
-                    context: self.context,
+                    context: context,
                     initialPage: PlayerPageContainer.transcriptPageIndex,
-                    opensChat: askAI
+                    opensChat: askAI,
+                    browse: plan == .browseWhileOtherPlays ? browse : nil,
+                    onPlayBrowsed: plan == .browseWhileOtherPlays ? adopt : nil
                 )
             }
             if presenter.presentingViewController != nil {
@@ -325,20 +368,27 @@ final class DetailTranscriptCoordinator {
         }
     }
 
-    private func ensureCurrentEpisode() async {
-        let currentURL = context.playback.currentEpisode?.enclosureUrl
-        if currentURL == enclosureURL, !(currentURL ?? "").isEmpty {
-            if policy.autoplayWhenOpeningTranscript, !context.playback.isPlaying {
-                await context.playback.play()
-            }
-            return
-        }
-        guard let row = await prepareEpisode() else { return }
-        if policy.autoplayWhenOpeningTranscript {
+    /// Inserts the episode the way Play does and loads it. `autoplay` starts
+    /// audio; otherwise the item is loaded paused. Returns false when the
+    /// caller could not produce a row.
+    @discardableResult
+    private static func loadPrepared(
+        prepare: () async -> PlaylistEpisodeRow?,
+        context: UIContext,
+        autoplay: Bool
+    ) async -> Bool {
+        guard let row = await prepare() else { return false }
+        if autoplay {
             await context.playback.playByEpisode(row)
         } else {
             await context.playback.setByEpisode(row)
             await context.playback.reloadQueue()
         }
+        return true
+    }
+
+    private static func showOpenFailure(from presenter: UIViewController) {
+        guard let window = presenter.view.window else { return }
+        ToastPresenter.shared.show("Couldn't open this transcript", in: window, duration: 3)
     }
 }

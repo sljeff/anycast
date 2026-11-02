@@ -188,16 +188,62 @@ struct DetailTranscriptStateTests {
 
     // MARK: - Cache
 
-    @Test("Allowance cache serves a value inside the window and forgets it after")
+    @Test("Allowance cache is per account and expires")
     func cacheFreshness() {
         let cache = TranscriptAllowanceCache(freshness: 60)
         let start = Date(timeIntervalSince1970: 1_000)
-        cache.store(TranscriptAllowance(remaining: 7, isSubscribed: false), now: start)
-        #expect(cache.current(now: start.addingTimeInterval(59))?.remaining == 7)
-        #expect(cache.current(now: start.addingTimeInterval(60)) == nil)
-        cache.store(TranscriptAllowance(remaining: 6, isSubscribed: false), now: start)
+        let allowance = TranscriptAllowance(remaining: 7, isSubscribed: false)
+        cache.store(allowance, uid: "user-a", now: start)
+        #expect(cache.current(uid: "user-a", now: start.addingTimeInterval(59))?.remaining == 7)
+        #expect(cache.current(uid: "user-a", now: start.addingTimeInterval(60)) == nil)
+        cache.store(allowance, uid: "user-a", now: start)
+        #expect(cache.current(uid: "user-b", now: start) == nil)
         cache.invalidate()
-        #expect(cache.current(now: start) == nil)
+        #expect(cache.current(uid: "user-a", now: start) == nil)
+    }
+
+    @Test("Read transcript does not take over an episode that is already playing")
+    func openPlanLeavesOtherEpisodePlaying() {
+        let plan = TranscriptOpenPlan.make(
+            enclosureURL: "https://x.example/this.mp3",
+            currentURL: "https://x.example/other.mp3",
+            isPlaying: true
+        )
+        #expect(plan == .browseWhileOtherPlays)
+        #expect(!plan.requiresSuccessfulPrepare)
+    }
+
+    @Test("Read transcript loads a paused episode and stays on the current one")
+    func openPlanWhenIdleOrCurrent() {
+        let idle = TranscriptOpenPlan.make(
+            enclosureURL: "https://x.example/this.mp3",
+            currentURL: "https://x.example/other.mp3",
+            isPlaying: false
+        )
+        #expect(idle == .loadWithoutPlaying)
+        #expect(idle.requiresSuccessfulPrepare)
+
+        let current = TranscriptOpenPlan.make(
+            enclosureURL: "https://x.example/this.mp3",
+            currentURL: "https://x.example/this.mp3",
+            isPlaying: true
+        )
+        #expect(current == .showCurrent)
+        #expect(!current.requiresSuccessfulPrepare)
+
+        let nothing = TranscriptOpenPlan.make(
+            enclosureURL: "https://x.example/this.mp3",
+            currentURL: nil,
+            isPlaying: false
+        )
+        #expect(nothing == .loadWithoutPlaying)
+    }
+
+    @Test("A failed prepare must not open the player")
+    func prepareFailureBlocksPresent() {
+        #expect(TranscriptOpenPlan.loadWithoutPlaying.requiresSuccessfulPrepare)
+        #expect(!TranscriptOpenPlan.browseWhileOtherPlays.requiresSuccessfulPrepare)
+        #expect(!TranscriptOpenPlan.showCurrent.requiresSuccessfulPrepare)
     }
 
     // MARK: - Row accessibility

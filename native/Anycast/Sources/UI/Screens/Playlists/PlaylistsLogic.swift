@@ -277,7 +277,10 @@ enum AITranscriptAction: Equatable {
         case .default:
             return .requestTranscript
         case .failed:
-            return .removeStaleRecord
+            // Same Retry as the detail row and the transcript page. The old
+            // path only deleted the record and toasted; the user had to tap
+            // again to generate.
+            return .requestTranscript
         case .succeeded:
             return .toast("You can check the transcript when playing.")
         case .processing:

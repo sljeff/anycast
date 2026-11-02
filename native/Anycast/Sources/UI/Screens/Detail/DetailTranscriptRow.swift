@@ -9,8 +9,7 @@ import UIKit
 @MainActor
 final class DetailTranscriptRow: UIView {
 
-    /// Concentric with the floating sheet: its 54 pt corner minus the 28 pt inset.
-    static let cornerRadius: CGFloat = 26
+    /// Same height as the Play capsule. No spacing token names that control.
     static let minimumHeight: CGFloat = 52
 
     var onAction: ((DetailTranscriptAction) -> Void)?
@@ -30,9 +29,12 @@ final class DetailTranscriptRow: UIView {
     private let compactRow = UIStackView()
     private let accessibleColumn = UIStackView()
     private let accessibleTitleRow = UIStackView()
-    private let accessibleValueRow = UIStackView()
-    /// Keeps the accessibility-size count and action on the leading edge.
-    private let accessibleSpacer = UIView()
+    private var iconWidth: NSLayoutConstraint?
+    private var iconHeight: NSLayoutConstraint?
+    private var spinnerWidth: NSLayoutConstraint?
+    private var spinnerHeight: NSLayoutConstraint?
+    private var slotWidth: NSLayoutConstraint?
+    private var slotHeight: NSLayoutConstraint?
     /// Explicit height so the row hugs max(52, its content) and the sheet
     /// does not stretch it. Updated after content and trait changes.
     private var rowHeight: NSLayoutConstraint!
@@ -42,7 +44,7 @@ final class DetailTranscriptRow: UIView {
         isAccessibilityElement = true
         accessibilityIdentifier = "detail-transcript-row"
         backgroundColor = Theme.surfaceContainer
-        layer.cornerRadius = Self.cornerRadius
+        layer.cornerRadius = Radius.sheetConcentric
         layer.cornerCurve = .continuous
         clipsToBounds = true
         setContentHuggingPriority(.required, for: .vertical)
@@ -106,16 +108,7 @@ final class DetailTranscriptRow: UIView {
         iconView.tintColor = Theme.onSurfaceVariant
         iconView.setContentHuggingPriority(.required, for: .horizontal)
         iconView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            iconView.widthAnchor.constraint(equalToConstant: 20),
-            iconView.heightAnchor.constraint(equalToConstant: 20),
-        ])
-
         spinner.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            spinner.widthAnchor.constraint(equalToConstant: 16),
-            spinner.heightAnchor.constraint(equalToConstant: 16),
-        ])
 
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textColor = Theme.onSurface
@@ -124,12 +117,13 @@ final class DetailTranscriptRow: UIView {
         valueLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         valueLabel.setContentHuggingPriority(.required, for: .horizontal)
 
+        actionButton.contentHorizontalAlignment = .leading
         actionButton.addAction(UIAction { [weak self] _ in self?.activateTrailing() }, for: .touchUpInside)
         actionButton.isAccessibilityElement = false
-        actionButton.setContentCompressionResistancePriority(.required, for: .horizontal)
-        actionButton.setContentHuggingPriority(.required, for: .horizontal)
         var actionConfig = UIButton.Configuration.plain()
-        actionConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 4, bottom: 12, trailing: 0)
+        actionConfig.contentInsets = NSDirectionalEdgeInsets(
+            top: Spacing.xs, leading: Spacing.xs, bottom: Spacing.xs, trailing: 0
+        )
         actionButton.configuration = actionConfig
 
         mainButton.translatesAutoresizingMaskIntoConstraints = false
@@ -173,25 +167,19 @@ final class DetailTranscriptRow: UIView {
         compactRow.alignment = .center
         compactRow.spacing = Spacing.gap
         compactRow.isLayoutMarginsRelativeArrangement = true
-        compactRow.layoutMargins = UIEdgeInsets(top: 0, left: 18, bottom: 0, right: Spacing.cardInner)
+        compactRow.layoutMargins = UIEdgeInsets(top: 0, left: Spacing.pageH, bottom: 0, right: Spacing.cardInner)
 
         accessibleTitleRow.axis = .horizontal
         accessibleTitleRow.alignment = .center
         accessibleTitleRow.spacing = Spacing.gap
-        accessibleValueRow.axis = .horizontal
-        accessibleValueRow.alignment = .center
-        accessibleValueRow.spacing = Spacing.gap
-        accessibleSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        accessibleValueRow.addArrangedSubview(accessibleSpacer)
         accessibleColumn.axis = .vertical
         accessibleColumn.alignment = .fill
-        accessibleColumn.spacing = Spacing.xs
+        accessibleColumn.spacing = Spacing.xxs
         accessibleColumn.isLayoutMarginsRelativeArrangement = true
         accessibleColumn.layoutMargins = UIEdgeInsets(
-            top: Spacing.gap, left: 18, bottom: Spacing.gap, right: Spacing.cardInner
+            top: Spacing.xs, left: Spacing.pageH, bottom: Spacing.xs, right: Spacing.cardInner
         )
         accessibleColumn.addArrangedSubview(accessibleTitleRow)
-        accessibleColumn.addArrangedSubview(accessibleValueRow)
 
         host.axis = .vertical
         host.translatesAutoresizingMaskIntoConstraints = false
@@ -222,15 +210,30 @@ final class DetailTranscriptRow: UIView {
         valueLabel.font = TypographyV2.meta.font(traits: traitCollection)
         titleLabel.numberOfLines = multiline ? 2 : 1
         titleLabel.lineBreakMode = multiline ? .byWordWrapping : .byTruncatingTail
+        // Accessibility sizes give the count and the action their own lines
+        // so neither is crushed. The title is the only piece that truncates,
+        // and only on the single-line arrangement.
+        valueLabel.numberOfLines = multiline ? 0 : 1
+        valueLabel.lineBreakMode = multiline ? .byWordWrapping : .byTruncatingTail
+        valueLabel.setContentCompressionResistancePriority(
+            multiline ? .defaultHigh : .required, for: .horizontal
+        )
+        actionButton.setContentCompressionResistancePriority(
+            multiline ? .defaultLow : .required, for: .horizontal
+        )
+        actionButton.setContentHuggingPriority(
+            multiline ? .defaultLow : .required, for: .horizontal
+        )
         compactRow.isHidden = multiline
         accessibleColumn.isHidden = !multiline
+        applyIconScale()
         // Reparent the shared labels into the visible arrangement.
         let iconSlot = iconContainer()
         if multiline {
             place(iconSlot, in: accessibleTitleRow, at: 0)
             place(titleLabel, in: accessibleTitleRow, at: 1)
-            place(valueLabel, in: accessibleValueRow, at: 0)
-            place(actionButton, in: accessibleValueRow, at: 1)
+            place(valueLabel, in: accessibleColumn, at: 1)
+            place(actionButton, in: accessibleColumn, at: 2)
         } else {
             place(iconSlot, in: compactRow, at: 0)
             place(titleLabel, in: compactRow, at: 1)
@@ -240,6 +243,28 @@ final class DetailTranscriptRow: UIView {
         updateFittedHeight()
     }
 
+    /// Re-reads fonts and the accessibility-size stack after the view joins a window.
+    func relayoutForCurrentTraits() {
+        applyTraits()
+        applyContent(content, animated: false)
+    }
+
+    private func applyIconScale() {
+        let icon = UIFontMetrics(forTextStyle: .body).scaledValue(
+            for: Spacing.cardInner, compatibleWith: traitCollection
+        )
+        let ring = UIFontMetrics(forTextStyle: .body).scaledValue(
+            for: Spacing.pageH, compatibleWith: traitCollection
+        )
+        iconWidth?.constant = icon
+        iconHeight?.constant = icon
+        slotWidth?.constant = icon
+        slotHeight?.constant = icon
+        spinnerWidth?.constant = ring
+        spinnerHeight?.constant = ring
+        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: icon, weight: .regular)
+    }
+
     private func iconContainer() -> UIView {
         // The spinner and the glyph share one slot so the title doesn't shift.
         if iconView.superview !== spinner.superview || iconSlot == nil {
@@ -247,15 +272,27 @@ final class DetailTranscriptRow: UIView {
             slot.translatesAutoresizingMaskIntoConstraints = false
             slot.addSubview(iconView)
             slot.addSubview(spinner)
+            let slotW = slot.widthAnchor.constraint(equalToConstant: Spacing.cardInner)
+            let slotH = slot.heightAnchor.constraint(equalToConstant: Spacing.cardInner)
+            let iconW = iconView.widthAnchor.constraint(equalToConstant: Spacing.cardInner)
+            let iconH = iconView.heightAnchor.constraint(equalToConstant: Spacing.cardInner)
+            let ringW = spinner.widthAnchor.constraint(equalToConstant: Spacing.pageH)
+            let ringH = spinner.heightAnchor.constraint(equalToConstant: Spacing.pageH)
+            slotWidth = slotW
+            slotHeight = slotH
+            iconWidth = iconW
+            iconHeight = iconH
+            spinnerWidth = ringW
+            spinnerHeight = ringH
             NSLayoutConstraint.activate([
-                slot.widthAnchor.constraint(equalToConstant: 20),
-                slot.heightAnchor.constraint(equalToConstant: 20),
+                slotW, slotH, iconW, iconH, ringW, ringH,
                 iconView.centerXAnchor.constraint(equalTo: slot.centerXAnchor),
                 iconView.centerYAnchor.constraint(equalTo: slot.centerYAnchor),
                 spinner.centerXAnchor.constraint(equalTo: slot.centerXAnchor),
                 spinner.centerYAnchor.constraint(equalTo: slot.centerYAnchor),
             ])
             iconSlot = slot
+            applyIconScale()
         }
         return iconSlot!
     }
@@ -284,8 +321,6 @@ final class DetailTranscriptRow: UIView {
 
         let hasAction = content.actionTitle != nil
         actionButton.isHidden = !hasAction
-        // An empty second line (generating) should not add a gap at accessibility sizes.
-        accessibleValueRow.isHidden = content.value == nil && !hasAction
         applyActionTitle(content)
         actionButton.isEnabled = hasAction
 
@@ -320,18 +355,24 @@ final class DetailTranscriptRow: UIView {
             && traitCollection.accessibilityContrast == .high
         let color = highContrast ? Theme.onSurface : Theme.primary
         let font = TypographyV2.body.font(traits: traitCollection)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = usesMultilineLayout ? .byWordWrapping : .byTruncatingTail
         var attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: color,
+            .paragraphStyle: paragraph,
         ]
         if highContrast {
             attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
         }
         var config = actionButton.configuration ?? .plain()
         config.title = nil
+        config.titleLineBreakMode = usesMultilineLayout ? .byWordWrapping : .byTruncatingTail
         config.attributedTitle = AttributedString(NSAttributedString(string: title, attributes: attributes))
         config.baseForegroundColor = color
         actionButton.configuration = config
+        actionButton.titleLabel?.numberOfLines = usesMultilineLayout ? 0 : 1
+        actionButton.titleLabel?.lineBreakMode = usesMultilineLayout ? .byWordWrapping : .byTruncatingTail
     }
 
     private static func image(for symbol: DetailTranscriptContent.Symbol, reduceMotion: Bool) -> UIImage? {
@@ -365,9 +406,10 @@ final class DetailTranscriptRow: UIView {
         if !actionButton.isHidden, actionButton.isEnabled {
             let frame = actionButton.convert(actionButton.bounds, to: self)
             var hit = frame
-            if hit.width < 44 {
-                hit.origin.x -= (44 - hit.width) / 2
-                hit.size.width = 44
+            let minimum = AnycastIconButton.standardDiameter
+            if hit.width < minimum {
+                hit.origin.x -= (minimum - hit.width) / 2
+                hit.size.width = minimum
             }
             hit.origin.y = bounds.minY
             hit.size.height = bounds.height
@@ -401,9 +443,10 @@ private final class TranscriptActionButton: UIButton {
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         var rect = bounds
-        if rect.width < 44 {
-            rect.origin.x -= (44 - rect.width) / 2
-            rect.size.width = 44
+        let minimum = AnycastIconButton.standardDiameter
+        if rect.width < minimum {
+            rect.origin.x -= (minimum - rect.width) / 2
+            rect.size.width = minimum
         }
         if let row = enclosingRow {
             let rowBounds = convert(row.bounds, from: row)

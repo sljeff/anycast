@@ -46,6 +46,11 @@ final class SubtitlesPageViewController: UIViewController {
 
     // MARK: Observed state
 
+    /// Set when Read transcript / Ask AI opened this page for an episode
+    /// that is not the one playing. Playback is left alone until the user
+    /// taps play here.
+    private var pinnedTranscript: TranscriptBrowseTarget?
+    private var adoptPinned: (() async -> Bool)?
     private var loadedURL: String?
     private var rowPhase: TranscriptRowPhase = .fetching
     private var subtitleRow: SubtitleRow?
@@ -107,7 +112,7 @@ final class SubtitlesPageViewController: UIViewController {
         progressLoop.track(
             read: { [weak self] in _ = self?.context.playback.positionData },
             onChange: { [weak self] in
-                guard let self else { return }
+                guard let self, !self.isBrowsingOtherEpisode else { return }
                 self.lyricsView.setProgress(
                     positionMilliseconds: Int(self.context.playback.positionData.positionMilliseconds)
                 )
@@ -132,6 +137,20 @@ final class SubtitlesPageViewController: UIViewController {
         configureDemoIfRequested()
         #endif
         refreshState()
+    }
+
+    /// Shows `target`'s transcript without replacing the playing item.
+    /// `adopt` runs when the user taps play on this page and should make
+    /// `target` the current episode.
+    func pinTranscript(_ target: TranscriptBrowseTarget, adopt: @escaping () async -> Bool) {
+        pinnedTranscript = target
+        adoptPinned = adopt
+    }
+
+    private var isBrowsingOtherEpisode: Bool {
+        guard let pinnedTranscript else { return false }
+        let current = context.playback.currentEpisode?.enclosureUrl ?? ""
+        return pinnedTranscript.enclosureURL != current
     }
 
     deinit {
@@ -248,10 +267,29 @@ final class SubtitlesPageViewController: UIViewController {
             return
         }
         #endif
+        if let pinned = pinnedTranscript,
+           pinned.enclosureURL == (context.playback.currentEpisode?.enclosureUrl ?? "") {
+            pinnedTranscript = nil
+            adoptPinned = nil
+        }
+        transport.onPlay = isBrowsingOtherEpisode ? { [weak self] in
+            Task { await self?.adoptPinnedEpisode() }
+        } : nil
+
+        if let pinned = pinnedTranscript {
+            showPinnedHeader(pinned)
+            loadURL(pinned.enclosureURL)
+            return
+        }
+
         let episode = context.playback.currentEpisode
         updateHeader(episode: episode)
 
         let url = (episode?.enclosureUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        loadURL(url)
+    }
+
+    private func loadURL(_ url: String) {
         if url != loadedURL {
             loadedURL = url
             subtitleRow = nil
@@ -267,6 +305,32 @@ final class SubtitlesPageViewController: UIViewController {
             loadTranslationRow(url: url)
         }
         render()
+    }
+
+    private func adoptPinnedEpisode() async {
+        guard let adoptPinned else { return }
+        let adopted = await adoptPinned()
+        guard adopted else {
+            if let window = view.window {
+                ToastPresenter.shared.show("Couldn't open this transcript", in: window, duration: 3)
+            }
+            return
+        }
+        pinnedTranscript = nil
+        self.adoptPinned = nil
+        transport.onPlay = nil
+        refreshState()
+    }
+
+    private func showPinnedHeader(_ pinned: TranscriptBrowseTarget) {
+        headerArtwork.isHidden = false
+        titleLabel.isHidden = false
+        titleLabel.text = pinned.title
+        let imageURL = pinned.imageURL ?? ""
+        guard imageURL != headerArtworkURL else { return }
+        headerArtworkURL = imageURL
+        headerArtwork.kf.cancelDownloadTask()
+        headerArtwork.setArtwork(URL(string: imageURL), title: pinned.channelTitle)
     }
 
     private func loadTranscriptRow(url: String) {
@@ -617,11 +681,26 @@ final class SubtitlesPageViewController: UIViewController {
     /// "Ask AI about this"); the chat asks for the current line lazily so a
     /// quick-ask can quote what is playing.
     func openChat(draftQuestion: String? = nil) {
+        let pinned = isBrowsingOtherEpisode ? pinnedTranscript : nil
         let chat = ChatViewController(
             context: context,
+            episodeTitle: pinned?.title,
+            enclosureURL: pinned?.enclosureURL,
             draftQuestion: draftQuestion,
             currentLineProvider: { [weak self] in self?.lyricsView.activeLineText },
-            onJump: { [weak self] milliseconds in self?.jump(toMilliseconds: milliseconds) }
+            onJump: { [weak self] milliseconds in
+                guard let self else { return }
+                if self.isBrowsingOtherEpisode {
+                    Task { @MainActor in
+                        await self.adoptPinnedEpisode()
+                        if !self.isBrowsingOtherEpisode {
+                            self.jump(toMilliseconds: milliseconds)
+                        }
+                    }
+                } else {
+                    self.jump(toMilliseconds: milliseconds)
+                }
+            }
         )
         AppSheets.presentExpand(chat, from: topMostPresented())
     }

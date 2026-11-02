@@ -326,15 +326,50 @@ nonisolated enum DetailTranscriptState {
     }
 }
 
+/// How Read transcript / Ask AI treat the player. Another episode that is
+/// actually playing stays put: no queue insert, no Inbox removal, no
+/// `setByEpisode`. Nothing playing can still load this episode paused.
+nonisolated enum TranscriptOpenPlan: Equatable, Sendable {
+    /// This episode is already the current one. Just show its transcript.
+    case showCurrent
+    /// Nothing is playing. Load this episode without starting audio.
+    /// `prepareEpisode` must succeed or the player stays closed.
+    case loadWithoutPlaying
+    /// A different episode is playing. Show this transcript beside it.
+    case browseWhileOtherPlays
+
+    static func make(enclosureURL: String, currentURL: String?, isPlaying: Bool) -> TranscriptOpenPlan {
+        let current = currentURL?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let target = enclosureURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !current.isEmpty, current == target { return .showCurrent }
+        if isPlaying, !current.isEmpty { return .browseWhileOtherPlays }
+        return .loadWithoutPlaying
+    }
+
+    /// Only the paused-load path depends on queue preparation. Failing that
+    /// must not open the player on whatever episode is already current.
+    var requiresSuccessfulPrepare: Bool { self == .loadWithoutPlaying }
+}
+
+/// The episode a transcript page can show without becoming the current item.
+nonisolated struct TranscriptBrowseTarget: Equatable, Sendable {
+    var enclosureURL: String
+    var title: String
+    var channelTitle: String?
+    var imageURL: String?
+}
+
 /// Short-lived memory of `GET /api/user`'s `remaining`, shared by the
-/// detail sheet and Membership so a sheet opened just after the account
-/// page does not fetch again. A successful generate invalidates it.
+/// detail sheet and Membership. Keyed by account id so a sign-out or a
+/// different login cannot display the previous account's count. Purchase,
+/// restore, sign-out, and an accepted generate all invalidate it.
 @MainActor
 final class TranscriptAllowanceCache {
 
     static let shared = TranscriptAllowanceCache()
 
     private struct Record {
+        var uid: String
         var allowance: TranscriptAllowance
         var fetchedAt: Date
     }
@@ -346,15 +381,15 @@ final class TranscriptAllowanceCache {
         self.freshness = freshness
     }
 
-    /// The value when it is still inside the freshness window.
-    func current(now: Date = Date()) -> TranscriptAllowance? {
-        guard let record, now.timeIntervalSince(record.fetchedAt) < freshness else { return nil }
+    /// The value when it belongs to `uid` and is still inside the freshness window.
+    func current(uid: String, now: Date = Date()) -> TranscriptAllowance? {
+        guard let record, record.uid == uid, now.timeIntervalSince(record.fetchedAt) < freshness else { return nil }
         return record.allowance
     }
 
     @discardableResult
-    func store(_ allowance: TranscriptAllowance, now: Date = Date()) -> TranscriptAllowance {
-        record = Record(allowance: allowance, fetchedAt: now)
+    func store(_ allowance: TranscriptAllowance, uid: String, now: Date = Date()) -> TranscriptAllowance {
+        record = Record(uid: uid, allowance: allowance, fetchedAt: now)
         return allowance
     }
 

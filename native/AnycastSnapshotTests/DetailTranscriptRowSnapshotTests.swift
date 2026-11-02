@@ -3,10 +3,10 @@ import Testing
 @testable import Anycast
 
 /// Light, dark, and accessibility-size strips of the detail transcript row.
-/// Baselines are per iOS major, same as the specimen snapshots. This suite
-/// does not record them: a run without `SNAPSHOT_RECORD=1` and without a
-/// committed baseline passes without writing. Recording is a separate
-/// explicit step and does not touch the screen baselines.
+/// The host is in a window so `overrideUserInterfaceStyle` and the content
+/// size category reach `TypographyV2.font(traits:)`. Missing baselines fail;
+/// record with `SNAPSHOT_RECORD=1`. These files are separate from the S5
+/// screen baseline.
 @MainActor
 struct DetailTranscriptRowSnapshotTests {
 
@@ -35,83 +35,103 @@ struct DetailTranscriptRowSnapshotTests {
         category: UIContentSizeCategory,
         file: StaticString = #filePath
     ) throws {
-        guard Self.shouldAssert(named: name, file: file) else { return }
         let strip = Self.makeStrip(style: style, category: category)
-        try SnapshotBaseline.assertSnapshot(of: strip, named: name, file: file)
-    }
-
-    /// Verify when a baseline is already committed. Record only when asked.
-    /// Otherwise skip, so a normal test run does not fail on a missing PNG
-    /// and does not rewrite unrelated baselines.
-    private static func shouldAssert(named name: String, file: StaticString) -> Bool {
-        if SnapshotBaseline.recordMode { return true }
-        let fileURL = URL(fileURLWithPath: file.description)
-        let baseline = fileURL.deletingLastPathComponent()
-            .appendingPathComponent("__Snapshots__")
-            .appendingPathComponent(fileURL.deletingPathExtension().lastPathComponent)
-            .appendingPathComponent(SnapshotBaseline.osDirectoryName)
-            .appendingPathComponent("\(name).png")
-        return FileManager.default.fileExists(atPath: baseline.path)
+        defer { strip.window.isHidden = true }
+        try SnapshotBaseline.assertSnapshot(of: strip.host, named: name, file: file)
     }
 
     private static func makeStrip(
         style: UIUserInterfaceStyle,
         category: UIContentSizeCategory
-    ) -> UIView {
-        let states: [(String, DetailTranscriptContent)] = [
-            ("Signed out", DetailTranscriptState.reduce(status: nil, signedIn: false, allowance: nil)),
-            ("7 left", DetailTranscriptState.reduce(
+    ) -> (host: UIView, window: UIWindow) {
+        let states: [DetailTranscriptContent] = [
+            DetailTranscriptState.reduce(status: nil, signedIn: false, allowance: nil),
+            DetailTranscriptState.reduce(
                 status: nil, signedIn: true,
                 allowance: TranscriptAllowance(remaining: 7, isSubscribed: false)
-            )),
-            ("Plus", DetailTranscriptState.reduce(
+            ),
+            DetailTranscriptState.reduce(
                 status: nil, signedIn: true,
                 allowance: TranscriptAllowance(remaining: 32, isSubscribed: true)
-            )),
-            ("Plus low", DetailTranscriptState.reduce(
+            ),
+            DetailTranscriptState.reduce(
                 status: nil, signedIn: true,
                 allowance: TranscriptAllowance(remaining: 3, isSubscribed: true)
-            )),
-            ("None left", DetailTranscriptState.reduce(
+            ),
+            DetailTranscriptState.reduce(
                 status: nil, signedIn: true,
                 allowance: TranscriptAllowance(remaining: 0, isSubscribed: false)
-            )),
-            ("Generating", DetailTranscriptState.reduce(status: "processing", signedIn: true, allowance: nil)),
-            ("Ready", DetailTranscriptState.reduce(status: "succeeded", signedIn: true, allowance: nil)),
-            ("Failed", DetailTranscriptState.reduce(status: "failed", signedIn: true, allowance: nil)),
-            ("Unknown", DetailTranscriptState.reduce(status: nil, signedIn: true, allowance: nil)),
+            ),
+            DetailTranscriptState.reduce(status: "processing", signedIn: true, allowance: nil),
+            DetailTranscriptState.reduce(status: "succeeded", signedIn: true, allowance: nil),
+            DetailTranscriptState.reduce(status: "failed", signedIn: true, allowance: nil),
+            DetailTranscriptState.reduce(status: nil, signedIn: true, allowance: nil),
         ]
         let column = UIStackView()
         column.axis = .vertical
-        column.spacing = 12
+        column.spacing = Spacing.gap
         column.translatesAutoresizingMaskIntoConstraints = false
         column.isLayoutMarginsRelativeArrangement = true
-        column.layoutMargins = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
-        for (_, content) in states {
+        column.layoutMargins = UIEdgeInsets(
+            top: Spacing.pageH, left: Spacing.pageH, bottom: Spacing.pageH, right: Spacing.pageH
+        )
+        var rows: [DetailTranscriptRow] = []
+        for content in states {
             let row = DetailTranscriptRow()
             row.translatesAutoresizingMaskIntoConstraints = false
-            row.apply(content, animated: false)
             column.addArrangedSubview(row)
+            rows.append(row)
         }
-        let host = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 720))
+        let host = UIView()
         host.backgroundColor = Theme.surface
-        host.overrideUserInterfaceStyle = style
-        host.traitOverrides.preferredContentSizeCategory = category
+        host.translatesAutoresizingMaskIntoConstraints = false
         host.addSubview(column)
         NSLayoutConstraint.activate([
             column.topAnchor.constraint(equalTo: host.topAnchor),
             column.leadingAnchor.constraint(equalTo: host.leadingAnchor),
             column.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            column.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+            host.widthAnchor.constraint(equalToConstant: 390),
         ])
-        host.setNeedsLayout()
-        host.layoutIfNeeded()
-        let height = max(column.systemLayoutSizeFitting(
+
+        let root = UIViewController()
+        root.view.backgroundColor = Theme.surface
+        root.overrideUserInterfaceStyle = style
+        root.traitOverrides.preferredContentSizeCategory = category
+        host.overrideUserInterfaceStyle = style
+        host.traitOverrides.preferredContentSizeCategory = category
+        root.view.addSubview(host)
+        NSLayoutConstraint.activate([
+            host.topAnchor.constraint(equalTo: root.view.topAnchor),
+            host.leadingAnchor.constraint(equalTo: root.view.leadingAnchor),
+            host.trailingAnchor.constraint(equalTo: root.view.trailingAnchor),
+        ])
+
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 1200))
+        window.windowScene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first
+        window.overrideUserInterfaceStyle = style
+        window.rootViewController = root
+        window.makeKeyAndVisible()
+        root.view.frame = window.bounds
+        root.view.setNeedsLayout()
+        root.view.layoutIfNeeded()
+
+        for (row, content) in zip(rows, states) {
+            row.overrideUserInterfaceStyle = style
+            row.traitOverrides.preferredContentSizeCategory = category
+            row.apply(content, animated: false)
+            row.relayoutForCurrentTraits()
+        }
+        root.view.layoutIfNeeded()
+        let height = host.systemLayoutSizeFitting(
             CGSize(width: 390, height: 0),
             withHorizontalFittingPriority: .required,
             verticalFittingPriority: .fittingSizeLevel
-        ).height, 1)
-        host.frame.size.height = height
+        ).height
+        host.frame = CGRect(x: 0, y: 0, width: 390, height: max(height, 1))
         host.layoutIfNeeded()
-        return host
+        return (host, window)
     }
 }

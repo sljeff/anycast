@@ -103,7 +103,7 @@ struct AITranscriptDisplayTests {
     @Test("Tap actions per state, with the exact Dart toast copy")
     func actions() {
         #expect(AITranscriptAction.action(display: .default) == .requestTranscript)
-        #expect(AITranscriptAction.action(display: .failed) == .removeStaleRecord)
+        #expect(AITranscriptAction.action(display: .failed) == .requestTranscript)
         #expect(AITranscriptAction.action(display: .unknown) == AITranscriptAction.none)
         #expect(AITranscriptAction.action(display: .succeeded) == .toast("You can check the transcript when playing."))
         #expect(AITranscriptAction.action(display: .processing) == .toast("Generating transcript may take 2 ~ 5 minutes..."))

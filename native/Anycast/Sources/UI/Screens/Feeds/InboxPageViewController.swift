@@ -900,9 +900,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         )
     }
 
-    /// Play's queue preparation without starting audio: the episode moves
-    /// to the top of the playlist and leaves the inbox. Playback is the
-    /// coordinator's decision (`DetailTranscriptPolicy`).
+    /// Queue preparation for opening a transcript when nothing else is
+    /// playing: the episode moves to the top of the playlist and stays in
+    /// the inbox. Playback is not started here.
     private func prepareTranscriptEpisode(_ episode: FeedEpisodeRow) async -> PlaylistEpisodeRow? {
         guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return nil }
         let playlistId = ChannelPlaylistLogic.defaultPlaylistID
@@ -912,7 +912,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         if let stored = try? await repository.episode(byEnclosureURL: enclosureURL) {
             row = stored
         }
-        await removeFromInbox(urls: [enclosureURL])
         return row
     }
 
