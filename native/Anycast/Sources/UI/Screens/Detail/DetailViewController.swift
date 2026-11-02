@@ -145,6 +145,9 @@ final class DetailViewController: UIViewController {
     private let transcriptSlot = UIView()
     private let statusLoop = ObservationLoop()
     private var actionRowHeight: NSLayoutConstraint!
+    private var actionLeading: NSLayoutConstraint!
+    private var actionTrailing: NSLayoutConstraint!
+    private var rowBottom: NSLayoutConstraint!
     private var transcriptGap: NSLayoutConstraint!
     private var transcriptSlotHeight: NSLayoutConstraint!
     private var transcriptRowPins: [NSLayoutConstraint] = []
@@ -302,9 +305,12 @@ final class DetailViewController: UIViewController {
         }
 
         // 28 pt from the floating card's bottom; at large the home
-        // indicator's safe area wins.
-        let rowBottom = actionRow.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.inset)
+        // indicator's safe area wins. Accessibility sizes add the sheet
+        // corner's arc clearance so Play and ••• stay outside the curve.
+        rowBottom = actionRow.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.inset)
         rowBottom.priority = .defaultHigh
+        actionLeading = actionRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.inset)
+        actionTrailing = actionRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.inset)
         actionRowHeight = actionRow.heightAnchor.constraint(equalToConstant: Layout.actionHeight)
         // The slot hugs the row. Height 0 keeps the notes-to-actions gap
         // unchanged when the row is hidden.
@@ -327,8 +333,8 @@ final class DetailViewController: UIViewController {
             // visible sheet (long text otherwise ran past inset sheets).
             content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
 
-            actionRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.inset),
-            actionRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.inset),
+            actionLeading,
+            actionTrailing,
             actionRowHeight,
             actionRow.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
             rowBottom,
@@ -369,8 +375,9 @@ final class DetailViewController: UIViewController {
             // The scroll view's bottom fade covers its last 40 pt. Add that
             // much so the channel name and date sit above the fade instead
             // of dissolving into the transcript row.
+            let bottom = Self.actionEdgeMargin(accessibility: true)
             let measured = Layout.inset + headerStack.bounds.height + Layout.fadeHeight + Layout.rowGap
-                + transcriptHeight + Spacing.md + actionRow.bounds.height + Layout.inset
+                + transcriptHeight + Spacing.md + actionRow.bounds.height + bottom
             if !didMeasureAccessibilityDetent || abs(measured - accessibilityDetentHeight) > 1 {
                 didMeasureAccessibilityDetent = true
                 accessibilityDetentHeight = measured
@@ -651,6 +658,18 @@ final class DetailViewController: UIViewController {
         let multiline = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
         actionRow.alignment = multiline ? .center : .fill
         actionRowHeight.isActive = !multiline
+        let margin = Self.actionEdgeMargin(accessibility: multiline)
+        actionLeading.constant = margin
+        actionTrailing.constant = -margin
+        rowBottom.constant = -margin
+    }
+
+    /// Default size keeps the 28 pt concentric inset. Accessibility sizes add
+    /// the sheet corner's arc clearance so a taller Play capsule and the •••
+    /// button stay outside the display corner.
+    private static func actionEdgeMargin(accessibility: Bool) -> CGFloat {
+        guard accessibility else { return Layout.inset }
+        return Spacing.sheetContent + Radius.arcContentInset(Radius.sheetDisplay)
     }
 
     // MARK: - Actions (Play capsule with progress; the rest behind •••)

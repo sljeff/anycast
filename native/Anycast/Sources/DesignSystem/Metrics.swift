@@ -48,6 +48,14 @@ nonisolated enum Radius {
     static let pill: CGFloat = 999
     /// A control inset by `Spacing.sheetContent` inside the floating sheet's 54 pt corner.
     static let sheetConcentric: CGFloat = 54 - Spacing.sheetContent
+    /// Floating sheet corner the concentric inset is measured from.
+    static var sheetDisplay: CGFloat { sheetConcentric + Spacing.sheetContent }
+
+    /// How far content must sit from a corner of `radius` so it stays outside
+    /// the arc: radius × (1 − 1/√2).
+    static func arcContentInset(_ radius: CGFloat) -> CGFloat {
+        radius * (1 - 1 / CGFloat(2).squareRoot())
+    }
 }
 
 /// Anycast 2.0 motion durations and curves (`AnycastMotion`).

@@ -176,9 +176,7 @@ final class DetailTranscriptRow: UIView {
         accessibleColumn.alignment = .fill
         accessibleColumn.spacing = Spacing.xxs
         accessibleColumn.isLayoutMarginsRelativeArrangement = true
-        accessibleColumn.layoutMargins = UIEdgeInsets(
-            top: Spacing.xs, left: Spacing.pageH, bottom: Spacing.xs, right: Spacing.cardInner
-        )
+        accessibleColumn.layoutMargins = Self.accessibilityMargins()
         accessibleColumn.addArrangedSubview(accessibleTitleRow)
 
         host.axis = .vertical
@@ -226,6 +224,13 @@ final class DetailTranscriptRow: UIView {
         )
         compactRow.isHidden = multiline
         accessibleColumn.isHidden = !multiline
+        // The tall row keeps a 26 pt corner. Padding has to clear that arc;
+        // the default one-line capsule is already clear and stays as designed.
+        if multiline {
+            accessibleColumn.layoutMargins = Self.accessibilityMargins()
+            accessibleTitleRow.alignment = .center
+        }
+        layer.cornerRadius = Radius.sheetConcentric
         applyIconScale()
         // Reparent the shared labels into the visible arrangement.
         let iconSlot = iconContainer()
@@ -241,6 +246,17 @@ final class DetailTranscriptRow: UIView {
             place(actionButton, in: compactRow, at: 3)
         }
         updateFittedHeight()
+    }
+
+    /// Inset that keeps the icon and text out of the row's corner arc.
+    private static func accessibilityMargins() -> UIEdgeInsets {
+        let clear = max(Radius.arcContentInset(Radius.sheetConcentric), Spacing.pageH)
+        return UIEdgeInsets(
+            top: clear,
+            left: max(Spacing.pageH, clear),
+            bottom: clear,
+            right: max(Spacing.cardInner, clear)
+        )
     }
 
     /// Re-reads fonts and the accessibility-size stack after the view joins a window.
