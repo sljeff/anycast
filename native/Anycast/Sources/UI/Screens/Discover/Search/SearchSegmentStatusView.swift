@@ -18,6 +18,9 @@ final class SearchSegmentStatusView: UIView {
     private weak var layoutHost: UIView?
     private var applied: SearchResultPresentation?
     private var currentAction: SearchResultAction?
+    /// The search field, once found. Cleared by the system if the field leaves
+    /// the hierarchy; the next lookup walks the window only when this is nil.
+    private weak var cachedSearchField: UIView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -160,17 +163,31 @@ final class SearchSegmentStatusView: UIView {
     }
 
     private func floatingSearchClearance(over host: UIView) -> CGFloat {
-        guard let window,
-              let field = Self.view(identifier: "search-page-field", in: window) else { return 0 }
+        guard Self.keyboardIsShown(in: host), let window,
+              let field = searchField(in: window) else { return 0 }
         let chrome = Self.searchBar(containing: field) ?? field
         let frame = chrome.convert(chrome.bounds, to: host)
         let keyboardTop = host.keyboardLayoutGuide.layoutFrame.minY
         // Docked on the keyboard: the bar's bottom meets the keyboard top.
-        // A field under the header (iOS 18) is far from that edge, and while
-        // the keyboard is down the guide already sits above the bar.
+        // A field under the header (iOS 18) is far from that edge.
         let gap = keyboardTop - frame.maxY
         guard gap > -24, gap < 40 else { return 0 }
         return max(0, keyboardTop - frame.minY)
+    }
+
+    /// The guide is as tall as the home indicator while the keyboard is down
+    /// (`usesBottomSafeArea`). A real keyboard is taller than that inset.
+    private static func keyboardIsShown(in host: UIView) -> Bool {
+        host.keyboardLayoutGuide.layoutFrame.height > host.safeAreaInsets.bottom + 1
+    }
+
+    private func searchField(in window: UIWindow) -> UIView? {
+        if let cachedSearchField, cachedSearchField.window != nil {
+            return cachedSearchField
+        }
+        let found = Self.findView(identifier: "search-page-field", in: window)
+        cachedSearchField = found
+        return found
     }
 
     private static func searchBar(containing field: UIView) -> UISearchBar? {
@@ -182,10 +199,10 @@ final class SearchSegmentStatusView: UIView {
         return nil
     }
 
-    private static func view(identifier: String, in view: UIView) -> UIView? {
-        if view.accessibilityIdentifier == identifier { return view }
-        for subview in view.subviews {
-            if let match = view(identifier: identifier, in: subview) { return match }
+    private static func findView(identifier: String, in root: UIView) -> UIView? {
+        if root.accessibilityIdentifier == identifier { return root }
+        for subview in root.subviews {
+            if let match = Self.findView(identifier: identifier, in: subview) { return match }
         }
         return nil
     }

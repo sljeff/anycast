@@ -212,14 +212,28 @@ class EmptyStateView: UIView {
         // then clipped with no ellipsis.
         var height: CGFloat = 0
         var previous: UIView?
-        for view in [disc, titleLabel, messageLabel, actionColumn] where !view.isHidden {
+        for row in [disc, titleLabel, messageLabel, actionColumn] where !row.isHidden {
             if let previous {
                 let custom = column.customSpacing(after: previous)
                 height += custom == UIStackView.spacingUseDefault ? column.spacing : custom
             }
-            height += view.sizeThatFits(textLimit).height
-            previous = view
+            height += rowHeight(row, columnWidth: columnWidth, textLimit: textLimit)
+            previous = row
         }
         return ceil(height + margins.top + margins.bottom)
+    }
+
+    /// Labels measure their wrapped text with `sizeThatFits`. The disc and
+    /// the button row do not: `UIView.sizeThatFits` returns the current
+    /// bounds, which are still zero the first time this runs.
+    private func rowHeight(_ row: UIView, columnWidth: CGFloat, textLimit: CGSize) -> CGFloat {
+        if row === titleLabel || row === messageLabel {
+            return row.sizeThatFits(textLimit).height
+        }
+        return row.systemLayoutSizeFitting(
+            CGSize(width: columnWidth, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
     }
 }
