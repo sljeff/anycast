@@ -142,8 +142,14 @@ final class PlayerPageTabView: UIView {
 @MainActor
 final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
 
+    /// Transcript page. Opening here does not change the close-reset, which
+    /// still returns to the main controls page.
+    static let transcriptPageIndex = 2
+
     private let context: UIContext
-    let selection = PlayerPageSelection(pageCount: 3, initialIndex: 1)
+    private let opensChat: Bool
+    private var didOpenChat = false
+    let selection: PlayerPageSelection
 
     private let pages: [UIViewController]
     private let pageController = UIPageViewController(
@@ -155,8 +161,15 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
     private let backdropObservation = ObservationLoop()
     private var backdropImageURL: String?
 
-    static func present(from presenter: UIViewController, context: UIContext) {
-        let controller = PlayerPageContainer(context: context)
+    static func present(
+        from presenter: UIViewController,
+        context: UIContext,
+        initialPage: Int = 1,
+        opensChat: Bool = false
+    ) {
+        let controller = PlayerPageContainer(
+            context: context, openingPage: initialPage, opensChat: opensChat
+        )
         controller.modalPresentationStyle = .pageSheet
         if let sheet = controller.sheetPresentationController {
             sheet.detents = [.large()]
@@ -167,8 +180,10 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         presenter.present(controller, animated: true)
     }
 
-    init(context: UIContext) {
+    init(context: UIContext, openingPage: Int = 1, opensChat: Bool = false) {
         self.context = context
+        self.opensChat = opensChat
+        self.selection = PlayerPageSelection(pageCount: 3, initialIndex: 1)
         self.pages = [
             EpisodePageViewController(context: context),
             PlayerMainPageViewController(context: context),
@@ -180,6 +195,10 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
             .init(icon: AppIcons.topology ?? UIImage(), accessibilityLabel: "Player AI transcript"),
         ])
         super.init(nibName: nil, bundle: nil)
+        let opening = min(max(openingPage, 0), pages.count - 1)
+        if opening != selection.selectedIndex {
+            selection.select(opening)
+        }
         pageTab.onSelect = { [weak self] index in
             self?.pageTabSelected(index)
         }
@@ -229,6 +248,13 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
             onChange: { [weak self] in self?.updateBackdrop() }
         )
         updateBackdrop()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard opensChat, !didOpenChat else { return }
+        didOpenChat = true
+        (pages[Self.transcriptPageIndex] as? SubtitlesPageViewController)?.openChat()
     }
 
     override func viewDidDisappear(_ animated: Bool) {

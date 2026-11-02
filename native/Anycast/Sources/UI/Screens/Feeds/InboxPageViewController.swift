@@ -889,8 +889,31 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             shortenURL: { [weak self] url in
                 await self?.context.api.getShortURL(for: url) ?? url
             },
-            isInPlaylist: context.playback.queue.contains(where: { $0.enclosureUrl == enclosureURL })
+            isInPlaylist: context.playback.queue.contains(where: { $0.enclosureUrl == enclosureURL }),
+            transcript: DetailTranscriptCoordinator(
+                context: context,
+                episode: detailEpisode,
+                prepareEpisode: { [weak self] in
+                    await self?.prepareTranscriptEpisode(episode)
+                }
+            )
         )
+    }
+
+    /// Play's queue preparation without starting audio: the episode moves
+    /// to the top of the playlist and leaves the inbox. Playback is the
+    /// coordinator's decision (`DetailTranscriptPolicy`).
+    private func prepareTranscriptEpisode(_ episode: FeedEpisodeRow) async -> PlaylistEpisodeRow? {
+        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return nil }
+        let playlistId = ChannelPlaylistLogic.defaultPlaylistID
+        var row = ChannelPlaylistLogic.playlistRow(from: episode, playlistId: playlistId)
+        let repository = context.database.playlistRepository()
+        try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: 0)
+        if let stored = try? await repository.episode(byEnclosureURL: enclosureURL) {
+            row = stored
+        }
+        await removeFromInbox(urls: [enclosureURL])
+        return row
     }
 
     /// The same three actions render inside Detail (card.dart:115); the
@@ -1103,12 +1126,47 @@ extension InboxPageViewController: UICollectionViewDelegate {
     func contextMenu(at indexPath: IndexPath) -> UIMenu? {
         guard sectionKind(indexPath.section) == .cards,
               displayedEpisodes.indices.contains(indexPath.item) else { return nil }
-        let actions = actions(for: displayedEpisodes[indexPath.item], at: indexPath)
-        return UIMenu(children: actions.map { action in
+        let episode = displayedEpisodes[indexPath.item]
+        let actions = actions(for: episode, at: indexPath)
+        var children: [UIMenuElement] = []
+        if DetailTranscriptPolicy.current.includeInboxContextMenu {
+            children.append(contentsOf: transcriptContextElements(for: episode))
+        }
+        children.append(contentsOf: actions.map { action in
             UIAction(title: action.accessibilityLabel, image: action.icon) { _ in
                 action.handler()
             }
         })
+        return UIMenu(children: children)
+    }
+
+    /// Same entries as the detail sheet's ••• group. Only built when
+    /// `DetailTranscriptPolicy.includeInboxContextMenu` is on.
+    private func transcriptContextElements(for episode: FeedEpisodeRow) -> [UIMenuElement] {
+        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return [] }
+        let detailEpisode = DetailViewController.Episode(
+            title: episode.title ?? "",
+            channelTitle: episode.channelTitle ?? "",
+            pubDateMilliseconds: episode.pubDate,
+            durationMilliseconds: episode.duration,
+            imageURL: episode.imageUrl,
+            rssFeedURL: episode.rssFeedUrl ?? "",
+            enclosureURL: enclosureURL,
+            descriptionHTML: episode.description ?? ""
+        )
+        let coordinator = DetailTranscriptCoordinator(
+            context: context,
+            episode: detailEpisode,
+            prepareEpisode: { [weak self] in
+                await self?.prepareTranscriptEpisode(episode)
+            }
+        )
+        return coordinator.content().menu.map { item in
+            UIAction(title: item.title, subtitle: item.subtitle, image: DetailTranscriptMenuImages.image(for: item.action)) { [weak self] _ in
+                guard let self else { return }
+                coordinator.handle(item.action, from: self)
+            }
+        }
     }
 
     /// The leading swipe surface (UI kit Inbox: swipe right to queue): Add

@@ -10,8 +10,12 @@ import AnycastKit
 /// at the bottom in thumb reach over a soft fade: a Play capsule that
 /// carries the episode's progress ("Resume · 32m left") and a ••• menu with
 /// Add to playlist, Share episode, Copy link and the remaining actions.
-/// Preserved v1 behaviors: actions auto-dismiss this sheet after firing
-/// (03 §10.1 wrapper quirk), share → shortlink → UIActivityViewController.
+/// A transcript status row sits in the same thumb reach, just above the
+/// actions: whether this episode can be transcribed, what it costs, and the
+/// one next step. Preserved v1 behaviors: actions auto-dismiss this sheet
+/// after firing (03 §10.1 wrapper quirk), share → shortlink →
+/// UIActivityViewController. Transcript taps that open the player dismiss
+/// the sheet themselves; Generate stays here.
 ///
 /// Presenters inject behavior: `openChannel`, `shortenURL`, the action
 /// closures inside `EpisodeCardAction`, and whether the episode is already
@@ -103,6 +107,8 @@ final class DetailViewController: UIViewController {
     /// the ShowNotesTextView below; this instance is stored but unused.
     private let htmlRenderer: HTMLContentRenderer
     private let now: () -> Date
+    /// Nil only for callers that have no playback context (the row hides).
+    private let transcript: DetailTranscriptCoordinator?
 
     private let scrollView = UIScrollView()
     private let descriptionTextView: ShowNotesTextView
@@ -113,6 +119,16 @@ final class DetailViewController: UIViewController {
     /// beside the cover at both detents.
     private let trailingSpacer = UIView()
     private let actionRow = UIStackView()
+    private let transcriptRow = DetailTranscriptRow()
+    /// Wraps the row so hiding it (no coordinator, or medium when the
+    /// policy says so) collapses to zero without fighting the row's own
+    /// minimum height.
+    private let transcriptSlot = UIView()
+    private let statusLoop = ObservationLoop()
+    private var actionRowHeight: NSLayoutConstraint!
+    private var transcriptGap: NSLayoutConstraint!
+    private var transcriptSlotHeight: NSLayoutConstraint!
+    private var transcriptRowPins: [NSLayoutConstraint] = []
     private let bottomFade = GradientFadeLayerView()
 
     private enum Layout {
@@ -136,6 +152,7 @@ final class DetailViewController: UIViewController {
         openChannel: ((ChannelReference) -> Void)? = nil,
         shortenURL: ((URL) async -> URL?)? = nil,
         isInPlaylist: Bool = false,
+        transcript: DetailTranscriptCoordinator? = nil,
         now: @escaping () -> Date = { Date() }
     ) {
         let controller = DetailViewController(
@@ -145,6 +162,7 @@ final class DetailViewController: UIViewController {
             openChannel: openChannel,
             shortenURL: shortenURL,
             isInPlaylist: isInPlaylist,
+            transcript: transcript,
             now: now
         )
         controller.modalPresentationStyle = .pageSheet
@@ -171,6 +189,7 @@ final class DetailViewController: UIViewController {
         openChannel: ((ChannelReference) -> Void)? = nil,
         shortenURL: ((URL) async -> URL?)? = nil,
         isInPlaylist: Bool = false,
+        transcript: DetailTranscriptCoordinator? = nil,
         now: @escaping () -> Date = { Date() }
     ) {
         self.episode = episode
@@ -179,6 +198,7 @@ final class DetailViewController: UIViewController {
         self.openChannel = openChannel
         self.shortenURL = shortenURL
         self.isInPlaylist = isInPlaylist
+        self.transcript = transcript
         self.now = now
         self.descriptionTextView = ShowNotesTextView()
         super.init(nibName: nil, bundle: nil)
@@ -194,6 +214,7 @@ final class DetailViewController: UIViewController {
         Theme.installPageBase(on: view)
         build()
         renderDescription()
+        startTranscript()
     }
 
     // MARK: - Build
@@ -222,16 +243,50 @@ final class DetailViewController: UIViewController {
         actionRow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(actionRow)
 
+        transcriptSlot.translatesAutoresizingMaskIntoConstraints = false
+        transcriptSlot.setContentHuggingPriority(.required, for: .vertical)
+        transcriptSlot.setContentCompressionResistancePriority(.required, for: .vertical)
+        view.addSubview(transcriptSlot)
+        transcriptRow.translatesAutoresizingMaskIntoConstraints = false
+        transcriptRow.onAction = { [weak self] action in
+            guard let self, let transcript = self.transcript else { return }
+            transcript.handle(action, from: self)
+        }
+        transcriptSlot.addSubview(transcriptRow)
+        transcriptRowPins = [
+            transcriptRow.topAnchor.constraint(equalTo: transcriptSlot.topAnchor),
+            transcriptRow.bottomAnchor.constraint(equalTo: transcriptSlot.bottomAnchor),
+            transcriptRow.leadingAnchor.constraint(equalTo: transcriptSlot.leadingAnchor),
+            transcriptRow.trailingAnchor.constraint(equalTo: transcriptSlot.trailingAnchor),
+        ]
+        // Keep a collapsed slot unambiguous. Required pins replace these
+        // while the row is showing; the equations match, so they don't fight.
+        for anchor in [
+            transcriptRow.topAnchor.constraint(equalTo: transcriptSlot.topAnchor),
+            transcriptRow.leadingAnchor.constraint(equalTo: transcriptSlot.leadingAnchor),
+            transcriptRow.trailingAnchor.constraint(equalTo: transcriptSlot.trailingAnchor),
+        ] {
+            anchor.priority = .fittingSizeLevel
+            anchor.isActive = true
+        }
+
         // 28 pt from the floating card's bottom; at large the home
         // indicator's safe area wins.
         let rowBottom = actionRow.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.inset)
         rowBottom.priority = .defaultHigh
+        actionRowHeight = actionRow.heightAnchor.constraint(equalToConstant: Layout.actionHeight)
+        // The slot hugs the row. Height 0 keeps the notes-to-actions gap
+        // unchanged when the row is hidden.
+        transcriptGap = transcriptSlot.bottomAnchor.constraint(
+            equalTo: actionRow.topAnchor, constant: -Spacing.md
+        )
+        transcriptSlotHeight = transcriptSlot.heightAnchor.constraint(equalToConstant: 0)
 
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: actionRow.topAnchor, constant: -Layout.rowGap),
+            scrollView.bottomAnchor.constraint(equalTo: transcriptSlot.topAnchor, constant: -Layout.rowGap),
 
             content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             content.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
@@ -243,9 +298,13 @@ final class DetailViewController: UIViewController {
 
             actionRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.inset),
             actionRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.inset),
-            actionRow.heightAnchor.constraint(equalToConstant: Layout.actionHeight),
+            actionRowHeight,
             actionRow.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
             rowBottom,
+
+            transcriptSlot.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.inset),
+            transcriptSlot.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.inset),
+            transcriptGap,
 
             bottomFade.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -Layout.fadeHeight),
             bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -263,6 +322,10 @@ final class DetailViewController: UIViewController {
         // The last line of the notes scrolls to rest above the fade.
         scrollView.contentInset.bottom = Layout.fadeHeight
         applyDetentLayout()
+        applyActionRowMetrics()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (self: Self, _) in
+            self.applyActionRowMetrics()
+        }
     }
 
     private func buildContent() -> UIView {
@@ -374,6 +437,28 @@ final class DetailViewController: UIViewController {
         let isLarge = sheetPresentationController?.selectedDetentIdentifier == .large
         artworkSide.constant = isLarge ? Layout.artworkLarge : Layout.artworkMedium
         titleLabel.numberOfLines = isLarge ? 4 : 3
+        applyTranscriptVisibility(isLarge: isLarge)
+    }
+
+    /// The row is chrome, not scrolling content. Medium shows it unless the
+    /// policy keeps it for the large detent only.
+    private func applyTranscriptVisibility(isLarge: Bool) {
+        let visible = transcript != nil
+            && (DetailTranscriptPolicy.current.visibleAtMediumDetent || isLarge)
+        transcriptRow.isHidden = !visible
+        transcriptSlot.isHidden = !visible
+        transcriptGap.constant = visible ? -Spacing.md : 0
+        transcriptSlotHeight.isActive = !visible
+        NSLayoutConstraint.deactivate(transcriptRowPins)
+        if visible { NSLayoutConstraint.activate(transcriptRowPins) }
+    }
+
+    /// Accessibility sizes let the Play capsule grow with its label. The
+    /// ••• button keeps its 52 pt circle and stays centered.
+    private func applyActionRowMetrics() {
+        let multiline = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        actionRow.alignment = multiline ? .center : .fill
+        actionRowHeight.isActive = !multiline
     }
 
     // MARK: - Actions (Play capsule with progress; the rest behind •••)
@@ -414,7 +499,11 @@ final class DetailViewController: UIViewController {
             style: .tonal, icon: AppIcons.more, accessibilityLabel: "More episode actions",
             diameter: Layout.actionHeight
         )
-        more.menu = UIMenu(children: overflowMenuChildren())
+        more.menu = UIMenu(children: [
+            UIDeferredMenuElement.uncached { [weak self] completion in
+                completion(self?.overflowMenuChildren() ?? [])
+            },
+        ])
         more.showsMenuAsPrimaryAction = true
         // Keep the written order when the menu opens upward: destructive
         // last, nearest the button.
@@ -423,6 +512,10 @@ final class DetailViewController: UIViewController {
     }
 
     private func overflowMenuChildren() -> [UIMenuElement] {
+        var groups: [[UIMenuElement]] = []
+        let transcriptItems = transcriptMenuElements()
+        if !transcriptItems.isEmpty { groups.append(transcriptItems) }
+
         var items: [UIMenuElement] = []
         if let addAction {
             if isInPlaylist {
@@ -439,6 +532,7 @@ final class DetailViewController: UIViewController {
         items.append(UIAction(title: "Copy link", image: AppIcons.copy) { [weak self] _ in
             self?.copyLinkTapped()
         })
+        if !items.isEmpty { groups.append(items) }
         let others = otherActions.map { action in
             UIAction(
                 title: action.accessibilityLabel,
@@ -446,9 +540,48 @@ final class DetailViewController: UIViewController {
                 attributes: action.accessibilityLabel.hasPrefix("Remove") ? .destructive : []
             ) { [weak self] _ in self?.fire(action) }
         }
-        guard !others.isEmpty else { return items }
-        // Destructive and other episode actions sit apart, under a divider.
-        return [UIMenu(options: .displayInline, children: items), UIMenu(options: .displayInline, children: others)]
+        if !others.isEmpty { groups.append(others) }
+        guard groups.count > 1 else { return groups.first ?? [] }
+        // Transcript entries, then the episode actions, then destructive —
+        // each group under its own divider. Fixed order keeps Remove nearest
+        // the button.
+        return groups.map { UIMenu(options: .displayInline, children: $0) }
+    }
+
+    private func transcriptMenuElements() -> [UIMenuElement] {
+        guard let transcript else { return [] }
+        return transcript.content().menu.map { item in
+            UIAction(
+                title: item.title,
+                subtitle: item.subtitle,
+                image: DetailTranscriptMenuImages.image(for: item.action)
+            ) { [weak self] _ in
+                guard let self else { return }
+                self.transcript?.handle(item.action, from: self)
+            }
+        }
+    }
+
+    private func startTranscript() {
+        guard let transcript else { return }
+        transcript.onChange = { [weak self] in
+            self?.renderTranscriptRow(animated: true)
+        }
+        let subtitles = transcript.context.subtitles
+        statusLoop.track(
+            read: { _ = subtitles.statuses },
+            onChange: { [weak self] in self?.renderTranscriptRow(animated: true) }
+        )
+        renderTranscriptRow(animated: false)
+        Task { [weak self] in
+            await transcript.refreshAllowanceIfNeeded()
+            self?.renderTranscriptRow(animated: true)
+        }
+    }
+
+    private func renderTranscriptRow(animated: Bool) {
+        guard let transcript else { return }
+        transcriptRow.apply(transcript.content(), animated: animated)
     }
 
     // MARK: - Behavior

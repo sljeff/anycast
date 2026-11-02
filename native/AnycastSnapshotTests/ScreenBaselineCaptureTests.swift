@@ -292,19 +292,28 @@ struct ScreenBaselineCaptureTests {
     @Test("S5 Detail sheet")
     func captureDetail() async throws {
         try await Self.withRoot { root in
+            let context = await Self.liveContext()
+            let episode = DetailViewController.Episode(
+                title: "Reference episode — detail sheet layout",
+                channelTitle: "Reference channel",
+                pubDateMilliseconds: 1_756_000_000_000,
+                imageURL: nil,
+                rssFeedURL: "https://example.com/feed.rss",
+                enclosureURL: "https://example.com/episode.mp3",
+                descriptionHTML: "<p>Reference show notes with a <a href=\"https://example.com\">link</a>.</p>"
+            )
             DetailViewController.present(
                 from: root,
-                episode: .init(
-                    title: "Reference episode — detail sheet layout",
-                    channelTitle: "Reference channel",
-                    pubDateMilliseconds: 1_756_000_000_000,
-                    imageURL: nil,
-                    rssFeedURL: "https://example.com/feed.rss",
-                    enclosureURL: "https://example.com/episode.mp3",
-                    descriptionHTML: "<p>Reference show notes with a <a href=\"https://example.com\">link</a>.</p>"
-                ),
+                episode: episode,
                 actions: [],
-                htmlRenderer: HTMLContentRenderer()
+                htmlRenderer: HTMLContentRenderer(),
+                transcript: context.map { ctx in
+                    DetailTranscriptCoordinator(
+                        context: ctx,
+                        episode: episode,
+                        prepareEpisode: { nil }
+                    )
+                }
             )
             // The first WebKit HTML parse spins up a process (~3s) — poll
             // for the description instead of settling on a fixed clock. A
