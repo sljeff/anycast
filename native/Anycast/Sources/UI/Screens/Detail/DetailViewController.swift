@@ -8,11 +8,12 @@ import AnycastKit
 /// beside the title, the show (opens the Channel sheet ON TOP — 03 §10.1)
 /// and the date · duration line, then the HTML show notes. At an
 /// accessibility size the title stays full width and the cover sits beside
-/// the channel line, shrunk so it does not grow with the text. The actions
-/// stay at the bottom in thumb reach over a soft fade — unless that identity
-/// still does not fit, in which case the header, transcript row and actions
-/// scroll together, the viewport stops above the sheet corner, and the scroll
-/// indicator shows. A Play capsule
+/// the channel line, shrunk so it does not grow with the text. Corners on
+/// this sheet are concentric with the 54 pt sheet corner
+/// (`Radius.concentric`). The actions stay at the bottom in thumb reach over
+/// a soft fade — unless that identity still does not fit, in which case the
+/// header, transcript row and actions scroll together. A fold fade covers a
+/// card the viewport cuts, and it stays above the sheet arc. A Play capsule
 /// carries the episode's progress ("Resume · 32m left") and a ••• menu with
 /// Add to playlist, Share episode, Copy link and the remaining actions.
 /// A transcript status row sits in the same thumb reach, just above the
@@ -152,6 +153,8 @@ final class DetailViewController: UIViewController {
     /// beside the cover at both detents.
     private let trailingSpacer = UIView()
     private let actionRow = UIStackView()
+    private var playButton: UIButton!
+    private var moreButton: AnycastIconButton!
     private let transcriptRow = DetailTranscriptRow()
     /// Wraps the row so hiding it (no coordinator, or medium when the
     /// policy says so) collapses to zero without fighting the row's own
@@ -186,13 +189,17 @@ final class DetailViewController: UIViewController {
     private var transcriptSlotHeight: NSLayoutConstraint!
     private var transcriptRowPins: [NSLayoutConstraint] = []
     private let bottomFade = GradientFadeLayerView()
+    private var fadeLeading: NSLayoutConstraint!
+    private var fadeTrailing: NSLayoutConstraint!
+    private var fadeTop: NSLayoutConstraint!
 
     private enum Layout {
         static let mediumHeight: CGFloat = 460
-        static let inset: CGFloat = 28
+        /// Header inset. The bottom stack's inset comes from `Radius.concentric`.
+        static let inset: CGFloat = Spacing.sheetContent
         static let artworkMedium: CGFloat = 120
         static let artworkLarge: CGFloat = 160
-        static let actionHeight: CGFloat = 52
+        static let actionHeight: CGFloat = Radius.sheetCapsuleHeight
         static let fadeHeight: CGFloat = 40
         /// Clear band between the notes' fade and the action row.
         static let rowGap: CGFloat = Spacing.sm
@@ -293,6 +300,7 @@ final class DetailViewController: UIViewController {
         scrollView.showsVerticalScrollIndicator = false
         scrollView.alwaysBounceVertical = true
         scrollView.contentInsetAdjustmentBehavior = .never
+        scrollView.delegate = self
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
 
@@ -385,6 +393,11 @@ final class DetailViewController: UIViewController {
         scrollActionBottom = actionRow.bottomAnchor.constraint(
             equalTo: contentContainer.bottomAnchor, constant: -Layout.inset
         )
+        fadeTop = bottomFade.topAnchor.constraint(
+            equalTo: scrollView.bottomAnchor, constant: -Layout.fadeHeight
+        )
+        fadeLeading = bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor)
+        fadeTrailing = bottomFade.trailingAnchor.constraint(equalTo: view.trailingAnchor)
 
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -410,9 +423,9 @@ final class DetailViewController: UIViewController {
             transcriptTrailing,
             transcriptGap,
 
-            bottomFade.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -Layout.fadeHeight),
-            bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bottomFade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            fadeTop,
+            fadeLeading,
+            fadeTrailing,
             bottomFade.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
         ])
 
@@ -444,7 +457,7 @@ final class DetailViewController: UIViewController {
             // much so a pinned header clears the fade. The sheet still caps
             // this at its maximum; updateChromeScrolling unpins when the cap
             // leaves the date under the fade.
-            let bottom = Self.actionEdgeMargin(accessibility: true)
+            let bottom = self.sheetChrome().inset
             let measured = Layout.inset + headerStack.bounds.height + Layout.fadeHeight + Layout.rowGap
                 + transcriptHeight + Spacing.md + actionRow.bounds.height + bottom
             if !didMeasureAccessibilityDetent || abs(measured - accessibilityDetentHeight) > 1 {
@@ -454,6 +467,7 @@ final class DetailViewController: UIViewController {
             }
             updateScrollContentInsets()
             updateChromeScrolling()
+            updateFoldTreatment()
             let overflows = scrollView.contentSize.height > scrollView.bounds.height + 1
             scrollView.showsVerticalScrollIndicator = overflows || scrollsChrome
         } else {
@@ -477,7 +491,7 @@ final class DetailViewController: UIViewController {
         guard view.bounds.height > 1, contentContainer.bounds.width > 1 else { return }
         let transcriptHeight = transcriptSlot.isHidden ? 0 : transcriptSlot.bounds.height
         let transcriptGapHeight = transcriptSlot.isHidden ? 0 : Spacing.md
-        let bottomInset = max(Self.actionEdgeMargin(accessibility: true), view.safeAreaInsets.bottom)
+        let bottomInset = max(sheetChrome().inset, view.safeAreaInsets.bottom)
         let chrome = Layout.rowGap + transcriptHeight + transcriptGapHeight
             + actionRow.bounds.height + bottomInset
         let visibleBottom = view.bounds.height - chrome - Layout.fadeHeight
@@ -515,7 +529,7 @@ final class DetailViewController: UIViewController {
             contentContainer.addSubview(transcriptSlot)
             contentContainer.addSubview(actionRow)
             NSLayoutConstraint.activate(flowing)
-            bottomFade.isHidden = true
+            bottomFade.isHidden = false
             scrollView.contentInset.bottom = 0
             scrollView.showsVerticalScrollIndicator = true
             needsScrollHint = true
@@ -528,28 +542,70 @@ final class DetailViewController: UIViewController {
             view.bringSubviewToFront(transcriptSlot)
             NSLayoutConstraint.activate(pinned)
             bottomFade.isHidden = false
+            bottomFade.setSolidStop(0)
+            fadeLeading.constant = 0
+            fadeTrailing.constant = 0
+            fadeTop.constant = -Layout.fadeHeight
             scrollView.showsVerticalScrollIndicator = false
             scrollView.verticalScrollIndicatorInsets.bottom = 0
             scrollView.contentInset.bottom = Layout.fadeHeight
         }
     }
 
-    /// Side and bottom inset for Play once it scrolls with the notes. Matches
-    /// the pinned accessibility margin, and stays above the home indicator.
-    /// The scrolling viewport itself stops `Spacing.sheetContent` above the
-    /// sheet edge, so a block inset by the same amount — the transcript card —
-    /// stays at least the corner's arc clearance inside the rounded rect.
+    /// Softens a card or Play control the fold cuts through. Hidden once that
+    /// control is fully on screen, so a scrolled-to-the-end capsule keeps its
+    /// corners. The fade is inset with the chrome, above the sheet arc.
+    private func updateFoldTreatment() {
+        guard scrollsChrome, scrollView.bounds.height > 1 else { return }
+        let fold = scrollView.bounds.maxY
+        func sliced(_ candidate: UIView) -> Bool {
+            guard !candidate.isHidden, candidate.bounds.height > 1, candidate.superview != nil else {
+                return false
+            }
+            let frame = candidate.convert(candidate.bounds, to: scrollView)
+            return frame.minY < fold - 1 && frame.maxY > fold + 1
+        }
+        bottomFade.isHidden = !sliced(transcriptSlot) && !sliced(actionRow)
+    }
+
+    /// Inset, corner radius and control height for the transcript card, Play
+    /// and •••. Default text keeps the 52 pt capsule at a 28 pt inset.
+    /// Accessibility sizes grow Play until the capsule would cross the sheet
+    /// arc, then stop. The inset is whatever makes that capsule concentric.
+    private func sheetChrome() -> (inset: CGFloat, radius: CGFloat, height: CGFloat) {
+        let base = Radius.sheetCapsuleHeight
+        guard traitCollection.preferredContentSizeCategory.isAccessibilityCategory else {
+            return (Spacing.sheetContent, Radius.sheetConcentric, base)
+        }
+        let line = TypographyV2.emphasis.font(traits: traitCollection).lineHeight
+        let natural = line + Spacing.gap * 2
+        let height = min(max(natural, base), Radius.maximumSheetCapsuleHeight)
+        let inset = Radius.sheetCorner - height / 2
+        return (inset, Radius.concentric(insetFromSheetEdge: inset), height)
+    }
+
+    /// Side and bottom inset for Play once it scrolls with the notes. The
+    /// scroll view itself stops at that inset, so a fully revealed Play sits
+    /// concentric with the sheet. The fold fade, when it is up, is inset by
+    /// the same amount and so stays above the sheet arc.
     private func updateScrollContentInsets() {
-        let margin = max(Self.actionEdgeMargin(accessibility: true), view.safeAreaInsets.bottom)
-        scrollActionLeading.constant = margin
-        scrollActionTrailing.constant = -margin
-        scrollActionBottom.constant = -margin
+        let chrome = sheetChrome()
+        let bottom = max(chrome.inset, view.safeAreaInsets.bottom)
+        scrollTranscriptLeading.constant = chrome.inset
+        scrollTranscriptTrailing.constant = -chrome.inset
+        scrollActionLeading.constant = chrome.inset
+        scrollActionTrailing.constant = -chrome.inset
+        // The scroll view already ends `bottom` above the sheet. Play is the
+        // last item, so it must not add that inset a second time.
+        scrollActionBottom.constant = 0
         guard scrollsChrome else { return }
-        let bottom = max(Spacing.sheetContent, view.safeAreaInsets.bottom)
         scrollFullBottom.constant = -bottom
-        // The indicator hugs the trailing edge, so it needs to end where the
-        // side becomes straight. Content inset by sheetContent is already clear.
-        scrollView.verticalScrollIndicatorInsets.bottom = max(0, Radius.sheetDisplay - bottom)
+        fadeLeading.constant = chrome.inset
+        fadeTrailing.constant = -chrome.inset
+        fadeTop.constant = -max(Layout.fadeHeight, chrome.radius)
+        bottomFade.setSolidStop(0.5)
+        // The indicator hugs the trailing edge. End it where the side is straight.
+        scrollView.verticalScrollIndicatorInsets.bottom = max(0, Radius.sheetCorner - bottom)
     }
 
     private func buildContent() -> UIView {
@@ -557,7 +613,7 @@ final class DetailViewController: UIViewController {
 
         artwork.contentMode = .scaleAspectFill
         artwork.clipsToBounds = true
-        artwork.layer.cornerRadius = Radius.artwork
+        artwork.layer.cornerRadius = Radius.concentric(insetFromSheetEdge: Layout.inset)
         artwork.layer.cornerCurve = .continuous
         artwork.backgroundColor = Theme.surfaceContainerHighest
         artwork.setArtwork(episode.imageURL.flatMap(URL.init(string:)), title: episode.channelTitle)
@@ -873,25 +929,38 @@ final class DetailViewController: UIViewController {
         if visible { NSLayoutConstraint.activate(transcriptRowPins) }
     }
 
-    /// Accessibility sizes let the Play capsule grow with its label. The
-    /// ••• button keeps its 52 pt circle and stays centered.
+    /// Play and ••• share one height. The transcript card shares their inset
+    /// and their corner radius, from `Radius.concentric`.
     private func applyActionRowMetrics() {
-        let multiline = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
-        actionRow.alignment = multiline ? .center : .fill
-        actionRowHeight.isActive = !multiline
-        let margin = Self.actionEdgeMargin(accessibility: multiline)
-        actionLeading.constant = margin
-        actionTrailing.constant = -margin
-        rowBottom.constant = -margin
-        if multiline { updateScrollContentInsets() }
+        let chrome = sheetChrome()
+        actionRow.alignment = .fill
+        actionRowHeight.isActive = true
+        actionRowHeight.constant = chrome.height
+        actionLeading.constant = chrome.inset
+        actionTrailing.constant = -chrome.inset
+        rowBottom.constant = -max(chrome.inset, view.safeAreaInsets.bottom)
+        transcriptLeading.constant = chrome.inset
+        transcriptTrailing.constant = -chrome.inset
+        let glyph = 17 * chrome.height / Radius.sheetCapsuleHeight
+        moreButton.setDiameter(chrome.height, glyphPointSize: glyph)
+        transcriptRow.applyConcentricRadius(chrome.radius)
+        artwork.layer.cornerRadius = Radius.concentric(insetFromSheetEdge: Layout.inset)
+        if traitCollection.preferredContentSizeCategory.isAccessibilityCategory {
+            fitPlayButton(height: chrome.height)
+        }
+        updateScrollContentInsets()
     }
 
-    /// Default size keeps the 28 pt concentric inset. Accessibility sizes add
-    /// the sheet corner's arc clearance so a taller Play capsule and the •••
-    /// button stay outside the display corner.
-    private static func actionEdgeMargin(accessibility: Bool) -> CGFloat {
-        guard accessibility else { return Layout.inset }
-        return Spacing.sheetContent + Radius.arcContentInset(Radius.sheetDisplay)
+    /// Keeps the Play label inside the capped capsule without changing the
+    /// default 12 pt inset when the 52 pt height already has room.
+    private func fitPlayButton(height: CGFloat) {
+        guard var configuration = playButton.configuration else { return }
+        let line = TypographyV2.emphasis.font(traits: traitCollection).lineHeight
+        let vertical = max(0, min(Spacing.gap, (height - line) / 2))
+        configuration.contentInsets = NSDirectionalEdgeInsets(
+            top: vertical, leading: Spacing.cardInner, bottom: vertical, trailing: Spacing.cardInner
+        )
+        playButton.configuration = configuration
     }
 
     // MARK: - Actions (Play capsule with progress; the rest behind •••)
@@ -926,12 +995,14 @@ final class DetailViewController: UIViewController {
         if let playAction {
             play.addAction(UIAction { [weak self] _ in self?.fire(playAction) }, for: .touchUpInside)
         }
+        playButton = play
         actionRow.addArrangedSubview(play)
 
         let more = AnycastIconButton(
             style: .tonal, icon: AppIcons.more, accessibilityLabel: "More episode actions",
             diameter: Layout.actionHeight
         )
+        moreButton = more
         more.menu = UIMenu(children: [
             UIDeferredMenuElement.uncached { [weak self] completion in
                 completion(self?.overflowMenuChildren() ?? [])
@@ -1128,6 +1199,12 @@ final class DetailViewController: UIViewController {
     }
 }
 
+extension DetailViewController: UIScrollViewDelegate {
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateFoldTreatment()
+    }
+}
+
 extension DetailViewController: UISheetPresentationControllerDelegate {
     func sheetPresentationControllerDidChangeSelectedDetentIdentifier(
         _ sheetPresentationController: UISheetPresentationController
@@ -1186,6 +1263,9 @@ final class GradientFadeLayerView: UIView {
 
     private var color: UIColor = .clear
     private var fromTop = true
+    /// Share of the fade that stays fully opaque at the solid end, so a
+    /// clipped card edge disappears instead of reading as a flat cut.
+    private var solidStop: CGFloat = 0
 
     func configure(color: UIColor, fromTop: Bool) {
         self.color = color
@@ -1194,6 +1274,13 @@ final class GradientFadeLayerView: UIView {
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _) in
             self.applyColors()
         }
+    }
+
+    func setSolidStop(_ stop: CGFloat) {
+        let clamped = min(max(stop, 0), 0.8)
+        guard clamped != solidStop else { return }
+        solidStop = clamped
+        applyColors()
     }
 
     override func didMoveToWindow() {
@@ -1207,6 +1294,17 @@ final class GradientFadeLayerView: UIView {
         let resolved = color.resolvedColor(with: traitCollection)
         let opaque = resolved.cgColor
         let clear = resolved.withAlphaComponent(0).cgColor
-        gradient.colors = fromTop ? [opaque, clear] : [clear, opaque]
+        if solidStop > 0 {
+            let split = fromTop ? solidStop : 1 - solidStop
+            gradient.locations = [
+                NSNumber(value: 0),
+                NSNumber(value: Double(split)),
+                NSNumber(value: 1),
+            ]
+            gradient.colors = fromTop ? [opaque, opaque, clear] : [clear, opaque, opaque]
+        } else {
+            gradient.locations = [NSNumber(value: 0), NSNumber(value: 1)]
+            gradient.colors = fromTop ? [opaque, clear] : [clear, opaque]
+        }
     }
 }

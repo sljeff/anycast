@@ -45,6 +45,17 @@ struct DetailAccessibilityHeaderTests {
         UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
     }
 
+    @Test("Detail sheet corners are concentric with the 54 pt sheet")
+    func sheetCornerRule() {
+        #expect(Radius.sheetCorner == 54)
+        #expect(Radius.concentric(insetFromSheetEdge: Spacing.sheetContent) == 26)
+        #expect(Radius.sheetCapsuleHeight == 52)
+        let arc = Radius.arcContentInset(Radius.sheetCorner)
+        let cap = Radius.maximumSheetCapsuleHeight
+        #expect(abs(cap - 2 * (Radius.sheetCorner - arc)) < 0.001)
+        #expect(abs((Radius.sheetCorner - cap / 2) - arc) < 0.001)
+    }
+
     @Test("Default size keeps the one-line channel button beside the 120 pt cover")
     func defaultSizeChannelButton() throws {
         let detail = makeDetail()

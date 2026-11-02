@@ -43,11 +43,24 @@ final class AnycastIconButton: UIButton {
         }
         self.accessibilityLabel = accessibilityLabel
         translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: diameter),
-            heightAnchor.constraint(equalToConstant: diameter),
-        ])
+        let width = widthAnchor.constraint(equalToConstant: diameter)
+        let height = heightAnchor.constraint(equalToConstant: diameter)
+        diameterConstraints = [width, height]
+        NSLayoutConstraint.activate(diameterConstraints)
         addPressFeedback()
+    }
+
+    private var diameterConstraints: [NSLayoutConstraint] = []
+
+    /// Resizes the circle. The detail sheet uses this so ••• matches Play
+    /// as the capsule grows, and stays a circle of that height.
+    func setDiameter(_ diameter: CGFloat, glyphPointSize: CGFloat) {
+        for constraint in diameterConstraints {
+            constraint.constant = diameter
+        }
+        configuration?.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
+            pointSize: glyphPointSize, weight: .medium
+        )
     }
 
     @available(*, unavailable)

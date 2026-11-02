@@ -9,8 +9,8 @@ import UIKit
 @MainActor
 final class DetailTranscriptRow: UIView {
 
-    /// Same height as the Play capsule. No spacing token names that control.
-    static let minimumHeight: CGFloat = 52
+    /// Same height as the default Play capsule (`Radius.sheetCapsuleHeight`).
+    static let minimumHeight: CGFloat = Radius.sheetCapsuleHeight
 
     var onAction: ((DetailTranscriptAction) -> Void)?
 
@@ -38,6 +38,9 @@ final class DetailTranscriptRow: UIView {
     /// Explicit height so the row hugs max(52, its content) and the sheet
     /// does not stretch it. Updated after content and trait changes.
     private var rowHeight: NSLayoutConstraint!
+    /// Corner shared with Play. The parent sets it from the sheet's
+    /// concentric rule; the default is the 28 pt inset.
+    private var concentricRadius = Radius.sheetConcentric
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -223,13 +226,13 @@ final class DetailTranscriptRow: UIView {
         )
         compactRow.isHidden = multiline
         accessibleColumn.isHidden = !multiline
-        // The tall row keeps a 26 pt corner. Padding has to clear that arc;
-        // the default one-line capsule is already clear and stays as designed.
+        // Padding has to clear the row's own corner. The default one-line
+        // capsule is already clear and stays as designed.
         if multiline {
-            accessibleColumn.layoutMargins = Self.accessibilityMargins()
+            accessibleColumn.layoutMargins = Self.accessibilityMargins(radius: concentricRadius)
             accessibleTitleRow.alignment = .center
         }
-        layer.cornerRadius = Radius.sheetConcentric
+        layer.cornerRadius = concentricRadius
         applyIconScale()
         // Reparent the shared labels into the visible arrangement.
         let iconSlot = iconContainer()
@@ -247,9 +250,16 @@ final class DetailTranscriptRow: UIView {
         updateFittedHeight()
     }
 
+    /// The sheet tells the row which concentric radius to draw.
+    func applyConcentricRadius(_ radius: CGFloat) {
+        guard radius != concentricRadius else { return }
+        concentricRadius = radius
+        applyTraits()
+    }
+
     /// Inset that keeps the icon and text out of the row's corner arc.
-    private static func accessibilityMargins() -> UIEdgeInsets {
-        let clear = max(Radius.arcContentInset(Radius.sheetConcentric), Spacing.pageH)
+    private static func accessibilityMargins(radius: CGFloat) -> UIEdgeInsets {
+        let clear = max(Radius.arcContentInset(radius), Spacing.pageH)
         return UIEdgeInsets(
             top: clear,
             left: max(Spacing.pageH, clear),
