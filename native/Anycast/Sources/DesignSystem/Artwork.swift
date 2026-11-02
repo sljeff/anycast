@@ -53,8 +53,17 @@ extension UIImageView {
         kf.setImage(
             with: url,
             placeholder: placeholder,
-            options: [.transition(.none), .onFailureImage(placeholder)]
+            options: [.transition(artworkCrossfade(for: url)), .onFailureImage(placeholder)]
         )
+    }
+
+    /// Letter-tile → artwork. The prototype crossfades only an uncached
+    /// image; a cache hit and Reduce Motion stay a hard swap, which is the
+    /// non-motion fallback. Off, every load stays `.transition(.none)`.
+    func artworkCrossfade(for url: URL?) -> ImageTransition {
+        guard MotionProto.isEnabled(.cover), !Motion.reduceMotion else { return .none }
+        guard let url, !ImageCache.default.isCached(forKey: url.absoluteString) else { return .none }
+        return .fade(Motion.quick)
     }
 
     /// The cover's 0.5 pt inner hairline (`sandAlpha4`). Content casts no

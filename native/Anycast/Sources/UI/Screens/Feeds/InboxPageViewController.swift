@@ -808,7 +808,21 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // Animated deletion applies only while the rows were on screen AND
         // the column keeps its structure: emptying the displayed list
         // collapses every section into the ImportBlock empty state — that
-        // structural rebuild goes through the plain path.
+        // structural rebuild goes through the plain path. The prototype
+        // fades that last card out and fades the empty state in.
+        if MotionProto.isEnabled(.transitions),
+           view.window != nil,
+           !removedPaths.isEmpty,
+           displayedAfterRemoval.isEmpty {
+            await animateInboxCardsOut(removedPaths)
+            emptyStateView.alpha = 0
+            episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
+            renderList()
+            UIView.animate(withDuration: Motion.reduceMotion ? Motion.quick : Motion.standard) {
+                self.emptyStateView.alpha = 1
+            }
+            return
+        }
         guard view.window != nil, !removedPaths.isEmpty, !displayedAfterRemoval.isEmpty else {
             episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
             renderList()
@@ -827,6 +841,34 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // have emptied the list while the delete animation ran.
         collectionView.backgroundView = displayedEpisodes.isEmpty ? emptyStateView : nil
         refreshChromeStatus()
+    }
+
+    /// Fade (and, unless Reduce Motion is on, collapse) the last inbox cards
+    /// before the unanimated structural rebuild swaps in the empty state.
+    private func animateInboxCardsOut(_ paths: [IndexPath]) async {
+        let cells = paths.compactMap { collectionView.cellForItem(at: $0) }
+        guard !cells.isEmpty else { return }
+        let reduce = Motion.reduceMotion
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            UIView.animate(
+                withDuration: reduce ? Motion.quick : Motion.standard,
+                delay: 0,
+                options: [.curveEaseOut, .allowUserInteraction]
+            ) {
+                for cell in cells {
+                    cell.contentView.alpha = 0
+                    if !reduce {
+                        cell.contentView.transform = CGAffineTransform(scaleX: 1, y: 0.01)
+                    }
+                }
+            } completion: { _ in
+                for cell in cells {
+                    cell.contentView.transform = .identity
+                    cell.contentView.alpha = 1
+                }
+                continuation.resume()
+            }
+        }
     }
 
     /// The cards section's provider index in the current section set.

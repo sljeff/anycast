@@ -16,7 +16,9 @@ import AnycastKit
 ///
 /// Gestures (03 §3.1): whole-bar tap opens the full-screen player; ANY
 /// vertical drag — up or down, no threshold, the shipped quirk — also opens
-/// it. The play/pause and +30 s controls never bubble to the open gesture.
+/// it. `-motionProto.drag` replaces that pan with a finger-following open
+/// that can spring back. The play/pause and +30 s controls never bubble to
+/// the open gesture.
 @MainActor
 final class PlayerBarView: UIView {
 
@@ -42,6 +44,9 @@ final class PlayerBarView: UIView {
 
     /// Set by the host (UIContext.makePlayerBar pre-wires it).
     var onOpenPlayer: (() -> Void)?
+    /// When set (`-motionProto.drag`), a vertical pan is an interactive open
+    /// instead of the 1 pt canned present. Nil keeps the shipped quirk.
+    var onVerticalPan: ((UIPanGestureRecognizer) -> Void)?
 
     private let playback: PlaybackService
     private let style: HostingStyle
@@ -270,6 +275,10 @@ final class PlayerBarView: UIView {
     }
 
     @objc private func panHandled(_ gesture: UIPanGestureRecognizer) {
+        if let onVerticalPan {
+            onVerticalPan(gesture)
+            return
+        }
         if gesture.state == .began {
             openedByPan = false
         }

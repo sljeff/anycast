@@ -317,12 +317,24 @@ final class HistoryDialogViewController: UIViewController {
         return UICollectionViewCompositionalLayout.list(using: configuration)
     }
 
+    /// After the first populated apply, later diffs can animate.
+    private var didApplyItems = false
+
     private func applySnapshot() {
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(episodes.compactMap(\.enclosureUrl))
-        dataSource.apply(snapshot, animatingDifferences: false)
+        let emptying = episodes.isEmpty && didApplyItems && MotionProto.isEnabled(.transitions) && view.window != nil
+        if emptying { emptyView.alpha = 0 }
+        let animate = MotionProto.isEnabled(.transitions) && !Motion.reduceMotion && didApplyItems && !episodes.isEmpty
+        dataSource.apply(snapshot, animatingDifferences: animate)
+        if !episodes.isEmpty { didApplyItems = true }
         renderStates()
+        if emptying {
+            UIView.animate(withDuration: Motion.reduceMotion ? Motion.quick : Motion.standard) {
+                self.emptyView.alpha = 1
+            }
+        }
     }
 
     private func renderStates() {

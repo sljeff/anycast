@@ -51,7 +51,7 @@ nonisolated final class KingfisherShowNotesImageLoader: ShowNotesImageLoading {
             options: [
                 .processor(DownsamplingImageProcessor(size: target)),
                 .cacheOriginalImage,
-                .transition(.none),
+                .transition(Self.showNotesTransition(for: url)),
                 // Kingfisher defaults to scale 1; without the screen scale
                 // every inline image decodes at 1x and looks soft on 2x/3x
                 // displays (the processor sizes by points * scale).
@@ -65,6 +65,15 @@ nonisolated final class KingfisherShowNotesImageLoader: ShowNotesImageLoading {
             }
         )
         return ShowNotesImageLoadToken { task?.cancel() }
+    }
+
+    /// `retrieveImage` does not paint this transition (the bitmap lands in a
+    /// text attachment). The option matches the cover helper: uncached loads
+    /// ask for `Motion.quick`, cache hits stay `.none`.
+    private static func showNotesTransition(for url: URL) -> ImageTransition {
+        guard MotionProto.isEnabled(.cover) else { return .none }
+        if ImageCache.default.isCached(forKey: url.absoluteString) { return .none }
+        return .fade(Motion.quick)
     }
 
     /// Rounds each dimension up to the next 64 px bucket (minimum 64) so

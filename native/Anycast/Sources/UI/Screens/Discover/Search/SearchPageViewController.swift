@@ -333,6 +333,9 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
 
     private let collectionView: UICollectionView
     private let spinner = UIActivityIndicatorView(style: .large)
+    private let subtleSpinner = UIActivityIndicatorView(style: .medium)
+    private let skeleton = SkeletonListView(style: .channelRows)
+    private var skeletonTop: NSLayoutConstraint?
     private let statusLabel = UILabel()
     private let observation = ObservationLoop()
     private var lastChannelSignature: [String?] = []
@@ -410,6 +413,17 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
+        subtleSpinner.color = Theme.primary
+        subtleSpinner.hidesWhenStopped = true
+        subtleSpinner.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
+        subtleSpinner.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(subtleSpinner)
+
+        skeleton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(skeleton)
+        let skeletonTop = skeleton.topAnchor.constraint(equalTo: view.topAnchor)
+        self.skeletonTop = skeletonTop
+
         statusLabel.font = TypographyV2.body.font()
         statusLabel.adjustsFontForContentSizeCategory = true
         statusLabel.textColor = Theme.onSurface
@@ -425,35 +439,64 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            subtleSpinner.topAnchor.constraint(equalTo: skeleton.topAnchor),
+            subtleSpinner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            skeletonTop,
+            skeleton.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            skeleton.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            skeleton.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             statusLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             statusLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let top = collectionView.contentInset.top + Spacing.gap
+        if skeletonTop?.constant != top { skeletonTop?.constant = top }
+    }
+
     private func render() {
+        let hasContent = !viewModel.channels.isEmpty
+        let chrome = MotionLoading.chrome(
+            isLoading: viewModel.channelsPhase == .loading,
+            hasContent: hasContent
+        )
+        if chrome.showBlockingSpinner { spinner.startAnimating() } else { spinner.stopAnimating() }
+        if chrome.showSubtleIndicator { subtleSpinner.startAnimating() } else { subtleSpinner.stopAnimating() }
         switch viewModel.channelsPhase {
         case .loading:
-            spinner.startAnimating()
             statusLabel.isHidden = true
         case .noResults:
-            spinner.stopAnimating()
             statusLabel.text = "No results"
             statusLabel.isHidden = false
         case .networkError:
-            spinner.stopAnimating()
             statusLabel.text = "Network Error"
             statusLabel.isHidden = false
         case .loaded:
-            spinner.stopAnimating()
             statusLabel.isHidden = true
         }
 
+        let hadContent = !lastChannelSignature.isEmpty
         let signature = viewModel.channels.map(\.rssFeedUrl)
-        if signature != lastChannelSignature {
+        let signatureChanged = signature != lastChannelSignature
+        if signatureChanged {
             lastChannelSignature = signature
+            // Whole-list reload stays unanimated; the prototype fades the
+            // first arrival in afterwards instead of growing rows here.
             UIView.performWithoutAnimation {
                 collectionView.reloadData()
             }
+        }
+        let reveal = signatureChanged && !hadContent && !signature.isEmpty
+            && (MotionProto.isEnabled(.skeleton) || MotionProto.isEnabled(.transitions))
+        if reveal {
+            let cards = collectionView.visibleCells.filter { $0 is PodcastCardCell }
+            MotionArrival.reveal(in: collectionView, cells: cards, skeleton: skeleton, staggered: true)
+        } else if chrome.showSkeleton {
+            skeleton.setShown(true)
+        } else if !skeleton.isDismissing {
+            skeleton.setShown(false)
         }
     }
 
@@ -514,6 +557,9 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
 
     private let collectionView: UICollectionView
     private let spinner = UIActivityIndicatorView(style: .large)
+    private let subtleSpinner = UIActivityIndicatorView(style: .medium)
+    private let skeleton = SkeletonListView(style: .episodeCards)
+    private var skeletonTop: NSLayoutConstraint?
     private let statusLabel = UILabel()
     private let expandCoordinator = CardExpandCoordinator()
     /// Needs `self` as owner — created lazily (post-super.init).
@@ -601,6 +647,17 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
+        subtleSpinner.color = Theme.primary
+        subtleSpinner.hidesWhenStopped = true
+        subtleSpinner.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
+        subtleSpinner.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(subtleSpinner)
+
+        skeleton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(skeleton)
+        let skeletonTop = skeleton.topAnchor.constraint(equalTo: view.topAnchor)
+        self.skeletonTop = skeletonTop
+
         statusLabel.font = TypographyV2.body.font()
         statusLabel.adjustsFontForContentSizeCategory = true
         statusLabel.textColor = Theme.onSurface
@@ -616,6 +673,12 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            subtleSpinner.topAnchor.constraint(equalTo: skeleton.topAnchor),
+            subtleSpinner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            skeletonTop,
+            skeleton.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            skeleton.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            skeleton.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             statusLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             statusLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
@@ -623,24 +686,34 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         binder.onListContentChanged = { [weak self] in self?.refreshVisibleCards() }
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let top = collectionView.contentInset.top + Spacing.gap
+        if skeletonTop?.constant != top { skeletonTop?.constant = top }
+    }
+
     private func render() {
+        let hasContent = !viewModel.episodes.isEmpty
+        let chrome = MotionLoading.chrome(
+            isLoading: viewModel.episodesPhase == .loading,
+            hasContent: hasContent
+        )
+        if chrome.showBlockingSpinner { spinner.startAnimating() } else { spinner.stopAnimating() }
+        if chrome.showSubtleIndicator { subtleSpinner.startAnimating() } else { subtleSpinner.stopAnimating() }
         switch viewModel.episodesPhase {
         case .loading:
-            spinner.startAnimating()
             statusLabel.isHidden = true
         case .noResults:
-            spinner.stopAnimating()
             statusLabel.text = "No results"
             statusLabel.isHidden = false
         case .networkError:
-            spinner.stopAnimating()
             statusLabel.text = "Network Error"
             statusLabel.isHidden = false
         case .loaded:
-            spinner.stopAnimating()
             statusLabel.isHidden = true
         }
 
+        let hadContent = !lastEpisodeSignature.isEmpty
         let signature = viewModel.episodes.map(\.episode.enclosureUrl)
         if signature != lastEpisodeSignature {
             lastEpisodeSignature = signature
@@ -648,8 +721,17 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
                 collectionView.reloadData()
             }
             refreshMembership()
-            needsEntrance = !signature.isEmpty
-            playEntranceIfNeeded()
+            // A silent refresh keeps the rows that were already on screen.
+            let silentUpdate = MotionProto.isEnabled(.silent) && hadContent
+            if !silentUpdate {
+                needsEntrance = !signature.isEmpty
+                playEntranceIfNeeded()
+            }
+        }
+        if chrome.showSkeleton {
+            skeleton.setShown(true)
+        } else if !skeleton.isDismissing {
+            skeleton.setShown(false)
         }
     }
 
@@ -659,6 +741,9 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     private func playEntranceIfNeeded() {
         guard needsEntrance, view.window != nil else { return }
         needsEntrance = false
+        if !skeleton.isHidden {
+            skeleton.dismissAnimated()
+        }
         CardEntranceAnimator.play(in: collectionView)
     }
 

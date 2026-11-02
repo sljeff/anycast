@@ -102,6 +102,20 @@ nonisolated enum Motion {
 
     static var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
 
+    /// Posted when Reduce Motion flips, and only while `-motionProto.reduceMotion`
+    /// (or the master switch) is on. In-flight view animations have already
+    /// been snapped to their end state before this is posted.
+    static let reduceMotionDidChange = Notification.Name("anycast.reduceMotionDidChange")
+
+    /// Starts listening for `reduceMotionStatusDidChange` when the prototype
+    /// flag is on. Off, nothing is observed and `reduceMotion` stays a live
+    /// read with no follow-up for animations already in flight.
+    @MainActor
+    static func installReduceMotionObserverIfNeeded() {
+        guard MotionProto.isEnabled(.reduceMotion) else { return }
+        ReduceMotionWatch.install()
+    }
+
     /// `UIView.animate` convenience with the standard v2 curve/duration.
     @MainActor
     static func animate(_ duration: TimeInterval = Motion.standard, _ animations: @escaping () -> Void, completion: (() -> Void)? = nil) {
@@ -161,5 +175,49 @@ extension UIControl {
                 options: [.allowUserInteraction, .beginFromCurrentState]
             ) { self.transform = .identity }
         }, for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
+    }
+}
+
+/// Snaps view animations already on screen when Reduce Motion turns on, then
+/// tells listeners (skeleton pulse, an open drag) to re-read the setting.
+@MainActor
+private final class ReduceMotionWatch {
+    static let shared = ReduceMotionWatch()
+    private var token: NSObjectProtocol?
+
+    static func install() {
+        shared.start()
+    }
+
+    private func start() {
+        guard token == nil else { return }
+        token = NotificationCenter.default.addObserver(
+            forName: UIAccessibility.reduceMotionStatusDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                ReduceMotionWatch.apply()
+            }
+        }
+    }
+
+    private static func apply() {
+        if UIAccessibility.isReduceMotionEnabled {
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            for scene in scenes {
+                for window in scene.windows {
+                    strip(window)
+                }
+            }
+        }
+        NotificationCenter.default.post(name: Motion.reduceMotionDidChange, object: nil)
+    }
+
+    private static func strip(_ view: UIView) {
+        view.layer.removeAllAnimations()
+        for child in view.subviews {
+            strip(child)
+        }
     }
 }
