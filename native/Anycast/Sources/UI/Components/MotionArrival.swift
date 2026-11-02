@@ -91,7 +91,7 @@ enum MiniPlayerInsertion {
         bar: UIView,
         height: NSLayoutConstraint,
         in host: UIView,
-        alongside: () -> Void = {}
+        alongside: @escaping () -> Void = {}
     ) {
         let target: CGFloat = visible ? PlayerBarView.barHeight : 0
         let unchanged = (bar.isHidden == !visible) && abs(height.constant - target) < 0.5
