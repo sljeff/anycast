@@ -47,8 +47,9 @@ enum DiscoverCategoriesReducer {
 }
 
 /// Search tab list phase (discover.dart:169-204 / 204-293): loading spinner;
-/// empty results → "No results"; a failed fetch → the error label instead
-/// of the Dart eternal spinner (K4 fix).
+/// empty results; a failed fetch instead of the Dart eternal spinner (K4
+/// fix). The sentence drawn for the empty and failed phases lives in
+/// `SearchResultState` — this value only says which phase it is.
 enum SearchListPhase: Equatable {
     case loading
     case noResults
@@ -292,8 +293,10 @@ final class DiscoverViewModel {
 }
 
 /// The global SearchPage state (discover.dart:113-306): the two tab
-/// searches, each (re)started by its tab's first display or revisit (the
-/// TabBarView children carry no KeepAliveWrapper, 03 §2.6/§3.5).
+/// searches. Submitting a query fetches only the segment that is showing.
+/// A segment that has already loaded in this search — including a settled
+/// zero-result answer — is shown again with no new request (option A). A
+/// segment whose fetch failed is not loaded, so visiting it requests again.
 @MainActor
 @Observable
 final class SearchPageViewModel {
@@ -306,6 +309,12 @@ final class SearchPageViewModel {
     private(set) var channelsFailed = false
     private(set) var episodesLoading = true
     private(set) var episodesFailed = false
+    /// True once this search's channels request completed without error,
+    /// including zero rows. A failure leaves it false.
+    private(set) var channelsLoaded = false
+    /// True once this search's episodes request completed without error,
+    /// including zero rows. A failure leaves it false.
+    private(set) var episodesLoaded = false
 
     /// Monotonic per list: a newer search of the same list supersedes any
     /// in-flight one — an older response must never clobber it (same ruling
@@ -313,11 +322,25 @@ final class SearchPageViewModel {
     private var channelsGeneration = 0
     private var episodesGeneration = 0
 
-    private let api: APIClient
+    private let fetchChannels: @Sendable (String) async throws -> [SubscriptionRow]
+    private let fetchEpisodes: @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
 
-    init(searchText: String, api: APIClient) {
+    init(
+        searchText: String,
+        fetchChannels: @escaping @Sendable (String) async throws -> [SubscriptionRow],
+        fetchEpisodes: @escaping @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
+    ) {
         self.searchText = searchText
-        self.api = api
+        self.fetchChannels = fetchChannels
+        self.fetchEpisodes = fetchEpisodes
+    }
+
+    convenience init(searchText: String, api: APIClient) {
+        self.init(
+            searchText: searchText,
+            fetchChannels: { try await api.searchChannels(keyword: $0) },
+            fetchEpisodes: { try await api.searchEpisodes(keyword: $0) }
+        )
     }
 
     var channelsPhase: SearchListPhase {
@@ -332,18 +355,29 @@ final class SearchPageViewModel {
         )
     }
 
-    /// searchChannels + searchEpisodes in parallel (discover.dart:170 / 205).
+    /// Fetches both segments. The search page does not call this on submit;
+    /// it activates only the segment that is showing.
     func search() {
         searchChannels()
         searchEpisodes()
     }
 
-    /// The SearchPage TabBarView children carry NO KeepAliveWrapper — each
-    /// (re)visit rebuilds that tab's FutureBuilder and re-runs its future
-    /// (discover.dart:167-293). The sheet opens on Channels, so the channels
-    /// search is the launch fetch; the episodes search runs on first (and
-    /// every later) visit of the Episodes tab.
+    /// Starts the segment's fetch the first time it is shown. A segment that
+    /// already loaded in this search is left as it is: no spinner, no
+    /// request. A failed segment loads again.
     func activate(tab index: Int) {
+        if index == 1 {
+            guard !episodesLoaded else { return }
+            searchEpisodes()
+        } else {
+            guard !channelsLoaded else { return }
+            searchChannels()
+        }
+    }
+
+    /// Re-fetches one segment and returns it to the loading spinner. Does
+    /// not touch the other segment or Recent.
+    func retry(tab index: Int) {
         if index == 1 {
             searchEpisodes()
         } else {
@@ -354,14 +388,15 @@ final class SearchPageViewModel {
     private func searchChannels() {
         channelsLoading = true
         channelsFailed = false
+        channelsLoaded = false
         channelsGeneration += 1
         let generation = channelsGeneration
-        let api = self.api
+        let fetch = fetchChannels
         let keyword = searchText
         Task { [weak self] in
             var fetched: [SubscriptionRow]?
             do {
-                fetched = try await api.searchChannels(keyword: keyword)
+                fetched = try await fetch(keyword)
             } catch {
                 fetched = nil
             }
@@ -369,9 +404,11 @@ final class SearchPageViewModel {
             if let channels = fetched {
                 self.channels = channels
                 self.channelsFailed = false
+                self.channelsLoaded = true
             } else {
                 self.channels = []
                 self.channelsFailed = true
+                self.channelsLoaded = false
             }
             self.channelsLoading = false
         }
@@ -380,14 +417,15 @@ final class SearchPageViewModel {
     private func searchEpisodes() {
         episodesLoading = true
         episodesFailed = false
+        episodesLoaded = false
         episodesGeneration += 1
         let generation = episodesGeneration
-        let api = self.api
+        let fetch = fetchEpisodes
         let keyword = searchText
         Task { [weak self] in
             var fetched: [APIClient.EpisodeWithChannel]?
             do {
-                fetched = try await api.searchEpisodes(keyword: keyword)
+                fetched = try await fetch(keyword)
             } catch {
                 fetched = nil
             }
@@ -397,9 +435,11 @@ final class SearchPageViewModel {
             if let episodes = fetched {
                 self.episodes = episodes
                 self.episodesFailed = false
+                self.episodesLoaded = true
             } else {
                 self.episodes = []
                 self.episodesFailed = true
+                self.episodesLoaded = false
             }
             self.episodesLoading = false
         }

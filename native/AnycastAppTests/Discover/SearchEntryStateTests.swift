@@ -1,5 +1,6 @@
 import UIKit
 import Testing
+import AnycastKit
 @testable import Anycast
 
 /// The Search tab's entry state: which sections show for which data, that it
@@ -85,19 +86,31 @@ struct SearchEntryStateTests {
         #expect(!page.isShowingResults)
         #expect(!page.entryPage.view.isHidden)
 
+        let script = ScriptedSearch(channels: .success([ScriptedSearch.channel("Second")]))
+        page.setSearchTransport(
+            channels: { try await script.fetchChannels($0) },
+            episodes: { try await script.fetchEpisodes($0) }
+        )
         page.entryPage.activate(.recent("second"))
         #expect(page.isShowingResults)
         #expect(page.entryPage.view.isHidden)
+        await Self.waitUntil { store.queries == ["second", "first"] }
         #expect(store.queries == ["second", "first"])
     }
 
-    @Test("Submitting a query records it")
+    @Test("Submitting a query records it once a segment returns a row")
     func searchRecordsQuery() async {
         guard let context = await Self.liveUIContext() else { return }
         let store = makeStore([])
+        let script = ScriptedSearch(channels: .success([ScriptedSearch.channel("Planet Money")]))
         let page = SearchPageViewController(context: context, recentStore: store, loadCategories: { [] })
+        page.setSearchTransport(
+            channels: { try await script.fetchChannels($0) },
+            episodes: { try await script.fetchEpisodes($0) }
+        )
         page.loadViewIfNeeded()
         page.search("  Planet Money ")
+        await Self.waitUntil { store.queries == ["Planet Money"] }
         #expect(store.queries == ["Planet Money"])
     }
 
@@ -105,6 +118,10 @@ struct SearchEntryStateTests {
     func emptiedFieldReturnsToEntry() async {
         guard let context = await Self.liveUIContext() else { return }
         let page = SearchPageViewController(context: context, recentStore: makeStore([]), loadCategories: { [] })
+        page.setSearchTransport(
+            channels: { (_: String) async throws -> [SubscriptionRow] in [] },
+            episodes: { (_: String) async throws -> [APIClient.EpisodeWithChannel] in [] }
+        )
         page.loadViewIfNeeded()
         page.search("news")
         #expect(page.isShowingResults)
@@ -121,9 +138,15 @@ struct SearchEntryStateTests {
     func cancelReturnsToEntry() async {
         guard let context = await Self.liveUIContext() else { return }
         let store = makeStore([])
+        let script = ScriptedSearch(channels: .success([ScriptedSearch.channel("news")]))
         let page = SearchPageViewController(context: context, recentStore: store, loadCategories: { [] })
+        page.setSearchTransport(
+            channels: { try await script.fetchChannels($0) },
+            episodes: { try await script.fetchEpisodes($0) }
+        )
         page.loadViewIfNeeded()
         page.search("news")
+        await Self.waitUntil { store.queries == ["news"] }
         #expect(page.isShowingResults)
 
         // The system clears the bar's text only after this callback.

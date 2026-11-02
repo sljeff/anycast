@@ -14,6 +14,14 @@ class EmptyStateView: UIView {
         var message: String?
         /// Buttons (or rows of buttons), stacked under the message.
         var actions: [UIView] = []
+        /// Spoken form of `title` when the visible text is shortened.
+        /// VoiceOver reads this instead of the label's text.
+        var titleAccessibilityLabel: String? = nil
+        /// The search result sentence is a heading; other empty states are not.
+        var titleIsHeader = false
+        /// Break a long unbroken query by character so the sentence is never
+        /// clipped. Other empty states keep word wrapping.
+        var wrapsTitleByCharacter = false
     }
 
     private let disc = UIView()
@@ -22,6 +30,11 @@ class EmptyStateView: UIView {
     private let titleLabel = UILabel()
     private let messageLabel = UILabel()
     private let actionColumn = UIStackView()
+    private let column: UIStackView
+    private let centersContent: NSLayoutConstraint
+    private let pinsContentToTop: NSLayoutConstraint
+    private let widthCap: NSLayoutConstraint
+    private let widthFill: NSLayoutConstraint
 
     private static let discSize: CGFloat = 64
     private static let glyphSize: CGFloat = 28
@@ -55,6 +68,7 @@ class EmptyStateView: UIView {
         for label in [titleLabel, messageLabel] {
             label.textAlignment = .center
             label.numberOfLines = 0
+            label.lineBreakMode = .byWordWrapping
             label.adjustsFontForContentSizeCategory = true
         }
 
@@ -62,7 +76,7 @@ class EmptyStateView: UIView {
         actionColumn.alignment = .center
         actionColumn.spacing = Spacing.md
 
-        let column = UIStackView(arrangedSubviews: [disc, titleLabel, messageLabel, actionColumn])
+        column = UIStackView(arrangedSubviews: [disc, titleLabel, messageLabel, actionColumn])
         column.axis = .vertical
         column.alignment = .center
         column.spacing = Spacing.md
@@ -71,8 +85,13 @@ class EmptyStateView: UIView {
         column.translatesAutoresizingMaskIntoConstraints = false
         addSubview(column)
 
-        let center = column.centerYAnchor.constraint(equalTo: layoutMarginsGuide.centerYAnchor)
-        center.priority = .defaultHigh
+        centersContent = column.centerYAnchor.constraint(equalTo: layoutMarginsGuide.centerYAnchor)
+        centersContent.priority = .defaultHigh
+        pinsContentToTop = column.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor)
+        pinsContentToTop.isActive = false
+        widthCap = column.widthAnchor.constraint(lessThanOrEqualToConstant: 320)
+        widthFill = column.widthAnchor.constraint(equalTo: layoutMarginsGuide.widthAnchor)
+        widthFill.isActive = false
         let discWidth = disc.widthAnchor.constraint(equalToConstant: Self.discSize)
         let discHeight = disc.heightAnchor.constraint(equalToConstant: Self.discSize)
         discConstraints = [discWidth, discHeight]
@@ -87,9 +106,9 @@ class EmptyStateView: UIView {
             column.trailingAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.trailingAnchor),
             column.topAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.topAnchor),
             column.bottomAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.bottomAnchor),
-            column.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
+            widthCap,
             column.centerXAnchor.constraint(equalTo: centerXAnchor),
-            center,
+            centersContent,
         ])
         applyDiscMetrics()
     }
@@ -113,11 +132,60 @@ class EmptyStateView: UIView {
         disc.isHidden = !content.showsSpinner && content.icon == nil
         if content.showsSpinner { spinner.startAnimating() } else { spinner.stopAnimating() }
         titleLabel.text = content.title
+        titleLabel.lineBreakMode = content.wrapsTitleByCharacter ? .byCharWrapping : .byWordWrapping
         titleLabel.isHidden = content.title == nil
+        titleLabel.accessibilityLabel = content.titleAccessibilityLabel
+        titleLabel.accessibilityTraits = content.titleIsHeader ? [.staticText, .header] : .staticText
         messageLabel.text = content.message
         messageLabel.isHidden = content.message == nil
         actionColumn.arrangedSubviews.forEach { $0.removeFromSuperview() }
         content.actions.forEach(actionColumn.addArrangedSubview)
         actionColumn.isHidden = content.actions.isEmpty
+        // With no message the next gap is the stack's 8 pt, which leaves the
+        // single button sitting on the sentence. Use the same 24 pt the
+        // message-to-action gap already uses. A message keeps the 8 pt title
+        // gap, so Playlist and History do not move.
+        let titleGap = (content.message == nil && !content.actions.isEmpty)
+            ? Spacing.pageHeader : Spacing.md
+        column.setCustomSpacing(titleGap, after: titleLabel)
+    }
+
+    /// The sentence label, for a VoiceOver layout-changed notification.
+    func accessibilityTitleView() -> UIView { titleLabel }
+
+    /// Accessibility sizes pin the block to the top and let it grow to the
+    /// readable width. Default through xxxLarge stays centered and capped.
+    func setAlignsContentToTop(_ alignsToTop: Bool) {
+        centersContent.isActive = !alignsToTop
+        pinsContentToTop.isActive = alignsToTop
+    }
+
+    func setExpandsToReadableWidth(_ expands: Bool) {
+        widthCap.isActive = !expands
+        widthFill.isActive = expands
+        actionColumn.alignment = expands ? .fill : .center
+    }
+
+    /// Height of the column at `width`, including layout margins. Used by a
+    /// host scroll view so a short block can center and a tall one can scroll.
+    func contentHeight(fittingWidth width: CGFloat) -> CGFloat {
+        let margins = directionalLayoutMargins
+        let columnWidth = max(0, width - margins.leading - margins.trailing)
+        // The width constraints fight a measurement that passes its own
+        // width, so they are lifted for the fit and restored after.
+        let fillWasActive = widthFill.isActive
+        let capWasActive = widthCap.isActive
+        widthFill.isActive = false
+        widthCap.isActive = false
+        titleLabel.preferredMaxLayoutWidth = columnWidth
+        messageLabel.preferredMaxLayoutWidth = columnWidth
+        let size = column.systemLayoutSizeFitting(
+            CGSize(width: columnWidth, height: 0),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        )
+        widthFill.isActive = fillWasActive
+        widthCap.isActive = capWasActive
+        return ceil(size.height + margins.top + margins.bottom)
     }
 }

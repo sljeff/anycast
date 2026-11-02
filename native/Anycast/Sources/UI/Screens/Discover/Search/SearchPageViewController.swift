@@ -8,9 +8,11 @@ import AnycastKit
 /// the search tab's system field, at the bottom with the tab bar; iOS 18
 /// keeps the Anycast field under the header. An empty query is the entry
 /// state (recent searches and categories, no strip or results); submitting
-/// runs a fresh search and records it as a recent. Each tab's
-/// search runs on its first display AND on every revisit (the Dart
-/// TabBarView children carry no KeepAliveWrapper). The Episodes page renders
+/// runs a fresh search. A query is saved to Recent only once a segment
+/// returns at least one row. Each segment is fetched the first time it is
+/// shown in that search; a segment that already loaded (including zero
+/// rows) is shown again with no spinner and no request, and a segment that
+/// failed is fetched again on the next visit. The Episodes page renders
 /// episode cards with play / add-to-playlist (UNGATED add — the SearchPage
 /// correction) through a fresh CardExpandCoordinator per search. The mini
 /// player comes from the shell, as on every tab.
@@ -40,6 +42,18 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
     /// Guards double activation when a scrub is followed by its settle.
     private var lastActivatedTab = -1
+    /// Transport for the next search. Production uses `context.api`; tests
+    /// replace it so a result state does not depend on the network.
+    private var fetchChannels: @Sendable (String) async throws -> [SubscriptionRow]
+    private var fetchEpisodes: @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
+    private var recentObservation = ObservationLoop()
+    /// This search has already written its query to Recent.
+    private var didRecordThisSearch = false
+    /// Both-empty focus runs once per search. Switching back to the other
+    /// segment keeps the sentence and leaves the keyboard down.
+    private(set) var didOfferBothEmptyFocus = false
+    /// How many times this page has tried to focus the field for both-empty.
+    private(set) var bothEmptyFocusCount = 0
 
     // MARK: - Construction
 
@@ -51,8 +65,10 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     ) {
         self.context = context
         self.recentStore = recentStore
-        self.viewModel = SearchPageViewModel(searchText: "", api: context.api)
         let api = context.api
+        self.fetchChannels = { try await api.searchChannels(keyword: $0) }
+        self.fetchEpisodes = { try await api.searchEpisodes(keyword: $0) }
+        self.viewModel = SearchPageViewModel(searchText: "", api: api)
         entryPage = SearchEntryViewController(
             store: recentStore,
             loadCategories: loadCategories ?? { try await api.listCategories().map(\.name) }
@@ -63,6 +79,24 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         episodesPage = SearchEpisodesPageViewController(context: context, viewModel: viewModel)
 
         super.init(nibName: nil, bundle: nil)
+        bindPages()
+    }
+
+    /// The field the both-empty state returns focus to.
+    var searchFieldForTests: UITextField { activeSearchField }
+
+    /// The two segments' phases. Tests and snapshot captures read this.
+    var segmentPhases: (channels: SearchListPhase, episodes: SearchListPhase) {
+        (viewModel.channelsPhase, viewModel.episodesPhase)
+    }
+
+    /// Replaces the transport used by later `search` calls.
+    func setSearchTransport(
+        channels: @escaping @Sendable (String) async throws -> [SubscriptionRow],
+        episodes: @escaping @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
+    ) {
+        fetchChannels = channels
+        fetchEpisodes = episodes
     }
 
     @available(*, unavailable)
@@ -119,25 +153,39 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     }
 
     /// Runs `text` as a new search: the view model's text is immutable, so
-    /// both tabs get a fresh model and fresh pages.
-    func search(_ text: String) {
+    /// both tabs get a fresh model and fresh pages. Recent is not written
+    /// here; `recordRecentHitIfNeeded` writes it once a segment has rows.
+    /// `channels` and `episodes` override the transport for this search only.
+    func search(
+        _ text: String,
+        channels: (@Sendable (String) async throws -> [SubscriptionRow])? = nil,
+        episodes: (@Sendable (String) async throws -> [APIClient.EpisodeWithChannel])? = nil
+    ) {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
-        recentStore.record(query)
         searchField.text = query
         searchController.searchBar.text = query
         searchField.resignFirstResponder()
         searchController.searchBar.resignFirstResponder()
 
-        viewModel = SearchPageViewModel(searchText: query, api: context.api)
+        viewModel = SearchPageViewModel(
+            searchText: query,
+            fetchChannels: channels ?? fetchChannels,
+            fetchEpisodes: episodes ?? fetchEpisodes
+        )
         channelsPage = SearchChannelsPageViewController(context: context, viewModel: viewModel)
         episodesPage = SearchEpisodesPageViewController(context: context, viewModel: viewModel)
+        bindPages()
         pagingContainer.replace(channelsPage, at: 0)
         pagingContainer.replace(episodesPage, at: 1)
         pagingContainer.select(0, animated: false)
         tabStrip.select(0, animated: false)
         setResultsVisible(true)
         lastActivatedTab = -1
+        didRecordThisSearch = false
+        didOfferBothEmptyFocus = false
+        bothEmptyFocusCount = 0
+        watchForRecentHit()
         activateTabIfNeeded(0)
     }
 
@@ -164,12 +212,113 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         setResultsVisible(false)
     }
 
-    /// Tab activation with the settle guard: a tab ACTIVATION (first build
-    /// or a revisit after leaving) re-runs that tab's search.
+    /// Tab activation with the settle guard. The view model skips a segment
+    /// that already loaded in this search, so a revisit does not refetch.
     private func activateTabIfNeeded(_ index: Int) {
         guard index != lastActivatedTab else { return }
         lastActivatedTab = index
         viewModel.activate(tab: index)
+    }
+
+    private func showSegment(_ index: Int) {
+        tabStrip.select(index, animated: true)
+        pagingContainer.select(index, animated: true)
+        activateTabIfNeeded(index)
+    }
+
+    /// Selects a segment the way the tab strip does. Snapshot and unit tests
+    /// use it; the buttons and the strip are the production paths.
+    func selectSegmentForTests(_ index: Int) {
+        showSegment(index)
+    }
+
+    private func bindPages() {
+        channelsPage.onSwitchTab = { [weak self] in self?.showSegment(1) }
+        channelsPage.onRetry = { [weak self] in self?.viewModel.retry(tab: 0) }
+        channelsPage.onPresentation = { [weak self] presentation in
+            self?.notePresentation(presentation, segment: .channels, focus: self?.channelsPage.resultFocusTarget)
+        }
+        episodesPage.onSwitchTab = { [weak self] in self?.showSegment(0) }
+        episodesPage.onRetry = { [weak self] in self?.viewModel.retry(tab: 1) }
+        episodesPage.onPresentation = { [weak self] presentation in
+            self?.notePresentation(presentation, segment: .episodes, focus: self?.episodesPage.resultFocusTarget)
+        }
+    }
+
+    /// VoiceOver and keyboard handling for the segment that is actually showing.
+    /// The off-screen segment updates its own sentence without moving focus.
+    private func notePresentation(
+        _ presentation: SearchResultPresentation?,
+        segment: SearchResultSegment,
+        focus: UIView?
+    ) {
+        let selected: SearchResultSegment = pagingContainer.selectedIndex == 0 ? .channels : .episodes
+        guard segment == selected, let presentation else { return }
+        switch presentation.action {
+        case .focusSearchField:
+            guard !didOfferBothEmptyFocus else { return }
+            didOfferBothEmptyFocus = true
+            bothEmptyFocusCount += 1
+            // Announce before moving focus, or VoiceOver only speaks the field.
+            UIAccessibility.post(notification: .announcement, argument: presentation.spokenTitle)
+            DispatchQueue.main.async { [weak self] in
+                self?.focusSearchFieldSelectingQuery()
+            }
+        case .showOtherSegment, .retry:
+            UIAccessibility.post(notification: .layoutChanged, argument: focus)
+        }
+    }
+
+    private var activeSearchField: UITextField {
+        if #available(iOS 26.0, *) {
+            return searchController.searchBar.searchTextField
+        }
+        return searchField
+    }
+
+    /// Makes the field first responder and selects the query so the next
+    /// keystroke replaces it.
+    private func focusSearchFieldSelectingQuery() {
+        let field = activeSearchField
+        let select = {
+            field.selectAll(nil)
+            if let range = field.textRange(from: field.beginningOfDocument, to: field.endOfDocument) {
+                field.selectedTextRange = range
+            }
+        }
+        if field.becomeFirstResponder() || field.isFirstResponder {
+            select()
+        }
+        DispatchQueue.main.async { [weak field] in
+            guard let field else { return }
+            if !field.isFirstResponder { field.becomeFirstResponder() }
+            field.selectAll(nil)
+            if let range = field.textRange(from: field.beginningOfDocument, to: field.endOfDocument) {
+                field.selectedTextRange = range
+            }
+        }
+    }
+
+    private func watchForRecentHit() {
+        recentObservation = ObservationLoop()
+        recentObservation.track(
+            read: { [weak self] in
+                guard let self else { return }
+                _ = self.viewModel.channelsPhase
+                _ = self.viewModel.episodesPhase
+            },
+            onChange: { [weak self] in self?.recordRecentHitIfNeeded() }
+        )
+    }
+
+    private func recordRecentHitIfNeeded() {
+        guard SearchRecentRule.shouldRecord(
+            alreadyRecorded: didRecordThisSearch,
+            channelsPhase: viewModel.channelsPhase,
+            episodesPhase: viewModel.episodesPhase
+        ) else { return }
+        didRecordThisSearch = true
+        recentStore.record(viewModel.searchText)
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -332,14 +481,22 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 @MainActor
 final class SearchChannelsPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
 
+    var onSwitchTab: (() -> Void)?
+    var onRetry: (() -> Void)?
+    var onPresentation: ((SearchResultPresentation?) -> Void)?
+
     private let context: UIContext
     private let viewModel: SearchPageViewModel
 
     private let collectionView: UICollectionView
     private let spinner = UIActivityIndicatorView(style: .large)
-    private let statusLabel = UILabel()
+    private let statusView = SearchSegmentStatusView()
+    private var statusTop: NSLayoutConstraint?
     private let observation = ObservationLoop()
     private var lastChannelSignature: [String?] = []
+    private var renderedPresentation: SearchResultPresentation?
+
+    var resultFocusTarget: UIView { statusView.focusTarget }
 
     init(context: UIContext, viewModel: SearchPageViewModel) {
         self.context = context
@@ -380,7 +537,10 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
 
     var edgeScrollView: UIScrollView { collectionView }
     var topChromeInset: CGFloat = 0 {
-        didSet { collectionView.contentInset.top = topChromeInset }
+        didSet {
+            collectionView.contentInset.top = topChromeInset
+            statusTop?.constant = topChromeInset
+        }
     }
 
     override func viewDidLoad() {
@@ -390,8 +550,8 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.viewModel.channelsLoading
-                _ = self.viewModel.channelsFailed
+                _ = self.viewModel.channelsPhase
+                _ = self.viewModel.episodesPhase
                 _ = self.viewModel.channels
             },
             onChange: { [weak self] in self?.render() }
@@ -414,13 +574,14 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
-        statusLabel.font = TypographyV2.body.font()
-        statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.textColor = Theme.onSurface
-        statusLabel.textAlignment = .center
-        statusLabel.isHidden = true
-        statusLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(statusLabel)
+        statusView.onAction = { [weak self] action in
+            switch action {
+            case .showOtherSegment: self?.onSwitchTab?()
+            case .retry: self?.onRetry?()
+            case .focusSearchField: break
+            }
+        }
+        statusTop = statusView.install(in: view, topInset: topChromeInset)
 
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -429,28 +590,11 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            statusLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            statusLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
     }
 
     private func render() {
-        switch viewModel.channelsPhase {
-        case .loading:
-            spinner.startAnimating()
-            statusLabel.isHidden = true
-        case .noResults:
-            spinner.stopAnimating()
-            statusLabel.text = "No results"
-            statusLabel.isHidden = false
-        case .networkError:
-            spinner.stopAnimating()
-            statusLabel.text = "Network Error"
-            statusLabel.isHidden = false
-        case .loaded:
-            spinner.stopAnimating()
-            statusLabel.isHidden = true
-        }
+        renderStatus()
 
         let signature = viewModel.channels.map(\.rssFeedUrl)
         if signature != lastChannelSignature {
@@ -459,6 +603,34 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
                 collectionView.reloadData()
             }
         }
+    }
+
+    private func renderStatus() {
+        let phase = viewModel.channelsPhase
+        if phase == .loading {
+            spinner.startAnimating()
+            spinner.isAccessibilityElement = true
+            spinner.accessibilityLabel = SearchResultState.searchingAnnouncement(query: viewModel.searchText)
+            view.bringSubviewToFront(spinner)
+        } else {
+            spinner.stopAnimating()
+            spinner.isAccessibilityElement = false
+            view.bringSubviewToFront(statusView)
+        }
+        if case .loaded = phase {
+            collectionView.accessibilityElementsHidden = false
+        } else {
+            collectionView.accessibilityElementsHidden = true
+        }
+        let presentation = statusView.render(
+            segment: .channels,
+            query: viewModel.searchText,
+            phase: phase,
+            otherPhase: viewModel.episodesPhase
+        )
+        guard presentation != renderedPresentation else { return }
+        renderedPresentation = presentation
+        onPresentation?(presentation)
     }
 
     func collectionView(
@@ -513,12 +685,17 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
 @MainActor
 final class SearchEpisodesPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
 
+    var onSwitchTab: (() -> Void)?
+    var onRetry: (() -> Void)?
+    var onPresentation: ((SearchResultPresentation?) -> Void)?
+
     private let context: UIContext
     private let viewModel: SearchPageViewModel
 
     private let collectionView: UICollectionView
     private let spinner = UIActivityIndicatorView(style: .large)
-    private let statusLabel = UILabel()
+    private let statusView = SearchSegmentStatusView()
+    private var statusTop: NSLayoutConstraint?
     private let expandCoordinator = CardExpandCoordinator()
     /// Needs `self` as owner — created lazily (post-super.init).
     private lazy var binder = SearchEpisodeBinder(
@@ -530,6 +707,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     private let playbackObservation = ObservationLoop()
     private let modelObservation = ObservationLoop()
     private var lastEpisodeSignature: [String?] = []
+    private var renderedPresentation: SearchResultPresentation?
     /// Set when a new result list replaces the old one; the entrance plays
     /// once it can (`CardEntranceAnimator`). Pagination is not a new list.
     private var needsEntrance = false
@@ -547,9 +725,14 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    var resultFocusTarget: UIView { statusView.focusTarget }
+
     var edgeScrollView: UIScrollView { collectionView }
     var topChromeInset: CGFloat = 0 {
-        didSet { collectionView.contentInset.top = topChromeInset }
+        didSet {
+            collectionView.contentInset.top = topChromeInset
+            statusTop?.constant = topChromeInset
+        }
     }
 
     override func viewDidLoad() {
@@ -560,8 +743,8 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         modelObservation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.viewModel.episodesLoading
-                _ = self.viewModel.episodesFailed
+                _ = self.viewModel.channelsPhase
+                _ = self.viewModel.episodesPhase
                 _ = self.viewModel.episodes
             },
             onChange: { [weak self] in self?.render() }
@@ -605,13 +788,14 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
-        statusLabel.font = TypographyV2.body.font()
-        statusLabel.adjustsFontForContentSizeCategory = true
-        statusLabel.textColor = Theme.onSurface
-        statusLabel.textAlignment = .center
-        statusLabel.isHidden = true
-        statusLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(statusLabel)
+        statusView.onAction = { [weak self] action in
+            switch action {
+            case .showOtherSegment: self?.onSwitchTab?()
+            case .retry: self?.onRetry?()
+            case .focusSearchField: break
+            }
+        }
+        statusTop = statusView.install(in: view, topInset: topChromeInset)
 
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -620,30 +804,13 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            statusLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            statusLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
 
         binder.onListContentChanged = { [weak self] in self?.refreshVisibleCards() }
     }
 
     private func render() {
-        switch viewModel.episodesPhase {
-        case .loading:
-            spinner.startAnimating()
-            statusLabel.isHidden = true
-        case .noResults:
-            spinner.stopAnimating()
-            statusLabel.text = "No results"
-            statusLabel.isHidden = false
-        case .networkError:
-            spinner.stopAnimating()
-            statusLabel.text = "Network Error"
-            statusLabel.isHidden = false
-        case .loaded:
-            spinner.stopAnimating()
-            statusLabel.isHidden = true
-        }
+        renderStatus()
 
         let signature = viewModel.episodes.map(\.episode.enclosureUrl)
         if signature != lastEpisodeSignature {
@@ -655,6 +822,34 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             needsEntrance = !signature.isEmpty
             playEntranceIfNeeded()
         }
+    }
+
+    private func renderStatus() {
+        let phase = viewModel.episodesPhase
+        if phase == .loading {
+            spinner.startAnimating()
+            spinner.isAccessibilityElement = true
+            spinner.accessibilityLabel = SearchResultState.searchingAnnouncement(query: viewModel.searchText)
+            view.bringSubviewToFront(spinner)
+        } else {
+            spinner.stopAnimating()
+            spinner.isAccessibilityElement = false
+            view.bringSubviewToFront(statusView)
+        }
+        if case .loaded = phase {
+            collectionView.accessibilityElementsHidden = false
+        } else {
+            collectionView.accessibilityElementsHidden = true
+        }
+        let presentation = statusView.render(
+            segment: .episodes,
+            query: viewModel.searchText,
+            phase: phase,
+            otherPhase: viewModel.channelsPhase
+        )
+        guard presentation != renderedPresentation else { return }
+        renderedPresentation = presentation
+        onPresentation?(presentation)
     }
 
     /// Plays the entrance right after the new results were applied. A page
