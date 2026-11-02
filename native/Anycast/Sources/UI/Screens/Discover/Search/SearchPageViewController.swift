@@ -47,6 +47,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     private var fetchChannels: @Sendable (String) async throws -> [SubscriptionRow]
     private var fetchEpisodes: @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
     private var recentObservation = ObservationLoop()
+    private var keyboardObservers: [NSObjectProtocol] = []
     /// This search has already written its query to Recent.
     private var didRecordThisSearch = false
     /// Both-empty focus runs once per search. Switching back to the other
@@ -106,6 +107,16 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         Theme.installPageBase(on: view)
         buildViewHierarchy()
         setResultsVisible(false)
+        observeKeyboardFrame()
+    }
+
+    deinit {
+        // Observer tokens are not Sendable; teardown is on the main thread.
+        MainActor.assumeIsolated {
+            for observer in keyboardObservers {
+                NotificationCenter.default.removeObserver(observer)
+            }
+        }
     }
 
     /// The chrome the entry list runs under: the header, plus the field on
@@ -118,6 +129,42 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         clearEntryTop()
+        relayFloatingSearchField()
+    }
+
+    /// The segment pages do not own the search field. Hand them the real one
+    /// so clearance does not depend on finding it in the window.
+    private func relayFloatingSearchField() {
+        let field = activeSearchField
+        channelsPage.setFloatingSearchField(field)
+        episodesPage.setFloatingSearchField(field)
+        channelsPage.refreshSearchFieldClearance()
+        episodesPage.refreshSearchFieldClearance()
+    }
+
+    private func observeKeyboardFrame() {
+        let names: [Notification.Name] = [
+            UIResponder.keyboardWillShowNotification,
+            UIResponder.keyboardWillChangeFrameNotification,
+            UIResponder.keyboardDidShowNotification,
+        ]
+        for name in names {
+            let token = NotificationCenter.default.addObserver(
+                forName: name, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.keyboardFrameChanged()
+                }
+            }
+            keyboardObservers.append(token)
+        }
+    }
+
+    private func keyboardFrameChanged() {
+        relayFloatingSearchField()
+        view.setNeedsLayout()
+        channelsPage.viewIfLoaded?.setNeedsLayout()
+        episodesPage.viewIfLoaded?.setNeedsLayout()
     }
 
     private func clearEntryTop() {
@@ -550,6 +597,14 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         render()
     }
 
+    func setFloatingSearchField(_ field: UIView?) {
+        statusView.setFloatingSearchField(field)
+    }
+
+    func refreshSearchFieldClearance() {
+        statusView.updateBottomClearance()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         statusView.updateBottomClearance()
@@ -759,6 +814,14 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             }
         )
         render()
+    }
+
+    func setFloatingSearchField(_ field: UIView?) {
+        statusView.setFloatingSearchField(field)
+    }
+
+    func refreshSearchFieldClearance() {
+        statusView.updateBottomClearance()
     }
 
     override func viewDidLayoutSubviews() {

@@ -18,8 +18,7 @@ final class SearchSegmentStatusView: UIView {
     private weak var layoutHost: UIView?
     private var applied: SearchResultPresentation?
     private var currentAction: SearchResultAction?
-    /// The search field, once found. Cleared by the system if the field leaves
-    /// the hierarchy; the next lookup walks the window only when this is nil.
+    /// The search page's field, handed in by the host. Not looked up.
     private weak var cachedSearchField: UIView?
 
     override init(frame: CGRect) {
@@ -150,6 +149,11 @@ final class SearchSegmentStatusView: UIView {
         }
     }
 
+    /// The host passes its real search field. There is no window walk.
+    func setFloatingSearchField(_ field: UIView?) {
+        cachedSearchField = field
+    }
+
     /// Lifts the block above the floating search field while the keyboard is up.
     /// Called from the page's `viewDidLayoutSubviews`, not from `layoutSubviews`.
     func updateBottomClearance() {
@@ -159,46 +163,23 @@ final class SearchSegmentStatusView: UIView {
         bottomConstraint.constant = constant
     }
 
-    /// Extra inset above the keyboard top. The content bottom should sit at
-    /// or above the search field's top, minus a small margin. Zero while the
-    /// keyboard is down.
+    /// Extra inset above the keyboard top so the content bottom is at
+    /// `field.top - 8`. Zero while the keyboard is down, or the field has
+    /// no window.
     private func clearanceAboveSearchField(in container: UIView) -> CGFloat {
-        // iOS 18 keeps the field under the header. Only the iOS 26 bottom
-        // field should pull the content up, and only while the keyboard is up.
         guard #available(iOS 26.0, *),
-              Self.keyboardIsShown(in: container), let window,
-              let field = searchField(in: window) else { return 0 }
-        let fieldFrame = field.convert(field.bounds, to: container)
-        let margin: CGFloat = 8
+              Self.keyboardIsShown(in: container),
+              let field = cachedSearchField, field.window != nil else { return 0 }
+        let fieldTop = field.convert(field.bounds, to: container).minY
         let keyboardTop = container.keyboardLayoutGuide.layoutFrame.minY
-        let keyboardOverlap = max(0, container.bounds.maxY - keyboardTop)
-        let aboveField = container.bounds.maxY - fieldFrame.minY + margin
-        let clearanceFromBottom = max(keyboardOverlap, aboveField)
-        let desiredBottom = container.bounds.maxY - clearanceFromBottom
-        return max(0, keyboardTop - desiredBottom)
+        let margin: CGFloat = 8
+        return max(0, keyboardTop - (fieldTop - margin))
     }
 
     /// The guide is as tall as the home indicator while the keyboard is down
     /// (`usesBottomSafeArea`). A real keyboard is taller than that inset.
     private static func keyboardIsShown(in host: UIView) -> Bool {
         host.keyboardLayoutGuide.layoutFrame.height > host.safeAreaInsets.bottom + 1
-    }
-
-    private func searchField(in window: UIWindow) -> UIView? {
-        if let cachedSearchField, cachedSearchField.window != nil {
-            return cachedSearchField
-        }
-        let found = Self.findView(identifier: "search-page-field", in: window)
-        cachedSearchField = found
-        return found
-    }
-
-    private static func findView(identifier: String, in root: UIView) -> UIView? {
-        if root.accessibilityIdentifier == identifier { return root }
-        for subview in root.subviews {
-            if let match = Self.findView(identifier: identifier, in: subview) { return match }
-        }
-        return nil
     }
 
     private func apply(_ presentation: SearchResultPresentation) {
