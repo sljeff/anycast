@@ -48,13 +48,36 @@ extension UIImageView {
     /// failure (no spinners or generic glyphs).
     @MainActor
     func setArtwork(_ url: URL?, title: String?) {
-        applyArtworkHairline()
         let placeholder = ArtworkPlaceholder.image(for: title)
-        kf.setImage(
-            with: url,
-            placeholder: placeholder,
-            options: [.transition(.none), .onFailureImage(placeholder)]
-        )
+        setCover(url, placeholder: placeholder, failureImage: placeholder)
+    }
+
+    /// Loads a cover. A memory hit is applied immediately. A disk hit is read
+    /// on this queue (`loadDiskFileSynchronously`) so the letter tile is
+    /// replaced before the next paint — Kingfisher otherwise sets the
+    /// placeholder, then waits on its I/O queue. A network arrival crossfades
+    /// in `Motion.quick`; Reduce Motion and cache hits do not.
+    func setCover(_ url: URL?, placeholder: UIImage?, failureImage: UIImage?) {
+        applyArtworkHairline()
+        guard let url else {
+            kf.cancelDownloadTask()
+            image = placeholder
+            return
+        }
+        if let memory = ImageCache.default.retrieveImageInMemoryCache(forKey: url.absoluteString) {
+            kf.cancelDownloadTask()
+            image = memory
+            return
+        }
+        let transition: ImageTransition = Motion.reduceMotion ? .none : .fade(Motion.quick)
+        var options: KingfisherOptionsInfo = [
+            .loadDiskFileSynchronously,
+            .transition(transition),
+        ]
+        if let failureImage {
+            options.append(.onFailureImage(failureImage))
+        }
+        kf.setImage(with: url, placeholder: placeholder, options: options)
     }
 
     /// The cover's 0.5 pt inner hairline (`sandAlpha4`). Content casts no

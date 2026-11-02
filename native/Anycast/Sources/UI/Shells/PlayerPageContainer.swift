@@ -157,14 +157,20 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
 
     static func present(from presenter: UIViewController, context: UIContext) {
         let controller = PlayerPageContainer(context: context)
-        controller.modalPresentationStyle = .pageSheet
-        if let sheet = controller.sheetPresentationController {
+        controller.adoptSystemSheet()
+        presenter.present(controller, animated: true)
+    }
+
+    /// Full-height page sheet with the system grabber (A2). Shared with the
+    /// interactive drag, which hands off to this once the finger releases.
+    func adoptSystemSheet() {
+        modalPresentationStyle = .pageSheet
+        if let sheet = sheetPresentationController {
             sheet.detents = [.large()]
             // A2 adaptation: system grabber + system chrome; the Flutter
             // expand-sheet handler is deliberately not recreated here.
             sheet.prefersGrabberVisible = true
         }
-        presenter.present(controller, animated: true)
     }
 
     init(context: UIContext) {

@@ -16,6 +16,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         // before anything else can fail. First frame does NOT wait for the
         // chain; the UI renders a placeholder until the environment is ready.
         environment.startup.start()
+        Motion.installReduceMotionObserverIfNeeded()
         return true
     }
 }

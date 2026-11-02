@@ -313,14 +313,66 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
             self.playerBar.isHidden = !visible
             self.floatingFade?.isHidden = !visible
         }
+        let avoidance = visible ? PlayerBarView.barHeight + FloatingMetrics.gap * 2 : 0
+        let applyInsets = { [weak self] in
+            guard let self else { return }
+            for child in self.tabRoots {
+                child.additionalSafeAreaInsets.bottom = avoidance
+            }
+        }
+        let slide = animated && view.window != nil
+        if slide && !Motion.reduceMotion {
+            if visible {
+                playerBar.alpha = 1
+                playerBar.isHidden = false
+                floatingFade?.isHidden = false
+                playerBar.transform = CGAffineTransform(
+                    translationX: 0, y: PlayerBarView.barHeight + FloatingMetrics.gap
+                )
+            }
+            UIView.animate(
+                withDuration: Motion.standard,
+                delay: 0,
+                usingSpringWithDamping: 0.86,
+                initialSpringVelocity: 0.35,
+                options: [.allowUserInteraction, .beginFromCurrentState]
+            ) {
+                self.playerBar.transform = visible
+                    ? .identity
+                    : CGAffineTransform(translationX: 0, y: PlayerBarView.barHeight + FloatingMetrics.gap)
+                if visible {
+                    self.playerBar.isHidden = false
+                    self.floatingFade?.isHidden = false
+                }
+                applyInsets()
+                self.view.layoutIfNeeded()
+            } completion: { _ in
+                self.playerBar.isHidden = !visible
+                self.floatingFade?.isHidden = !visible
+                self.playerBar.transform = .identity
+            }
+            return
+        }
+        if slide && Motion.reduceMotion {
+            if visible {
+                playerBar.alpha = 0
+                playerBar.isHidden = false
+                floatingFade?.isHidden = false
+            }
+            UIView.animate(withDuration: Motion.quick, animations: {
+                self.playerBar.alpha = visible ? 1 : 0
+                applyInsets()
+            }, completion: { _ in
+                changes()
+                self.playerBar.alpha = 1
+            })
+            return
+        }
         if animated {
             UIView.animate(withDuration: Motion.quick, animations: changes)
         } else {
             changes()
         }
-        let avoidance = visible ? PlayerBarView.barHeight + FloatingMetrics.gap * 2 : 0
-        for child in tabRoots {
-            child.additionalSafeAreaInsets.bottom = avoidance
-        }
+        applyInsets()
     }
 }
