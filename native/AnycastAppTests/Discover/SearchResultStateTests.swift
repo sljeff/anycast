@@ -126,7 +126,7 @@ struct SearchResultStateTests {
 
     @Test("A 76-character query keeps its tail inside the sentence")
     func longEchoKeepsTheTail() {
-        let tail = "anythingatall9"
+        let tail = "anythingatall99"
         #expect(tail.count == 15)
         let query = String(repeating: "n", count: 40) + String(repeating: "m", count: 21) + tail
         #expect(query.count == 76)

@@ -492,9 +492,9 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    /// 40 + 21 + 15 = 76, so the sentence shows the first 40, an ellipsis, and "anythingatall9".
+    /// 40 + 21 + 15 = 76, so the sentence shows the first 40, an ellipsis, and "anythingatall99".
     private static let longSearchQuery =
-        String(repeating: "n", count: 40) + String(repeating: "m", count: 21) + "anythingatall9"
+        String(repeating: "n", count: 40) + String(repeating: "m", count: 21) + "anythingatall99"
 
     @Test("S9e The request failed")
     func captureSearchFailed() async throws {

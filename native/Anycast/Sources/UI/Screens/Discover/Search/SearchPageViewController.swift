@@ -550,6 +550,11 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         render()
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        statusView.updateBottomClearance()
+    }
+
     private func build() {
         collectionView.backgroundColor = .clear
         collectionView.keyboardDismissMode = .interactive
@@ -754,6 +759,11 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             }
         )
         render()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        statusView.updateBottomClearance()
     }
 
     override func viewDidAppear(_ animated: Bool) {
