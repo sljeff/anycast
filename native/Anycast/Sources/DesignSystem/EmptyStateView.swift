@@ -34,6 +34,8 @@ class EmptyStateView: UIView {
     private var pinsContentToTop: NSLayoutConstraint!
     private var widthCap: NSLayoutConstraint!
     private var widthFill: NSLayoutConstraint!
+    /// The sentence before a too-wide token is given character breaks.
+    private var plainTitle: String?
 
     private static let discSize: CGFloat = 64
     private static let glyphSize: CGFloat = 28
@@ -129,6 +131,7 @@ class EmptyStateView: UIView {
         iconView.isHidden = content.showsSpinner || content.icon == nil
         disc.isHidden = !content.showsSpinner && content.icon == nil
         if content.showsSpinner { spinner.startAnimating() } else { spinner.stopAnimating() }
+        plainTitle = content.title
         titleLabel.text = content.title
         titleLabel.isHidden = content.title == nil
         titleLabel.accessibilityLabel = content.titleAccessibilityLabel
@@ -151,12 +154,36 @@ class EmptyStateView: UIView {
     func accessibilityTitleView() -> UIView { titleLabel }
 
     /// `0` means as many lines as the text needs. Search uses 3 at the
-    /// default sizes and 0 at accessibility sizes; other empty states stay
-    /// unlimited. Also word-wraps the title. Playlist and History never call
-    /// this, so they keep the label's default truncating break mode.
+    /// default sizes and 0 at accessibility sizes. A finite limit truncates
+    /// the tail with an ellipsis; unlimited text word-wraps. Playlist and
+    /// History never call this, so they keep the label's default break mode.
     func setTitleLineLimit(_ lines: Int) {
-        titleLabel.numberOfLines = lines > 0 ? lines : 0
-        titleLabel.lineBreakMode = .byWordWrapping
+        let limit = lines > 0 ? lines : 0
+        titleLabel.numberOfLines = limit
+        titleLabel.lineBreakMode = limit > 0 ? .byTruncatingTail : .byWordWrapping
+        titleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+    }
+
+    /// Column width the title will actually be given: the 320 pt cap when
+    /// it is on, otherwise the full readable width.
+    func columnWidth(fitting width: CGFloat) -> CGFloat {
+        let margins = directionalLayoutMargins
+        let available = max(0, width - margins.leading - margins.trailing)
+        guard widthCap.isActive else { return available }
+        return min(available, widthCap.constant)
+    }
+
+    /// Breaks a single token that cannot fit on one line. Other words stay
+    /// whole, so a query that fits on the next line is not split.
+    func fitTitle(toLineWidth lineWidth: CGFloat) {
+        guard let plainTitle, lineWidth > 1 else { return }
+        let font = titleLabel.font ?? UIFont.preferredFont(forTextStyle: .headline)
+        let fitted = SearchResultState.titleFittingLine(plainTitle, lineWidth: lineWidth) { string in
+            ceil((string as NSString).size(withAttributes: [.font: font]).width)
+        }
+        if titleLabel.text != fitted {
+            titleLabel.text = fitted
+        }
     }
 
     /// Accessibility sizes pin the block to the top and let it grow to the
@@ -176,22 +203,23 @@ class EmptyStateView: UIView {
     /// host scroll view so a short block can center and a tall one can scroll.
     func contentHeight(fittingWidth width: CGFloat) -> CGFloat {
         let margins = directionalLayoutMargins
-        let columnWidth = max(0, width - margins.leading - margins.trailing)
-        // The width constraints fight a measurement that passes its own
-        // width, so they are lifted for the fit and restored after.
-        let fillWasActive = widthFill.isActive
-        let capWasActive = widthCap.isActive
-        widthFill.isActive = false
-        widthCap.isActive = false
+        let columnWidth = columnWidth(fitting: width)
         titleLabel.preferredMaxLayoutWidth = columnWidth
         messageLabel.preferredMaxLayoutWidth = columnWidth
-        let size = column.systemLayoutSizeFitting(
-            CGSize(width: columnWidth, height: 0),
-            withHorizontalFittingPriority: .required,
-            verticalFittingPriority: .fittingSizeLevel
-        )
-        widthFill.isActive = fillWasActive
-        widthCap.isActive = capWasActive
-        return ceil(size.height + margins.top + margins.bottom)
+        let textLimit = CGSize(width: columnWidth, height: CGFloat.greatestFiniteMagnitude)
+        // Sum the visible rows at the column width. Measuring the stack at
+        // the full page width reports too few lines, and the last line is
+        // then clipped with no ellipsis.
+        var height: CGFloat = 0
+        var previous: UIView?
+        for view in [disc, titleLabel, messageLabel, actionColumn] where !view.isHidden {
+            if let previous {
+                let custom = column.customSpacing(after: previous)
+                height += custom == UIStackView.spacingUseDefault ? column.spacing : custom
+            }
+            height += view.sizeThatFits(textLimit).height
+            previous = view
+        }
+        return ceil(height + margins.top + margins.bottom)
     }
 }

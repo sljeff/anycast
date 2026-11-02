@@ -14,6 +14,8 @@ final class SearchSegmentStatusView: UIView {
     private let emptyState = EmptyStateView()
     private let actionButton = AnycastButton.make(.secondary, title: "Retry")
     private var heightConstraint: NSLayoutConstraint!
+    private var bottomConstraint: NSLayoutConstraint?
+    private weak var layoutHost: UIView?
     private var applied: SearchResultPresentation?
     private var currentAction: SearchResultAction?
 
@@ -67,16 +69,21 @@ final class SearchSegmentStatusView: UIView {
 
     /// Pins the block to `host`, under `topInset` (the tab strip) and above
     /// the keyboard. Returns the top constraint so the page can track the inset.
+    /// The bottom lifts further while the iOS 26 search field is docked above
+    /// the keyboard, so the last line is not hidden under that field.
     @discardableResult
     func install(in host: UIView, topInset: CGFloat) -> NSLayoutConstraint {
         translatesAutoresizingMaskIntoConstraints = false
         host.addSubview(self)
+        layoutHost = host
         let top = topAnchor.constraint(equalTo: host.topAnchor, constant: topInset)
+        let bottom = bottomAnchor.constraint(equalTo: host.keyboardLayoutGuide.topAnchor)
+        bottomConstraint = bottom
         NSLayoutConstraint.activate([
             top,
             leadingAnchor.constraint(equalTo: host.leadingAnchor),
             trailingAnchor.constraint(equalTo: host.trailingAnchor),
-            bottomAnchor.constraint(equalTo: host.keyboardLayoutGuide.topAnchor),
+            bottom,
         ])
         return top
     }
@@ -121,11 +128,14 @@ final class SearchSegmentStatusView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        updateSearchFieldClearance()
         let width = scrollView.bounds.width
         guard width > 1 else { return }
         let accessibilitySize = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
         applyTitleLineLimit()
         emptyState.setExpandsToReadableWidth(accessibilitySize)
+        let columnWidth = emptyState.columnWidth(fitting: width)
+        emptyState.fitTitle(toLineWidth: columnWidth)
         let content = emptyState.contentHeight(fittingWidth: width)
         let viewport = scrollView.bounds.height
         // Accessibility sizes always start at the top. A block that does not
@@ -136,6 +146,48 @@ final class SearchSegmentStatusView: UIView {
         if abs(heightConstraint.constant - height) > 0.5 {
             heightConstraint.constant = height
         }
+    }
+
+    /// How far the iOS 26 search field rises above the keyboard guide.
+    /// Zero when the field is not docked there (keyboard down, or iOS 18,
+    /// where the field sits under the header).
+    private func updateSearchFieldClearance() {
+        guard let bottomConstraint, let host = layoutHost else { return }
+        let clearance = floatingSearchClearance(over: host)
+        let constant = clearance > 0 ? -(clearance + Spacing.md) : 0
+        guard abs(bottomConstraint.constant - constant) > 0.5 else { return }
+        bottomConstraint.constant = constant
+    }
+
+    private func floatingSearchClearance(over host: UIView) -> CGFloat {
+        guard let window,
+              let field = Self.view(identifier: "search-page-field", in: window) else { return 0 }
+        let chrome = Self.searchBar(containing: field) ?? field
+        let frame = chrome.convert(chrome.bounds, to: host)
+        let keyboardTop = host.keyboardLayoutGuide.layoutFrame.minY
+        // Docked on the keyboard: the bar's bottom meets the keyboard top.
+        // A field under the header (iOS 18) is far from that edge, and while
+        // the keyboard is down the guide already sits above the bar.
+        let gap = keyboardTop - frame.maxY
+        guard gap > -24, gap < 40 else { return 0 }
+        return max(0, keyboardTop - frame.minY)
+    }
+
+    private static func searchBar(containing field: UIView) -> UISearchBar? {
+        var current = field.superview
+        while let view = current {
+            if let bar = view as? UISearchBar { return bar }
+            current = view.superview
+        }
+        return nil
+    }
+
+    private static func view(identifier: String, in view: UIView) -> UIView? {
+        if view.accessibilityIdentifier == identifier { return view }
+        for subview in view.subviews {
+            if let match = view(identifier: identifier, in: subview) { return match }
+        }
+        return nil
     }
 
     private func apply(_ presentation: SearchResultPresentation) {

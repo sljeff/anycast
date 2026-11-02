@@ -456,6 +456,46 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
+    @Test("S9f Long query at the default size")
+    func captureSearchLongQuery() async throws {
+        let query = Self.longSearchQuery
+        try await Self.captureSearchResultVariants(
+            named: "S9f-long-query",
+            containing: "No channels",
+            variants: [("light", .light, .large), ("dark", .dark, .large)]
+        ) { search in
+            let script = SnapshotSearchScript(channels: .success([]), episodes: .success([]))
+            search.search(
+                query,
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+            )
+        }
+    }
+
+    @Test("S9f Long query at AX5, both empty, keyboard up")
+    func captureSearchLongQueryAccessibility() async throws {
+        let query = Self.longSearchQuery
+        try await Self.captureSearchResultVariants(
+            named: "S9f-long-query",
+            containing: "Nothing found",
+            variants: [("ax5", .light, .accessibilityExtraExtraExtraLarge)]
+        ) { search in
+            let script = SnapshotSearchScript(channels: .success([]), episodes: .success([]))
+            search.search(
+                query,
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+            )
+            guard await Self.waitForResultTitle(in: search.view, containing: "No channels") else { return }
+            search.selectSegmentForTests(1)
+        }
+    }
+
+    /// 40 + 21 + 15 = 76, so the sentence shows the first 40, an ellipsis, and "anythingatall9".
+    private static let longSearchQuery =
+        String(repeating: "n", count: 40) + String(repeating: "m", count: 21) + "anythingatall9"
+
     @Test("S9e The request failed")
     func captureSearchFailed() async throws {
         try await Self.captureSearchResultVariants(named: "S9e-request-failed", containing: "load results") { search in
@@ -502,6 +542,11 @@ struct ScreenBaselineCaptureTests {
     private static func captureSearchResultVariants(
         named name: String,
         containing text: String,
+        variants: [(String, UIUserInterfaceStyle, UIContentSizeCategory)] = [
+            ("light", .light, .large),
+            ("dark", .dark, .large),
+            ("ax5", .light, .accessibilityExtraExtraExtraLarge),
+        ],
         prepare: (SearchPageViewController) async -> Void
     ) async throws {
         try await withRoot { root in
@@ -522,11 +567,6 @@ struct ScreenBaselineCaptureTests {
                 root.overrideUserInterfaceStyle = previousStyle
                 search.view.window?.overrideUserInterfaceStyle = previousStyle
             }
-            let variants: [(String, UIUserInterfaceStyle, UIContentSizeCategory)] = [
-                ("light", .light, .large),
-                ("dark", .dark, .large),
-                ("ax5", .light, .accessibilityExtraExtraExtraLarge),
-            ]
             for (suffix, style, size) in variants {
                 root.overrideUserInterfaceStyle = style
                 search.view.window?.overrideUserInterfaceStyle = style

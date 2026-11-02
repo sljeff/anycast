@@ -57,10 +57,9 @@ struct SearchResultStateTests {
         let query = "xyzqqqnotaword123"
         let unknown: [SearchListPhase] = [.loading, .loaded(count: 4), .networkError]
 
-        let drawn = SearchResultState.displayedQuery(query)
         for other in unknown {
             let channels = presentation(.channels, .noResults, other, query)
-            #expect(channels?.title == "No channels for “\(drawn)”")
+            #expect(channels?.title == "No channels for “\(query)”")
             #expect(channels?.spokenTitle == "No channels for “\(query)”")
             #expect(channels?.title.hasPrefix("No channels for “") == true)
             #expect(channels?.action == .showOtherSegment)
@@ -69,7 +68,7 @@ struct SearchResultStateTests {
             #expect(channels?.showsButton == true)
 
             let episodes = presentation(.episodes, .noResults, other, query)
-            #expect(episodes?.title == "No episodes for “\(drawn)”")
+            #expect(episodes?.title == "No episodes for “\(query)”")
             #expect(episodes?.spokenTitle == "No episodes for “\(query)”")
             #expect(episodes?.action == .showOtherSegment)
             #expect(episodes?.actionTitle == "Show channels")
@@ -77,11 +76,10 @@ struct SearchResultStateTests {
         }
 
         let both = presentation(.episodes, .noResults, .noResults, query)
-        #expect(both?.title == "Nothing found for “\(drawn)”. Try another word.")
+        #expect(both?.title == "Nothing found for “\(query)”. Try another word.")
         #expect(both?.spokenTitle == "Nothing found for “\(query)”. Try another word.")
         #expect(both?.title.hasSuffix(". Try another word.") == true)
-        #expect(both?.title.contains("\u{200B}") == true)
-        #expect(both?.spokenTitle.contains("\u{200B}") == false)
+        #expect(both?.title.contains("\u{200B}") == false)
         #expect(both?.action == .focusSearchField)
         #expect(both?.showsButton == false)
         #expect(presentation(.channels, .noResults, .noResults, query) == both)
@@ -104,11 +102,39 @@ struct SearchResultStateTests {
         let query = String(repeating: "b", count: 80)
         let state = presentation(.channels, .noResults, .loading, query)
         let echo = SearchResultState.echoedQuery(query)
-        #expect(state?.title == "No channels for “\(SearchResultState.displayedQuery(echo.visible))”")
+        #expect(state?.title == "No channels for “\(echo.visible)”")
+        #expect(state?.title.hasSuffix("”") == true)
         #expect(state?.spokenTitle == "No channels for “\(echo.spoken)”")
         #expect(state?.spokenTitle.contains("\u{200B}") == false)
         #expect(state?.spokenTitle.contains(query) == true)
         #expect(state?.actionAccessibilityLabel == "Show episodes for \(query)")
+    }
+
+    @Test("A token breaks by character only when it cannot fit on one line")
+    func characterBreaksOnlyWhenTooWide() {
+        let sentence = "No channels for “xyzqqqnotaword123”"
+        let measure: (String) -> CGFloat = { CGFloat($0.count) * 10 }
+        let narrow = SearchResultState.titleFittingLine(sentence, lineWidth: 100, measure: measure)
+        #expect(narrow.hasPrefix("No channels for "))
+        #expect(!narrow.contains("N\u{200B}"))
+        #expect(!narrow.contains("channels".map(String.init).joined(separator: "\u{200B}")))
+        #expect(narrow.contains("\u{200B}"))
+        let wide = SearchResultState.titleFittingLine(sentence, lineWidth: 400, measure: measure)
+        #expect(wide == sentence)
+        #expect(!wide.contains("\u{200B}"))
+    }
+
+    @Test("A 76-character query keeps its tail inside the sentence")
+    func longEchoKeepsTheTail() {
+        let tail = "anythingatall9"
+        #expect(tail.count == 15)
+        let query = String(repeating: "n", count: 40) + String(repeating: "m", count: 21) + tail
+        #expect(query.count == 76)
+        let echo = SearchResultState.echoedQuery(query)
+        #expect(echo.visible.hasSuffix(tail))
+        let state = presentation(.channels, .noResults, .loading, query)
+        #expect(state?.title.hasSuffix("\(tail)”") == true)
+        #expect(state?.title.contains("\u{200B}") == false)
     }
 
     @Test("The sentences never offer a second path")
