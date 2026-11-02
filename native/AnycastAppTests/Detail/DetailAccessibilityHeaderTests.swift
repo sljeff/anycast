@@ -25,26 +25,31 @@ struct DetailAccessibilityHeaderTests {
     }
 
     /// Hidden, and not key, so a size-category override can lay the header
-    /// out without disturbing other suites.
-    private var window: UIWindow?
-
-    private func layOut(_ detail: DetailViewController, category: UIContentSizeCategory) {
+    /// out without disturbing other suites. The caller keeps the window alive.
+    private func layOut(
+        _ detail: DetailViewController,
+        in window: UIWindow,
+        category: UIContentSizeCategory
+    ) {
         detail.traitOverrides.preferredContentSizeCategory = category
-        if window == nil {
-            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+        if window.rootViewController !== detail {
             window.rootViewController = detail
-            self.window = window
         }
-        detail.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+        detail.view.frame = window.bounds
         detail.view.setNeedsLayout()
         detail.view.layoutIfNeeded()
         detail.view.layoutIfNeeded()
     }
 
+    private func makeWindow() -> UIWindow {
+        UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+    }
+
     @Test("Default size keeps the one-line channel button beside the 120 pt cover")
     func defaultSizeChannelButton() throws {
         let detail = makeDetail()
-        layOut(detail, category: .large)
+        let window = makeWindow()
+        layOut(detail, in: window, category: .large)
 
         let button = try #require(channelButton(in: detail.view))
         #expect(button.superview is UIStackView)
@@ -72,7 +77,8 @@ struct DetailAccessibilityHeaderTests {
     @Test("Accessibility size taps the channel name block and shrinks the cover")
     func accessibilityChannelBlock() throws {
         let detail = makeDetail()
-        layOut(detail, category: .accessibilityExtraExtraExtraLarge)
+        let window = makeWindow()
+        layOut(detail, in: window, category: .accessibilityExtraExtraExtraLarge)
 
         let button = try #require(channelButton(in: detail.view))
         let block = try #require(button.superview)
@@ -86,7 +92,10 @@ struct DetailAccessibilityHeaderTests {
         #expect(button.accessibilityLabel == "Open channel Reference channel")
         #expect(button.accessibilityTraits.contains(.button))
         #expect(button.isAccessibilityElement)
-        #expect((button.configuration?.title ?? "").isEmpty)
+        // The label draws the name. The button is only the hit target, so its
+        // configuration title is nil rather than an empty stand-in.
+        let configuration = try #require(button.configuration)
+        #expect(configuration.title == nil)
         #expect(block.bounds.height > 1)
         let hit = block.hitTest(CGPoint(x: block.bounds.midX, y: block.bounds.midY), with: nil)
         #expect(hit?.isDescendant(of: button) == true)
@@ -104,7 +113,7 @@ struct DetailAccessibilityHeaderTests {
         #expect(artwork.superview?.superview !== header)
 
         // Leaving the accessibility size restores the one-line button.
-        layOut(detail, category: .large)
+        layOut(detail, in: window, category: .large)
         let restored = try #require(channelButton(in: detail.view))
         #expect(restored.superview is UIStackView)
         #expect(restored.configuration?.title == "Reference channel")

@@ -11,7 +11,8 @@ import AnycastKit
 /// the channel line, shrunk so it does not grow with the text. The actions
 /// stay at the bottom in thumb reach over a soft fade — unless that identity
 /// still does not fit, in which case the header, transcript row and actions
-/// scroll together and the scroll indicator shows. A Play capsule
+/// scroll together, the viewport stops above the sheet corner, and the scroll
+/// indicator shows. A Play capsule
 /// carries the episode's progress ("Resume · 32m left") and a ••• menu with
 /// Add to playlist, Share episode, Copy link and the remaining actions.
 /// A transcript status row sits in the same thumb reach, just above the
@@ -499,11 +500,11 @@ final class DetailViewController: UIViewController {
     private func setScrollsChrome(_ enabled: Bool) {
         guard enabled != scrollsChrome else { return }
         scrollsChrome = enabled
-        let pinned = [
+        let pinned: [NSLayoutConstraint] = [
             scrollAboveTranscript, actionLeading, actionTrailing, actionSafeBottom,
             rowBottom, transcriptLeading, transcriptTrailing, contentBottom,
         ]
-        let flowing = [
+        let flowing: [NSLayoutConstraint] = [
             scrollFullBottom, scrollTranscriptTop, scrollTranscriptLeading,
             scrollTranscriptTrailing, scrollActionLeading, scrollActionTrailing,
             scrollActionBottom,
@@ -528,17 +529,27 @@ final class DetailViewController: UIViewController {
             NSLayoutConstraint.activate(pinned)
             bottomFade.isHidden = false
             scrollView.showsVerticalScrollIndicator = false
+            scrollView.verticalScrollIndicatorInsets.bottom = 0
             scrollView.contentInset.bottom = Layout.fadeHeight
         }
     }
 
     /// Side and bottom inset for Play once it scrolls with the notes. Matches
     /// the pinned accessibility margin, and stays above the home indicator.
+    /// The scrolling viewport itself stops `Spacing.sheetContent` above the
+    /// sheet edge, so a block inset by the same amount — the transcript card —
+    /// stays at least the corner's arc clearance inside the rounded rect.
     private func updateScrollContentInsets() {
         let margin = max(Self.actionEdgeMargin(accessibility: true), view.safeAreaInsets.bottom)
         scrollActionLeading.constant = margin
         scrollActionTrailing.constant = -margin
         scrollActionBottom.constant = -margin
+        guard scrollsChrome else { return }
+        let bottom = max(Spacing.sheetContent, view.safeAreaInsets.bottom)
+        scrollFullBottom.constant = -bottom
+        // The indicator hugs the trailing edge, so it needs to end where the
+        // side becomes straight. Content inset by sheetContent is already clear.
+        scrollView.verticalScrollIndicatorInsets.bottom = max(0, Radius.sheetDisplay - bottom)
     }
 
     private func buildContent() -> UIView {
