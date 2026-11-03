@@ -128,7 +128,8 @@ final class EpisodeCardCell: UICollectionViewCell {
     private let progressMeter = EpisodeProgressBackdrop()
     private let rightTextLabel = UILabel()
     private let descriptionLabel = UILabel()
-    private let downloadCircle = UIView()
+    private let downloadCircle = MinimumHitAreaView()
+    private let cardTapGuard = DownloadTapGuard()
     private let downloadIcon = UIImageView()
     private let downloadRing = ProgressRingView(lineWidth: 3)
     private let downloadDoneIcon = UIImageView()
@@ -141,6 +142,10 @@ final class EpisodeCardCell: UICollectionViewCell {
     private let drawer = CapsuleView()
     private let drawerRow = UIStackView()
     private var stripHeightConstraint: NSLayoutConstraint!
+    private var drawerHeightConstraint: NSLayoutConstraint!
+    /// Source images for strip buttons, keyed by button tag, so Dynamic
+    /// Type can redraw brand imagesets without losing an AI state swap.
+    private var stripIconSources: [Int: UIImage] = [:]
     private var actionButtons: [UIButton] = []
     private var actions: [EpisodeCardAction] = []
     private var descriptionTask: Task<Void, Never>?
@@ -284,7 +289,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         drawer.layer.removeAllAnimations()
         drawer.alpha = 1
         drawer.transform = .identity
-        stripHeightConstraint.constant = expanded ? Self.stripHeight : 0
+        stripHeightConstraint.constant = expanded ? resolvedStripHeight() : 0
         stripContainer.isHidden = !expanded
         if settleLayout {
             layoutIfNeeded()
@@ -384,7 +389,9 @@ final class EpisodeCardCell: UICollectionViewCell {
         cardContainer.translatesAutoresizingMaskIntoConstraints = false
         stack.addArrangedSubview(cardContainer)
 
-        cardContainer.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(cardTapped)))
+        let cardTap = UITapGestureRecognizer(target: self, action: #selector(cardTapped))
+        cardTap.delegate = cardTapGuard
+        cardContainer.addGestureRecognizer(cardTap)
         cardContainer.isAccessibilityElement = false // children carry labels
 
         // Cover (64×64, rounded 16) — its own gesture beats the card tap.
@@ -487,7 +494,9 @@ final class EpisodeCardCell: UICollectionViewCell {
         downloadCircle.isAccessibilityElement = true
         downloadCircle.accessibilityTraits = [.button]
         downloadCircle.accessibilityLabel = "Download"
+        downloadCircle.enableIconLargeContentViewer(title: "Download", image: AppIcons.download)
         downloadCircle.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(downloadTapped)))
+        cardTapGuard.download = downloadCircle
         cardContainer.addSubview(downloadCircle)
 
         downloadRing.tintColorOverride = Theme.primary
@@ -527,6 +536,10 @@ final class EpisodeCardCell: UICollectionViewCell {
         tail.setContentCompressionResistancePriority(UILayoutPriority(1), for: .vertical)
         stack.addArrangedSubview(tail)
         stripHeightConstraint = stripContainer.heightAnchor.constraint(equalToConstant: 0)
+        drawerHeightConstraint = drawer.heightAnchor.constraint(equalToConstant: Self.drawerHeight)
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (cell: EpisodeCardCell, _) in
+            cell.applyStripMetrics()
+        }
         rightTextLabel.setContentHuggingPriority(.required, for: .horizontal)
         separatorLabel.setContentHuggingPriority(.required, for: .horizontal)
         separatorLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -598,7 +611,7 @@ final class EpisodeCardCell: UICollectionViewCell {
             drawer.leadingAnchor.constraint(equalTo: stripContainer.leadingAnchor),
             drawer.trailingAnchor.constraint(equalTo: stripContainer.trailingAnchor),
             drawer.topAnchor.constraint(equalTo: stripContainer.topAnchor, constant: Spacing.gap),
-            drawer.heightAnchor.constraint(equalToConstant: Self.drawerHeight),
+            drawerHeightConstraint,
             drawerRow.leadingAnchor.constraint(equalTo: drawer.leadingAnchor, constant: Spacing.xs),
             drawerRow.trailingAnchor.constraint(equalTo: drawer.trailingAnchor, constant: -Spacing.xs),
             drawerRow.topAnchor.constraint(equalTo: drawer.topAnchor),
@@ -656,11 +669,59 @@ final class EpisodeCardCell: UICollectionViewCell {
         }
     }
 
+    /// Replaces one strip glyph (AI state swaps) and remembers the source
+    /// so a later content-size change redraws the same asset.
+    func setStripIcon(_ image: UIImage, at index: Int) {
+        stripIconSources[index] = image
+        guard let button = actionButtons.first(where: { $0.tag == index }) else { return }
+        let foreground = button.configuration?.baseForegroundColor
+        var configuration = button.configuration ?? UIButton.Configuration.plain()
+        configuration.image = image.preparedStripIcon(compatibleWith: traitCollection)
+            .withRenderingMode(.alwaysTemplate)
+        configuration.preferredSymbolConfigurationForImage = IconMetrics.stripSymbolConfiguration(
+            compatibleWith: traitCollection
+        )
+        if let foreground { configuration.baseForegroundColor = foreground }
+        button.configuration = configuration
+        button.largeContentImage = configuration.image
+    }
+
+    /// Drawer row grows with body metrics from the 48 pt design height.
+    /// At the default content size this is `stripHeight` (12 + 48).
+    private func resolvedDrawerHeight() -> CGFloat {
+        IconMetrics.scaledUp(Self.drawerHeight, style: .body, compatibleWith: traitCollection)
+    }
+
+    private func resolvedStripHeight() -> CGFloat {
+        Spacing.gap + resolvedDrawerHeight()
+    }
+
+    private func applyStripMetrics() {
+        let drawer = resolvedDrawerHeight()
+        drawerHeightConstraint?.constant = drawer
+        if isStripExpanded {
+            stripHeightConstraint?.constant = resolvedStripHeight()
+        }
+        for button in actionButtons {
+            guard let source = stripIconSources[button.tag] else { continue }
+            let foreground = button.configuration?.baseForegroundColor
+            var configuration = button.configuration ?? UIButton.Configuration.plain()
+            configuration.image = source.preparedStripIcon(compatibleWith: traitCollection)
+                .withRenderingMode(.alwaysTemplate)
+            configuration.preferredSymbolConfigurationForImage = IconMetrics.stripSymbolConfiguration(
+                compatibleWith: traitCollection
+            )
+            if let foreground { configuration.baseForegroundColor = foreground }
+            button.configuration = configuration
+        }
+    }
+
     /// Equal segments split by hairlines; destructive (remove) actions in
     /// the error ink.
     private func rebuildActionButtons() {
         drawerRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
         actionButtons = []
+        stripIconSources = [:]
         guard !actions.isEmpty else { return }
         var firstButton: UIButton?
         for (index, action) in actions.enumerated() {
@@ -681,12 +742,17 @@ final class EpisodeCardCell: UICollectionViewCell {
             }
             let button = UIButton(type: .system)
             var configuration = UIButton.Configuration.plain()
-            configuration.image = action.icon.withRenderingMode(.alwaysTemplate)
-            configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+            configuration.image = action.icon.preparedStripIcon(compatibleWith: traitCollection)
+                .withRenderingMode(.alwaysTemplate)
+            configuration.preferredSymbolConfigurationForImage = IconMetrics.stripSymbolConfiguration(
+                compatibleWith: traitCollection
+            )
             configuration.baseForegroundColor = action.accessibilityLabel.hasPrefix("Remove") ? Theme.error : Theme.onSurface
             button.configuration = configuration
             button.accessibilityLabel = action.accessibilityLabel
+            button.enableIconLargeContentViewer(image: action.icon)
             button.tag = index
+            stripIconSources[index] = action.icon
             button.addTarget(self, action: #selector(actionTapped(_:)), for: .touchUpInside)
             button.addPressFeedback()
             drawerRow.addArrangedSubview(button)
@@ -697,6 +763,18 @@ final class EpisodeCardCell: UICollectionViewCell {
             }
             actionButtons.append(button)
         }
+    }
+}
+
+/// Card taps pass through except on the download control, whose hit area
+/// is larger than the 16 pt disc.
+@MainActor
+private final class DownloadTapGuard: NSObject, UIGestureRecognizerDelegate {
+    weak var download: UIView?
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard let download, !download.isHidden else { return true }
+        return download.point(inside: touch.location(in: download), with: nil) == false
     }
 }
 

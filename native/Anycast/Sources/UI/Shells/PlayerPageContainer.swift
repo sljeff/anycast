@@ -48,41 +48,53 @@ final class PlayerPageTabView: UIView {
 
     var onSelect: ((Int) -> Void)?
 
+    private let items: [Item]
     private var buttons: [UIButton] = []
+    private var iconViews: [UIImageView] = []
+    private var buttonSizeConstraints: [NSLayoutConstraint] = []
+    private var iconBoxConstraints: [NSLayoutConstraint] = []
     private(set) var selectedIndex = 0
 
     init(items: [Item]) {
+        self.items = items
         super.init(frame: .zero)
 
         for (index, item) in items.enumerated() {
             let button = UIButton(type: .custom)
-            // Brand SVGs load as 1 pt vector images (width="1em" in the
-            // source), so the glyph box is explicit, not image-size driven.
+            // Brand imagesets ignore symbol configuration, so the glyph box
+            // is explicit. SF Symbols use the same box plus a point size.
             let iconView = UIImageView(image: item.icon.withRenderingMode(.alwaysTemplate))
             iconView.contentMode = .scaleAspectFit
-            iconView.preferredSymbolConfiguration = IconStyle.groupAction.configuration
             iconView.isUserInteractionEnabled = false
             iconView.translatesAutoresizingMaskIntoConstraints = false
             button.addSubview(iconView)
             button.isAccessibilityElement = true
             button.accessibilityLabel = item.accessibilityLabel
             button.accessibilityIdentifier = "player-page-tab-\(index)"
-            button.layer.cornerRadius = AnycastIconButton.standardDiameter / 2
             button.layer.cornerCurve = .continuous
             button.addAction(
                 UIAction { [weak self] _ in self?.tapped(index: index) },
                 for: .touchUpInside
             )
             button.addPressFeedback()
+            button.enableIconLargeContentViewer(image: item.icon)
+            let boxWidth = iconView.widthAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs)
+            let boxHeight = iconView.heightAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs)
+            let buttonWidth = button.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter)
+            let buttonHeight = button.heightAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter)
             NSLayoutConstraint.activate([
                 iconView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
                 iconView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-                iconView.widthAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs),
-                iconView.heightAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs),
-                button.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
-                button.heightAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
+                boxWidth, boxHeight, buttonWidth, buttonHeight,
             ])
+            iconBoxConstraints.append(contentsOf: [boxWidth, boxHeight])
+            buttonSizeConstraints.append(contentsOf: [buttonWidth, buttonHeight])
+            iconViews.append(iconView)
             buttons.append(button)
+        }
+        applyIconMetrics()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (view: PlayerPageTabView, _) in
+            view.applyIconMetrics()
         }
 
         let group = AnycastButtonGroup(
@@ -105,6 +117,43 @@ final class PlayerPageTabView: UIView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Page-tab glyphs track body metrics from the 20 pt group-action size.
+    /// The brand transcript mark is imageset artwork, so its box is what
+    /// scales; SF Symbols also take the point size.
+    private func applyIconMetrics() {
+        let glyph = IconMetrics.scaledUp(
+            IconStyle.groupAction.pointSize,
+            style: .body,
+            compatibleWith: traitCollection
+        )
+        let box = IconMetrics.scaledUp(
+            IconStyle.groupAction.pointSize + Spacing.xs,
+            style: .body,
+            compatibleWith: traitCollection
+        )
+        let side = IconMetrics.diameter(
+            AnycastIconButton.standardDiameter,
+            style: .body,
+            compatibleWith: traitCollection
+        )
+        let symbol = UIImage.SymbolConfiguration(pointSize: glyph, weight: IconStyle.groupAction.weight)
+        for constraint in iconBoxConstraints { constraint.constant = box }
+        for constraint in buttonSizeConstraints { constraint.constant = side }
+        for (index, iconView) in iconViews.enumerated() {
+            iconView.preferredSymbolConfiguration = symbol
+            let source = items[index].icon
+            if source.isSymbolImage == false, source.size != .zero {
+                iconView.image = source.withIconMetrics(
+                    pointSize: box,
+                    weight: IconStyle.groupAction.weight,
+                    compatibleWith: traitCollection
+                )
+            }
+            buttons[index].layer.cornerRadius = side / 2
+            buttons[index].largeContentImage = iconView.image
+        }
+    }
 
     func select(_ index: Int) {
         guard buttons.indices.contains(index), index != selectedIndex else { return }
@@ -177,7 +226,7 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         self.pageTab = PlayerPageTabView(items: [
             .init(icon: AppIcons.playerEpisode, accessibilityLabel: "This episode"),
             .init(icon: AppIcons.playerMain, accessibilityLabel: "Player main"),
-            .init(icon: AppIcons.topology ?? UIImage(), accessibilityLabel: "Player AI transcript"),
+            .init(icon: AppIcons.aiTranscript ?? UIImage(), accessibilityLabel: "Player AI transcript"),
         ])
         super.init(nibName: nil, bundle: nil)
         pageTab.onSelect = { [weak self] index in

@@ -223,7 +223,7 @@ final class ChannelViewController: UIViewController {
             actionRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageH),
             actionRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
             actionRow.bottomAnchor.constraint(equalTo: playerBar.topAnchor, constant: -Spacing.md),
-            actionRow.heightAnchor.constraint(equalToConstant: AnycastIconButton.largeDiameter),
+            actionRow.heightAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.largeDiameter),
 
             bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bottomFade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -1022,10 +1022,11 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
 
         var search = UIButton.Configuration.plain()
         search.image = AppIcons.search
-        search.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        search.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(textStyle: .title3)
         search.baseForegroundColor = Theme.onSurfaceVariant
         searchButton.configuration = search
         searchButton.accessibilityLabel = "Search episodes"
+        searchButton.enableIconLargeContentViewer()
         searchButton.translatesAutoresizingMaskIntoConstraints = false
         searchButton.addAction(UIAction { [weak self] _ in self?.onSearch?() }, for: .touchUpInside)
 
@@ -1036,8 +1037,8 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
         // into that margin so its label lines up with the page text.
         NSLayoutConstraint.activate([
             orderButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: -Spacing.gap),
-            orderButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
-            orderButton.heightAnchor.constraint(equalToConstant: 36),
+            orderButton.topAnchor.constraint(equalTo: contentView.topAnchor),
+            orderButton.heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit),
 
             searchButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: 4),
             searchButton.centerYAnchor.constraint(equalTo: orderButton.centerYAnchor),
@@ -1061,7 +1062,8 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
         var configuration = UIButton.Configuration.plain()
         configuration.title = reversed ? "Oldest" : "Newest"
         configuration.image = UIImage(systemName: "chevron.up.chevron.down")
-        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(textStyle: .caption1)
+            .applying(UIImage.SymbolConfiguration(weight: .semibold))
         configuration.imagePlacement = .trailing
         configuration.imagePadding = Spacing.sm
         configuration.baseForegroundColor = TypographyV2.emphasis.color

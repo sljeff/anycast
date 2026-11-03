@@ -86,7 +86,7 @@ final class ShowsShelfView: UIView {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.pageH),
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            heightAnchor.constraint(equalToConstant: ShowsShelfLayout.itemSide),
+            heightAnchor.constraint(greaterThanOrEqualToConstant: ShowsShelfLayout.itemSide),
         ])
     }
 

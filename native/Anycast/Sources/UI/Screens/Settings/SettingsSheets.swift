@@ -232,11 +232,11 @@ class SettingsRowCell: UICollectionViewListCell {
     let subtitleLabel = UILabel()
     let valueLabel = UILabel()
     let textStack = UIStackView()
-    private let chevronView = UIImageView(
-        image: UIImage(systemName: "chevron.forward")?.applyingSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        )
-    )
+    private let chevronView: UIImageView = {
+        let view = UIImageView(image: UIImage(systemName: "chevron.forward"))
+        view.preferredSymbolConfiguration = IconMetrics.disclosureConfiguration()
+        return view
+    }()
     private let rowStack = UIStackView()
     private var usesPlate = true
 

@@ -39,6 +39,10 @@ final class AnycastStepperView: UIView {
 
         Self.configure(minusButton, symbol: "minus", label: minusLabel, tint: tint, action: onMinus)
         Self.configure(plusButton, symbol: "plus", label: plusLabel, tint: tint, action: onPlus)
+        applyIconMetrics()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (view: AnycastStepperView, _) in
+            view.applyIconMetrics()
+        }
         bindHighlight(of: minusButton, to: minusHighlight)
         bindHighlight(of: plusButton, to: plusHighlight)
 
@@ -116,11 +120,17 @@ final class AnycastStepperView: UIView {
     ) {
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(systemName: symbol)
-        configuration.preferredSymbolConfigurationForImage = IconStyle.stepperControl.configuration
+        configuration.preferredSymbolConfigurationForImage = IconMetrics.symbolConfiguration(
+            pointSize: IconStyle.stepperControl.pointSize,
+            weight: IconStyle.stepperControl.weight,
+            style: .body,
+            compatibleWith: button.traitCollection
+        )
         configuration.baseForegroundColor = tint
         configuration.contentInsets = .zero
         button.configuration = configuration
         button.accessibilityLabel = label
+        button.enableIconLargeContentViewer()
         button.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             button.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
@@ -128,5 +138,29 @@ final class AnycastStepperView: UIView {
         ])
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
         button.addPressFeedback(haptic: false)
+    }
+
+    /// ± stay 16 pt light at the default size and at least 44 pt to tap.
+    private func applyIconMetrics() {
+        let configuration = IconMetrics.symbolConfiguration(
+            pointSize: IconStyle.stepperControl.pointSize,
+            weight: IconStyle.stepperControl.weight,
+            style: .body,
+            compatibleWith: traitCollection
+        )
+        let side = IconMetrics.diameter(
+            AnycastIconButton.standardDiameter,
+            style: .body,
+            compatibleWith: traitCollection
+        )
+        for button in [minusButton, plusButton] {
+            if var buttonConfiguration = button.configuration {
+                buttonConfiguration.preferredSymbolConfigurationForImage = configuration
+                button.configuration = buttonConfiguration
+            }
+            for constraint in button.constraints where constraint.firstAttribute == .width || constraint.firstAttribute == .height {
+                constraint.constant = side
+            }
+        }
     }
 }

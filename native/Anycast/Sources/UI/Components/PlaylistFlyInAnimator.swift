@@ -77,7 +77,9 @@ final class PlaylistFlyInAnimator {
         overlay.addSubview(backdrop)
 
         let icon = UIImageView(image: AppIcons.play)
-        icon.tintColor = .white
+        // Fixed light ink: the plate is always black, and onPrimary flips
+        // with the app appearance.
+        icon.tintColor = Theme.playerText
         icon.contentMode = .scaleAspectFit
         icon.translatesAutoresizingMaskIntoConstraints = false
         overlay.addSubview(icon)

@@ -87,6 +87,11 @@ final class ImportExportDialogViewController: UIViewController,
         helpButton.tintColor = Theme.onSurfaceVariant
         helpButton.isAccessibilityElement = true
         helpButton.accessibilityLabel = "Import help"
+        helpButton.setPreferredSymbolConfiguration(
+            UIImage.SymbolConfiguration(textStyle: .body),
+            forImageIn: .normal
+        )
+        helpButton.enableIconLargeContentViewer()
         helpButton.widthAnchor.constraint(equalToConstant: Layout.titleRowHeight).isActive = true
         helpButton.heightAnchor.constraint(equalToConstant: Layout.titleRowHeight).isActive = true
         helpButton.addAction(

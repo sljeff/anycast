@@ -24,6 +24,8 @@ class EmptyStateView: UIView {
     private let actionColumn = UIStackView()
 
     private static let discSize: CGFloat = 64
+    private static let glyphSize: CGFloat = 28
+    private var discConstraints: [NSLayoutConstraint] = []
 
     init() {
         super.init(frame: .zero)
@@ -35,7 +37,9 @@ class EmptyStateView: UIView {
 
         iconView.tintColor = Theme.primary
         iconView.contentMode = .center
-        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 28, weight: .medium)
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (view: EmptyStateView, _) in
+            view.applyDiscMetrics()
+        }
         iconView.translatesAutoresizingMaskIntoConstraints = false
         disc.addSubview(iconView)
 
@@ -69,9 +73,11 @@ class EmptyStateView: UIView {
 
         let center = column.centerYAnchor.constraint(equalTo: layoutMarginsGuide.centerYAnchor)
         center.priority = .defaultHigh
+        let discWidth = disc.widthAnchor.constraint(equalToConstant: Self.discSize)
+        let discHeight = disc.heightAnchor.constraint(equalToConstant: Self.discSize)
+        discConstraints = [discWidth, discHeight]
         NSLayoutConstraint.activate([
-            disc.widthAnchor.constraint(equalToConstant: Self.discSize),
-            disc.heightAnchor.constraint(equalToConstant: Self.discSize),
+            discWidth, discHeight,
             iconView.centerXAnchor.constraint(equalTo: disc.centerXAnchor),
             iconView.centerYAnchor.constraint(equalTo: disc.centerYAnchor),
             spinner.centerXAnchor.constraint(equalTo: disc.centerXAnchor),
@@ -85,10 +91,21 @@ class EmptyStateView: UIView {
             column.centerXAnchor.constraint(equalTo: centerXAnchor),
             center,
         ])
+        applyDiscMetrics()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Decorative disc. Design size at the default content size; grows with title1.
+    private func applyDiscMetrics() {
+        let side = IconMetrics.scaledUp(Self.discSize, style: .displaySmall, compatibleWith: traitCollection)
+        for constraint in discConstraints { constraint.constant = side }
+        disc.layer.cornerRadius = side / 2
+        iconView.preferredSymbolConfiguration = IconMetrics.symbolConfiguration(
+            pointSize: Self.glyphSize, weight: .medium, style: .displaySmall, compatibleWith: traitCollection
+        )
+    }
 
     func configure(_ content: Content) {
         iconView.image = content.icon

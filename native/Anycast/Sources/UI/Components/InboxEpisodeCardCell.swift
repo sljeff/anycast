@@ -57,9 +57,11 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
     private let descriptionLabel = UILabel()
     private let coverView = UIImageView()
     private let statusBadge = UIImageView()
+    private var badgeSideConstraints: [NSLayoutConstraint] = []
     private let showNameLabel = UILabel()
     private let metaLabel = UILabel()
     let moreButton = UIButton(type: .system)
+    private var moreSideConstraints: [NSLayoutConstraint] = []
 
     private var descriptionTask: Task<Void, Never>?
     /// Guards the description resolve: a reconfigure with the same HTML must
@@ -145,12 +147,14 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         case .playing:
             statusBadge.isHidden = false
             statusBadge.image = UIImage(systemName: "waveform")
-            statusBadge.backgroundColor = AnycastColor.gold9
+            statusBadge.backgroundColor = Theme.primary
+            statusBadge.tintColor = Theme.onPrimary
             statusBadge.accessibilityLabel = "Playing"
         case .queued:
             statusBadge.isHidden = false
-            statusBadge.image = UIImage(systemName: "checkmark")
+            statusBadge.image = AppIcons.addedToList
             statusBadge.backgroundColor = AnycastColor.grass9
+            statusBadge.tintColor = Theme.onPrimary
             statusBadge.accessibilityLabel = "In playlist"
         }
     }
@@ -195,8 +199,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         coverView.backgroundColor = Theme.surfaceContainerHighest
 
         statusBadge.contentMode = .center
-        statusBadge.tintColor = .white
-        statusBadge.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 9, weight: .bold)
+        statusBadge.tintColor = Theme.onPrimary
         statusBadge.layer.cornerRadius = Layout.badgeSide / 2
         statusBadge.layer.borderWidth = Spacing.hairline
         statusBadge.setDynamicBorderColor(Theme.surface)
@@ -214,18 +217,32 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
 
         var moreConfig = UIButton.Configuration.plain()
         moreConfig.image = AppIcons.more
-        moreConfig.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        moreConfig.preferredSymbolConfigurationForImage = IconMetrics.symbolConfiguration(
+            pointSize: 16, weight: .medium, style: .body, compatibleWith: traitCollection
+        )
         moreConfig.baseForegroundColor = AnycastColor.sandAlpha9
         moreConfig.contentInsets = .zero
         moreButton.configuration = moreConfig
         moreButton.showsMenuAsPrimaryAction = true
         moreButton.accessibilityLabel = "More actions"
         moreButton.accessibilityIdentifier = "inbox-card-more"
+        moreButton.enableIconLargeContentViewer()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (cell: InboxEpisodeCardCell, _) in
+            cell.applyBadgeMetrics()
+            cell.applyMoreMetrics()
+        }
 
         for view in [textColumn, coverView, statusBadge, showNameLabel, metaLabel, moreButton] {
             view.translatesAutoresizingMaskIntoConstraints = false
             cardContainer.addSubview(view)
         }
+
+        let badgeWidth = statusBadge.widthAnchor.constraint(equalToConstant: Layout.badgeSide)
+        let badgeHeight = statusBadge.heightAnchor.constraint(equalToConstant: Layout.badgeSide)
+        badgeSideConstraints = [badgeWidth, badgeHeight]
+        let moreWidth = moreButton.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter)
+        let moreHeight = moreButton.heightAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter)
+        moreSideConstraints = [moreWidth, moreHeight]
 
         NSLayoutConstraint.activate([
             cardContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageH),
@@ -244,8 +261,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
             coverView.widthAnchor.constraint(equalToConstant: Layout.artworkSide),
             coverView.heightAnchor.constraint(equalToConstant: Layout.artworkSide),
 
-            statusBadge.widthAnchor.constraint(equalToConstant: Layout.badgeSide),
-            statusBadge.heightAnchor.constraint(equalToConstant: Layout.badgeSide),
+            badgeWidth, badgeHeight,
             statusBadge.centerXAnchor.constraint(equalTo: coverView.trailingAnchor, constant: -Spacing.xxs),
             statusBadge.centerYAnchor.constraint(equalTo: coverView.topAnchor, constant: Spacing.xxs),
 
@@ -258,9 +274,32 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
             moreButton.topAnchor.constraint(equalTo: textColumn.bottomAnchor, constant: Spacing.xs + Spacing.sm),
             moreButton.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.md),
             moreButton.bottomAnchor.constraint(equalTo: cardContainer.bottomAnchor, constant: -Spacing.sm),
-            moreButton.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
-            moreButton.heightAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
+            moreWidth, moreHeight,
         ])
+        applyBadgeMetrics()
+        applyMoreMetrics()
+    }
+
+    /// Status badge stays at least 18 pt and grows with caption metrics.
+    /// The more button's hit target stays at least 44.
+    private func applyBadgeMetrics() {
+        let side = IconMetrics.scaledUp(Layout.badgeSide, textStyle: .caption1, compatibleWith: traitCollection)
+        for constraint in badgeSideConstraints { constraint.constant = side }
+        statusBadge.layer.cornerRadius = side / 2
+        statusBadge.preferredSymbolConfiguration = IconMetrics.symbolConfiguration(
+            pointSize: 9, weight: .bold, textStyle: .caption1, compatibleWith: traitCollection
+        )
+    }
+
+    private func applyMoreMetrics() {
+        let side = IconMetrics.diameter(AnycastIconButton.standardDiameter, style: .body, compatibleWith: traitCollection)
+        for constraint in moreSideConstraints { constraint.constant = side }
+        if var configuration = moreButton.configuration {
+            configuration.preferredSymbolConfigurationForImage = IconMetrics.symbolConfiguration(
+                pointSize: 16, weight: .medium, style: .body, compatibleWith: traitCollection
+            )
+            moreButton.configuration = configuration
+        }
     }
 
     // MARK: - Actions

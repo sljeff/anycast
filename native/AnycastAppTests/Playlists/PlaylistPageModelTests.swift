@@ -115,6 +115,6 @@ struct AITranscriptDisplayTests {
         #expect(AITranscriptDisplay.display(status: nil).icon == AppIcons.aiTranscript)
         #expect(AITranscriptDisplay.display(status: "processing").icon == AppIcons.aiTranscript)
         #expect(AITranscriptDisplay.display(status: "succeeded").icon == AppIcons.checkCircle)
-        #expect(AITranscriptDisplay.display(status: "failed").icon == AppIcons.smsFailed)
+        #expect(AITranscriptDisplay.display(status: "failed").icon == AppIcons.transcriptFailed)
     }
 }
