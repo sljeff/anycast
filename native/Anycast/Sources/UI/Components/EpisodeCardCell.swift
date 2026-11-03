@@ -689,7 +689,7 @@ final class EpisodeCardCell: UICollectionViewCell {
     /// Drawer row grows with body metrics from the 48 pt design height.
     /// At the default content size this is `stripHeight` (12 + 48).
     private func resolvedDrawerHeight() -> CGFloat {
-        IconMetrics.scaledUp(Self.drawerHeight, style: .body, compatibleWith: traitCollection)
+        IconMetrics.scaledUp(Self.drawerHeight, style: TypographyV2.body, compatibleWith: traitCollection)
     }
 
     private func resolvedStripHeight() -> CGFloat {

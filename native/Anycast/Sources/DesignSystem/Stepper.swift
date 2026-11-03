@@ -123,7 +123,7 @@ final class AnycastStepperView: UIView {
         configuration.preferredSymbolConfigurationForImage = IconMetrics.symbolConfiguration(
             pointSize: IconStyle.stepperControl.pointSize,
             weight: IconStyle.stepperControl.weight,
-            style: .body,
+            style: TypographyV2.body,
             compatibleWith: button.traitCollection
         )
         configuration.baseForegroundColor = tint
@@ -145,12 +145,12 @@ final class AnycastStepperView: UIView {
         let configuration = IconMetrics.symbolConfiguration(
             pointSize: IconStyle.stepperControl.pointSize,
             weight: IconStyle.stepperControl.weight,
-            style: .body,
+            style: TypographyV2.body,
             compatibleWith: traitCollection
         )
         let side = IconMetrics.diameter(
             AnycastIconButton.standardDiameter,
-            style: .body,
+            style: TypographyV2.body,
             compatibleWith: traitCollection
         )
         for button in [minusButton, plusButton] {

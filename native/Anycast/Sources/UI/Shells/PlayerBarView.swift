@@ -216,7 +216,7 @@ final class PlayerBarView: UIView {
     private func applyForwardGlyph() {
         let point = min(
             28,
-            IconMetrics.scaledUp(22, style: .body, compatibleWith: traitCollection)
+            IconMetrics.scaledUp(22, style: TypographyV2.body, compatibleWith: traitCollection)
         )
         forwardButton.setPreferredSymbolConfiguration(
             UIImage.SymbolConfiguration(pointSize: point),

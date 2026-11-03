@@ -42,7 +42,7 @@ final class AnycastIconButton: UIButton {
         diameter: CGFloat = AnycastIconButton.standardDiameter,
         glyphSize: CGFloat = 17,
         glyphWeight: UIImage.SymbolWeight = .medium,
-        metrics: TypographyV2.Style = .body
+        metrics: TypographyV2.Style = TypographyV2.body
     ) {
         self.style = style
         self.designDiameter = diameter

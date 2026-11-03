@@ -99,7 +99,7 @@ nonisolated enum IconMetrics {
         symbolConfiguration(
             pointSize: stripPointSize,
             weight: .medium,
-            style: .body,
+            style: TypographyV2.body,
             compatibleWith: traits
         )
     }
@@ -152,7 +152,7 @@ extension UIImage {
         if isSymbolImage || size == .zero { return self }
         let point = IconMetrics.scaledUp(
             IconMetrics.stripPointSize,
-            style: .body,
+            style: TypographyV2.body,
             compatibleWith: traits
         )
         return withIconMetrics(pointSize: point, weight: .medium, compatibleWith: traits)

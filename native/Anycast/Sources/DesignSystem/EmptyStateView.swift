@@ -99,11 +99,11 @@ class EmptyStateView: UIView {
 
     /// Decorative disc. Design size at the default content size; grows with title1.
     private func applyDiscMetrics() {
-        let side = IconMetrics.scaledUp(Self.discSize, style: .displaySmall, compatibleWith: traitCollection)
+        let side = IconMetrics.scaledUp(Self.discSize, style: TypographyV2.displaySmall, compatibleWith: traitCollection)
         for constraint in discConstraints { constraint.constant = side }
         disc.layer.cornerRadius = side / 2
         iconView.preferredSymbolConfiguration = IconMetrics.symbolConfiguration(
-            pointSize: Self.glyphSize, weight: .medium, style: .displaySmall, compatibleWith: traitCollection
+            pointSize: Self.glyphSize, weight: .medium, style: TypographyV2.displaySmall, compatibleWith: traitCollection
         )
     }
 

@@ -82,11 +82,11 @@ struct TypographyTests {
     @Test("Icon metrics keep the design size at the default content size")
     func iconMetricsMatchDesignSize() {
         let traits = UITraitCollection(preferredContentSizeCategory: .large)
-        #expect(IconMetrics.scaledUp(20, style: .body, compatibleWith: traits) == 20)
-        #expect(IconMetrics.diameter(44, style: .body, compatibleWith: traits) == 44)
-        #expect(IconMetrics.diameter(72, style: .headlineMedium, compatibleWith: traits) == 72)
+        #expect(IconMetrics.scaledUp(20, style: TypographyV2.body, compatibleWith: traits) == 20)
+        #expect(IconMetrics.diameter(44, style: TypographyV2.body, compatibleWith: traits) == 44)
+        #expect(IconMetrics.diameter(72, style: TypographyV2.headlineMedium, compatibleWith: traits) == 72)
         let accessibility = UITraitCollection(preferredContentSizeCategory: .accessibilityExtraExtraExtraLarge)
-        #expect(IconMetrics.diameter(44, style: .body, compatibleWith: accessibility) > 44)
+        #expect(IconMetrics.diameter(44, style: TypographyV2.body, compatibleWith: accessibility) > 44)
     }
 
     @Test("Brand SVG imagesets are present as template images")

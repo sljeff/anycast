@@ -157,7 +157,7 @@ final class ChatInputBar: UIView {
 
     /// 15 pt bold at the default size, growing with body metrics inside the 44 pt disc.
     private func applySendGlyph() {
-        let point = IconMetrics.scaledUp(15, style: .body, compatibleWith: traitCollection)
+        let point = IconMetrics.scaledUp(15, style: TypographyV2.body, compatibleWith: traitCollection)
         sendButton.setPreferredSymbolConfiguration(
             UIImage.SymbolConfiguration(pointSize: point, weight: .bold),
             forImageIn: .normal

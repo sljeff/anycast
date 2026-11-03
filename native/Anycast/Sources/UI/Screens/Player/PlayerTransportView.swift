@@ -40,14 +40,14 @@ final class PlayerTransportView: UIView {
     private let replayButton = AnycastIconButton(
         style: .plain, icon: AppIcons.replay10, accessibilityLabel: "Seek back 10 seconds",
         diameter: Layout.transportSlot, glyphSize: IconStyle.playerTransport.pointSize,
-        glyphWeight: IconStyle.playerTransport.weight, metrics: .headlineMedium
+        glyphWeight: IconStyle.playerTransport.weight, metrics: TypographyV2.headlineMedium
     )
     private let playPauseButton = UIButton(type: .custom)
     private let playPauseIcon = PlayPauseIconControl(size: IconStyle.playerPrimary.pointSize)
     private let forwardButton = AnycastIconButton(
         style: .plain, icon: AppIcons.forward30, accessibilityLabel: "Seek forward 30 seconds",
         diameter: Layout.transportSlot, glyphSize: IconStyle.playerTransport.pointSize,
-        glyphWeight: IconStyle.playerTransport.weight, metrics: .headlineMedium
+        glyphWeight: IconStyle.playerTransport.weight, metrics: TypographyV2.headlineMedium
     )
     private var playSlotConstraints: [NSLayoutConstraint] = []
     private var playGlyphConstraints: [NSLayoutConstraint] = []
@@ -243,7 +243,7 @@ final class PlayerTransportView: UIView {
     private func applyTransportMetrics() {
         let side = IconMetrics.diameter(
             Layout.transportSlot,
-            style: .headlineMedium,
+            style: TypographyV2.headlineMedium,
             compatibleWith: traitCollection
         )
         let glyph = side * (IconStyle.playerPrimary.pointSize / Layout.transportSlot)

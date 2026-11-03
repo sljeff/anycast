@@ -218,7 +218,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         var moreConfig = UIButton.Configuration.plain()
         moreConfig.image = AppIcons.more
         moreConfig.preferredSymbolConfigurationForImage = IconMetrics.symbolConfiguration(
-            pointSize: 16, weight: .medium, style: .body, compatibleWith: traitCollection
+            pointSize: 16, weight: .medium, style: TypographyV2.body, compatibleWith: traitCollection
         )
         moreConfig.baseForegroundColor = AnycastColor.sandAlpha9
         moreConfig.contentInsets = .zero
@@ -292,11 +292,11 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
     }
 
     private func applyMoreMetrics() {
-        let side = IconMetrics.diameter(AnycastIconButton.standardDiameter, style: .body, compatibleWith: traitCollection)
+        let side = IconMetrics.diameter(AnycastIconButton.standardDiameter, style: TypographyV2.body, compatibleWith: traitCollection)
         for constraint in moreSideConstraints { constraint.constant = side }
         if var configuration = moreButton.configuration {
             configuration.preferredSymbolConfigurationForImage = IconMetrics.symbolConfiguration(
-                pointSize: 16, weight: .medium, style: .body, compatibleWith: traitCollection
+                pointSize: 16, weight: .medium, style: TypographyV2.body, compatibleWith: traitCollection
             )
             moreButton.configuration = configuration
         }

@@ -145,12 +145,12 @@ final class TranscriptStatusCapsuleView: UIView {
             spinner.startAnimating()
             elements.append(spinner)
         case .icon(let image):
-            let point = IconMetrics.scaledUp(16, style: .meta, compatibleWith: traitCollection)
+            let point = IconMetrics.scaledUp(16, style: TypographyV2.meta, compatibleWith: traitCollection)
             let glyph = UIImageView()
             glyph.tintColor = Theme.playerText
             glyph.contentMode = .scaleAspectFit
             glyph.preferredSymbolConfiguration = IconMetrics.symbolConfiguration(
-                pointSize: 16, weight: .medium, style: .meta, compatibleWith: traitCollection
+                pointSize: 16, weight: .medium, style: TypographyV2.meta, compatibleWith: traitCollection
             )
             if let image {
                 glyph.image = image.isSymbolImage

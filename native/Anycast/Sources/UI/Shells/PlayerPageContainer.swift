@@ -124,17 +124,17 @@ final class PlayerPageTabView: UIView {
     private func applyIconMetrics() {
         let glyph = IconMetrics.scaledUp(
             IconStyle.groupAction.pointSize,
-            style: .body,
+            style: TypographyV2.body,
             compatibleWith: traitCollection
         )
         let box = IconMetrics.scaledUp(
             IconStyle.groupAction.pointSize + Spacing.xs,
-            style: .body,
+            style: TypographyV2.body,
             compatibleWith: traitCollection
         )
         let side = IconMetrics.diameter(
             AnycastIconButton.standardDiameter,
-            style: .body,
+            style: TypographyV2.body,
             compatibleWith: traitCollection
         )
         let symbol = UIImage.SymbolConfiguration(pointSize: glyph, weight: IconStyle.groupAction.weight)
