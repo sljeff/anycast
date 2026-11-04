@@ -323,25 +323,22 @@ final class PlaylistEpisodeListBinder: NSObject {
                 guard let self else { return }
                 let signal = await self.context.subtitles.add(url: enclosureURL)
                 // K27: user-triggered failures stay visible; the poller
-                // itself is silent and routes 401 to login.
-                guard let signal, let window = self.owner.view?.window else { return }
-                switch signal {
-                case .errorMessage(let text):
-                    ToastPresenter.shared.show(text, in: window, duration: 3)
-                case .errorBody(let status, let body):
-                    ToastPresenter.shared.show("Error \(status): \(body)", in: window, duration: 3)
-                case .loginRequired:
-                    break
+                // itself is silent and routes 401 to login. A quota 403
+                // opens the same paywall the player capsule uses.
+                guard let signal else {
+                    let status = self.context.subtitles.statuses[enclosureURL]
+                    if AuthAccountSnapshot.current(context: self.context).signedIn,
+                       status == "processing" || status == "succeeded" {
+                        TranscriptAllowanceCache.shared.invalidate()
+                    }
+                    return
                 }
-            }
-        case .removeStaleRecord:
-            Task { [weak self] in
-                await self?.context.subtitles.remove(url: enclosureURL)
-                if let window = self?.owner.view?.window {
-                    ToastPresenter.shared.show(
-                        AITranscriptAction.failedToastMessage, in: window, duration: 3
-                    )
-                }
+                await TranscriptRequests.presentFailure(
+                    signal: signal,
+                    context: self.context,
+                    from: self.owner,
+                    episode: Self.paywallEpisode(for: episode)
+                )
             }
         case .toast(let message):
             if let window = owner.view?.window {
@@ -503,6 +500,15 @@ final class PlaylistEpisodeListBinder: NSObject {
         return robot
     }
 
+    private static func paywallEpisode(for episode: PlaylistEpisodeRow) -> PaywallModel.Episode {
+        PaywallModel.Episode(
+            title: episode.title ?? "",
+            showName: episode.channelTitle ?? "",
+            durationMilliseconds: episode.duration,
+            artworkURL: episode.imageUrl.flatMap(URL.init(string:))
+        )
+    }
+
     private static func aiAccessibilityLabel(for display: AITranscriptDisplay) -> String {
         switch display {
         case .default, .unknown: return "Transcribe with AI"
@@ -580,8 +586,30 @@ final class PlaylistEpisodeListBinder: NSObject {
             htmlRenderer: HTMLContentRenderer(),
             shortenURL: { [weak self] url in
                 await self?.context.api.getShortURL(for: url) ?? url
-            }
+            },
+            transcript: DetailTranscriptCoordinator(
+                context: context,
+                episode: detailEpisode,
+                prepareEpisode: { [weak self] in
+                    await self?.prepareTranscriptEpisode(episode)
+                }
+            )
         )
+    }
+
+    /// Play's move-to-top without starting audio.
+    private func prepareTranscriptEpisode(_ episode: PlaylistEpisodeRow) async -> PlaylistEpisodeRow? {
+        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return nil }
+        var row = episode
+        row.playlistId = playlistId
+        try? await context.database.playlistRepository().insertOrUpdateByIndex(
+            row, playlistId: playlistId, index: 0
+        )
+        if let stored = try? await context.database.playlistRepository()
+            .episode(byEnclosureURL: enclosureURL) {
+            row = stored
+        }
+        return row
     }
 
     // MARK: - Helpers

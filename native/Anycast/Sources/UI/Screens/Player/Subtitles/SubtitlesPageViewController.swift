@@ -46,6 +46,11 @@ final class SubtitlesPageViewController: UIViewController {
 
     // MARK: Observed state
 
+    /// Set when Read transcript / Ask AI opened this page for an episode
+    /// that is not the one playing. Playback is left alone until the user
+    /// taps play here.
+    private var pinnedTranscript: TranscriptBrowseTarget?
+    private var adoptPinned: (() async -> Bool)?
     private var loadedURL: String?
     private var rowPhase: TranscriptRowPhase = .fetching
     private var subtitleRow: SubtitleRow?
@@ -107,7 +112,7 @@ final class SubtitlesPageViewController: UIViewController {
         progressLoop.track(
             read: { [weak self] in _ = self?.context.playback.positionData },
             onChange: { [weak self] in
-                guard let self else { return }
+                guard let self, !self.isBrowsingOtherEpisode else { return }
                 self.lyricsView.setProgress(
                     positionMilliseconds: Int(self.context.playback.positionData.positionMilliseconds)
                 )
@@ -132,6 +137,20 @@ final class SubtitlesPageViewController: UIViewController {
         configureDemoIfRequested()
         #endif
         refreshState()
+    }
+
+    /// Shows `target`'s transcript without replacing the playing item.
+    /// `adopt` runs when the user taps play on this page and should make
+    /// `target` the current episode.
+    func pinTranscript(_ target: TranscriptBrowseTarget, adopt: @escaping () async -> Bool) {
+        pinnedTranscript = target
+        adoptPinned = adopt
+    }
+
+    private var isBrowsingOtherEpisode: Bool {
+        guard let pinnedTranscript else { return false }
+        let current = context.playback.currentEpisode?.enclosureUrl ?? ""
+        return pinnedTranscript.enclosureURL != current
     }
 
     deinit {
@@ -248,10 +267,29 @@ final class SubtitlesPageViewController: UIViewController {
             return
         }
         #endif
+        if let pinned = pinnedTranscript,
+           pinned.enclosureURL == (context.playback.currentEpisode?.enclosureUrl ?? "") {
+            pinnedTranscript = nil
+            adoptPinned = nil
+        }
+        transport.onPlay = isBrowsingOtherEpisode ? { [weak self] in
+            Task { await self?.adoptPinnedEpisode() }
+        } : nil
+
+        if let pinned = pinnedTranscript {
+            showPinnedHeader(pinned)
+            loadURL(pinned.enclosureURL)
+            return
+        }
+
         let episode = context.playback.currentEpisode
         updateHeader(episode: episode)
 
         let url = (episode?.enclosureUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        loadURL(url)
+    }
+
+    private func loadURL(_ url: String) {
         if url != loadedURL {
             loadedURL = url
             subtitleRow = nil
@@ -267,6 +305,32 @@ final class SubtitlesPageViewController: UIViewController {
             loadTranslationRow(url: url)
         }
         render()
+    }
+
+    private func adoptPinnedEpisode() async {
+        guard let adoptPinned else { return }
+        let adopted = await adoptPinned()
+        guard adopted else {
+            if let window = view.window {
+                ToastPresenter.shared.show("Couldn't open this transcript", in: window, duration: 3)
+            }
+            return
+        }
+        pinnedTranscript = nil
+        self.adoptPinned = nil
+        transport.onPlay = nil
+        refreshState()
+    }
+
+    private func showPinnedHeader(_ pinned: TranscriptBrowseTarget) {
+        headerArtwork.isHidden = false
+        titleLabel.isHidden = false
+        titleLabel.text = pinned.title
+        let imageURL = pinned.imageURL ?? ""
+        guard imageURL != headerArtworkURL else { return }
+        headerArtworkURL = imageURL
+        headerArtwork.kf.cancelDownloadTask()
+        headerArtwork.setArtwork(URL(string: imageURL), title: pinned.channelTitle)
     }
 
     private func loadTranscriptRow(url: String) {
@@ -505,62 +569,29 @@ final class SubtitlesPageViewController: UIViewController {
         Task { await context.playback.seek(Int64(milliseconds)) }
     }
 
-    /// `controller.add(url)` with the K27 user-trigger surface: the error
-    /// signal from the add itself becomes a toast (background polling is
-    /// silent; 401 routes to login inside the poller).
+    /// `controller.add(url)` with the K27 user-trigger surface. Login, the
+    /// quota paywall, and the toast live in `TranscriptRequests` so the
+    /// detail sheet and the playlist card use the same refusal.
     private func generateTranscript() {
-        guard loadedURL != nil else { return }
-        // Signed out: sign in first, then generate once the sheet reports
-        // success (the add would only bounce off a 401 otherwise).
-        guard AuthAccountSnapshot.current(context: context).signedIn else {
-            LoginSheetViewController.present(
-                from: topMostPresented(), context: context, source: .transcribe
-            ) { [weak self] in self?.startTranscriptGeneration() }
-            return
-        }
-        startTranscriptGeneration()
+        guard let url = loadedURL, !url.isEmpty else { return }
+        TranscriptRequests.generate(
+            enclosureURL: url,
+            context: context,
+            from: self,
+            episode: quotaEpisode() ?? PaywallModel.Episode(
+                title: "", showName: "", durationMilliseconds: nil, artworkURL: nil
+            )
+        )
     }
 
-    private func startTranscriptGeneration() {
-        guard let url = loadedURL else { return }
-        Task { @MainActor in
-            let signal = await self.context.subtitles.add(url: url)
-            guard let signal, let window = self.view.window else { return }
-            switch signal {
-            case .errorMessage(let text):
-                // A 403 at the quota limit opens the paywall instead of a
-                // toast; any other 403 keeps the toast.
-                if await self.presentQuotaPaywallIfExhausted() { return }
-                ToastPresenter.shared.show(text, in: window, duration: 3)
-            case .errorBody(let status, let body):
-                ToastPresenter.shared.show("Error \(status): \(body)", in: window, duration: 3)
-            case .loginRequired:
-                break
-            }
-        }
-    }
-
-    /// Re-reads the account after a refused add: when it has no transcripts
-    /// left and the user is not Plus, presents the quota paywall (variant C)
-    /// for the current episode and returns true.
-    private func presentQuotaPaywallIfExhausted() async -> Bool {
-        var remaining: Int?
-        if let result = try? await context.api.getUser(), case .user(let user) = result {
-            remaining = user.remaining
-        }
-        let subscribed = remaining == 0 ? await context.purchases.isSubscribed() : false
-        guard PaywallModel.shouldPresentQuotaPaywall(refreshedRemaining: remaining, isSubscribed: subscribed),
-              let episode = context.playback.currentEpisode, view.window != nil else { return false }
-        let summary = PaywallModel.Episode(
+    private func quotaEpisode() -> PaywallModel.Episode? {
+        guard let episode = context.playback.currentEpisode else { return nil }
+        return PaywallModel.Episode(
             title: episode.title ?? "",
             showName: episode.channelTitle ?? "",
             durationMilliseconds: episode.duration,
             artworkURL: episode.imageUrl.flatMap(URL.init(string:))
         )
-        PaywallViewController.present(
-            from: topMostPresented(), context: context, variant: .quota(summary)
-        )
-        return true
     }
 
     // MARK: - Lyrics
@@ -649,12 +680,27 @@ final class SubtitlesPageViewController: UIViewController {
     /// Opens the chat sheet. `draftQuestion` pre-fills the input (long-press
     /// "Ask AI about this"); the chat asks for the current line lazily so a
     /// quick-ask can quote what is playing.
-    private func openChat(draftQuestion: String? = nil) {
+    func openChat(draftQuestion: String? = nil) {
+        let pinned = isBrowsingOtherEpisode ? pinnedTranscript : nil
         let chat = ChatViewController(
             context: context,
+            episodeTitle: pinned?.title,
+            enclosureURL: pinned?.enclosureURL,
             draftQuestion: draftQuestion,
             currentLineProvider: { [weak self] in self?.lyricsView.activeLineText },
-            onJump: { [weak self] milliseconds in self?.jump(toMilliseconds: milliseconds) }
+            onJump: { [weak self] milliseconds in
+                guard let self else { return }
+                if self.isBrowsingOtherEpisode {
+                    Task { @MainActor in
+                        await self.adoptPinnedEpisode()
+                        if !self.isBrowsingOtherEpisode {
+                            self.jump(toMilliseconds: milliseconds)
+                        }
+                    }
+                } else {
+                    self.jump(toMilliseconds: milliseconds)
+                }
+            }
         )
         AppSheets.presentExpand(chat, from: topMostPresented())
     }

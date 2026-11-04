@@ -364,11 +364,23 @@ final class MembershipViewController: UIViewController {
             self.isSubscribed = isSubscribed
             self.plus = plus
             self.account = AuthAccountSnapshot.current(context: context)
+            if self.remaining == nil,
+               let uid = self.account.uid,
+               let cached = TranscriptAllowanceCache.shared.current(uid: uid),
+               cached.isSubscribed == isSubscribed {
+                self.remaining = cached.remaining
+            }
             self.render()
 
             if let result = try? await context.api.getUser(), case .user(let user) = result {
                 guard !Task.isCancelled else { return }
                 self.remaining = user.remaining
+                if let uid = self.account.uid {
+                    TranscriptAllowanceCache.shared.store(
+                        TranscriptAllowance(remaining: user.remaining, isSubscribed: isSubscribed),
+                        uid: uid
+                    )
+                }
                 self.render()
             }
         }

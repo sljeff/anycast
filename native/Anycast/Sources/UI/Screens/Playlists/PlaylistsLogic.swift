@@ -262,23 +262,21 @@ enum AITranscriptDisplay: Equatable {
     }
 }
 
-/// The AI tap behavior (playlists.dart:154-180): default → request the
-/// transcript; failed → drop the stale record then surface the error
-/// toast; succeeded/processing → informational toasts. The Dart snackbar
-/// title ("Error"/"Success"/"Generating") has no room in the shared
-/// single-line toast, so the MESSAGE copy is ported verbatim.
+/// The AI tap behavior (playlists.dart:154-180): default and failed →
+/// request the transcript; succeeded/processing → informational toasts.
+/// The Dart snackbar title ("Error"/"Success"/"Generating") has no room in
+/// the shared single-line toast, so the MESSAGE copy is ported verbatim.
 enum AITranscriptAction: Equatable {
     case requestTranscript
-    case removeStaleRecord
     case toast(String)
     case none
 
     static func action(display: AITranscriptDisplay) -> AITranscriptAction {
         switch display {
-        case .default:
+        case .default, .failed:
+            // Failed retries in place, the same as the detail row and the
+            // transcript page.
             return .requestTranscript
-        case .failed:
-            return .removeStaleRecord
         case .succeeded:
             return .toast("You can check the transcript when playing.")
         case .processing:
@@ -287,8 +285,4 @@ enum AITranscriptAction: Equatable {
             return .none
         }
     }
-
-    /// The toast shown for the failed branch after the stale record drops
-    /// (Dart 'Error' snackbar body).
-    static let failedToastMessage = "Transcript generation failed, please try again later."
 }

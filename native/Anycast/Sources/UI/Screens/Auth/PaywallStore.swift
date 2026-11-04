@@ -105,7 +105,9 @@ struct PaywallStore {
         do {
             let result = try await Purchases.shared.purchase(package: package)
             if result.userCancelled { return .cancelled }
-            return result.customerInfo.entitlements.active.isEmpty ? .pending : .purchased
+            let purchased = !result.customerInfo.entitlements.active.isEmpty
+            if purchased { TranscriptAllowanceCache.shared.invalidate() }
+            return purchased ? .purchased : .pending
         } catch let error as ErrorCode where error == .purchaseCancelledError {
             return .cancelled
         }
@@ -117,7 +119,9 @@ struct PaywallStore {
         guard purchases.configured else { return false }
         do {
             let info = try await Purchases.shared.restorePurchases()
-            return !info.entitlements.active.isEmpty
+            let restored = !info.entitlements.active.isEmpty
+            if restored { TranscriptAllowanceCache.shared.invalidate() }
+            return restored
         } catch {
             return false
         }

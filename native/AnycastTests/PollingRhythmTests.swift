@@ -167,21 +167,32 @@ struct PollingRhythmTests {
         #expect(stored?.language == "en")
         #expect((stored?.segments ?? []).count == 2)
 
-        // failed → local record removed, UI frees back to Generate.
+        // failed → local record removed. The in-memory status stays
+        // "failed" for this run so the UI can offer Retry; a relaunch
+        // reseeds from the database and returns to Generate.
         L2ContractTests.ReplayProtocol.reset { _ in
             .response(status: 200, body: #"{"status":"failed"}"#)
         }
         await controller.add(url: url)
-        #expect(controller.statuses[url] == nil)
+        #expect(controller.statuses[url] == "failed")
         #expect(try await database.subtitleRepository().get(byEnclosureURL: url) == nil)
 
         // User-triggered 403 quota → the server's error text returns for
-        // the dialog (K27: user-initiated failures stay visible).
+        // the dialog (K27: user-initiated failures stay visible), and the
+        // optimistic processing flag rolls back to whatever it was.
         L2ContractTests.ReplayProtocol.reset { _ in
             .response(status: 403, body: #"{"error":"Monthly transcription quota exhausted","code":1}"#)
         }
         let quota = await controller.add(url: url)
         #expect(quota == .errorMessage("Monthly transcription quota exhausted"))
+        #expect(controller.statuses[url] == "failed",
+                "a refused add restores the status from before the optimistic processing flag")
+
+        let fresh = "https://x.example/ep-quota.mp3"
+        let freshQuota = await controller.add(url: fresh)
+        #expect(freshQuota == .errorMessage("Monthly transcription quota exhausted"))
+        #expect(controller.statuses[fresh] == nil,
+                "a refused add on a never-started episode does not stick on Generating")
     }
 
     @Test("login-cancel rollback: processing entries clear, succeeded and other statuses survive")

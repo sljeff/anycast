@@ -59,6 +59,11 @@ final class PlayerTransportView: UIView {
     /// one so the skip glyphs clear the 44 pt accessory buttons.
     private let transportGap: CGFloat
 
+    /// When set, the play button runs this instead of toggling the current
+    /// item. The transcript page uses it to adopt a browsed episode without
+    /// the button pausing whatever is already playing.
+    var onPlay: (() -> Void)?
+
     init(context: UIContext, transportGap: CGFloat = Layout.transportGap) {
         self.context = context
         self.transportGap = transportGap
@@ -201,6 +206,10 @@ final class PlayerTransportView: UIView {
         playPauseButton.addAction(
             UIAction { [weak self] _ in
                 guard let self else { return }
+                if let onPlay = self.onPlay {
+                    onPlay()
+                    return
+                }
                 Task { await self.context.playback.togglePlay() }
             },
             for: .touchUpInside
