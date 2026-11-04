@@ -199,6 +199,11 @@ final class ChatViewController: UIViewController {
         newChatButton.setImage(UIImage(systemName: "square.and.pencil"), for: .normal)
         newChatButton.tintColor = Theme.playerText
         newChatButton.accessibilityLabel = "New chat"
+        newChatButton.setPreferredSymbolConfiguration(
+            UIImage.SymbolConfiguration(textStyle: .body, scale: .large),
+            forImageIn: .normal
+        )
+        newChatButton.enableIconLargeContentViewer()
         // Glyph flush with the content inset (the composer's trailing edge);
         // the 44 pt hit area extends inward.
         newChatButton.contentHorizontalAlignment = .trailing

@@ -153,7 +153,7 @@ final class PlayerMainPageViewController: UIViewController {
         retryRow.alignment = .center
         retryRow.isHidden = true
         let retryButton = AnycastButton.make(
-            .secondary, title: "Retry", image: UIImage(systemName: "arrow.clockwise")
+            .secondary, title: "Retry", image: AppIcons.retry
         )
         retryButton.accessibilityLabel = "Retry playback"
         retryButton.addAction(
@@ -246,11 +246,13 @@ final class PlayerMainPageViewController: UIViewController {
 
         var chapterConfig = UIButton.Configuration.plain()
         chapterConfig.baseForegroundColor = Theme.playerSecondary
-        chapterConfig.contentInsets = .zero
+        chapterConfig.contentInsets = NSDirectionalEdgeInsets(
+            top: Spacing.md, leading: 0, bottom: Spacing.md, trailing: 0
+        )
         chapterConfig.titleLineBreakMode = .byTruncatingTail
-        chapterConfig.image = UIImage(systemName: "chevron.right")
+        chapterConfig.image = AppIcons.disclosure
         chapterConfig.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
-            font: TypographyV2.meta.font(), scale: .small
+            textStyle: TypographyV2.meta.scalingTextStyle, scale: .small
         )
         chapterConfig.imagePlacement = .trailing
         chapterConfig.imagePadding = Spacing.xs
@@ -263,6 +265,8 @@ final class PlayerMainPageViewController: UIViewController {
         chapterButton.contentHorizontalAlignment = .leading
         chapterButton.titleLabel?.adjustsFontForContentSizeCategory = true
         chapterButton.accessibilityIdentifier = "player-current-chapter"
+        // The label can stay meta-sized. The control itself is at least 44 pt.
+        chapterButton.heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit).isActive = true
         chapterButton.addAction(UIAction { [weak self] _ in self?.openEpisodePage() }, for: .touchUpInside)
     }
 
@@ -338,8 +342,10 @@ final class PlayerMainPageViewController: UIViewController {
         speedButton.accessibilityValue = text
     }
 
-    /// Off: the moon. Counting down: the minutes left, in gold. End of
-    /// episode: the moon in gold.
+    /// Off: outline moon in player text. End of episode: filled moon in
+    /// primary. Counting down: the minutes replace the glyph (the button
+    /// is one slot). Player text, not `Theme.onSurface`: the player is
+    /// always dark, and onSurface follows the app appearance.
     private func renderSleep() {
         let timer = context.sleepTimer
         let remaining = timer.remainingMilliseconds ?? 0
@@ -350,9 +356,10 @@ final class PlayerMainPageViewController: UIViewController {
             sleepButton.accessibilityValue = "\(timer.countdownMinutes) minutes left"
         } else {
             sleepButton.configuration?.title = nil
-            sleepButton.setIcon(AppIcons.sleepTimer)
-            sleepButton.configuration?.baseForegroundColor = timer.stopsAtEpisodeEnd ? Theme.primary : Theme.playerText
-            sleepButton.accessibilityValue = timer.stopsAtEpisodeEnd ? "End of episode" : "Off"
+            let engaged = timer.stopsAtEpisodeEnd
+            sleepButton.setIcon(engaged ? AppIcons.sleepTimerActive : AppIcons.sleepTimer)
+            sleepButton.configuration?.baseForegroundColor = engaged ? Theme.primary : Theme.playerText
+            sleepButton.accessibilityValue = engaged ? "End of episode" : "Off"
         }
     }
 

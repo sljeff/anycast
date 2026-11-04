@@ -80,7 +80,7 @@ final class PaywallDetailsViewController: UIViewController {
         case .subtitles: UIImage(systemName: "sparkles")
         case .transcripts: AppIcons.aiTranscript
         case .ask: AppIcons.aiChat
-        case .export: AppIcons.newDoc
+        case .export: AppIcons.exportFile
         }
     }
 

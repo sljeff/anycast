@@ -101,7 +101,9 @@ final class TranscriptStatusCapsuleView: UIView {
         if case .icon(let image) = content.leading {
             configuration.image = image
             configuration.imagePadding = 8
-            configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+            configuration.preferredSymbolConfigurationForImage = IconMetrics.symbolConfiguration(
+                pointSize: 14, weight: .semibold, textStyle: .footnote, compatibleWith: traitCollection
+            )
         }
         configuration.baseBackgroundColor = Theme.playerText
         configuration.baseForegroundColor = Theme.playerBackground
@@ -143,10 +145,21 @@ final class TranscriptStatusCapsuleView: UIView {
             spinner.startAnimating()
             elements.append(spinner)
         case .icon(let image):
-            let glyph = UIImageView(image: image)
+            let point = IconMetrics.scaledUp(16, style: TypographyV2.meta, compatibleWith: traitCollection)
+            let glyph = UIImageView()
             glyph.tintColor = Theme.playerText
-            glyph.contentMode = .center
-            glyph.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+            glyph.contentMode = .scaleAspectFit
+            glyph.preferredSymbolConfiguration = IconMetrics.symbolConfiguration(
+                pointSize: 16, weight: .medium, style: TypographyV2.meta, compatibleWith: traitCollection
+            )
+            if let image {
+                glyph.image = image.isSymbolImage
+                    ? image
+                    : image.withIconMetrics(pointSize: point, weight: .medium, compatibleWith: traitCollection)
+            }
+            glyph.translatesAutoresizingMaskIntoConstraints = false
+            glyph.widthAnchor.constraint(equalToConstant: point).isActive = true
+            glyph.heightAnchor.constraint(equalToConstant: point).isActive = true
             elements.append(glyph)
         }
 

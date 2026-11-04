@@ -243,7 +243,7 @@ final class DetailViewController: UIViewController {
 
             actionRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.inset),
             actionRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.inset),
-            actionRow.heightAnchor.constraint(equalToConstant: Layout.actionHeight),
+            actionRow.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.actionHeight),
             actionRow.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
             rowBottom,
 
