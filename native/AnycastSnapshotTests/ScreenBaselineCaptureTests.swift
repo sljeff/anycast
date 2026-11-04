@@ -430,6 +430,87 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
+    @Test("S9c Channels empty, the other segment not yet loaded")
+    func captureSearchChannelsEmpty() async throws {
+        try await Self.captureSearchResultVariants(named: "S9c-channels-empty", containing: "No channels") { search in
+            let script = SnapshotSearchScript(channels: .success([]), episodes: .success([]))
+            search.search(
+                "xyzqqqnotaword123",
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+            )
+        }
+    }
+
+    @Test("S9d Both segments empty, field focused")
+    func captureSearchBothEmpty() async throws {
+        try await Self.captureSearchResultVariants(named: "S9d-both-empty", containing: "Nothing found") { search in
+            let script = SnapshotSearchScript(channels: .success([]), episodes: .success([]))
+            search.search(
+                "xyzqqqnotaword123",
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+            )
+            guard await Self.waitForResultTitle(in: search.view, containing: "No channels") else { return }
+            search.selectSegmentForTests(1)
+        }
+    }
+
+    @Test("S9f Long query at the default size")
+    func captureSearchLongQuery() async throws {
+        let query = Self.longSearchQuery
+        try await Self.captureSearchResultVariants(
+            named: "S9f-long-query",
+            containing: "No channels",
+            variants: [("light", .light, .large), ("dark", .dark, .large)]
+        ) { search in
+            let script = SnapshotSearchScript(channels: .success([]), episodes: .success([]))
+            search.search(
+                query,
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+            )
+        }
+    }
+
+    @Test("S9f Long query at AX5, both empty, keyboard up")
+    func captureSearchLongQueryAccessibility() async throws {
+        let query = Self.longSearchQuery
+        try await Self.captureSearchResultVariants(
+            named: "S9f-long-query",
+            containing: "Nothing found",
+            variants: [("ax5", .light, .accessibilityExtraExtraExtraLarge)]
+        ) { search in
+            let script = SnapshotSearchScript(channels: .success([]), episodes: .success([]))
+            search.search(
+                query,
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+            )
+            guard await Self.waitForResultTitle(in: search.view, containing: "No channels") else { return }
+            search.selectSegmentForTests(1)
+        }
+    }
+
+    /// 40 + 21 + 15 = 76, so the sentence shows the first 40, an ellipsis, and "anythingatall99".
+    private static let longSearchQuery =
+        String(repeating: "n", count: 40) + String(repeating: "m", count: 21) + "anythingatall99"
+
+    @Test("S9e The request failed")
+    func captureSearchFailed() async throws {
+        try await Self.captureSearchResultVariants(named: "S9e-request-failed", containing: "load results") { search in
+            let script = SnapshotSearchScript(
+                channels: .failure(SnapshotSearchFailure()),
+                episodes: .success([])
+            )
+            search.search(
+                "decoder",
+                channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+                episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+            )
+        }
+    }
+
     @Test("S15 Chat sheet with a scripted reply")
     func captureChat() async throws {
         try await Self.withRoot { root in
@@ -454,6 +535,90 @@ struct ScreenBaselineCaptureTests {
     }
 
     // MARK: - Helpers
+
+    /// Light, dark, and AX5 frames of one scripted search result. The
+    /// transport is passed for that search only, so S9's live fetch is left
+    /// alone. Writes `name-light`, `name-dark`, and `name-ax5`.
+    private static func captureSearchResultVariants(
+        named name: String,
+        containing text: String,
+        variants: [(String, UIUserInterfaceStyle, UIContentSizeCategory)] = [
+            ("light", .light, .large),
+            ("dark", .dark, .large),
+            ("ax5", .light, .accessibilityExtraExtraExtraLarge),
+        ],
+        prepare: (SearchPageViewController) async -> Void
+    ) async throws {
+        try await withRoot { root in
+            guard let context = await liveContext() else {
+                missingBaselineInput("live UIContext (\(name))")
+                return
+            }
+            context.tabs.select(3)
+            defer { context.tabs.select(0) }
+            guard let search = find(SearchPageViewController.self, in: root) else {
+                missingBaselineInput("Search tab (\(name))")
+                return
+            }
+            let previousSize = root.traitCollection.preferredContentSizeCategory
+            let previousStyle = root.overrideUserInterfaceStyle
+            defer {
+                root.traitOverrides.preferredContentSizeCategory = previousSize
+                root.overrideUserInterfaceStyle = previousStyle
+                search.view.window?.overrideUserInterfaceStyle = previousStyle
+            }
+            for (suffix, style, size) in variants {
+                root.overrideUserInterfaceStyle = style
+                search.view.window?.overrideUserInterfaceStyle = style
+                root.traitOverrides.preferredContentSizeCategory = size
+                search.traitOverrides.preferredContentSizeCategory = size
+                root.view.setNeedsLayout()
+                root.view.layoutIfNeeded()
+                await prepare(search)
+                guard await waitForResultTitle(in: search.view, containing: text) else {
+                    missingBaselineInput("\(name) sentence containing \(text)")
+                    return
+                }
+                search.view.setNeedsLayout()
+                search.view.layoutIfNeeded()
+                try await settle(0.8)
+                try await capture("\(name)-\(suffix)")
+            }
+        }
+    }
+
+    /// Polls until the result sentence is on screen. The phase can settle a
+    /// turn before the observation loop draws it.
+    private static func waitForResultTitle(in view: UIView, containing text: String) async -> Bool {
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline {
+            if let label = firstView(identifier: "search-result-title", in: view) as? UILabel,
+               label.text?.contains(text) == true,
+               isOnScreen(label) {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return false
+    }
+
+    private static func isOnScreen(_ view: UIView) -> Bool {
+        var current: UIView? = view
+        while let view = current {
+            if view.isHidden { return false }
+            current = view.superview
+        }
+        return true
+    }
+
+    private static func firstView(identifier: String, in view: UIView?) -> UIView? {
+        guard let view else { return nil }
+        if view.accessibilityIdentifier == identifier { return view }
+        for subview in view.subviews {
+            if let match = firstView(identifier: identifier, in: subview) { return match }
+        }
+        return nil
+    }
 
     /// A deterministic scripted transport for the chat reference capture.
     final class ScriptedChatTransport: ChatTransport {
@@ -689,6 +854,32 @@ struct ScreenBaselineCaptureTests {
     }
 
 }
+
+/// One-shot search responses for the S9c–S9e captures. Not actor-isolated,
+/// so the fetch methods can be the view model's `@Sendable` transport.
+/// The results do not change, so there is no lock to take.
+private nonisolated final class SnapshotSearchScript: @unchecked Sendable {
+    private let channels: Result<[SubscriptionRow], Error>
+    private let episodes: Result<[APIClient.EpisodeWithChannel], Error>
+
+    init(
+        channels: Result<[SubscriptionRow], Error>,
+        episodes: Result<[APIClient.EpisodeWithChannel], Error>
+    ) {
+        self.channels = channels
+        self.episodes = episodes
+    }
+
+    func fetchChannels(_ keyword: String) async throws -> [SubscriptionRow] {
+        try channels.get()
+    }
+
+    func fetchEpisodes(_ keyword: String) async throws -> [APIClient.EpisodeWithChannel] {
+        try episodes.get()
+    }
+}
+
+private struct SnapshotSearchFailure: Error {}
 
 private extension UIImage {
     /// Whether every pixel is the same color — the signature of a failed
