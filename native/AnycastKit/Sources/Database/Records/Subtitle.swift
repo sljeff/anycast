@@ -45,6 +45,17 @@ public struct SubtitleRow: Codable, Sendable, Equatable, FetchableRecord, Persis
         else { return nil }
         return try? JSONDecoder().decode([SubtitleSegment].self, from: data)
     }
+
+    /// Non-blank payload that is not the literal `"null"` (player.dart:779-782).
+    /// The insert gate drops empty and `"null"` writes; whitespace still
+    /// needs this check before the poller will advertise `succeeded`.
+    public var hasUsableTranscriptPayload: Bool {
+        guard let subtitle,
+              !subtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              subtitle != "null"
+        else { return false }
+        return true
+    }
 }
 
 extension SubtitleSegment {

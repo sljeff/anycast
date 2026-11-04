@@ -195,6 +195,102 @@ struct PollingRhythmTests {
                 "a refused add on a never-started episode does not stick on Generating")
     }
 
+    @Test("succeeded without a persistable row stays processing (no permanent spinner)")
+    func subtitleSucceededRequiresPersistedRow() async throws {
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
+        let controller = SubtitlePollController(
+            api: makeAPI(),
+            subtitles: database.subtitleRepository(),
+            timerFactory: ManualPollTimerFactory()
+        )
+        let url = "https://x.example/ep-nolang.mp3"
+
+        // Server says succeeded but omits detected_language — the insert
+        // gate rejects the write. The poll map must not advertise succeeded
+        // or the UI spinner never exits (the poller skips non-processing URLs).
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 200, body: #"{"status":"succeeded","subtitle":{"segments":[{"start":0.0,"end":1.0,"text":"Hi"}]}}"#)
+        }
+        let signal = await controller.add(url: url)
+        #expect(signal == nil)
+        #expect(controller.statuses[url] == "processing",
+                "unpersisted succeeded must keep polling")
+        #expect(try await database.subtitleRepository().get(byEnclosureURL: url) == nil)
+        let seeded = try await database.subtitleRepository().listStatuses()
+        #expect(seeded[url] == nil,
+                "foreground start() must not reseed a succeeded status with no row")
+
+        controller.markUnusable(url: url)
+        #expect(controller.statuses[url] == "processing")
+
+        // The next round, with a complete payload, persists and only then
+        // advertises succeeded — the spinner can leave.
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 200, body: #"{"status":"succeeded","subtitle":{"detected_language":"en","segments":[{"start":0.0,"end":1.0,"text":"Hi"}]}}"#)
+        }
+        await controller.refreshProcessing()
+        #expect(controller.statuses[url] == "succeeded")
+        let stored = try await database.subtitleRepository().get(byEnclosureURL: url)
+        #expect(stored?.language == "en")
+        #expect(stored?.segments?.first?.text == "Hi")
+    }
+
+    @Test("a blank stored payload is not advertised as succeeded")
+    func subtitleBlankStoredRowStaysProcessing() async throws {
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
+        let controller = SubtitlePollController(
+            api: makeAPI(),
+            subtitles: database.subtitleRepository(),
+            timerFactory: ManualPollTimerFactory()
+        )
+        let url = "https://x.example/ep-blank.mp3"
+        // The insert gate allows whitespace (it only rejects empty / "null"),
+        // which the page then treats as unusable.
+        try await database.subtitleRepository().insert(SubtitleRow(
+            enclosureUrl: url,
+            status: "succeeded",
+            subtitle: "   ",
+            language: "en"
+        ))
+
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 200, body: #"{"status":"succeeded","subtitle":{"segments":[{"start":0.0,"end":1.0,"text":"Hi"}]}}"#)
+        }
+        await controller.add(url: url)
+        #expect(controller.statuses[url] == "processing")
+        #expect(try await database.subtitleRepository().get(byEnclosureURL: url) == nil,
+                "an unusable row must not survive to reseed succeeded on next start()")
+    }
+
+    @Test("an unpersistable succeeded response keeps an already usable row")
+    func subtitleUnpersistableSucceededKeepsUsableRow() async throws {
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
+        let controller = SubtitlePollController(
+            api: makeAPI(),
+            subtitles: database.subtitleRepository(),
+            timerFactory: ManualPollTimerFactory()
+        )
+        let url = "https://x.example/ep-kept.mp3"
+        try await database.subtitleRepository().insert(SubtitleRow(
+            enclosureUrl: url,
+            status: "succeeded",
+            subtitle: SubtitleSegment.encode([SubtitleSegment(start: 0, end: 1, text: "Kept")]),
+            language: "en"
+        ))
+
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 200, body: #"{"status":"succeeded","subtitle":{"segments":[{"start":0.0,"end":1.0,"text":"Hi"}]}}"#)
+        }
+        await controller.add(url: url)
+        #expect(controller.statuses[url] == "succeeded")
+        let stored = try await database.subtitleRepository().get(byEnclosureURL: url)
+        #expect(stored?.language == "en")
+        #expect(stored?.segments?.first?.text == "Kept")
+    }
+
     @Test("login-cancel rollback: processing entries clear, succeeded and other statuses survive")
     func subtitleLoginCancelRollbackRevertsProcessing() async throws {
         let (database, databaseDirectory) = try await makeDatabase()

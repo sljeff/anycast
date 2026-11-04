@@ -299,6 +299,15 @@ final class SubtitlesPageViewController: UIViewController {
             if !url.isEmpty {
                 loadTranscriptRow(url: url)
             }
+        } else if TranscriptStateReducer.shouldReloadStoredRow(
+            url: url,
+            subtitleStatus: context.subtitles.statuses[url],
+            row: rowPhase
+        ) {
+            // Status flipped to succeeded after an earlier empty/failed
+            // fetch for the same URL (Generate while the page stayed open,
+            // or a poller round that just persisted).
+            loadTranscriptRow(url: url)
         }
         if let status = context.subtitles.statuses[url], status == "succeeded",
            !url.isEmpty, translationRowPhase == .idle {
@@ -338,21 +347,49 @@ final class SubtitlesPageViewController: UIViewController {
         render()
         Task { @MainActor in
             let repository = self.context.database.subtitleRepository()
-            let phase: (TranscriptRowPhase, SubtitleRow?)
+            let fetched: (TranscriptRowPhase, SubtitleRow?)
             do {
                 let row = try await repository.get(byEnclosureURL: url)
-                phase = Self.mapSubtitleRow(row)
+                fetched = Self.mapSubtitleRow(row)
             } catch {
-                phase = (.failed, nil)
+                fetched = (.failed, nil)
             }
             guard self.loadedURL == url else { return }
+            // The read above can predate a persist that just landed
+            // (Generate, or a poll round). Confirm before deleting so a
+            // usable row is not thrown away. `rowPhase` stays `.fetching`
+            // across these awaits, so a status tick does not start a second load.
+            var phase = fetched
+            if phase.0 == .empty {
+                let reread: (TranscriptRowPhase, SubtitleRow?)
+                do {
+                    reread = Self.mapSubtitleRow(try await repository.get(byEnclosureURL: url))
+                } catch {
+                    reread = phase
+                }
+                if reread.0 != .empty {
+                    phase = reread
+                }
+            }
+            guard self.loadedURL == url else { return }
+            if phase.0 == .empty {
+                // Dart reaches this cleanup from the succeeded FutureBuilder
+                // (player.dart:775+): delete the unusable row and return the
+                // poll map to processing (player.dart:782-786). A fetch while
+                // status is still nil is the Generate prompt;
+                // `shouldMarkUnusable` stays false there so that prompt remains.
+                // Flip the poll map before the delete await so a queued
+                // observation does not reload this URL as succeeded-with-no-row.
+                if TranscriptStateReducer.shouldMarkUnusable(
+                    subtitleStatus: self.context.subtitles.statuses[url]
+                ) {
+                    self.context.subtitles.markUnusable(url: url)
+                }
+                try? await repository.delete(byEnclosureURL: url)
+                guard self.loadedURL == url else { return }
+            }
             self.rowPhase = phase.0
             self.subtitleRow = phase.1
-            if phase.0 == .empty {
-                // Dart deletes the unusable row and falls back to processing
-                // (player.dart:782-786). The poller keeps its own status map.
-                try? await repository.delete(byEnclosureURL: url)
-            }
             self.render()
         }
     }
@@ -381,10 +418,7 @@ final class SubtitlesPageViewController: UIViewController {
     /// is the fetch-error panel.
     private static func mapSubtitleRow(_ row: SubtitleRow?) -> (TranscriptRowPhase, SubtitleRow?) {
         guard let row else { return (.empty, nil) }
-        guard let payload = row.subtitle,
-              !payload.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              payload != "null"
-        else { return (.empty, row) }
+        guard row.hasUsableTranscriptPayload else { return (.empty, row) }
         guard row.segments != nil else { return (.failed, row) }
         return (.loaded, row)
     }

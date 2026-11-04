@@ -171,7 +171,11 @@ public final class SubtitlePollController {
 
         switch result.status {
         case "succeeded":
-            statuses[url] = "succeeded"
+            // Persist first. `SubtitleRepository.insert` is a silent no-op
+            // when language is nil or the payload is empty / "null".
+            // Advertising "succeeded" before a usable row exists leaves the
+            // poll map stuck: this loop only revisits "processing" URLs, so
+            // the transcript page spins on a row that never arrives.
             let payload = SubtitleSegment.encode(result.segments ?? [])
             try? await subtitles.insert(SubtitleRow(
                 enclosureUrl: url,
@@ -180,6 +184,19 @@ public final class SubtitlePollController {
                 language: result.language,
                 summary: nil
             ))
+            if let stored = try? await subtitles.get(byEnclosureURL: url) {
+                if stored.hasUsableTranscriptPayload {
+                    statuses[url] = "succeeded"
+                } else {
+                    // A blank / "null" row would reseed "succeeded" on the
+                    // next foreground `start()` and stick the spinner again.
+                    try? await subtitles.delete(byEnclosureURL: url)
+                    statuses[url] = "processing"
+                }
+            } else {
+                // Keep/restore processing so the 15 s round retries.
+                statuses[url] = "processing"
+            }
         case "failed":
             // Visible for this run so the UI can offer Retry. The local row
             // is deleted, so a relaunch — which reseeds from the database —
@@ -190,6 +207,13 @@ public final class SubtitlePollController {
             break // still processing
         }
         return nil
+    }
+
+    /// Flutter player.dart:783-784: an unusable stored payload is deleted
+    /// and the poll map returns to "processing" so the 15 s loop retries
+    /// instead of leaving a permanent succeeded-with-no-row spinner.
+    public func markUnusable(url: String) {
+        statuses[url] = "processing"
     }
 
     /// K3 cascade: removing a queue entry drops its subtitle state too.

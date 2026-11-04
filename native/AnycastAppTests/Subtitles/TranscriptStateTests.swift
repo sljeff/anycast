@@ -91,4 +91,40 @@ struct TranscriptStateTests {
         #expect(reduce("succeeded", .failed) == .ready(translation: .translationUnavailable))
         #expect(reduce("succeeded", .loaded) == .ready(translation: .bilingual))
     }
+
+    @Test("same-URL succeeded reloads only after an empty or failed fetch")
+    func reloadStoredRow() {
+        #expect(TranscriptStateReducer.shouldReloadStoredRow(
+            url: "https://x.example/ep.mp3", subtitleStatus: "succeeded", row: .empty
+        ))
+        #expect(TranscriptStateReducer.shouldReloadStoredRow(
+            url: "https://x.example/ep.mp3", subtitleStatus: "succeeded", row: .failed
+        ))
+        // A fetch already in flight, or a row already on screen, must not
+        // start another load on every observation tick.
+        #expect(!TranscriptStateReducer.shouldReloadStoredRow(
+            url: "https://x.example/ep.mp3", subtitleStatus: "succeeded", row: .fetching
+        ))
+        #expect(!TranscriptStateReducer.shouldReloadStoredRow(
+            url: "https://x.example/ep.mp3", subtitleStatus: "succeeded", row: .loaded
+        ))
+        #expect(!TranscriptStateReducer.shouldReloadStoredRow(
+            url: "https://x.example/ep.mp3", subtitleStatus: "processing", row: .empty
+        ))
+        #expect(!TranscriptStateReducer.shouldReloadStoredRow(
+            url: "https://x.example/ep.mp3", subtitleStatus: nil, row: .empty
+        ))
+        #expect(!TranscriptStateReducer.shouldReloadStoredRow(
+            url: "", subtitleStatus: "succeeded", row: .empty
+        ))
+    }
+
+    @Test("unusable-row cleanup rewrites the poll map only when it already says succeeded")
+    func markUnusableOnlyAfterSucceeded() {
+        #expect(TranscriptStateReducer.shouldMarkUnusable(subtitleStatus: "succeeded"))
+        // nil is the Generate prompt; processing is already polling.
+        #expect(!TranscriptStateReducer.shouldMarkUnusable(subtitleStatus: nil))
+        #expect(!TranscriptStateReducer.shouldMarkUnusable(subtitleStatus: "processing"))
+        #expect(!TranscriptStateReducer.shouldMarkUnusable(subtitleStatus: "failed"))
+    }
 }
