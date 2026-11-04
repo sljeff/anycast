@@ -177,7 +177,7 @@ final class DetailTranscriptRow: UIView {
         accessibleTitleRow.spacing = Spacing.gap
         accessibleColumn.axis = .vertical
         accessibleColumn.alignment = .fill
-        accessibleColumn.spacing = Spacing.xxs
+        accessibleColumn.spacing = Spacing.sm
         accessibleColumn.isLayoutMarginsRelativeArrangement = true
         accessibleColumn.addArrangedSubview(accessibleTitleRow)
 
@@ -223,6 +223,12 @@ final class DetailTranscriptRow: UIView {
         )
         actionButton.setContentHuggingPriority(
             multiline ? .defaultLow : .required, for: .horizontal
+        )
+        // The count and the action sit on their own lines at accessibility
+        // sizes. 6 pt at the default size (the column is hidden then) scales
+        // with the body style so the two lines do not read as one sentence.
+        accessibleColumn.spacing = TypographyV2.scaledValue(
+            Spacing.sm, style: .body, compatibleWith: traitCollection
         )
         compactRow.isHidden = multiline
         accessibleColumn.isHidden = !multiline

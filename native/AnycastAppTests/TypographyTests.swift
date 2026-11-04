@@ -139,6 +139,55 @@ struct TypographyTests {
         }
     }
 
+    @Test("Emphasis line height is the 22 pt token at the default size")
+    func emphasisLineHeightAtDefault() {
+        let traits = UITraitCollection(preferredContentSizeCategory: .large)
+        let style = TypographyV2.emphasis
+        let font = style.font(traits: traits)
+        let line = style.resolvedLineHeight(for: font, traits: traits)
+        #expect(style.lineHeight == 22)
+        #expect(line == 22)
+        let paragraph = style.attributes(traits: traits)[.paragraphStyle] as? NSParagraphStyle
+        #expect(paragraph?.minimumLineHeight == 22)
+        #expect(paragraph?.maximumLineHeight == 22)
+    }
+
+    @Test("Line height scales with Dynamic Type and caps at 1.25")
+    func lineHeightCapsAboveTheDefaultSize() {
+        let traits = UITraitCollection(preferredContentSizeCategory: .accessibilityExtraExtraExtraLarge)
+        let style = TypographyV2.emphasis
+        let font = style.font(traits: traits)
+        let line = style.resolvedLineHeight(for: font, traits: traits)
+        let scaled = UIFontMetrics(forTextStyle: style.scalingTextStyle)
+            .scaledValue(for: style.lineHeight, compatibleWith: traits)
+        let cap = font.pointSize * TypographyV2.Style.accessibilityLineHeightMultiple
+        #expect(abs(line - min(scaled, cap)) < 0.01)
+        #expect(line > style.lineHeight)
+        #expect(line <= cap + 0.01)
+
+        let display = TypographyV2.displaySmall
+        let displayFont = display.font(traits: traits)
+        let displayLine = display.resolvedLineHeight(for: displayFont, traits: traits)
+        #expect(displayLine > display.lineHeight)
+        #expect(displayLine <= displayFont.pointSize * TypographyV2.Style.accessibilityLineHeightMultiple + 0.01)
+    }
+
+    @Test("Block gaps match the token at the default size and grow above it")
+    func scaledBlockGaps() {
+        let traits = UITraitCollection(preferredContentSizeCategory: .large)
+        #expect(TypographyV2.scaledValue(Spacing.md, style: .emphasis, compatibleWith: traits) == Spacing.md)
+        #expect(TypographyV2.scaledValue(Spacing.xs, style: .meta, compatibleWith: traits) == Spacing.xs)
+        let ax = UITraitCollection(preferredContentSizeCategory: .accessibilityExtraExtraExtraLarge)
+        #expect(TypographyV2.scaledValue(Spacing.md, style: .emphasis, compatibleWith: ax) > Spacing.md)
+        let capped = TypographyV2.emphasis.font(
+            traits: ax, maximumPointSize: DetailViewController.playLabelMaximumPointSize
+        )
+        let uncapped = TypographyV2.emphasis.font(traits: ax)
+        #expect(capped.pointSize <= DetailViewController.playLabelMaximumPointSize)
+        #expect(capped.pointSize < uncapped.pointSize)
+        #expect(capped.pointSize > TypographyV2.emphasis.font(traits: traits).pointSize)
+    }
+
     @Test("Every named color token resolves from the asset catalog")
     func allNamedColorTokensResolve() {
         // Touching each accessor exercises its force-unwrapped

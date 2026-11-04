@@ -83,6 +83,13 @@ struct DetailAccessibilityHeaderTests {
         let title = try #require(label(in: detail.view, text: "Reference episode — detail sheet layout"))
         #expect(title.numberOfLines == 3)
         #expect(title.superview !== header)
+        let paragraph = title.attributedText?.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        #expect(paragraph?.minimumLineHeight == 22)
+        #expect(paragraph?.maximumLineHeight == 22)
+
+        let play = try #require(playButton(in: detail.view))
+        #expect(abs(play.bounds.height - Radius.sheetCapsuleHeight) < 0.5)
+        #expect(play.showsLargeContentViewer == false)
     }
 
     @Test("Accessibility size taps the channel name block and shrinks the cover")
@@ -117,9 +124,39 @@ struct DetailAccessibilityHeaderTests {
         let title = try #require(label(in: detail.view, text: "Reference episode — detail sheet layout"))
         let header = title.superview as? UIStackView
         #expect(header?.axis == .vertical)
-        #expect(header?.spacing == Spacing.xs)
+        let titleGap = TypographyV2.scaledValue(
+            Spacing.md, style: .emphasis, compatibleWith: detail.traitCollection
+        )
+        #expect(titleGap > Spacing.xs)
+        #expect(abs((header?.spacing ?? 0) - titleGap) < 0.5)
+        let metaGap = TypographyV2.scaledValue(
+            Spacing.xs, style: .meta, compatibleWith: detail.traitCollection
+        )
+        let info = block.superview as? UIStackView
+        #expect(abs((info?.spacing ?? 0) - metaGap) < 0.5)
         #expect(header?.arrangedSubviews.first === title)
         #expect(title.numberOfLines == 0)
+        let titleLine = title.attributedText?.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        let emphasis = TypographyV2.emphasis
+        let emphasisFont = emphasis.font(traits: detail.traitCollection)
+        let expectedLine = emphasis.resolvedLineHeight(for: emphasisFont, traits: detail.traitCollection)
+        #expect(abs((titleLine?.minimumLineHeight ?? 0) - expectedLine) < 0.5)
+        #expect(titleLine?.minimumLineHeight == titleLine?.maximumLineHeight)
+
+        let play = try #require(playButton(in: detail.view))
+        #expect(play.showsLargeContentViewer == true)
+        #expect(play.largeContentTitle?.isEmpty == false)
+        #expect(play.interactions.contains { $0 is UILargeContentViewerInteraction })
+        let capped = TypographyV2.emphasis.font(
+            traits: detail.traitCollection,
+            maximumPointSize: DetailViewController.playLabelMaximumPointSize
+        )
+        let natural = capped.lineHeight + Spacing.gap * 2
+        let expectedHeight = min(max(natural, Radius.sheetCapsuleHeight), Radius.maximumSheetCapsuleHeight)
+        #expect(expectedHeight < Radius.maximumSheetCapsuleHeight)
+        #expect(abs(play.bounds.height - expectedHeight) < 1)
+        #expect((play.titleLabel?.font.pointSize ?? 0) <= DetailViewController.playLabelMaximumPointSize + 0.5)
+        #expect((play.titleLabel?.font.pointSize ?? 0) > 30)
         // The cover is beside the channel line, not in its own row above the title.
         #expect(artwork.superview?.superview !== header)
 
@@ -133,6 +170,12 @@ struct DetailAccessibilityHeaderTests {
         #expect(abs(restoredArtwork.bounds.width - 120) < 0.5)
         let restoredHeader = restoredArtwork.superview?.superview as? UIStackView
         #expect(restoredHeader?.axis == .horizontal)
+    }
+
+    private func playButton(in root: UIView) -> UIButton? {
+        root.subviewsRecursive().compactMap { $0 as? UIButton }.first {
+            $0.accessibilityIdentifier == "detail-play"
+        }
     }
 
     private func channelButton(in root: UIView) -> UIButton? {
