@@ -16,26 +16,26 @@ struct SettingsPageModelTests {
     func sectionRowOrder() {
         let sections = SettingsPageModel.sections(tier: .signedOut)
         #expect(sections.map(\.header) == [
-            nil, "Downloads & Storage", "Subtitles & Translation",
+            nil, "Listening", "Downloads & Storage", "Subtitles & Translation",
             "Content & Discovery", "Help", nil,
         ])
         #expect(sections.map(\.rows) == [
             [.account],
+            [.history, .maxHistoryEpisodes],
             [.cacheLimit],
             [.enableTranslation, .targetLanguage],
-            [.country, .autoRefreshInterval, .maxFeedEpisodes,
-             .maxHistoryEpisodes, .importExport, .history],
+            [.country, .autoRefreshInterval, .maxFeedEpisodes, .importExport],
             [.contactEmail],
             [.privacyPolicy, .termsOfUse],
         ])
         // Only the trailing privacy links render outside a group plate.
-        #expect(sections.map(\.plainStyle) == [false, false, false, false, false, true])
+        #expect(sections.map(\.plainStyle) == [false, false, false, false, false, false, true])
     }
 
     @Test("The gold Upgrade plate follows the identity row for free users only")
     func upgradePlateIsTierDependent() {
         let free = SettingsPageModel.sections(tier: .free)
-        #expect(free.map(\.rows).prefix(3) == [[.account], [.plusUpgrade], [.cacheLimit]])
+        #expect(free.map(\.rows).prefix(3) == [[.account], [.plusUpgrade], [.history, .maxHistoryEpisodes]])
         #expect(free.count == SettingsPageModel.sections(tier: .signedOut).count + 1)
         #expect(free[1].header == nil)
         #expect(free[1].plainStyle == false)
@@ -105,6 +105,9 @@ struct SettingsPageModelTests {
         #expect(SettingsPageModel.value(for: .maxFeedEpisodes, settings: settings) == "200 episodes")
         #expect(SettingsPageModel.value(for: .maxHistoryEpisodes, settings: settings) == "50 episodes")
         #expect(SettingsPageModel.value(for: .cacheLimit, settings: settings) == "20 episodes")
+        #expect(SettingsPageModel.historyCountDisplay(count: 0) == "None")
+        #expect(SettingsPageModel.historyCountDisplay(count: 1) == "1 episode")
+        #expect(SettingsPageModel.historyCountDisplay(count: 12) == "12 episodes")
         #expect(SettingsPageModel.value(for: .contactEmail, settings: settings) == "Email")
 
         settings.targetLanguage = ""

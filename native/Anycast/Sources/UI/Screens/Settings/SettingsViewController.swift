@@ -103,6 +103,8 @@ final class SettingsViewController: UIViewController {
 
     private let longPressRecognizer = UILongPressGestureRecognizer()
     private var notificationObservers: [NSObjectProtocol] = []
+    /// Nil until the history count read finishes. The row then shows None / N episodes.
+    private var historyCount: Int?
 
     init(context: UIContext) {
         self.context = context
@@ -323,6 +325,18 @@ final class SettingsViewController: UIViewController {
         }
         self.dataSource = dataSource
         applySnapshot()
+        reloadHistoryCount()
+    }
+
+    /// Listening History's trailing count. Re-read whenever the sheet loads;
+    /// the sheet is created per presentation.
+    private func reloadHistoryCount() {
+        Task { [weak self] in
+            guard let self else { return }
+            guard let count = try? await context.database.historyRepository().count() else { return }
+            self.historyCount = count
+            self.reconfigureVisible()
+        }
     }
 
     private func applySnapshot() {
@@ -371,10 +385,16 @@ final class SettingsViewController: UIViewController {
             let opensSomething: Set<SettingsPageModel.Row> = [
                 .targetLanguage, .country, .importExport, .history,
             ]
+            let value: String?
+            if row == .history {
+                value = historyCount.map(SettingsPageModel.historyCountDisplay(count:))
+            } else {
+                value = SettingsPageModel.value(for: row, settings: settings)
+            }
             cell.configure(
                 title: title,
                 subtitle: SettingsPageModel.subtitle(for: row),
-                value: SettingsPageModel.value(for: row, settings: settings),
+                value: value,
                 showsChevron: opensSomething.contains(row) && !isDimmed,
                 isDimmed: isDimmed
             )
@@ -571,8 +591,17 @@ final class SettingsViewController: UIViewController {
         ImportExportDialogViewController.present(from: self, context: context)
     }
 
+    /// Dismiss Settings first, then present History from the page underneath.
+    /// History must not stack on the Settings sheet.
     private func presentHistory() {
-        HistoryDialogViewController.present(from: self, context: context)
+        let context = context
+        guard let presenter = presentingViewController else {
+            HistoryDialogViewController.present(from: self, context: context)
+            return
+        }
+        dismiss(animated: true) {
+            HistoryDialogViewController.present(from: presenter.topMostPresented(), context: context)
+        }
     }
 
     private func presentCountrySheet() {

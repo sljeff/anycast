@@ -1,16 +1,14 @@
 import Foundation
 import GRDB
 
-/// The inherited schema, mirrored statement-for-statement from
-/// lib/models/helper.dart + the individual model files (docs/migration/01 §1).
-/// The native first release keeps this schema byte-compatible for
-/// write-back: same tables, same columns, same `user_version`, rollback
-/// journal (never WAL) — docs/migration/05 §2.4.
+/// The inherited schema, mirrored from `lib/models/helper.dart` and the
+/// model files. `user_version` and the migration map stay in lockstep with
+/// that file. The journal stays rollback (never WAL) — docs/migration/05 §2.4.
 public enum Schema {
 
     /// `PRAGMA user_version` — the database schema version, not the app
     /// version (AGENTS.md).
-    public static let version = 4
+    public static let version = 5
 
     /// Historical migration steps, ported from `migrations` in helper.dart.
     /// Keys are target schema versions; released steps are append-only.
@@ -18,6 +16,13 @@ public enum Schema {
         // 3 -> 4
         4: [
             "ALTER TABLE settings ADD COLUMN continuousPlaying INTEGER DEFAULT 1",
+        ],
+        // 4 -> 5. `lastPlayedAt` is the history sort key. Rows written before
+        // the column existed have no real play time; copying `id` keeps the
+        // previous id-DESC order as a monotonic fallback.
+        5: [
+            "ALTER TABLE historyEpisode ADD COLUMN lastPlayedAt INTEGER",
+            "UPDATE historyEpisode SET lastPlayedAt = id WHERE lastPlayedAt IS NULL",
         ],
     ]
 
@@ -115,7 +120,8 @@ public enum Schema {
           pubDate INTEGER,
           imageUrl TEXT,
           channelTitle TEXT,
-          rssFeedUrl TEXT
+          rssFeedUrl TEXT,
+          lastPlayedAt INTEGER
         )
         """,
         """

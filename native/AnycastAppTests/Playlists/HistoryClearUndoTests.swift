@@ -3,12 +3,9 @@ import Testing
 import AnycastKit
 @testable import Anycast
 
-/// History's Clear All defers the DB delete for an Undo window: beginning a
-/// clear empties the list only, Undo re-reads the untouched DB, and the
-/// commit (timer, early commit, or disappearance) deletes exactly once.
-/// Real SQLite in a temporary file; the controller is built over the live
-/// app context (like the sibling screen tests) with the temporary database
-/// injected, so the app's own history is never touched.
+/// History Clear All deletes on confirm (no undo window). Per-item delete
+/// removes one enclosure. Real SQLite in a temporary file; the controller
+/// is built over the live app context with that database injected.
 @MainActor
 struct HistoryClearUndoTests {
 
@@ -27,7 +24,7 @@ struct HistoryClearUndoTests {
     }
 
     /// nil when the app host never produced a `UIContext` (non-hosted run).
-    private static func makeFixture(undoWindow: Duration = .seconds(60)) async throws -> Fixture? {
+    private static func makeFixture() async throws -> Fixture? {
         guard let context = await liveUIContext() else { return nil }
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("history-clear-\(UUID().uuidString).sqlite")
@@ -37,12 +34,11 @@ struct HistoryClearUndoTests {
                 title: "Episode \(index)",
                 enclosureUrl: "https://example.test/episode-\(index).mp3",
                 imageUrl: nil,
-                channelTitle: "Channel"
+                channelTitle: "Channel",
+                lastPlayedAt: Int64(index) * 1_000
             ))
         }
-        let controller = HistoryDialogViewController(
-            context: context, database: database, undoWindow: undoWindow
-        )
+        let controller = HistoryDialogViewController(context: context, database: database)
         controller.loadViewIfNeeded()
         let fixture = Fixture(controller: controller, database: database, databaseURL: url)
         let loaded = await waitUntil { controller.episodes.count == 3 }
@@ -50,71 +46,107 @@ struct HistoryClearUndoTests {
         return fixture
     }
 
-    @Test("begin pending clear empties the list and leaves the DB alone")
-    func beginKeepsDatabase() async throws {
+    @Test("confirmed clear deletes every history row and shows the one-line empty state")
+    func confirmClearDeletes() async throws {
         guard let fixture = try await Self.makeFixture() else { return }
         defer { fixture.cleanUp() }
 
-        #expect(fixture.controller.footerState == .hold)
-        fixture.controller.beginPendingClear()
+        #expect(Self.visibleButtonTitles(in: fixture.controller.view).contains("Clear All"))
+        fixture.controller.commitClearAll()
 
         #expect(fixture.controller.episodes.isEmpty)
-        #expect(fixture.controller.footerState == .undo)
-        #expect(await fixture.historyCount() == 3)
+        let emptied = await Self.waitUntil { await fixture.historyCount() == 0 }
+        #expect(emptied)
+        fixture.controller.view.layoutIfNeeded()
+        #expect(!Self.visibleButtonTitles(in: fixture.controller.view).contains("Clear All"))
+        #expect(Self.visibleButtonTitles(in: fixture.controller.view).contains("Explore"))
+        #expect(Self.visibleLabelTexts(in: fixture.controller.view).contains("Play an episode and it shows up here."))
+        #expect(!Self.visibleLabelTexts(in: fixture.controller.view).contains("No history"))
     }
 
-    @Test("undo restores the rows from the DB and returns to the hold button")
-    func undoRestores() async throws {
+    @Test("deleting one enclosure leaves the others")
+    func deleteOneRow() async throws {
         guard let fixture = try await Self.makeFixture() else { return }
         defer { fixture.cleanUp() }
 
-        fixture.controller.beginPendingClear()
-        await fixture.controller.undoPendingClear()
-
-        #expect(fixture.controller.episodes.count == 3)
-        #expect(fixture.controller.footerState == .hold)
-        #expect(await fixture.historyCount() == 3)
+        fixture.controller.deleteEpisode(url: "https://example.test/episode-2.mp3")
+        #expect(fixture.controller.episodes.map(\.enclosureUrl) == [
+            "https://example.test/episode-3.mp3",
+            "https://example.test/episode-1.mp3",
+        ])
+        let settled = await Self.waitUntil { await fixture.historyCount() == 2 }
+        #expect(settled)
     }
 
-    @Test("the undo window elapsing commits the delete")
-    func windowElapsedCommits() async throws {
-        guard let fixture = try await Self.makeFixture(undoWindow: .milliseconds(100)) else { return }
-        defer { fixture.cleanUp() }
-
-        fixture.controller.beginPendingClear()
-        try await Task.sleep(for: .milliseconds(400))
-
-        let emptied = await Self.waitUntil { await fixture.historyCount() == 0 }
-        #expect(emptied)
-        #expect(fixture.controller.footerState == .hidden)
-    }
-
-    @Test("early commit deletes once; a second commit is a no-op")
-    func earlyCommitIsIdempotent() async throws {
-        guard let fixture = try await Self.makeFixture() else { return }
-        defer { fixture.cleanUp() }
-
-        fixture.controller.beginPendingClear()
-        fixture.controller.commitPendingClear()
-        #expect(!fixture.controller.hasPendingClear)
-
-        let emptied = await Self.waitUntil { await fixture.historyCount() == 0 }
-        #expect(emptied)
-        #expect(fixture.controller.footerState == .hidden)
-
-        fixture.controller.commitPendingClear()
-        #expect(fixture.controller.footerState == .hidden)
-        #expect(await fixture.historyCount() == 0)
-    }
-
-    @Test("history row title is a single truncated line")
-    func rowTitleIsOneLine() {
+    @Test("history row title may wrap")
+    func rowTitleMayWrap() {
         let cell = HistoryRowCell(frame: .zero)
         cell.configure(HistoryEpisodeRow(title: "A very long episode title", channelTitle: "Channel"))
-        #expect(cell.titleLabel.numberOfLines == 1)
+        #expect(cell.titleLabel.numberOfLines == 0)
+    }
+
+    @Test("day groups follow the calendar and keep newest-first order")
+    func dayGroups() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let today = Int64(now.timeIntervalSince1970 * 1000)
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: now)!
+        let earlier = calendar.date(byAdding: .day, value: -3, to: now)!
+        func millis(_ date: Date) -> Int64 { Int64(date.timeIntervalSince1970 * 1000) }
+
+        let rows = [
+            HistoryEpisodeRow(title: "later today", enclosureUrl: "https://example.test/t2.mp3", lastPlayedAt: today),
+            HistoryEpisodeRow(title: "earlier today", enclosureUrl: "https://example.test/t1.mp3", lastPlayedAt: today - 3_600_000),
+            HistoryEpisodeRow(title: "yesterday", enclosureUrl: "https://example.test/y.mp3", lastPlayedAt: millis(yesterday)),
+            HistoryEpisodeRow(title: "old", enclosureUrl: "https://example.test/e.mp3", lastPlayedAt: millis(earlier)),
+            HistoryEpisodeRow(title: "unknown", enclosureUrl: "https://example.test/u.mp3", lastPlayedAt: nil),
+        ]
+        let grouped = HistoryDayGrouping.grouped(rows, now: now, calendar: calendar)
+        #expect(grouped.map(\.section) == [.today, .yesterday, .earlier])
+        #expect(grouped[0].rows.map(\.title) == ["later today", "earlier today"])
+        #expect(grouped[1].rows.map(\.title) == ["yesterday"])
+        #expect(grouped[2].rows.map(\.title) == ["old", "unknown"])
+    }
+
+    @Test("row subtitle is the show and a relative play time")
+    func rowSubtitle() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let twoHoursAgo = Int64(now.timeIntervalSince1970 * 1000) - 2 * 3_600_000
+        #expect(
+            HistoryPresentation.subtitle(channel: "Night Kitchen", lastPlayedAt: twoHoursAgo, now: now)
+                == "Night Kitchen · 2h ago"
+        )
+        #expect(HistoryPresentation.subtitle(channel: "Night Kitchen", lastPlayedAt: nil, now: now) == "Night Kitchen")
+        #expect(HistoryPresentation.subtitle(channel: nil, lastPlayedAt: twoHoursAgo, now: now) == "2h ago")
     }
 
     // MARK: - Helpers
+
+    private static func visibleLabelTexts(in view: UIView) -> [String] {
+        guard !view.isHidden, view.alpha > 0 else { return [] }
+        var texts: [String] = []
+        if let label = view as? UILabel, let text = label.text, !text.isEmpty {
+            texts.append(text)
+        }
+        for subview in view.subviews {
+            texts.append(contentsOf: visibleLabelTexts(in: subview))
+        }
+        return texts
+    }
+
+    private static func visibleButtonTitles(in view: UIView) -> [String] {
+        guard !view.isHidden, view.alpha > 0 else { return [] }
+        var titles: [String] = []
+        if let button = view as? UIButton {
+            let title = button.configuration?.title ?? button.currentTitle ?? ""
+            if !title.isEmpty { titles.append(title) }
+        }
+        for subview in view.subviews {
+            titles.append(contentsOf: visibleButtonTitles(in: subview))
+        }
+        return titles
+    }
 
     private static func waitUntil(
         timeout: Duration = .seconds(5),
