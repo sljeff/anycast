@@ -474,7 +474,7 @@ final class SubtitlesPageViewController: UIViewController {
             return .init(id: "loading", leading: .spinner, message: "Loading transcript")
         case .loadFailed:
             return .init(
-                id: "loadFailed", leading: .icon(UIImage(systemName: "arrow.triangle.2.circlepath")),
+                id: "loadFailed", leading: .icon(AppIcons.retry),
                 message: "Couldn't load transcript",
                 action: ("Retry", { [weak self] in
                     guard let self, let url = self.loadedURL, !url.isEmpty else { return }
@@ -483,7 +483,7 @@ final class SubtitlesPageViewController: UIViewController {
             )
         case .prompt:
             return .init(
-                id: "prompt", leading: .icon(UIImage(systemName: "sparkles")),
+                id: "prompt", leading: .icon(AppIcons.aiTranscript),
                 message: "AI transcript",
                 action: ("Generate", { [weak self] in self?.generateTranscript() })
             )
@@ -492,7 +492,7 @@ final class SubtitlesPageViewController: UIViewController {
             return .init(id: "processing", leading: .spinner, message: "Generating transcript")
         case .failed:
             return .init(
-                id: "failed", leading: .icon(UIImage(systemName: "exclamationmark.triangle")),
+                id: "failed", leading: .icon(AppIcons.transcriptFailed),
                 message: "Couldn't transcribe",
                 action: ("Retry", { [weak self] in self?.generateTranscript() })
             )
@@ -622,7 +622,7 @@ final class SubtitlesPageViewController: UIViewController {
         let episodeTitle = context.playback.currentEpisode?.title ?? ""
 
         return UIMenu(children: [
-            UIAction(title: "Ask AI about this", image: UIImage(systemName: "sparkles")) { [weak self] _ in
+            UIAction(title: "Ask AI about this", image: AppIcons.aiChat) { [weak self] _ in
                 self?.openChat(draftQuestion: "Can you explain this part of the episode? \"\(text)\"")
             },
             UIAction(title: "Play from here", image: AppIcons.play) { [weak self] _ in

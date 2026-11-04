@@ -49,6 +49,10 @@ extension UITextField {
         if clearButtonMode == .never {
             rightView = Self.makeSpacer()
             rightViewMode = .always
+        } else {
+            // The system clear control measures about 20×20. Replace it
+            // with a 44 pt target; the glyph stays the small system mark.
+            installAnycastClearButton()
         }
 
         updateAnycastBorder()
@@ -65,6 +69,47 @@ extension UITextField {
         let spacer = UIView(frame: CGRect(x: 0, y: 0, width: Spacing.pageH, height: 1))
         spacer.widthAnchor.constraint(equalToConstant: Spacing.pageH).isActive = true
         return spacer
+    }
+
+    /// A 44×44 clear control. The glyph is the system clear mark
+    /// (`xmark.circle.fill`), which dismisses typed text — not Remove,
+    /// which is `trash`, and not Close, which is a bare `xmark`.
+    func installAnycastClearButton() {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        button.setPreferredSymbolConfiguration(
+            UIImage.SymbolConfiguration(textStyle: .body, scale: .large),
+            forImageIn: .normal
+        )
+        button.tintColor = Theme.onSurfaceVariant
+        button.accessibilityLabel = "Clear text"
+        button.enableIconLargeContentViewer()
+        button.frame = CGRect(x: 0, y: 0, width: IconMetrics.minimumHit, height: IconMetrics.minimumHit)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: IconMetrics.minimumHit),
+            button.heightAnchor.constraint(equalToConstant: IconMetrics.minimumHit),
+        ])
+        button.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            self.text = ""
+            self.sendActions(for: .editingChanged)
+            self.refreshAnycastClearButton()
+        }, for: .touchUpInside)
+        clearButtonMode = .never
+        rightView = button
+        addAction(UIAction { [weak self] _ in self?.refreshAnycastClearButton() }, for: .editingChanged)
+        addAction(UIAction { [weak self] _ in self?.refreshAnycastClearButton() }, for: .editingDidBegin)
+        addAction(UIAction { [weak self] _ in self?.refreshAnycastClearButton() }, for: .editingDidEnd)
+        refreshAnycastClearButton()
+    }
+
+    /// Shows the clear control only while editing and the field has text.
+    func refreshAnycastClearButton() {
+        let hasText = (text ?? "").isEmpty == false
+        let show = isEditing && hasText
+        rightView?.isHidden = !show
+        rightViewMode = show ? .always : .never
     }
 
     /// The hairline is a CGColor (frozen at assignment, 09 §9a).

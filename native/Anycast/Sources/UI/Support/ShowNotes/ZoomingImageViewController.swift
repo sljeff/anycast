@@ -103,7 +103,7 @@ final class ZoomingImageViewController: UIViewController, UIScrollViewDelegate {
         retryButton.isHidden = true
         view.addSubview(retryButton)
 
-        activityIndicator.color = .white
+        activityIndicator.color = Theme.onSurface
         view.addSubview(activityIndicator)
 
         if imageURL != nil {
@@ -128,23 +128,28 @@ final class ZoomingImageViewController: UIViewController, UIScrollViewDelegate {
 
     private func configureChromeButton(_ button: UIButton, symbol: String, label: String) {
         button.setImage(UIImage(systemName: symbol), for: .normal)
-        button.tintColor = .white
+        button.setPreferredSymbolConfiguration(
+            UIImage.SymbolConfiguration(textStyle: .body, scale: .large),
+            forImageIn: .normal
+        )
+        button.tintColor = Theme.onSurface
         button.accessibilityLabel = label
-        button.backgroundColor = UIColor(white: 0, alpha: 0.55)
-        button.layer.cornerRadius = 22
+        button.backgroundColor = Theme.surfaceContainer
+        button.layer.cornerRadius = IconMetrics.minimumHit / 2
         button.layer.masksToBounds = true
+        button.enableIconLargeContentViewer()
     }
 
     private func positionChrome() {
         let safe = view.safeAreaInsets
-        let side: CGFloat = 44
-        closeButton.frame = CGRect(x: 16, y: safe.top + 12, width: side, height: side)
-        retryButton.frame = CGRect(
-            x: view.bounds.width - 16 - side,
-            y: safe.top + 12,
-            width: side,
-            height: side
-        )
+        let side = IconMetrics.minimumHit
+        let margin = Spacing.pageH
+        let top = safe.top + Spacing.gap
+        let leadingX = margin
+        let trailingX = view.bounds.width - margin - side
+        let rtl = view.effectiveUserInterfaceLayoutDirection == .rightToLeft
+        closeButton.frame = CGRect(x: rtl ? trailingX : leadingX, y: top, width: side, height: side)
+        retryButton.frame = CGRect(x: rtl ? leadingX : trailingX, y: top, width: side, height: side)
         activityIndicator.center = CGPoint(
             x: view.bounds.midX,
             y: view.bounds.midY

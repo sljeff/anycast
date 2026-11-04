@@ -217,10 +217,11 @@ enum PlaylistDownloadDisplay {
 
 // MARK: - AI transcribe icon (play_icon.dart AIIcon, playlists.dart:154-180)
 
-/// Four-state AI transcribe display. The Dart `subtitleUrls` map carried
-/// nil / "processing" / "succeeded" / "failed"; any other server string
-/// matched no switch case (icon: default sparkle, tap: no-op) — kept as
-/// `.unknown` for exact parity.
+    /// Four-state AI transcribe display. The Dart `subtitleUrls` map carried
+    /// nil / "processing" / "succeeded" / "failed"; any other server string
+    /// matched no switch case (icon: default transcript mark, tap: no-op) —
+    /// kept as `.unknown` for exact parity. Success stays a filled check
+    /// (fill = success). Failure is the outline triangle.
 enum AITranscriptDisplay: Equatable {
     case `default`
     case processing
@@ -243,7 +244,7 @@ enum AITranscriptDisplay: Equatable {
         case .succeeded:
             return AppIcons.checkCircle
         case .failed:
-            return AppIcons.smsFailed
+            return AppIcons.transcriptFailed
         case .default, .processing, .unknown:
             return AppIcons.aiTranscript ?? UIImage()
         }

@@ -206,6 +206,10 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
             searchController.searchBar.autocapitalizationType = .none
             searchController.searchBar.delegate = self
             searchController.searchBar.searchTextField.accessibilityIdentifier = "search-page-field"
+            // The system clear button is about 20×20. Replace it with the
+            // shared 44 pt control (same glyph, larger hit area).
+            searchController.searchBar.searchTextField.clearButtonMode = .whileEditing
+            searchController.searchBar.searchTextField.installAnycastClearButton()
             navigationItem.searchController = searchController
             stripTop = tabStrip.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.gap)
         } else {

@@ -1259,11 +1259,14 @@ final class HistoryTailCell: UICollectionViewCell {
         super.init(frame: frame)
         var configuration = UIButton.Configuration.plain()
         configuration.title = "history"
-        configuration.image = UIImage(systemName: "chevron.right")
+        configuration.image = AppIcons.disclosure
         configuration.imagePlacement = .trailing
-        configuration.imagePadding = 4
+        configuration.imagePadding = Spacing.xs
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
+            textStyle: TypographyV2.meta.scalingTextStyle
+        )
         configuration.contentInsets = NSDirectionalEdgeInsets(
-            top: 0, leading: 4, bottom: 0, trailing: 4
+            top: 0, leading: Spacing.xs, bottom: 0, trailing: Spacing.xs
         )
         configuration.cornerStyle = .capsule
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
@@ -1285,7 +1288,7 @@ final class HistoryTailCell: UICollectionViewCell {
             button.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageH),
             button.topAnchor.constraint(equalTo: contentView.topAnchor),
             button.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            button.heightAnchor.constraint(equalToConstant: 36),
+            button.heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit),
         ])
     }
 

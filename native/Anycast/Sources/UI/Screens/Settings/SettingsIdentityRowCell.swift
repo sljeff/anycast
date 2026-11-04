@@ -18,11 +18,12 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let actionLabel = UILabel()
-    private let chevronView = UIImageView(
-        image: UIImage(systemName: "chevron.forward")?.applyingSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        )
-    )
+    private let chevronView: UIImageView = {
+        let view = UIImageView(image: UIImage(systemName: "chevron.forward"))
+        view.preferredSymbolConfiguration = IconMetrics.disclosureConfiguration()
+        return view
+    }()
+    private var avatarSideConstraints: [NSLayoutConstraint] = []
     private let rowStack = UIStackView()
     private var topConstraint: NSLayoutConstraint?
     private var bottomConstraint: NSLayoutConstraint?
@@ -36,9 +37,8 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
         avatarView.translatesAutoresizingMaskIntoConstraints = false
         glyphView.contentMode = .center
         glyphView.tintColor = Theme.onSurfaceVariant
-        glyphView.image = UIImage(systemName: "person.fill")?.applyingSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
-        )
+        glyphView.image = UIImage(systemName: "person.fill")
+        glyphView.preferredSymbolConfiguration = IconMetrics.avatarGlyphConfiguration()
         initialLabel.font = TypographyV2.body.font()
         initialLabel.adjustsFontForContentSizeCategory = true
         initialLabel.textColor = Theme.onSurface
@@ -51,10 +51,13 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
                 inner.centerYAnchor.constraint(equalTo: avatarView.centerYAnchor),
             ])
         }
-        NSLayoutConstraint.activate([
-            avatarView.widthAnchor.constraint(equalToConstant: Self.avatarSize),
-            avatarView.heightAnchor.constraint(equalToConstant: Self.avatarSize),
-        ])
+        let avatarWidth = avatarView.widthAnchor.constraint(equalToConstant: Self.avatarSize)
+        let avatarHeight = avatarView.heightAnchor.constraint(equalToConstant: Self.avatarSize)
+        avatarSideConstraints = [avatarWidth, avatarHeight]
+        NSLayoutConstraint.activate([avatarWidth, avatarHeight])
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (cell: SettingsIdentityRowCell, _) in
+            cell.applyAvatarMetrics()
+        }
         avatarView.setContentHuggingPriority(.required, for: .horizontal)
         avatarView.setContentCompressionResistancePriority(.required, for: .horizontal)
 
@@ -121,6 +124,17 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        avatarView.layer.cornerRadius = avatarView.bounds.height / 2
+    }
+
+    /// Avatar disc tracks title2 with the glyph, from the 44 pt design size.
+    private func applyAvatarMetrics() {
+        let side = IconMetrics.scaledUp(Self.avatarSize, textStyle: .title2, compatibleWith: traitCollection)
+        for constraint in avatarSideConstraints { constraint.constant = side }
+    }
 
     /// Identity row on the surface plate.
     func configure(identity: AccountPageModel.IdentityContent) {

@@ -39,14 +39,18 @@ final class PlayerTransportView: UIView {
     private let progressBar = PlayerProgressBarView()
     private let replayButton = AnycastIconButton(
         style: .plain, icon: AppIcons.replay10, accessibilityLabel: "Seek back 10 seconds",
-        diameter: Layout.transportSlot, glyphSize: IconStyle.playerTransport.pointSize
+        diameter: Layout.transportSlot, glyphSize: IconStyle.playerTransport.pointSize,
+        glyphWeight: IconStyle.playerTransport.weight, metrics: TypographyV2.headlineMedium
     )
     private let playPauseButton = UIButton(type: .custom)
     private let playPauseIcon = PlayPauseIconControl(size: IconStyle.playerPrimary.pointSize)
     private let forwardButton = AnycastIconButton(
         style: .plain, icon: AppIcons.forward30, accessibilityLabel: "Seek forward 30 seconds",
-        diameter: Layout.transportSlot, glyphSize: IconStyle.playerTransport.pointSize
+        diameter: Layout.transportSlot, glyphSize: IconStyle.playerTransport.pointSize,
+        glyphWeight: IconStyle.playerTransport.weight, metrics: TypographyV2.headlineMedium
     )
+    private var playSlotConstraints: [NSLayoutConstraint] = []
+    private var playGlyphConstraints: [NSLayoutConstraint] = []
     private let controlsRow = UIView()
     private let stack = UIStackView()
     private var scrubberFooter: UIView?
@@ -67,6 +71,7 @@ final class PlayerTransportView: UIView {
         build()
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (self: Self, _) in
             self.updateScrubberSpacing()
+            self.applyTransportMetrics()
         }
         progressBar.onSeek = { [weak self] position in
             guard let self else { return }
@@ -191,7 +196,10 @@ final class PlayerTransportView: UIView {
 
         playPauseButton.isAccessibilityElement = true
         playPauseButton.accessibilityLabel = "Play or pause"
+        playPauseButton.enableIconLargeContentViewer()
+        // The button is the accessible control. The icon only draws.
         playPauseIcon.isUserInteractionEnabled = false
+        playPauseIcon.isAccessibilityElement = false
         playPauseIcon.translatesAutoresizingMaskIntoConstraints = false
         playPauseButton.addSubview(playPauseIcon)
         playPauseButton.addPressFeedback(scale: Motion.pressScaleStrong)
@@ -211,18 +219,22 @@ final class PlayerTransportView: UIView {
             button.translatesAutoresizingMaskIntoConstraints = false
             controlsRow.addSubview(button)
         }
+        let playWidth = playPauseButton.widthAnchor.constraint(equalToConstant: Layout.transportSlot)
+        let playHeight = playPauseButton.heightAnchor.constraint(equalToConstant: Layout.transportSlot)
+        let glyphWidth = playPauseIcon.widthAnchor.constraint(equalToConstant: IconStyle.playerPrimary.pointSize)
+        let glyphHeight = playPauseIcon.heightAnchor.constraint(equalToConstant: IconStyle.playerPrimary.pointSize)
+        playSlotConstraints = [playWidth, playHeight]
+        playGlyphConstraints = [glyphWidth, glyphHeight]
         NSLayoutConstraint.activate([
             playPauseButton.centerXAnchor.constraint(equalTo: controlsRow.centerXAnchor),
             playPauseButton.topAnchor.constraint(equalTo: controlsRow.topAnchor),
             playPauseButton.bottomAnchor.constraint(equalTo: controlsRow.bottomAnchor),
-            playPauseButton.widthAnchor.constraint(equalToConstant: Layout.transportSlot),
-            playPauseButton.heightAnchor.constraint(equalToConstant: Layout.transportSlot),
+            playWidth, playHeight,
             playPauseIcon.centerXAnchor.constraint(equalTo: playPauseButton.centerXAnchor),
             playPauseIcon.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
             // Explicit size: the loading lottie's canvas must never be able
             // to stretch the control past its slot (R2).
-            playPauseIcon.widthAnchor.constraint(equalToConstant: IconStyle.playerPrimary.pointSize),
-            playPauseIcon.heightAnchor.constraint(equalToConstant: IconStyle.playerPrimary.pointSize),
+            glyphWidth, glyphHeight,
 
             replayButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
             replayButton.trailingAnchor.constraint(equalTo: playPauseButton.leadingAnchor, constant: -transportGap),
@@ -231,6 +243,21 @@ final class PlayerTransportView: UIView {
             forwardButton.leadingAnchor.constraint(equalTo: playPauseButton.trailingAnchor, constant: transportGap),
             forwardButton.trailingAnchor.constraint(lessThanOrEqualTo: controlsRow.trailingAnchor),
         ])
+        applyTransportMetrics()
+    }
+
+    /// Skip slots and the center play glyph grow together with headline
+    /// metrics. At the default content size the slots stay 72 and the
+    /// glyph stays 56.
+    private func applyTransportMetrics() {
+        let side = IconMetrics.diameter(
+            Layout.transportSlot,
+            style: TypographyV2.headlineMedium,
+            compatibleWith: traitCollection
+        )
+        let glyph = side * (IconStyle.playerPrimary.pointSize / Layout.transportSlot)
+        for constraint in playSlotConstraints { constraint.constant = side }
+        for constraint in playGlyphConstraints { constraint.constant = glyph }
     }
 
     // MARK: - Rendering (ObservationLoop-driven)

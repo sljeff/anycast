@@ -415,8 +415,9 @@ final class PlaylistEpisodeListBinder: NSObject {
             overlay.widthAnchor.constraint(equalToConstant: overlay.size),
             overlay.heightAnchor.constraint(equalToConstant: overlay.size),
         ])
-        button.setImage(UIImage(), for: .normal)
+        cell.setStripIcon(UIImage(), at: Self.playActionTag)
         button.isAccessibilityElement = true
+        overlay.isAccessibilityElement = false
         updatePlayOverlay(on: cell, enclosureURL: enclosureURL)
     }
 
@@ -436,15 +437,15 @@ final class PlaylistEpisodeListBinder: NSObject {
         button.accessibilityLabel = overlay.accessibilityLabel
     }
 
-    /// AI four state (play_icon.dart AIIcon): sparkle / robot lottie /
-    /// green check / failed bubble. The lottie overlays the strip button;
-    /// the static tinted SF symbols cover the rest.
+    /// AI four state (play_icon.dart AIIcon): transcript mark / robot lottie /
+    /// green check / outline triangle. The lottie overlays the strip button;
+    /// the static tinted symbols cover the rest.
     private func applyAIDisplay(on cell: EpisodeCardCell, enclosureURL: String) {
         guard let button = Self.descendantButton(tagged: Self.aiActionTag, in: cell) else { return }
         let display = AITranscriptDisplay.display(status: context.subtitles.statuses[enclosureURL])
         switch display {
         case .processing:
-            button.setImage(UIImage(), for: .normal)
+            cell.setStripIcon(UIImage(), at: Self.aiActionTag)
             button.tintColor = Theme.onSurface
             // Reuse an in-flight robot: visible cards reconfigure on every
             // playback / download tick, and rebuilding the lottie restarts
@@ -461,8 +462,12 @@ final class PlaylistEpisodeListBinder: NSObject {
                 $0.stop()
                 $0.removeFromSuperview()
             }
-            button.setImage(display.icon, for: .normal)
+            cell.setStripIcon(display.icon, at: Self.aiActionTag)
             button.tintColor = display.tintColor
+            if var configuration = button.configuration {
+                configuration.baseForegroundColor = display.tintColor
+                button.configuration = configuration
+            }
         }
         button.accessibilityLabel = Self.aiAccessibilityLabel(for: display)
     }

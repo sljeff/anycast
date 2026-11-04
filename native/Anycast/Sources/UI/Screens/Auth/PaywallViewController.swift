@@ -275,9 +275,9 @@ final class PaywallViewController: UIViewController {
     private func makeDetailsLink() -> UIView {
         var configuration = UIButton.Configuration.plain()
         configuration.title = PaywallModel.detailsLinkTitle
-        configuration.image = UIImage(
-            systemName: "chevron.right",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+        configuration.image = AppIcons.disclosure
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
+            textStyle: .caption1, scale: .medium
         )
         configuration.imagePlacement = .trailing
         configuration.imagePadding = Spacing.sm

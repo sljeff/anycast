@@ -142,16 +142,18 @@ final class PlayerBarView: UIView {
         capsule.addSubview(playPauseControl)
 
         forwardButton.setImage(AppIcons.forward30, for: .normal)
-        forwardButton.setPreferredSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 22),
-            forImageIn: .normal
-        )
+        applyForwardGlyph()
+        forwardButton.enableIconLargeContentViewer()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (bar: PlayerBarView, _) in
+            bar.applyForwardGlyph()
+        }
         forwardButton.addPressFeedback()
         forwardButton.tintColor = style == .capsule
             ? Theme.onSurface.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
             : Theme.onSurface
         forwardButton.isAccessibilityElement = true
         forwardButton.accessibilityLabel = "Forward 30 seconds"
+        forwardButton.largeContentTitle = "Forward 30 seconds"
         forwardButton.addAction(
             UIAction { [weak self] _ in
                 guard let self else { return }
@@ -208,6 +210,20 @@ final class PlayerBarView: UIView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// 22 pt at the default size. Capped so an accessibility size does not
+    /// paint outside the fixed 58 pt bar; the hit target stays 44.
+    private func applyForwardGlyph() {
+        let point = min(
+            28,
+            IconMetrics.scaledUp(22, style: TypographyV2.body, compatibleWith: traitCollection)
+        )
+        forwardButton.setPreferredSymbolConfiguration(
+            UIImage.SymbolConfiguration(pointSize: point),
+            forImageIn: .normal
+        )
+        forwardButton.largeContentImage = forwardButton.image(for: .normal)
+    }
 
     /// The capsule border runs through `layer.borderColor` — a frozen
     /// CGColor that must be re-resolved on appearance flips (09 §9a).
