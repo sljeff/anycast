@@ -7,31 +7,63 @@ public struct HistoryRepository: Sendable {
     let database: AppDatabase
     init(database: AppDatabase) { self.database = database }
 
-    /// "Latest" = ORDER BY id DESC — NOT pubDate (K12).
+    /// Latest play first. `id` is only a tie-break: it is the history row's
+    /// own rowid, not a playlist id and not a timestamp.
     @concurrent
     public func listAll() async throws -> [HistoryEpisodeRow] {
         try await database.queue.read { db in
-            try HistoryEpisodeRow.fetchAll(db, sql: "SELECT * FROM historyEpisode ORDER BY id DESC")
+            try HistoryEpisodeRow.fetchAll(
+                db,
+                sql: "SELECT * FROM historyEpisode ORDER BY lastPlayedAt DESC, id DESC"
+            )
         }
     }
 
-    /// Re-inserting keeps the id the caller carries: the Dart line passed
-    /// `HistoryEpisodeModel.fromMap(playlistEpisode.toMap())`, so the
-    /// history row's id IS the playlist row's id, and a resume re-insert
-    /// (delete + INSERT with the explicit id) leaves both the id and the
-    /// row's place in the id-DESC ordering unchanged (K30, corrected
-    /// 2026-09-23; sqflite-verified). A nil id autoincrements, mirroring
-    /// Dart's toMap omitting a null id. Both statements run in one
-    /// transaction (08 §1.2 — same final state, no crash window).
+    @concurrent
+    public func count() async throws -> Int {
+        try await database.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM historyEpisode") ?? 0
+        }
+    }
+
+    /// Upsert by `enclosureUrl`. A caller-supplied `id` is ignored so a
+    /// playlist rowid can never REPLACE a different history row. Re-listening
+    /// bumps `lastPlayedAt` (or `episode.lastPlayedAt` when a test pins it)
+    /// and keeps the existing history primary key.
     @concurrent
     public func insert(_ episode: HistoryEpisodeRow) async throws {
+        guard let enclosureUrl = episode.enclosureUrl, !enclosureUrl.isEmpty else { return }
+        let playedAt = episode.lastPlayedAt
+            ?? Int64(Date().timeIntervalSince1970 * 1000)
         try await database.queue.write { db in
             try db.execute(
-                sql: "DELETE FROM historyEpisode WHERE enclosureUrl = ?",
-                arguments: [episode.enclosureUrl]
+                sql: """
+                INSERT INTO historyEpisode (
+                  title, description, duration, enclosureUrl, pubDate, imageUrl,
+                  channelTitle, rssFeedUrl, lastPlayedAt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(enclosureUrl) DO UPDATE SET
+                  title = excluded.title,
+                  description = excluded.description,
+                  duration = excluded.duration,
+                  pubDate = excluded.pubDate,
+                  imageUrl = excluded.imageUrl,
+                  channelTitle = excluded.channelTitle,
+                  rssFeedUrl = excluded.rssFeedUrl,
+                  lastPlayedAt = excluded.lastPlayedAt
+                """,
+                arguments: [
+                    episode.title,
+                    episode.description,
+                    episode.duration,
+                    enclosureUrl,
+                    episode.pubDate,
+                    episode.imageUrl,
+                    episode.channelTitle,
+                    episode.rssFeedUrl,
+                    playedAt,
+                ]
             )
-            var copy = episode
-            try copy.insert(db, onConflict: .replace)
         }
     }
 
@@ -42,12 +74,14 @@ public struct HistoryRepository: Sendable {
         }
     }
 
+    /// Drops the oldest plays past `max`, ordered by `lastPlayedAt`.
     @discardableResult
     @concurrent
     public func trim(keeping max: Int64) async throws -> [String] {
         try await database.queue.write { db in
             let rows = try HistoryEpisodeRow.fetchAll(
-                db, sql: "SELECT * FROM historyEpisode ORDER BY id DESC"
+                db,
+                sql: "SELECT * FROM historyEpisode ORDER BY lastPlayedAt DESC, id DESC"
             )
             guard rows.count > max else { return [] }
             let removed = rows.dropFirst(Int(max)).compactMap(\.enclosureUrl)

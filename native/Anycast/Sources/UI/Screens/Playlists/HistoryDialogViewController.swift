@@ -2,83 +2,108 @@ import UIKit
 import Kingfisher
 import AnycastKit
 
-/// History (playlists.dart:240-421 `HistoryBlock`, opened from Settings and
-/// the Inbox tail) as a system page sheet in the Anycast 2.0 list language
-/// (09 §7a-C4: the Get.dialog card becomes a sheet): a centred "History"
-/// title and flat rows — 44 pt cover, one-line title, show name — that swipe
-/// to delete; tap opens Detail. Clear All lives at the bottom as a
-/// hold-to-confirm button (the Dart source cleared without asking): the clear
-/// is deferred for a 5 s Undo window and the DB is only written when it ends
-/// (or the sheet disappears / the app backgrounds), so Undo is a plain
-/// re-read. VoiceOver and Switch Control skip the hold for an inline
-/// Cancel / Clear confirm. Empty state is the shared empty block; loading a
-/// spinner. Settings presents this controller BY NAME via
-/// `HistoryDialogViewController(context:)`.
+/// Calendar bucket for the History sheet. Display only — the stored order
+/// is `lastPlayedAt`.
+enum HistoryDaySection: Int, Hashable, CaseIterable {
+    case today
+    case yesterday
+    case earlier
+
+    var title: String {
+        switch self {
+        case .today: return "Today"
+        case .yesterday: return "Yesterday"
+        case .earlier: return "Earlier"
+        }
+    }
+}
+
+enum HistoryDayGrouping {
+
+    static func section(
+        for lastPlayedAt: Int64?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> HistoryDaySection {
+        guard let lastPlayedAt else { return .earlier }
+        let date = Date(timeIntervalSince1970: TimeInterval(lastPlayedAt) / 1000)
+        if calendar.isDateInToday(date) { return .today }
+        if calendar.isDateInYesterday(date) { return .yesterday }
+        return .earlier
+    }
+
+    /// Non-empty buckets in Today / Yesterday / Earlier order. `episodes`
+    /// is already newest-first; that order is kept inside each bucket.
+    static func grouped(
+        _ episodes: [HistoryEpisodeRow],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [(section: HistoryDaySection, rows: [HistoryEpisodeRow])] {
+        var buckets: [HistoryDaySection: [HistoryEpisodeRow]] = [:]
+        for episode in episodes {
+            let section = section(for: episode.lastPlayedAt, now: now, calendar: calendar)
+            buckets[section, default: []].append(episode)
+        }
+        return HistoryDaySection.allCases.compactMap { section in
+            guard let rows = buckets[section], !rows.isEmpty else { return nil }
+            return (section, rows)
+        }
+    }
+}
+
+enum HistoryPresentation {
+
+    /// "Night Kitchen · 2h ago". Either side is dropped when it is missing.
+    static func subtitle(channel: String?, lastPlayedAt: Int64?, now: Date = Date()) -> String {
+        var parts: [String] = []
+        if let channel, !channel.isEmpty { parts.append(channel) }
+        if let lastPlayedAt {
+            parts.append(RelativeTimeFormatter.format(lastPlayedAt, now: now))
+        }
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// History, opened from Settings (after that sheet dismisses) and from the
+/// Inbox tail or empty-state link. One `AppSheets` page sheet at medium
+/// and large: a "History" title, Clear All when the list is non-empty, and
+/// day-grouped rows. Tap opens Detail. Swipe deletes one row. Clear All
+/// asks with a system alert, then deletes. The empty state is one sentence
+/// and an Explore button that closes the sheet and opens Discover.
 @MainActor
 final class HistoryDialogViewController: UIViewController {
-
-    /// What the pinned footer shows.
-    enum FooterState { case hidden, hold, undo, confirm }
 
     private let context: UIContext
     /// The context's database; tests inject a temporary one.
     private let database: AppDatabase
-    private let undoWindow: Duration
 
     private(set) var episodes: [HistoryEpisodeRow] = []
-    private(set) var footerState: FooterState = .hidden
-    /// A Clear is waiting out its Undo window; the DB is untouched.
-    private(set) var hasPendingClear = false
     private var isLoading = true
-    /// A clear was begun in this presentation (pending or committed).
-    private var didClear = false
 
-    private var pendingURLs: [String] = []
-    private var commitTask: Task<Void, Never>?
-    /// Block-API observer token — touched only on the main thread;
-    /// `nonisolated(unsafe)` because deinit is nonisolated.
-    private nonisolated(unsafe) var backgroundObserver: NSObjectProtocol?
+    private var dataSource: UICollectionViewDiffableDataSource<HistoryDaySection, String>!
 
-    private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
-
+    private let headerStack = UIStackView()
     private let titleLabel = UILabel()
+    private let clearButton = UIButton(type: .system)
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
     private let spinner = UIActivityIndicatorView(style: .medium)
-    private let emptyView = EmptyStateView()
-    private let bottomFade = ScrollEdgeFade(edge: .bottom, color: Theme.background)
-    private let footerStack = UIStackView()
-    private let holdButton = HoldToConfirmButton(
-        title: "Hold to Clear History", holdingTitle: "Keep holding…", image: AppIcons.delete
-    )
-    private let undoButton = UIButton(type: .system)
-    private let confirmStack = UIStackView()
-    private let confirmLabel = UILabel()
+    private let emptyStack = UIStackView()
+    private let emptyLabel = UILabel()
+    private let exploreButton = AnycastButton.make(.secondary, title: "Explore")
 
     static func present(from presenter: UIViewController, context: UIContext) {
         let controller = HistoryDialogViewController(context: context)
-        controller.modalPresentationStyle = .pageSheet
-        if let sheet = controller.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
-            sheet.prefersGrabberVisible = true
-        }
-        presenter.present(controller, animated: true)
+        AppSheets.presentExpand(controller, from: presenter, detents: [.medium(), .large()])
     }
 
-    init(context: UIContext, database: AppDatabase? = nil, undoWindow: Duration = .seconds(5)) {
+    init(context: UIContext, database: AppDatabase? = nil) {
         self.context = context
         self.database = database ?? context.database
-        self.undoWindow = undoWindow
         super.init(nibName: nil, bundle: nil)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    deinit {
-        if let backgroundObserver {
-            NotificationCenter.default.removeObserver(backgroundObserver)
-        }
-    }
 
     // MARK: - Lifecycle
 
@@ -87,175 +112,116 @@ final class HistoryDialogViewController: UIViewController {
         Theme.installPageBase(on: view)
         buildSheet()
         configureDataSource()
-        // A pending clear must not outlive the app being suspended.
-        backgroundObserver = NotificationCenter.default.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.commitPendingClear()
-        }
         Task { await reload() }
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        ScrollEdgeChrome.clearTop(of: collectionView, to: titleLabel.frame.maxY + Spacing.gap)
-        // Let the last row scroll clear of the pinned footer and its fade.
-        let inset = footerStack.isHidden
-            ? view.safeAreaInsets.bottom
-            : max(0, view.bounds.height - footerStack.frame.minY) + ScrollEdgeFade.fadeLength
+        ScrollEdgeChrome.clearTop(of: collectionView, to: headerStack.frame.maxY + Spacing.gap)
+        let inset = view.safeAreaInsets.bottom
         if abs(collectionView.contentInset.bottom - inset) > 0.5 {
             collectionView.contentInset.bottom = inset
         }
-    }
-
-    override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-        commitPendingClear()
     }
 
     // MARK: - Build
 
     private func buildSheet() {
         titleLabel.text = "History"
-        titleLabel.font = TypographyV2.emphasis.font()
+        titleLabel.font = TypographyV2.headlineMedium.font()
         titleLabel.textColor = Theme.onSurface
-        titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.accessibilityTraits = .header
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(titleLabel)
+        titleLabel.setContentHuggingPriority(.required, for: .horizontal)
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        var clearConfiguration = UIButton.Configuration.plain()
+        clearConfiguration.title = "Clear All"
+        clearConfiguration.baseForegroundColor = Theme.error
+        clearConfiguration.contentInsets = .zero
+        clearConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.body.font()
+            return outgoing
+        }
+        clearButton.configuration = clearConfiguration
+        clearButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        clearButton.accessibilityLabel = "Clear All"
+        clearButton.accessibilityIdentifier = "history-clear-all"
+        clearButton.setContentHuggingPriority(.required, for: .horizontal)
+        clearButton.isHidden = true
+        clearButton.addAction(UIAction { [weak self] _ in self?.clearAllTapped() }, for: .touchUpInside)
+
+        let spacer = UIView()
+        headerStack.axis = .horizontal
+        headerStack.alignment = .center
+        headerStack.spacing = Spacing.gap
+        headerStack.addArrangedSubview(titleLabel)
+        headerStack.addArrangedSubview(spacer)
+        headerStack.addArrangedSubview(clearButton)
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(headerStack)
 
         spinner.color = Theme.primary
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
 
-        emptyView.isHidden = true
-        emptyView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(emptyView)
+        emptyLabel.text = "Play an episode and it shows up here."
+        emptyLabel.font = TypographyV2.emphasis.font()
+        emptyLabel.textColor = Theme.onSurface
+        emptyLabel.textAlignment = .center
+        emptyLabel.numberOfLines = 0
+        emptyLabel.adjustsFontForContentSizeCategory = true
+
+        exploreButton.accessibilityLabel = "Explore"
+        exploreButton.accessibilityIdentifier = "history-explore"
+        exploreButton.addAction(UIAction { [weak self] _ in self?.exploreTapped() }, for: .touchUpInside)
+
+        emptyStack.axis = .vertical
+        emptyStack.alignment = .center
+        emptyStack.spacing = Spacing.cardInner
+        emptyStack.addArrangedSubview(emptyLabel)
+        emptyStack.addArrangedSubview(exploreButton)
+        emptyStack.isHidden = true
+        emptyStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(emptyStack)
 
         collectionView.backgroundColor = .clear
         collectionView.contentInsetAdjustmentBehavior = .never
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionView)
 
-        buildFooter()
-
-        let footerBottom = footerStack.bottomAnchor.constraint(
-            equalTo: view.bottomAnchor, constant: -Spacing.sheetContent
-        )
-        footerBottom.priority = .defaultHigh
+        let emptyCenter = emptyStack.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        emptyCenter.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.sheetContent),
-            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.sheetContent),
+            headerStack.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.sheetContent),
+            headerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.sheetContent),
+            headerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.sheetContent),
 
-            // Runs under the title row (content fades out behind it);
-            // `viewDidLayoutSubviews` keeps the resting first row in place.
             collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            emptyView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor),
-            emptyView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            emptyView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            emptyView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            emptyStack.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: Spacing.sheetContent),
+            emptyStack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -Spacing.sheetContent),
+            emptyStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            emptyStack.topAnchor.constraint(greaterThanOrEqualTo: headerStack.bottomAnchor, constant: Spacing.xl),
+            emptyStack.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
+            emptyCenter,
+
+            exploreButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
 
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-
-            // 28 from the view's bottom edge, but never closer than md to the
-            // safe-area bottom (home-indicator devices keep the 28).
-            footerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.sheetContent),
-            footerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.sheetContent),
-            footerStack.bottomAnchor.constraint(
-                lessThanOrEqualTo: view.bottomAnchor, constant: -Spacing.sheetContent
-            ),
-            footerStack.bottomAnchor.constraint(
-                lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.md
-            ),
-            footerBottom,
-
-            bottomFade.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bottomFade.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomFade.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            bottomFade.topAnchor.constraint(
-                equalTo: footerStack.topAnchor, constant: -ScrollEdgeFade.fadeLength
-            ),
         ])
         ScrollEdgeChrome.attachTopBand(
-            to: collectionView, in: view, below: titleLabel.bottomAnchor, restingGap: Spacing.gap
+            to: collectionView, in: view, below: headerStack.bottomAnchor, restingGap: Spacing.gap
         )
         ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view)
-        view.bringSubviewToFront(titleLabel)
-        renderEmptyState()
-    }
-
-    /// The pinned footer: one stack holding the three mutually exclusive
-    /// controls (hold / undo / confirm); `render` shows exactly one.
-    private func buildFooter() {
-        holdButton.onConfirm = { [weak self] in self?.beginPendingClear() }
-        holdButton.onConfirmRequested = { [weak self] in
-            guard self?.footerState == .hold else { return }
-            self?.setFooterState(.confirm)
-        }
-
-        var undoConfiguration = UIButton.Configuration.filled()
-        undoConfiguration.title = "Undo"
-        undoConfiguration.baseBackgroundColor = AnycastColor.sandAlpha4
-        undoConfiguration.baseForegroundColor = Theme.onSurface
-        undoConfiguration.cornerStyle = .capsule
-        undoConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: Spacing.gap, leading: Spacing.cardInner, bottom: Spacing.gap, trailing: Spacing.cardInner
-        )
-        undoConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-            var outgoing = incoming
-            outgoing.font = TypographyV2.emphasis.font()
-            return outgoing
-        }
-        undoButton.configuration = undoConfiguration
-        undoButton.titleLabel?.adjustsFontForContentSizeCategory = true
-        undoButton.addTarget(self, action: #selector(undoTapped), for: .touchUpInside)
-
-        // Assistive-tech path: an inline confirm instead of the hold gesture.
-        confirmLabel.font = TypographyV2.body.font()
-        confirmLabel.textColor = Theme.onSurface
-        confirmLabel.textAlignment = .center
-        confirmLabel.numberOfLines = 0
-        confirmLabel.adjustsFontForContentSizeCategory = true
-
-        let cancel = AnycastButton.make(.secondary, title: "Cancel")
-        cancel.addAction(UIAction { [weak self] _ in self?.setFooterState(.hold) }, for: .touchUpInside)
-        let clear = AnycastButton.make(.destructive, title: "Clear")
-        clear.addAction(UIAction { [weak self] _ in self?.beginPendingClear() }, for: .touchUpInside)
-        let buttonRow = UIStackView(arrangedSubviews: [cancel, clear])
-        buttonRow.axis = .horizontal
-        buttonRow.spacing = Spacing.md
-        buttonRow.distribution = .fillEqually
-
-        confirmStack.axis = .vertical
-        confirmStack.spacing = Spacing.gap
-        confirmStack.addArrangedSubview(confirmLabel)
-        confirmStack.addArrangedSubview(buttonRow)
-
-        for button in [undoButton, cancel, clear] {
-            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 52).isActive = true
-        }
-
-        footerStack.axis = .vertical
-        for arranged in [holdButton, undoButton, confirmStack] {
-            footerStack.addArrangedSubview(arranged)
-        }
-        footerStack.isHidden = true
-        footerStack.translatesAutoresizingMaskIntoConstraints = false
-
-        bottomFade.isHidden = true
-        view.addSubview(bottomFade)
-        view.addSubview(footerStack)
+        view.bringSubviewToFront(headerStack)
     }
 
     private func configureDataSource() {
@@ -264,7 +230,29 @@ final class HistoryDialogViewController: UIViewController {
             HistoryRowCell.self, forCellWithReuseIdentifier: HistoryRowCell.reuseIdentifier
         )
         collectionView.delegate = self
-        dataSource = UICollectionViewDiffableDataSource<Int, String>(
+
+        let headerRegistration = UICollectionView.SupplementaryRegistration<UICollectionViewListCell>(
+            elementKind: UICollectionView.elementKindSectionHeader
+        ) { [weak self] header, _, indexPath in
+            let title = self?.dataSource.sectionIdentifier(for: indexPath.section)?.title ?? ""
+            var config = header.defaultContentConfiguration()
+            config.text = title
+            config.textProperties.font = TypographyV2.meta.font()
+            config.textProperties.color = Theme.onSurfaceVariant
+            config.textProperties.numberOfLines = 0
+            config.textProperties.adjustsFontForContentSizeCategory = true
+            config.directionalLayoutMargins = NSDirectionalEdgeInsets(
+                top: Spacing.gap,
+                leading: Spacing.sheetContent,
+                bottom: Spacing.xs,
+                trailing: Spacing.sheetContent
+            )
+            header.contentConfiguration = config
+            header.backgroundConfiguration = .clear()
+            header.accessibilityTraits = .header
+        }
+
+        dataSource = UICollectionViewDiffableDataSource<HistoryDaySection, String>(
             collectionView: collectionView
         ) { [weak self] collectionView, indexPath, enclosureURL in
             guard let self,
@@ -276,25 +264,31 @@ final class HistoryDialogViewController: UIViewController {
             }
             cell.configure(episode)
             cell.onDelete = { [weak self] in
-                self?.delete(url: enclosureURL)
+                self?.deleteEpisode(url: enclosureURL)
             }
             cell.onTap = { [weak self] in
                 self?.presentDetail(episode)
             }
             return cell
         }
+        dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
+            collectionView.dequeueConfiguredReusableSupplementary(using: headerRegistration, for: indexPath)
+        }
     }
 
-    /// A plain list section: rows swipe to delete, hairlines only between
-    /// rows, starting at the text column.
+    /// A plain list: rows swipe to delete, hairlines only between rows,
+    /// starting at the text column. Day headers are display-only.
     private func makeLayout() -> UICollectionViewCompositionalLayout {
         var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
         configuration.showsSeparators = true
         configuration.backgroundColor = .clear
+        configuration.headerMode = .supplementary
+        configuration.headerTopPadding = Spacing.sm
         configuration.itemSeparatorHandler = { [weak self] indexPath, sectionSeparator in
             var separator = sectionSeparator
             separator.topSeparatorVisibility = .hidden
-            let isLast = indexPath.item >= (self?.episodes.count ?? 0) - 1
+            let count = self?.itemCount(inSectionAt: indexPath.section) ?? 0
+            let isLast = indexPath.item >= count - 1
             separator.bottomSeparatorVisibility = isLast ? .hidden : .visible
             separator.bottomSeparatorInsets = NSDirectionalEdgeInsets(
                 top: 0,
@@ -308,7 +302,7 @@ final class HistoryDialogViewController: UIViewController {
         configuration.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
             guard let self, let url = self.dataSource.itemIdentifier(for: indexPath) else { return nil }
             let delete = UIContextualAction(style: .destructive, title: "Delete") { [weak self] _, _, completion in
-                self?.delete(url: url)
+                self?.deleteEpisode(url: url)
                 completion(true)
             }
             delete.image = AppIcons.delete
@@ -317,10 +311,19 @@ final class HistoryDialogViewController: UIViewController {
         return UICollectionViewCompositionalLayout.list(using: configuration)
     }
 
+    private func itemCount(inSectionAt index: Int) -> Int {
+        guard let dataSource, let section = dataSource.sectionIdentifier(for: index) else { return 0 }
+        return dataSource.snapshot().numberOfItems(inSection: section)
+    }
+
     private func applySnapshot() {
-        var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
-        snapshot.appendSections([0])
-        snapshot.appendItems(episodes.compactMap(\.enclosureUrl))
+        var snapshot = NSDiffableDataSourceSnapshot<HistoryDaySection, String>()
+        for group in HistoryDayGrouping.grouped(episodes) {
+            let identifiers = group.rows.compactMap(\.enclosureUrl)
+            guard !identifiers.isEmpty else { continue }
+            snapshot.appendSections([group.section])
+            snapshot.appendItems(identifiers, toSection: group.section)
+        }
         dataSource.apply(snapshot, animatingDifferences: false)
         renderStates()
     }
@@ -329,60 +332,12 @@ final class HistoryDialogViewController: UIViewController {
         spinner.isHidden = !isLoading
         if isLoading { spinner.startAnimating() } else { spinner.stopAnimating() }
         let isEmpty = !isLoading && episodes.isEmpty
-        renderEmptyState()
-        emptyView.isHidden = !isEmpty
+        emptyStack.isHidden = !isEmpty
         collectionView.isHidden = isLoading || isEmpty
-        syncFooterState()
+        clearButton.isHidden = isLoading || episodes.isEmpty
     }
 
-    /// "History cleared" while a clear is pending or has committed in this
-    /// presentation; otherwise the plain "No history" block.
-    private func renderEmptyState() {
-        emptyView.configure(.init(
-            icon: didClear ? AppIcons.check : UIImage(systemName: "clock.arrow.circlepath"),
-            title: didClear ? "History cleared" : "No history",
-            message: "Episodes you play show up here."
-        ))
-    }
-
-    // MARK: - Footer
-
-    /// The footer follows the data: Undo while a clear is pending, nothing
-    /// while loading or empty, otherwise Hold (or the inline confirm).
-    private func syncFooterState() {
-        let next: FooterState
-        if hasPendingClear {
-            next = .undo
-        } else if isLoading || episodes.isEmpty {
-            next = .hidden
-        } else if footerState == .confirm {
-            next = .confirm
-        } else {
-            next = .hold
-        }
-        setFooterState(next)
-    }
-
-    private func setFooterState(_ state: FooterState) {
-        let previous = footerState
-        footerState = state
-        footerStack.isHidden = state == .hidden
-        bottomFade.isHidden = state == .hidden
-        holdButton.isHidden = state != .hold
-        undoButton.isHidden = state != .undo
-        confirmStack.isHidden = state != .confirm
-        if state == .hold && previous != .hold { holdButton.reset() }
-        if state == .confirm {
-            let count = episodes.count
-            confirmLabel.text = "Clear \(count) \(count == 1 ? "episode" : "episodes") from History?"
-            if previous != .confirm {
-                UIAccessibility.post(notification: .layoutChanged, argument: confirmLabel)
-            }
-        }
-        view.setNeedsLayout()
-    }
-
-    // MARK: - Data (HistoryRepository — "latest" is ORDER BY id DESC, K12)
+    // MARK: - Data
 
     private func reload() async {
         episodes = (try? await database.historyRepository().listAll()) ?? []
@@ -390,7 +345,7 @@ final class HistoryDialogViewController: UIViewController {
         applySnapshot()
     }
 
-    private func delete(url: String) {
+    func deleteEpisode(url: String) {
         episodes.removeAll { $0.enclosureUrl == url }
         applySnapshot()
         Task { [weak self] in
@@ -404,66 +359,49 @@ final class HistoryDialogViewController: UIViewController {
         }
     }
 
-    // MARK: - Clear All (deferred delete + Undo)
+    // MARK: - Clear All
 
-    /// Empties the list but leaves the DB alone; the delete runs when the
-    /// Undo window ends, or earlier on dismissal / backgrounding.
-    func beginPendingClear() {
-        guard !hasPendingClear, !episodes.isEmpty else { return }
-        pendingURLs = episodes.compactMap(\.enclosureUrl)
-        hasPendingClear = true
-        didClear = true
+    private func clearAllTapped() {
+        guard !episodes.isEmpty else { return }
+        let alert = UIAlertController(
+            title: "Clear all listening history?",
+            message: "This only removes History on this device. Playlists and progress stay.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Clear All", style: .destructive) { [weak self] _ in
+            self?.commitClearAll()
+        })
+        present(alert, animated: true)
+    }
+
+    /// Deletes every history row. The alert is the confirmation; this does
+    /// not touch playlists, progress, or subscriptions.
+    func commitClearAll() {
+        let urls = episodes.compactMap(\.enclosureUrl)
+        guard !urls.isEmpty else { return }
         episodes = []
         applySnapshot()
-        commitTask = Task { [weak self, undoWindow] in
-            try? await Task.sleep(for: undoWindow)
-            guard !Task.isCancelled else { return }
-            self?.commitPendingClear()
-        }
-    }
-
-    /// Cancels the pending delete and re-reads the (never touched) DB.
-    func undoPendingClear() async {
-        guard hasPendingClear else { return }
-        commitTask?.cancel()
-        commitTask = nil
-        pendingURLs = []
-        hasPendingClear = false
-        didClear = false
-        holdButton.reset()
-        await reload()
-    }
-
-    /// Writes the pending delete. State is cleared first so a second call
-    /// (timer, disappearance, backgrounding) cannot commit twice; the write
-    /// captures the repository, not self, so it finishes after dismissal.
-    func commitPendingClear() {
-        guard hasPendingClear else { return }
-        let urls = pendingURLs
-        pendingURLs = []
-        hasPendingClear = false
-        commitTask?.cancel()
-        commitTask = nil
-        syncFooterState()
         let repository = database.historyRepository()
         Task { [weak self] in
             do {
                 try await repository.deleteMany(urls)
             } catch {
-                self?.didClear = false
                 await self?.reload()
             }
         }
     }
 
-    // MARK: - Actions
-
-    @objc private func undoTapped() {
-        Task { await undoPendingClear() }
+    private func exploreTapped() {
+        // Same destination as the Inbox empty state's Explore: Discover.
+        let tabs = context.tabs
+        dismiss(animated: true) {
+            tabs.select(2)
+        }
     }
 }
 
-// MARK: - Row tap → Detail (playlists.dart:260-288)
+// MARK: - Row tap → Detail
 
 extension HistoryDialogViewController: UICollectionViewDelegate {
 
@@ -492,8 +430,6 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
                     icon: AppIcons.play,
                     accessibilityLabel: "Play"
                 ) { [weak self] in
-                    // toFeedEpisode → addToTop(1, ep) → playByEpisode
-                    // (playlists.dart:270-279).
                     Task { await self?.playFromHistory(episode) }
                 },
                 EpisodeCardAction(
@@ -501,7 +437,7 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
                     accessibilityLabel: "Remove"
                 ) { [weak self] in
                     guard let url = episode.enclosureUrl else { return }
-                    self?.delete(url: url)
+                    self?.deleteEpisode(url: url)
                 },
             ],
             htmlRenderer: HTMLContentRenderer(),
@@ -533,14 +469,14 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
     }
 }
 
-// MARK: - Row cell (playlists.dart:248-355)
+// MARK: - Row cell
 
-/// One history row: 44 pt rounded cover, one-line title, show name.
+/// One history row: rounded cover, one wrapping title, show name and relative time.
 final class HistoryRowCell: UICollectionViewListCell {
 
     static let reuseIdentifier = "HistoryRowCell"
 
-    private static let coverSize: CGFloat = 44
+    private static let coverSize: CGFloat = 56
     /// Where the text column (and the row separator) starts.
     static let textColumnLeading = Spacing.sheetContent + coverSize + Spacing.gap
 
@@ -579,14 +515,14 @@ final class HistoryRowCell: UICollectionViewListCell {
 
         titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
-        titleLabel.numberOfLines = 1
-        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.numberOfLines = 0
+        titleLabel.lineBreakMode = .byWordWrapping
         titleLabel.adjustsFontForContentSizeCategory = true
 
         channelLabel.font = TypographyV2.meta.font()
         channelLabel.textColor = Theme.onSurfaceVariant
-        channelLabel.numberOfLines = 1
-        channelLabel.lineBreakMode = .byTruncatingTail
+        channelLabel.numberOfLines = 0
+        channelLabel.lineBreakMode = .byWordWrapping
         channelLabel.adjustsFontForContentSizeCategory = true
 
         let textColumn = UIStackView(arrangedSubviews: [titleLabel, channelLabel])
@@ -600,24 +536,29 @@ final class HistoryRowCell: UICollectionViewListCell {
             coverView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             coverView.widthAnchor.constraint(equalToConstant: Self.coverSize),
             coverView.heightAnchor.constraint(equalToConstant: Self.coverSize),
+            coverView.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.md),
 
             textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
             textColumn.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.sheetContent),
             textColumn.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.row),
+            textColumn.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -Spacing.row),
             textColumn.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
+            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 72),
         ])
     }
 
-    func configure(_ episode: HistoryEpisodeRow) {
+    func configure(_ episode: HistoryEpisodeRow, now: Date = Date()) {
         let url = episode.imageUrl.flatMap(URL.init(string:))
         coverView.setArtwork(url, title: episode.channelTitle)
         titleLabel.text = episode.title ?? ""
-        channelLabel.text = episode.channelTitle ?? ""
+        let subtitle = HistoryPresentation.subtitle(
+            channel: episode.channelTitle, lastPlayedAt: episode.lastPlayedAt, now: now
+        )
+        channelLabel.text = subtitle
+        channelLabel.isHidden = subtitle.isEmpty
         isAccessibilityElement = true
         accessibilityTraits = [.button]
         accessibilityLabel = "\(episode.title ?? ""), \(episode.channelTitle ?? "")"
-        // Swipe-to-delete has a VoiceOver twin.
         accessibilityCustomActions = [
             UIAccessibilityCustomAction(name: "Delete") { [weak self] _ in
                 self?.onDelete?()
@@ -627,7 +568,6 @@ final class HistoryRowCell: UICollectionViewListCell {
     }
 
     override func accessibilityActivate() -> Bool {
-        // Row tap opens the Detail sheet (playlists.dart:260-288).
         onTap?()
         return true
     }

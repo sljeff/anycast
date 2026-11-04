@@ -46,12 +46,14 @@ nonisolated enum SettingsPageModel {
             sections.append(Section(header: nil, rows: [.plusUpgrade], plainStyle: false))
         }
         sections += [
+            // Listening sits on the first screen: History is a secondary
+            // tool, found here, not in the header or the tab bar.
+            Section(header: "Listening", rows: [.history, .maxHistoryEpisodes], plainStyle: false),
             Section(header: "Downloads & Storage", rows: [.cacheLimit], plainStyle: false),
             Section(header: "Subtitles & Translation",
                     rows: [.enableTranslation, .targetLanguage], plainStyle: false),
             Section(header: "Content & Discovery",
-                    rows: [.country, .autoRefreshInterval, .maxFeedEpisodes,
-                           .maxHistoryEpisodes, .importExport, .history],
+                    rows: [.country, .autoRefreshInterval, .maxFeedEpisodes, .importExport],
                     plainStyle: false),
             Section(header: "Help", rows: [.contactEmail], plainStyle: false),
             Section(header: nil, rows: [.privacyPolicy, .termsOfUse], plainStyle: true),
@@ -203,6 +205,16 @@ nonisolated enum SettingsPageModel {
 
     static func episodesDisplay(count: Int64) -> String {
         "\(count) episodes"
+    }
+
+    /// Trailing count on Listening History. Empty is "None" so it does not
+    /// read like the History Limit stepper ("100 episodes").
+    static func historyCountDisplay(count: Int) -> String {
+        switch count {
+        case ..<1: return "None"
+        case 1: return "1 episode"
+        default: return "\(count) episodes"
+        }
     }
 
     /// VoiceOver names for the minus/plus halves of each stepper row.

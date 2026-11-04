@@ -4,7 +4,7 @@ import GRDB
 /// Opens and owns the inherited `Documents/anycast.db`.
 ///
 /// Responsibilities (docs/migration/00 M1, 05 §2):
-/// - **Schema read-back validation**: `user_version` must be 4 (or migrate
+/// - **Schema read-back validation**: `user_version` must be 5 (or migrate
 ///   from a supported older version) with the 9 expected tables.
 /// - **Write-back compatibility**: same schema, rollback journal — never WAL
 ///   (a `DatabaseQueue` keeps the journal mode it finds; it does not enable

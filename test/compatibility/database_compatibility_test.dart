@@ -305,6 +305,8 @@ Future<void> _expectReleasedRowsReadableThroughModels(
       'enclosureUrl': _releasedHistoryEpisodeUrl,
       'pubDate': 1700000106,
       'imageUrl': 'https://released.example/history.jpg',
+      // Schema 5 backfills a missing play time from the old id order.
+      'lastPlayedAt': 106,
     },
     reason: 'HistoryEpisodeModel could not read the released row',
   );

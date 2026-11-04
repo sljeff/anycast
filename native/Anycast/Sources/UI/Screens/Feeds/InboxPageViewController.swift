@@ -22,9 +22,11 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     /// Scroll-column sections (Figma column order). The shelf shows only
     /// with subscriptions, the strip only with categories beyond "All", the
-    /// history tail only with cards. The header is not a section: it is
-    /// pinned outside the list, so it stays on the empty inbox and Settings
-    /// remains reachable, with the empty state beneath it.
+    /// history tail only with cards. An empty inbox keeps a weak
+    /// "Listening history" link at the page bottom instead. The header is
+    /// not a section: it is pinned outside the list, so it stays on the
+    /// empty inbox and Settings remains reachable, with the empty state
+    /// beneath it.
     enum Section {
         case shelf
         case strip
@@ -49,6 +51,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     private let collectionView: UICollectionView
     private let refreshControl = UIRefreshControl()
     private let emptyStateView = InboxEmptyStateView()
+    /// Empty-install link. Hidden once the inbox has cards; those use the tail.
+    private let historyFooterButton = UIButton(type: .system)
     private let htmlRenderer = HTMLContentRenderer()
 
     private let gate: InboxRefreshGate
@@ -376,6 +380,48 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             guard let self else { return }
             ImportInstructionsViewController.present(from: self)
         }
+
+        var historyFooterConfiguration = UIButton.Configuration.plain()
+        historyFooterConfiguration.title = "Listening history"
+        historyFooterConfiguration.baseForegroundColor = Theme.onSurfaceVariant
+        historyFooterConfiguration.titleLineBreakMode = .byWordWrapping
+        historyFooterConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.meta.font()
+            outgoing.foregroundColor = Theme.onSurfaceVariant
+            outgoing.underlineStyle = .single
+            return outgoing
+        }
+        historyFooterButton.configuration = historyFooterConfiguration
+        historyFooterButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        historyFooterButton.titleLabel?.textAlignment = .center
+        historyFooterButton.accessibilityLabel = "Listening history"
+        historyFooterButton.accessibilityIdentifier = "inbox-listening-history"
+        historyFooterButton.isHidden = true
+        historyFooterButton.translatesAutoresizingMaskIntoConstraints = false
+        historyFooterButton.addAction(
+            UIAction { [weak self] _ in self?.presentHistory() },
+            for: .touchUpInside
+        )
+        view.addSubview(historyFooterButton)
+        NSLayoutConstraint.activate([
+            historyFooterButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            historyFooterButton.leadingAnchor.constraint(
+                greaterThanOrEqualTo: view.leadingAnchor, constant: Spacing.pageH
+            ),
+            historyFooterButton.trailingAnchor.constraint(
+                lessThanOrEqualTo: view.trailingAnchor, constant: -Spacing.pageH
+            ),
+            historyFooterButton.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.pageHeader
+            ),
+            historyFooterButton.heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit),
+        ])
+        view.bringSubviewToFront(historyFooterButton)
+    }
+
+    private func presentHistory() {
+        HistoryDialogViewController.present(from: self, context: context)
     }
 
     // MARK: - Data
@@ -428,6 +474,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             }
         }
         collectionView.backgroundView = displayed.isEmpty ? emptyStateView : nil
+        historyFooterButton.isHidden = !displayed.isEmpty
         refreshChromeStatus()
         playEntranceIfNeeded()
     }
@@ -826,6 +873,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // Post-completion state, not a cached one: a concurrent refresh may
         // have emptied the list while the delete animation ran.
         collectionView.backgroundView = displayedEpisodes.isEmpty ? emptyStateView : nil
+        historyFooterButton.isHidden = !displayedEpisodes.isEmpty
         refreshChromeStatus()
     }
 
@@ -1013,8 +1061,7 @@ extension InboxPageViewController: UICollectionViewDataSource {
                 withReuseIdentifier: HistoryTailCell.reuseIdentifier, for: indexPath
             )
             (cell as? HistoryTailCell)?.onOpenHistory = { [weak self] in
-                guard let self else { return }
-                HistoryDialogViewController.present(from: self, context: self.context)
+                self?.presentHistory()
             }
             return cell
         case nil:
@@ -1188,8 +1235,8 @@ final class ChromeHostingCell: UICollectionViewCell {
     }
 }
 
-/// The "history ›" transparent pill closing the scroll column (Figma
-/// 1787:7899 tail; the v2 history screen itself is batch 2).
+/// The weak "history ›" capsule that closes the scroll column when the
+/// inbox has cards. Not chrome: it sits in the list, after the cards.
 final class HistoryTailCell: UICollectionViewCell {
 
     static let reuseIdentifier = "InboxHistoryTailCell"
@@ -1200,7 +1247,7 @@ final class HistoryTailCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        var configuration = UIButton.Configuration.plain()
+        var configuration = UIButton.Configuration.filled()
         configuration.title = "history"
         configuration.image = AppIcons.disclosure
         configuration.imagePlacement = .trailing
@@ -1208,8 +1255,10 @@ final class HistoryTailCell: UICollectionViewCell {
         configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
             textStyle: TypographyV2.meta.scalingTextStyle
         )
+        configuration.baseBackgroundColor = Theme.surfaceContainer
+        configuration.baseForegroundColor = Theme.onSurfaceVariant
         configuration.contentInsets = NSDirectionalEdgeInsets(
-            top: 0, leading: Spacing.xs, bottom: 0, trailing: Spacing.xs
+            top: Spacing.row, leading: Spacing.cardInner, bottom: Spacing.row, trailing: Spacing.cardInner
         )
         configuration.cornerStyle = .capsule
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
@@ -1218,18 +1267,23 @@ final class HistoryTailCell: UICollectionViewCell {
             return outgoing
         }
         button.configuration = configuration
-        button.contentHorizontalAlignment = .leading
-        button.tintColor = Theme.onSurfaceVariant
         button.translatesAutoresizingMaskIntoConstraints = false
         button.accessibilityIdentifier = "inbox-history-tail"
+        button.accessibilityLabel = "history"
         button.addAction(
             UIAction { [weak self] _ in self?.onOpenHistory?() },
             for: .touchUpInside
         )
         contentView.addSubview(button)
         NSLayoutConstraint.activate([
-            button.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageH),
-            button.topAnchor.constraint(equalTo: contentView.topAnchor),
+            button.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            button.leadingAnchor.constraint(
+                greaterThanOrEqualTo: contentView.leadingAnchor, constant: Spacing.pageH
+            ),
+            button.trailingAnchor.constraint(
+                lessThanOrEqualTo: contentView.trailingAnchor, constant: -Spacing.pageH
+            ),
+            button.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Spacing.gap),
             button.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             button.heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit),
         ])
