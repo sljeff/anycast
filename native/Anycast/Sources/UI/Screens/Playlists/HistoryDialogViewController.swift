@@ -27,9 +27,15 @@ enum HistoryDayGrouping {
     ) -> HistoryDaySection {
         guard let lastPlayedAt else { return .earlier }
         let date = Date(timeIntervalSince1970: TimeInterval(lastPlayedAt) / 1000)
-        if calendar.isDateInToday(date) { return .today }
-        if calendar.isDateInYesterday(date) { return .yesterday }
-        return .earlier
+        // Compare against the injected clock. `isDateInToday` / `isDateInYesterday`
+        // always use the wall clock, so a caller-supplied `now` would be ignored.
+        if calendar.isDate(date, inSameDayAs: now) { return .today }
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday),
+              calendar.isDate(date, inSameDayAs: startOfYesterday) else {
+            return .earlier
+        }
+        return .yesterday
     }
 
     /// Non-empty buckets in Today / Yesterday / Earlier order. `episodes`
