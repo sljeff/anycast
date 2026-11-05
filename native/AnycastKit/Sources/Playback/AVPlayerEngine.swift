@@ -50,18 +50,24 @@ public final class AVPlayerEngine: PlaybackEngine {
         }
 
         let center = NotificationCenter.default
+        // `object: nil` observes every AVPlayerItem in the process; only the
+        // engine's own current item may complete or fail the queue head.
         endToken = center.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification,
-                                      object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in
-                self?.events?(.completed)
+                                      object: nil, queue: .main) { [weak self] note in
+            let sender = (note.object as? AVPlayerItem).map(ObjectIdentifier.init)
+            MainActor.assumeIsolated {
+                guard let self, self.isCurrentItem(sender) else { return }
+                self.events?(.completed)
             }
         }
         failureToken = center.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime,
                                           object: nil, queue: .main) { [weak self] note in
+            let sender = (note.object as? AVPlayerItem).map(ObjectIdentifier.init)
             let reason = (note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)
             let message = reason?.localizedDescription ?? "playback failed"
-            Task { @MainActor in
-                self?.events?(.failed(message))
+            MainActor.assumeIsolated {
+                guard let self, self.isCurrentItem(sender) else { return }
+                self.events?(.failed(message))
             }
         }
     }
@@ -80,6 +86,13 @@ public final class AVPlayerEngine: PlaybackEngine {
     }
 
     public var hasItem: Bool { player.currentItem != nil }
+    /// Test seam: the item completion/failure notifications are matched against.
+    var currentItemForTesting: AVPlayerItem? { player.currentItem }
+
+    private func isCurrentItem(_ sender: ObjectIdentifier?) -> Bool {
+        guard let sender, let current = player.currentItem else { return false }
+        return sender == ObjectIdentifier(current)
+    }
     public var rate: Float { player.rate }
     public var desiredSpeedValue: Float { desiredSpeed }
 

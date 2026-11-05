@@ -154,8 +154,6 @@ nonisolated enum AppIcons {
     static let elbowIndent = symbol("arrow.turn.down.right")
     /// Detail transcript row / menu: lines once a transcript exists.
     static let transcriptLines = symbol("text.alignleft")
-    /// Detail transcript row: generation failed, offer Retry.
-    static let transcriptFailed = symbol("exclamationmark.triangle")
     /// Detail ••• "Ask AI" — a bubble, not the player-page brand mark.
     static let chatBubble = symbol("bubble.left")
 

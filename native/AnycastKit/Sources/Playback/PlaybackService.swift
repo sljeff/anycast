@@ -65,9 +65,9 @@ public final class PlaybackService {
     private let nowMilliseconds: @Sendable () -> Int64
     private var settings: AppSettings
 
-    /// Set by the composition root: queue removals must also drop the URL
-    /// from the subtitle/translation pollers (the Dart removeTop cascaded
-    /// into both controllers).
+    /// Notified after a completed episode leaves the queue. Production sets
+    /// no pollers here: transcripts outlive the queue entry (not the Dart
+    /// removeTop cascade).
     public var onEpisodeRemoved: ((String) -> Void)?
     /// Asked once per completed episode; true holds the next episode paused
     /// even with continuous play on (the sleep timer's "End of episode").
@@ -440,17 +440,20 @@ public final class PlaybackService {
         // its completed state).
         guard currentPlaylistId != nil else { return }
         guard let url = queue.first?.enclosureUrl else { return }
+        // Only the head that is actually playing can complete; anything else
+        // (a stray end-of-item) must never drop a queued row.
+        guard currentEpisode?.enclosureUrl == url else { return }
         let stopHere = shouldStopAtEpisodeEnd?() ?? false
 
         queue.removeFirst()
-        try? await store.removeEpisodeCascade(enclosureURL: url)
+        try? await store.removeEpisode(enclosureURL: url)
         await cache.remove(url: url)
         cacheStates[url] = nil
         onEpisodeRemoved?(url)
 
         if queue.isEmpty {
             // The completed-transition pause never persists (see
-            // pauseEngineOnly); the row is being cascaded away below.
+            // pauseEngineOnly); the row was removed above.
             pauseEngineOnly()
             await clearPlaybackState()
             return
@@ -542,9 +545,9 @@ public final class PlaybackService {
 @MainActor
 public protocol PlaybackStore: AnyObject {
     func episodes(playlistId: Int64) async throws -> [PlaylistEpisodeRow]
-    /// One transaction: playlistEpisode + subtitle + translation rows
-    /// (the cache FILE deletion happens in the cache store, outside).
-    func removeEpisodeCascade(enclosureURL: String) async throws
+    /// Deletes the queue row only; transcripts stay (the cache FILE deletion
+    /// happens in the cache store, outside).
+    func removeEpisode(enclosureURL: String) async throws
     func updatePlayedDuration(_ milliseconds: Int64, enclosureURL: String) async throws
     func savePointer(playlistId: Int64?) async throws
     func clearPointer() async throws
@@ -568,8 +571,8 @@ public final class DatabasePlaybackStore: PlaybackStore {
         try await database.playlistRepository().listEpisodes(playlistId: playlistId)
     }
 
-    public func removeEpisodeCascade(enclosureURL: String) async throws {
-        try await database.playlistRepository().removeEpisodeCascade(byEnclosureURL: enclosureURL)
+    public func removeEpisode(enclosureURL: String) async throws {
+        try await database.playlistRepository().removeEpisode(byEnclosureURL: enclosureURL)
     }
 
     public func updatePlayedDuration(_ milliseconds: Int64, enclosureURL: String) async throws {
