@@ -130,8 +130,9 @@ nonisolated enum AppIcons {
     /// Forward disclosure. Mirrors in right-to-left layouts.
     static let disclosure = symbol("chevron.forward")
     static let retry = symbol("arrow.clockwise")
-    /// Transcript failure. Outline, shared by the playlist strip and the
-    /// transcript page (not `exclamationmark.bubble.fill`).
+    /// Transcript failure. Outline, shared by the playlist strip, the
+    /// transcript page, and the detail transcript row when generation
+    /// failed and Retry is offered (not `exclamationmark.bubble.fill`).
     static let transcriptFailed = symbol("exclamationmark.triangle")
     static let check = symbol("checkmark")
     static let person = symbol("person")
@@ -154,8 +155,6 @@ nonisolated enum AppIcons {
     static let elbowIndent = symbol("arrow.turn.down.right")
     /// Detail transcript row / menu: lines once a transcript exists.
     static let transcriptLines = symbol("text.alignleft")
-    /// Detail transcript row: generation failed, offer Retry.
-    static let transcriptFailed = symbol("exclamationmark.triangle")
     /// Detail ••• "Ask AI" — a bubble, not the player-page brand mark.
     static let chatBubble = symbol("bubble.left")
 
