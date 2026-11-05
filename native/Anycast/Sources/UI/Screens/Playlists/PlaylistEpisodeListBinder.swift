@@ -349,7 +349,7 @@ final class PlaylistEpisodeListBinder: NSObject {
         }
     }
 
-    /// Remove (playlists.dart:182-190): K3 — removing the playing episode
+    /// Remove (playlists.dart:182-190): removing the playing episode
     /// also stops playback and clears the player state. The current-track
     /// check is BY IDENTITY, captured before the first await (a reload
     /// landing mid-task would reshuffle indexes; a positional check can
@@ -361,10 +361,9 @@ final class PlaylistEpisodeListBinder: NSObject {
         Task { [weak self] in
             guard let self else { return }
             let repository = self.context.database.playlistRepository()
-            try? await repository.removeEpisodeCascade(byEnclosureURL: enclosureURL)
-            // The Dart remove cascaded into subtitle/translation/cache state.
-            await self.context.subtitles.remove(url: enclosureURL)
-            await self.context.translations.remove(url: enclosureURL)
+            try? await repository.removeEpisode(byEnclosureURL: enclosureURL)
+            // Only the queue row and cached audio go. Transcripts and their
+            // in-flight polling stay (the Dart K3 cascade is dropped).
             await self.context.cacheStore.remove(url: enclosureURL)
             if wasCurrent {
                 // The episode may have completed and advanced the queue on

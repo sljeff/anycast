@@ -192,7 +192,8 @@ public final class SubtitlePollController {
         return nil
     }
 
-    /// K3 cascade: removing a queue entry drops its subtitle state too.
+    /// Drops the URL's subtitle state and row. Not called on queue removal
+    /// or completion (no K3 cascade: transcripts are paid for and stay).
     public func remove(url: String) async {
         statuses[url] = nil
         try? await subtitles.delete(byEnclosureURL: url)
@@ -345,7 +346,8 @@ public final class TranslationPollController {
         failureCounts.removeAll()
     }
 
-    /// K3 cascade.
+    /// Drops the URL's translation state and row. Not called on queue
+    /// removal or completion (no K3 cascade: translations are paid for).
     public func remove(url: String) async {
         statuses[url] = nil
         failureCounts[url] = nil

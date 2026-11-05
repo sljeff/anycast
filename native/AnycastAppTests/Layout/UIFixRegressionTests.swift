@@ -642,7 +642,7 @@ struct UIFixRegressionTests {
         // Best-effort net for early exits; the happy path awaits its own
         // cleanup first (idempotent delete by URL).
         defer {
-            Task { try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: tallURL) }
+            Task { try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: tallURL) }
         }
 
         let list = PlaylistEpisodeListViewController(
@@ -772,7 +772,7 @@ struct UIFixRegressionTests {
 
         // Restore the fixture: the seeded tall row leaves the playlist it
         // was appended to (awaited, so later serialized tests read clean).
-        try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: tallURL)
+        try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: tallURL)
     }
 
     // MARK: - 9b. Off-screen collapse (scroll-back settling)
@@ -829,7 +829,7 @@ struct UIFixRegressionTests {
         defer {
             Task {
                 for url in fillerURLs {
-                    try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: url)
+                    try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: url)
                 }
             }
         }
@@ -906,7 +906,7 @@ struct UIFixRegressionTests {
 
         // Fixture restore (awaited; the defer Task above is the early-exit net).
         for url in fillerURLs {
-            try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: url)
+            try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: url)
         }
     }
 
@@ -1188,7 +1188,7 @@ struct UIFixRegressionTests {
 
         // Restore the fixture (the live container must not leak this add):
         // back out of the playlist, return the inbox row.
-        try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: url)
+        try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: url)
         try? await context.database.feedRepository().insertMany([episodeRow])
     }
 
