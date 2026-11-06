@@ -236,8 +236,9 @@ enum ScrollEdgeChrome {
     /// The top edge of a sheet with no title row (content starts at the
     /// edge): a clear `height` strip at `host`'s top stands in as the chrome,
     /// so content scrolled up melts away under the grabber zone instead of
-    /// running into the edge. Nothing shows at rest as long as the content
-    /// starts at least `restingGap` below the strip.
+    /// running into the edge. The fade rests clear of content that starts at
+    /// least `restingGap` below the strip. The iOS 26 system effect reaches
+    /// past the strip, so callers also keep `updateTopEffect` current.
     @discardableResult
     static func attachTopEdge(
         to scrollView: UIScrollView,
@@ -260,6 +261,16 @@ enum ScrollEdgeChrome {
             restingGap: restingGap
         )
         return strip
+    }
+
+    /// Turns the iOS 26 top edge effect off while `scrollView` rests at its
+    /// top. The soft effect blurs well past its chrome, so with nothing
+    /// scrolled under the edge it would veil resting content. Call after
+    /// attaching and from `scrollViewDidScroll`.
+    static func updateTopEffect(of scrollView: UIScrollView) {
+        guard #available(iOS 26.0, *) else { return }
+        scrollView.topEdgeEffect.isHidden =
+            scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top
     }
 
     /// The bottom twin of `clearTop`: `chromeTopY` is where the last row
