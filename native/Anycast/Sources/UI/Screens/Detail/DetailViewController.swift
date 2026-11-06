@@ -95,6 +95,10 @@ final class DetailViewController: UIViewController {
             }
             return PlayLabel(title: "Play · \(TimeFormats.formatDuration(duration))", fraction: 0)
         }
+
+        /// The verb alone, for accessibility text sizes where the full title
+        /// no longer fits the capsule on one line.
+        var compactTitle: String { fraction > 0 ? "Resume" : "Play" }
     }
 
     var openChannel: ((ChannelReference) -> Void)?
@@ -435,6 +439,7 @@ final class DetailViewController: UIViewController {
         ScrollEdgeChrome.attachTopEdge(
             to: scrollView, in: view, height: Layout.inset, fadeColor: Theme.surface, restingGap: 0
         )
+        ScrollEdgeChrome.updateTopEffect(of: scrollView)
 
         // The last line of the notes scrolls to rest above the fade.
         scrollView.contentInset.bottom = Layout.fadeHeight
@@ -653,11 +658,7 @@ final class DetailViewController: UIViewController {
         meta.textColor = TypographyV2.meta.color
         meta.adjustsFontForContentSizeCategory = true
         meta.numberOfLines = 1
-        meta.text = RelativeTimeFormatter.dateAndDuration(
-            pubDateMilliseconds: episode.pubDateMilliseconds,
-            durationMilliseconds: episode.durationMilliseconds,
-            now: now()
-        )
+        meta.text = metaText(playTimeInMeta: false)
 
         for label in [titleLabel, meta] as [UIView] {
             label.setContentHuggingPriority(.required, for: .vertical)
@@ -945,10 +946,43 @@ final class DetailViewController: UIViewController {
         moreButton.setDiameter(chrome.height, glyphPointSize: glyph)
         transcriptRow.applyConcentricRadius(chrome.radius)
         artwork.layer.cornerRadius = Radius.concentric(insetFromSheetEdge: Layout.inset)
-        if traitCollection.preferredContentSizeCategory.isAccessibilityCategory {
+        let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        applyPlayTitle(accessibility: accessibility)
+        if accessibility {
             fitPlayButton(height: chrome.height)
         }
         updateScrollContentInsets()
+    }
+
+    /// Accessibility sizes keep the capsule to the verb on one line. The
+    /// time moves to the meta line, and VoiceOver still reads the full label.
+    private func applyPlayTitle(accessibility: Bool) {
+        guard var configuration = playButton.configuration else { return }
+        let label = playLabel
+        configuration.title = accessibility ? label.compactTitle : label.title
+        configuration.titleLineBreakMode = .byTruncatingTail
+        playButton.configuration = configuration
+        metaLabel.text = metaText(playTimeInMeta: accessibility && label.fraction > 0)
+    }
+
+    private var playLabel: PlayLabel {
+        PlayLabel.make(
+            durationMilliseconds: episode.durationMilliseconds,
+            playedMilliseconds: episode.playedMilliseconds
+        )
+    }
+
+    private func metaText(playTimeInMeta: Bool) -> String {
+        let meta = RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: episode.pubDateMilliseconds,
+            durationMilliseconds: episode.durationMilliseconds,
+            now: now()
+        )
+        guard playTimeInMeta, let duration = episode.durationMilliseconds else { return meta }
+        let left = PlaylistCardDisplay.timeLeft(
+            durationMilliseconds: duration, playedMilliseconds: episode.playedMilliseconds ?? 0
+        )
+        return "\(meta) · \(left)"
     }
 
     /// Keeps the Play label inside the capped capsule without changing the
@@ -982,10 +1016,7 @@ final class DetailViewController: UIViewController {
         actionRow.alignment = .fill
         actionRow.spacing = Spacing.md
 
-        let label = PlayLabel.make(
-            durationMilliseconds: episode.durationMilliseconds,
-            playedMilliseconds: episode.playedMilliseconds
-        )
+        let label = playLabel
         let play = AnycastButton.make(.primary, title: label.title, image: AppIcons.play)
         var configuration = play.configuration
         configuration?.background.customView = ProgressCapsuleBackground(fraction: label.fraction)
@@ -1201,6 +1232,7 @@ final class DetailViewController: UIViewController {
 
 extension DetailViewController: UIScrollViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        ScrollEdgeChrome.updateTopEffect(of: scrollView)
         updateFoldTreatment()
     }
 }
