@@ -130,8 +130,9 @@ nonisolated enum AppIcons {
     /// Forward disclosure. Mirrors in right-to-left layouts.
     static let disclosure = symbol("chevron.forward")
     static let retry = symbol("arrow.clockwise")
-    /// Transcript failure. Outline, shared by the playlist strip and the
-    /// transcript page (not `exclamationmark.bubble.fill`).
+    /// Transcript failure. Outline, shared by the playlist strip, the
+    /// transcript page, and the detail transcript row when generation
+    /// failed and Retry is offered (not `exclamationmark.bubble.fill`).
     static let transcriptFailed = symbol("exclamationmark.triangle")
     static let check = symbol("checkmark")
     static let person = symbol("person")
@@ -152,6 +153,10 @@ nonisolated enum AppIcons {
     static let smsFailed = symbol("exclamationmark.bubble.fill")
     static let photo = symbol("photo")
     static let elbowIndent = symbol("arrow.turn.down.right")
+    /// Detail transcript row / menu: lines once a transcript exists.
+    static let transcriptLines = symbol("text.alignleft")
+    /// Detail ••• "Ask AI" — a bubble, not the player-page brand mark.
+    static let chatBubble = symbol("bubble.left")
 
     /// Brand SVGs (template imagesets; tint with tintColor). Ask AI is
     /// `aiChat`; generating or opening a transcript is `aiTranscript`.
@@ -172,7 +177,8 @@ nonisolated enum AppIcons {
         "info.circle", "questionmark.circle", "questionmark", "ellipsis",
         "doc.on.doc", "safari.fill", "safari", "arrow.up.doc", "apple.logo",
         "envelope", "plus.circle", "exclamationmark.bubble.fill", "photo",
-        "arrow.turn.down.right",
+        "arrow.turn.down.right", "text.alignleft", "exclamationmark.triangle",
+        "bubble.left",
     ]
 
     private static func symbol(_ name: String) -> UIImage {

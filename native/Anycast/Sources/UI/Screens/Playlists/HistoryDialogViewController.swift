@@ -668,8 +668,39 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
             htmlRenderer: HTMLContentRenderer(),
             shortenURL: { [weak self] url in
                 await self?.context.api.getShortURL(for: url) ?? url
-            }
+            },
+            transcript: DetailTranscriptCoordinator(
+                context: context,
+                episode: detailEpisode,
+                prepareEpisode: { [weak self] in
+                    guard let self else { return nil }
+                    return await self.prepareTranscriptEpisode(episode)
+                }
+            )
         )
+    }
+
+    /// Same insert as play, without starting audio.
+    private func prepareTranscriptEpisode(_ episode: HistoryEpisodeRow) async -> PlaylistEpisodeRow? {
+        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return nil }
+        let playlistId = ChannelPlaylistLogic.defaultPlaylistID
+        var row = PlaylistEpisodeRow(
+            title: episode.title,
+            description: episode.description,
+            duration: episode.duration,
+            enclosureUrl: episode.enclosureUrl,
+            pubDate: episode.pubDate,
+            imageUrl: episode.imageUrl,
+            channelTitle: episode.channelTitle,
+            rssFeedUrl: episode.rssFeedUrl,
+            playlistId: playlistId
+        )
+        let repository = context.database.playlistRepository()
+        try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: 0)
+        if let stored = try? await repository.episode(byEnclosureURL: enclosureURL) {
+            row = stored
+        }
+        return row
     }
 
     private func playFromHistory(_ episode: HistoryEpisodeRow) async {

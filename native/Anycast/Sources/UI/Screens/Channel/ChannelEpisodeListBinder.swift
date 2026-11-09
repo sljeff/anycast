@@ -322,7 +322,15 @@ final class ChannelEpisodeListBinder {
             },
             shortenURL: { [weak self] url in
                 await self?.context.api.getShortURL(for: url) ?? url
-            }
+            },
+            transcript: DetailTranscriptCoordinator(
+                context: context,
+                episode: detailEpisode,
+                prepareEpisode: { [weak self] in
+                    guard let self else { return nil }
+                    return await self.addToTop(episode)
+                }
+            )
         )
     }
 

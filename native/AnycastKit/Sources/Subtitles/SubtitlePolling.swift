@@ -59,8 +59,9 @@ public struct MainPollTimerFactory: PollTimerFactory {
 ///   keep the `processing` state and the poller running (the server is
 ///   idempotent by enclosure_url); only 401/login surfaces, to any page;
 ///   user-triggered `add()` still returns its error signal for a dialog;
-/// - a server `failed` answer deletes the local row and frees the UI back
-///   to the Generate button (old behavior, replicated);
+/// - a server `failed` answer deletes the local row and keeps an in-memory
+///   `failed` status for this run (Retry). A relaunch reseeds from the
+///   database, which no longer has the row, and the UI returns to Generate;
 /// - iteration runs over a snapshot key list — the old concurrent
 ///   modification crash (08 §12.1-6) is not ported.
 @MainActor
@@ -128,11 +129,23 @@ public final class SubtitlePollController {
     /// stay visible; nil = no dialog).
     @discardableResult
     public func add(url: String) async -> APIClient.ErrorSignal? {
+        let previous = statuses[url]
         statuses[url] = "processing"
         do {
             let result = try await api.getSubtitles(enclosureURL: url)
-            return await apply(url: url, result: result, userTriggered: true)
+            let signal = await apply(url: url, result: result, userTriggered: true)
+            if signal != nil {
+                // A refused user trigger (quota 403 and any other
+                // dialog-worthy error) must not leave the optimistic
+                // processing flag. 401 returns nil from apply and keeps
+                // processing until the login sheet is dismissed. Background
+                // rounds never enter add(); they keep processing on
+                // transport errors (K27).
+                statuses[url] = previous
+            }
+            return signal
         } catch {
+            statuses[url] = previous
             return .errorBody(status: 0, body: error.localizedDescription)
         }
     }
@@ -168,7 +181,10 @@ public final class SubtitlePollController {
                 summary: nil
             ))
         case "failed":
-            statuses[url] = nil
+            // Visible for this run so the UI can offer Retry. The local row
+            // is deleted, so a relaunch — which reseeds from the database —
+            // returns to Generate.
+            statuses[url] = "failed"
             try? await subtitles.delete(byEnclosureURL: url)
         default:
             break // still processing
@@ -176,7 +192,8 @@ public final class SubtitlePollController {
         return nil
     }
 
-    /// K3 cascade: removing a queue entry drops its subtitle state too.
+    /// Drops the URL's subtitle state and row. Not called on queue removal
+    /// or completion (no K3 cascade: transcripts are paid for and stay).
     public func remove(url: String) async {
         statuses[url] = nil
         try? await subtitles.delete(byEnclosureURL: url)
@@ -329,7 +346,8 @@ public final class TranslationPollController {
         failureCounts.removeAll()
     }
 
-    /// K3 cascade.
+    /// Drops the URL's translation state and row. Not called on queue
+    /// removal or completion (no K3 cascade: translations are paid for).
     public func remove(url: String) async {
         statuses[url] = nil
         failureCounts[url] = nil
