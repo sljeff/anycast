@@ -180,20 +180,15 @@ public struct PlaylistRepository: Sendable {
         }
     }
 
-    /// Remove one queue entry plus its subtitle and translation rows — one
-    /// transaction (08 §1.2). Cache file deletion belongs to the cache store
-    /// (M2) and stays outside the transaction.
+    /// Remove one queue entry. Deliberately NOT the Dart K3 cascade: the
+    /// subtitle and translation rows stay, because transcripts cost the user
+    /// quota and other screens (detail, history replay) still show them.
+    /// Cache file deletion belongs to the cache store (M2).
     @concurrent
-    public func removeEpisodeCascade(byEnclosureURL enclosureUrl: String) async throws {
+    public func removeEpisode(byEnclosureURL enclosureUrl: String) async throws {
         try await database.queue.write { db in
             try db.execute(
                 sql: "DELETE FROM playlistEpisode WHERE enclosureUrl = ?", arguments: [enclosureUrl]
-            )
-            try db.execute(
-                sql: "DELETE FROM subtitle WHERE enclosureUrl = ?", arguments: [enclosureUrl]
-            )
-            try db.execute(
-                sql: "DELETE FROM translation WHERE enclosureUrl = ?", arguments: [enclosureUrl]
             )
         }
     }

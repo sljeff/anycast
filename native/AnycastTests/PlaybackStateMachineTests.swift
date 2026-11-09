@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import MediaPlayer
 import Testing
@@ -374,9 +375,10 @@ struct PlaybackStateMachineTests {
         // The finished episode is gone from every store: queue rows…
         let remaining = try await harness.database.playlistRepository().listEpisodes(playlistId: 1)
         #expect(remaining.map(\.enclosureUrl) == ["https://x.example/ep2.mp3"])
-        // …its subtitle and translation rows (K3 cascade)…
-        #expect(try await harness.database.subtitleRepository().get(byEnclosureURL: "https://x.example/ep1.mp3") == nil)
-        #expect(try await harness.database.translationRepository().get(byEnclosureURL: "https://x.example/ep1.mp3", language: "zh") == nil)
+        // …but its paid subtitle and translation rows stay (deliberately
+        // not the Dart K3 cascade: transcripts cost the user quota)…
+        #expect(try await harness.database.subtitleRepository().get(byEnclosureURL: "https://x.example/ep1.mp3") != nil)
+        #expect(try await harness.database.translationRepository().get(byEnclosureURL: "https://x.example/ep1.mp3", language: "zh") != nil)
         // …and its cache file.
         #expect(await harness.cache.removed == ["https://x.example/ep1.mp3"])
         #expect(removedByHook.with { $0 } == ["https://x.example/ep1.mp3"])
@@ -387,6 +389,60 @@ struct PlaybackStateMachineTests {
         await harness.service.flushStoreWrites()
         let history = try await harness.database.historyRepository().listAll()
         #expect(history.contains { $0.enclosureUrl == "https://x.example/ep2.mp3" })
+    }
+
+    @Test("completion for an episode that is not the queue head leaves queue, rows and cache untouched")
+    func completionOfNonHeadIsIgnored() async throws {
+        let harness = try await makeHarness()
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        await restore(harness)
+        let removedByHook = L2ContractTests.Locked<[String]>([])
+        harness.service.onEpisodeRemoved = { url in removedByHook.with { $0.append(url) } }
+
+        // The playing episode is NOT the queue head (e.g. a stray end-of-item
+        // notification from some other player item).
+        await harness.service.playByEpisode(harness.service.queue[1])
+        let loadsBefore = harness.engine.loads.count
+        harness.engine.emit(.completed)
+        try? await Task.sleep(for: .milliseconds(100))
+        await harness.service.flushStoreWrites()
+
+        let remaining = try await harness.database.playlistRepository().listEpisodes(playlistId: 1)
+        #expect(remaining.map(\.enclosureUrl) == ["https://x.example/ep1.mp3", "https://x.example/ep2.mp3"])
+        #expect(harness.service.queue.count == 2)
+        #expect(harness.service.currentEpisode?.enclosureUrl == "https://x.example/ep2.mp3")
+        #expect(harness.engine.loads.count == loadsBefore)
+        #expect(await harness.cache.removed.isEmpty)
+        #expect(removedByHook.with { $0 }.isEmpty)
+        #expect(try await harness.database.subtitleRepository().get(byEnclosureURL: "https://x.example/ep1.mp3") != nil)
+    }
+
+    // MARK: - AVPlayerEngine notification filtering
+
+    @Test("AVPlayerEngine ignores end/failure notifications from foreign items, honours its own")
+    func engineIgnoresForeignItems() async throws {
+        let engine = AVPlayerEngine()
+        let events = L2ContractTests.Locked<[String]>([])
+        engine.events = { event in
+            switch event {
+            case .completed: events.with { $0.append("completed") }
+            case .failed: events.with { $0.append("failed") }
+            default: break
+            }
+        }
+        engine.load(url: URL(string: "https://x.example/own.mp3")!, initialPositionMilliseconds: 0)
+        let own = try #require(engine.currentItemForTesting)
+        let foreign = AVPlayerItem(url: URL(string: "https://x.example/foreign.mp3")!)
+
+        NotificationCenter.default.post(name: AVPlayerItem.didPlayToEndTimeNotification, object: foreign)
+        NotificationCenter.default.post(name: .AVPlayerItemFailedToPlayToEndTime, object: foreign)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(events.with { $0 }.isEmpty, "a foreign item must not complete or fail the engine")
+
+        NotificationCenter.default.post(name: AVPlayerItem.didPlayToEndTimeNotification, object: own)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(events.with { $0 } == ["completed"])
     }
 
     @Test("continuousPlaying off: after completion the service pauses and resets the progress display")
@@ -532,7 +588,7 @@ struct PlaybackStateMachineTests {
         // The binder's remove-of-head sequence: cascade the row away
         // FIRST, then clear the player (playlists.dart:185-188).
         try await harness.database.playlistRepository()
-            .removeEpisodeCascade(byEnclosureURL: "https://x.example/ep1.mp3")
+            .removeEpisode(byEnclosureURL: "https://x.example/ep1.mp3")
         await harness.service.clear()
 
         // No zombie: episode, queue, pointer, engine item, Now Playing all
@@ -611,7 +667,7 @@ struct PlaybackStateMachineTests {
         // handleCompleted took queue.first (= the NEXT episode) and
         // cascade-deleted its rows, subtitle, translation and cache.
         try await harness.database.playlistRepository()
-            .removeEpisodeCascade(byEnclosureURL: "https://x.example/ep1.mp3")
+            .removeEpisode(byEnclosureURL: "https://x.example/ep1.mp3")
         await harness.cache.remove(url: "https://x.example/ep1.mp3")
         await harness.service.clear()
         // The screen resync after a removal reloads the queue: a no-op on
@@ -642,7 +698,7 @@ struct PlaybackStateMachineTests {
         harness.engine.emit(.playingChanged(true))
 
         try await harness.database.playlistRepository()
-            .removeEpisodeCascade(byEnclosureURL: "https://x.example/ep1.mp3")
+            .removeEpisode(byEnclosureURL: "https://x.example/ep1.mp3")
         await harness.service.clear()
 
         harness.clock.advance(3_000)

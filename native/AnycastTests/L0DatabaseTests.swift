@@ -443,6 +443,37 @@ struct L0DatabaseTests {
                 "upward move survives reopen")
     }
 
+    @Test("removing a queue episode keeps its paid subtitle and translation rows")
+    func removeEpisodeKeepsTranscripts() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-remove-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let database = try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
+
+        let repository = database.playlistRepository()
+        let url = "https://x.example/keep.mp3"
+        try await repository.insertOrUpdateByIndex(
+            PlaylistEpisodeRow(title: "Keep", enclosureUrl: url, playlistId: 1), playlistId: 1, index: 0
+        )
+        try await database.subtitleRepository().insert(SubtitleRow(
+            enclosureUrl: url, status: "succeeded",
+            subtitle: SubtitleSegment.encode([SubtitleSegment(start: 0, end: 1, text: "hi")]),
+            language: "en"
+        ))
+        try await database.translationRepository().insert(TranslationRow(
+            enclosureUrl: url, status: "succeeded",
+            translation: SubtitleSegment.encode([SubtitleSegment(start: 0, end: 1, text: "你好")]),
+            language: "zh"
+        ))
+
+        try await repository.removeEpisode(byEnclosureURL: url)
+
+        #expect(try await repository.listEpisodes(playlistId: 1).isEmpty)
+        #expect(try await database.subtitleRepository().get(byEnclosureURL: url) != nil)
+        #expect(try await database.translationRepository().get(byEnclosureURL: url, language: "zh") != nil)
+    }
+
     @Test("moveExisting: moves only, never inserts — the reorder resurrection guard")
     func moveExistingNeverInserts() async throws {
         let directory = FileManager.default.temporaryDirectory
@@ -464,7 +495,7 @@ struct L0DatabaseTests {
 
         // A row a completion cascaded away mid-drag: the reorder must drop,
         // not resurrect it with the stale in-memory copy.
-        try await repository.removeEpisodeCascade(byEnclosureURL: "https://x.example/B.mp3")
+        try await repository.removeEpisode(byEnclosureURL: "https://x.example/B.mp3")
         let movedGone = try await repository.moveExisting(
             byEnclosureURL: "https://x.example/B.mp3", playlistId: 1, index: 0
         )
@@ -571,7 +602,7 @@ struct L0DatabaseTests {
             TranslationRow(enclosureUrl: headURL, status: "succeeded",
                            translation: "[{\"start\":0.0,\"end\":1.0,\"text\":\"x\"}]", language: "zh")
         )
-        try await database.playlistRepository().removeEpisodeCascade(byEnclosureURL: headURL)
+        try await database.playlistRepository().removeEpisode(byEnclosureURL: headURL)
         let (episodeRows, subtitleRows, translationRows) = try await database.queue.read { db in
             let e = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM playlistEpisode WHERE enclosureUrl = ?", arguments: [headURL]) ?? 0
             let s = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM subtitle WHERE enclosureUrl = ?", arguments: [headURL]) ?? 0
