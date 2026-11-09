@@ -217,6 +217,38 @@ nonisolated enum SettingsPageModel {
         }
     }
 
+    /// One line under the Listening group while a lowered History Limit is
+    /// waiting for Settings to close. Nil when nothing would be removed
+    /// (pending limit at or above the stored count).
+    static func historyRemovalNotice(pendingLimit: Int64, historyCount: Int) -> String? {
+        let removed = historyCount - Int(clamping: pendingLimit)
+        guard removed > 0 else { return nil }
+        return removed == 1 ? "Oldest episode will be removed." : "Oldest \(removed) episodes will be removed."
+    }
+
+    /// The History Limit stepper value while Settings is open. Steps are
+    /// held here and written once, when Settings closes, so stepping below
+    /// the stored count deletes nothing yet and can be stepped back.
+    struct HistoryLimitDraft: Equatable {
+        /// The limit persisted in settings.
+        let stored: Int64
+        /// A held value that differs from `stored`; nil when there is none.
+        private(set) var pending: Int64?
+
+        init(stored: Int64, pending: Int64? = nil) {
+            self.stored = stored
+            self.pending = pending == stored ? nil : pending
+        }
+
+        /// What the stepper row shows.
+        var shown: Int64 { pending ?? stored }
+
+        mutating func step(_ direction: StepDirection, in choices: [Int64]) {
+            let next = SettingsPageModel.steppedValue(from: shown, direction, in: choices)
+            pending = next == stored ? nil : next
+        }
+    }
+
     /// VoiceOver names for the minus/plus halves of each stepper row.
     static func stepperAccessibilityLabels(for row: Row) -> (decrease: String, increase: String)? {
         switch row {

@@ -1,6 +1,7 @@
 import UIKit
 
-/// A destructive press-and-hold capsule. The system control owns the behaviour — every transition runs
+/// A destructive "press and hold to confirm" capsule (e.g. Hold to Clear
+/// History). The system control owns the behaviour — every transition runs
 /// off UIButton's own control events — and we only paint the look: a tinted
 /// fill grows leading → trailing while the finger stays down, and the action
 /// fires when it reaches the far edge. One look for iOS 18 and 26.
@@ -78,6 +79,13 @@ final class HoldToConfirmButton: UIButton {
         layer.cornerCurve = .continuous
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(greaterThanOrEqualToConstant: Self.minimumHeight).isActive = true
+        // A wrapped title at large text sizes must grow the capsule, not clip.
+        if let titleLabel {
+            titleLabel.numberOfLines = 0
+            heightAnchor.constraint(
+                greaterThanOrEqualTo: titleLabel.heightAnchor, constant: Spacing.gap * 2
+            ).isActive = true
+        }
 
         fillView.isUserInteractionEnabled = false
         fillView.backgroundColor = UIColor { traits in

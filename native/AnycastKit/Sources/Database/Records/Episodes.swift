@@ -63,7 +63,8 @@ public struct HistoryEpisodeRow: EpisodeFields, Equatable {
     public var imageUrl: String?
     public var channelTitle: String?
     public var rssFeedUrl: String?
-    /// Unix milliseconds of the latest play. The history sort key.
+    /// Unix milliseconds of the latest play. The history sort key. Nil for
+    /// rows that predate the column (upgraded from schema 4).
     /// Independent of `id` (which is no longer a playlist rowid).
     public var lastPlayedAt: Int64?
 

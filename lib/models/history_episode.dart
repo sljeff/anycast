@@ -21,8 +21,9 @@ Future<void> historyEpisodeTableCreator(DatabaseExecutor db) {
 }
 
 class HistoryEpisodeModel extends Episode {
-  /// Unix milliseconds of the latest play. Null only for a model that has
-  /// not been written yet; stored rows always have a value.
+  /// Unix milliseconds of the latest play. Null for a model that has not
+  /// been written yet, and for rows that predate the column (upgraded from
+  /// schema 4): their play time is unknown.
   int? lastPlayedAt;
 
   Map<String, dynamic> toMap() {
@@ -86,34 +87,34 @@ class HistoryEpisodeModel extends Episode {
   /// id the caller carries (playlist rowids used to be copied through and
   /// could REPLACE a different history row). Re-listening bumps lastPlayedAt
   /// and keeps the existing history id.
+  ///
+  /// UPDATE then INSERT rather than `ON CONFLICT DO UPDATE`: sqflite uses the
+  /// platform SQLite on Android, and releases before Android 11 ship a
+  /// version older than 3.24, which has no UPSERT syntax.
   static Future<void> insert(
       DatabaseExecutor db, HistoryEpisodeModel model) async {
-    final playedAt = DateTime.now().millisecondsSinceEpoch;
-    await db.rawInsert('''
-      INSERT INTO $tableName (
-        title, description, duration, enclosureUrl, pubDate, imageUrl,
-        channelTitle, rssFeedUrl, lastPlayedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(enclosureUrl) DO UPDATE SET
-        title = excluded.title,
-        description = excluded.description,
-        duration = excluded.duration,
-        pubDate = excluded.pubDate,
-        imageUrl = excluded.imageUrl,
-        channelTitle = excluded.channelTitle,
-        rssFeedUrl = excluded.rssFeedUrl,
-        lastPlayedAt = excluded.lastPlayedAt
-    ''', <Object?>[
-      model.title,
-      model.description,
-      model.duration,
-      model.enclosureUrl,
-      model.pubDate,
-      model.imageUrl,
-      model.channelTitle,
-      model.rssFeedUrl,
-      playedAt,
-    ]);
+    final values = <String, Object?>{
+      'title': model.title,
+      'description': model.description,
+      'duration': model.duration,
+      'pubDate': model.pubDate,
+      'imageUrl': model.imageUrl,
+      'channelTitle': model.channelTitle,
+      'rssFeedUrl': model.rssFeedUrl,
+      'lastPlayedAt': DateTime.now().millisecondsSinceEpoch,
+    };
+    final updated = await db.update(
+      tableName,
+      values,
+      where: 'enclosureUrl = ?',
+      whereArgs: [model.enclosureUrl],
+    );
+    if (updated == 0) {
+      await db.insert(
+        tableName,
+        {...values, 'enclosureUrl': model.enclosureUrl},
+      );
+    }
   }
 
   static Future<void> deleteMany(

@@ -210,6 +210,46 @@ struct SettingsPageModelTests {
         #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "pt_BR") == "pt")
     }
 
+    // MARK: - History Limit (held until Settings closes)
+
+    @Test("Removal notice: singular, plural, and hidden at or above the count")
+    func historyRemovalNotice() {
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 100, historyCount: 311)
+            == "Oldest 211 episodes will be removed.")
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 100, historyCount: 101)
+            == "Oldest episode will be removed.")
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 100, historyCount: 100) == nil)
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 300, historyCount: 100) == nil)
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 100, historyCount: 0) == nil)
+    }
+
+    @Test("History Limit draft holds steps, steps back to cancel, and clamps")
+    func historyLimitDraft() throws {
+        let choices = try #require(SettingsPageModel.stepperChoices(for: .maxHistoryEpisodes))
+        let stored = choices[choices.count / 2]
+        var draft = SettingsPageModel.HistoryLimitDraft(stored: stored)
+        #expect(draft.shown == stored)
+        #expect(draft.pending == nil)
+
+        draft.step(.decrease, in: choices)
+        let lower = choices[choices.count / 2 - 1]
+        #expect(draft.shown == lower)
+        #expect(draft.pending == lower)
+        #expect(draft.stored == stored, "stepping never changes the stored value")
+
+        draft.step(.increase, in: choices)
+        #expect(draft.shown == stored)
+        #expect(draft.pending == nil, "stepping back to the stored value drops the held change")
+
+        draft.step(.increase, in: choices)
+        #expect(draft.pending == choices[choices.count / 2 + 1], "raising is held too")
+
+        var floor = SettingsPageModel.HistoryLimitDraft(stored: choices[0])
+        floor.step(.decrease, in: choices)
+        #expect(floor.pending == nil, "no step below the smallest choice")
+        #expect(SettingsPageModel.HistoryLimitDraft(stored: stored, pending: stored).pending == nil)
+    }
+
     // MARK: - Deep links
 
     @Test("Contact mailto mirrors the shipped recipient quirk; privacy URLs exact")

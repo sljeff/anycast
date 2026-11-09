@@ -51,8 +51,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     private let collectionView: UICollectionView
     private let refreshControl = UIRefreshControl()
     private let emptyStateView = InboxEmptyStateView()
-    /// Empty-install link. Hidden once the inbox has cards; those use the tail.
-    private let historyFooterButton = UIButton(type: .system)
+    /// Empty-inbox link, shown only when History has rows. Hidden once the
+    /// inbox has cards; those use the tail.
+    private let historyFooterButton = HistoryLinkButton(accessibilityIdentifier: "inbox-listening-history")
     private let htmlRenderer = HTMLContentRenderer()
 
     private let gate: InboxRefreshGate
@@ -148,6 +149,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         playEntranceIfNeeded()
+        // History may have changed while another tab was in front.
+        historyFooterButton.refresh(pageIsEmpty: displayedEpisodes.isEmpty, database: context.database)
     }
 
     override func viewDidLoad() {
@@ -381,43 +384,11 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             ImportInstructionsViewController.present(from: self)
         }
 
-        var historyFooterConfiguration = UIButton.Configuration.plain()
-        historyFooterConfiguration.title = "Listening history"
-        historyFooterConfiguration.baseForegroundColor = Theme.onSurfaceVariant
-        historyFooterConfiguration.titleLineBreakMode = .byWordWrapping
-        historyFooterConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-            var outgoing = incoming
-            outgoing.font = TypographyV2.meta.font()
-            outgoing.foregroundColor = Theme.onSurfaceVariant
-            outgoing.underlineStyle = .single
-            return outgoing
-        }
-        historyFooterButton.configuration = historyFooterConfiguration
-        historyFooterButton.titleLabel?.adjustsFontForContentSizeCategory = true
-        historyFooterButton.titleLabel?.textAlignment = .center
-        historyFooterButton.accessibilityLabel = "Listening history"
-        historyFooterButton.accessibilityIdentifier = "inbox-listening-history"
-        historyFooterButton.isHidden = true
-        historyFooterButton.translatesAutoresizingMaskIntoConstraints = false
         historyFooterButton.addAction(
             UIAction { [weak self] _ in self?.presentHistory() },
             for: .touchUpInside
         )
-        view.addSubview(historyFooterButton)
-        NSLayoutConstraint.activate([
-            historyFooterButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            historyFooterButton.leadingAnchor.constraint(
-                greaterThanOrEqualTo: view.leadingAnchor, constant: Spacing.pageH
-            ),
-            historyFooterButton.trailingAnchor.constraint(
-                lessThanOrEqualTo: view.trailingAnchor, constant: -Spacing.pageH
-            ),
-            historyFooterButton.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Spacing.pageHeader
-            ),
-            historyFooterButton.heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit),
-        ])
-        view.bringSubviewToFront(historyFooterButton)
+        historyFooterButton.install(in: view)
     }
 
     private func presentHistory() {
@@ -474,7 +445,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             }
         }
         collectionView.backgroundView = displayed.isEmpty ? emptyStateView : nil
-        historyFooterButton.isHidden = !displayed.isEmpty
+        historyFooterButton.refresh(pageIsEmpty: displayed.isEmpty, database: context.database)
         refreshChromeStatus()
         playEntranceIfNeeded()
     }
@@ -873,7 +844,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // Post-completion state, not a cached one: a concurrent refresh may
         // have emptied the list while the delete animation ran.
         collectionView.backgroundView = displayedEpisodes.isEmpty ? emptyStateView : nil
-        historyFooterButton.isHidden = !displayedEpisodes.isEmpty
+        historyFooterButton.refresh(pageIsEmpty: displayedEpisodes.isEmpty, database: context.database)
         refreshChromeStatus()
     }
 

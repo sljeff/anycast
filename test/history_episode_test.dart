@@ -70,7 +70,7 @@ void main() {
     }
   });
 
-  test('a v4 history table gains monotonic lastPlayedAt and keeps its rows',
+  test('a v4 history table gains a NULL lastPlayedAt and keeps its rows',
       () async {
     final directory = await Directory.systemTemp.createTemp('history-v4-');
     final databasePath = path.join(directory.path, 'anycast.db');
@@ -123,7 +123,10 @@ void main() {
           'https://example.test/older.mp3',
         ],
       );
-      expect(listed.map((episode) => episode.lastPlayedAt).toList(), <int?>[9, 2]);
+      expect(
+        listed.map((episode) => episode.lastPlayedAt).toList(),
+        <int?>[null, null],
+      );
       expect(listed.first.id, 9);
       expect(listed.first.description, 'keep me');
 
@@ -151,5 +154,112 @@ void main() {
       await upgraded.close();
       await directory.delete(recursive: true);
     }
+  });
+  group('upgraded v4 file', () {
+    Future<String> writeV4(Directory directory) async {
+      final databasePath = path.join(directory.path, 'anycast.db');
+      final created = await databaseFactoryFfi.openDatabase(
+        databasePath,
+        options: OpenDatabaseOptions(
+          version: 4,
+          singleInstance: false,
+          onCreate: (db, _) async {
+            await db.execute('''
+              CREATE TABLE historyEpisode (
+                id INTEGER PRIMARY KEY,
+                title TEXT,
+                description TEXT,
+                duration INTEGER,
+                enclosureUrl TEXT UNIQUE,
+                pubDate INTEGER,
+                imageUrl TEXT,
+                channelTitle TEXT,
+                rssFeedUrl TEXT
+              )
+            ''');
+            await db.insert('historyEpisode', <String, Object?>{
+              'id': 2,
+              'title': 'older',
+              'enclosureUrl': 'https://example.test/older.mp3',
+            });
+            await db.insert('historyEpisode', <String, Object?>{
+              'id': 9,
+              'title': 'newer',
+              'enclosureUrl': 'https://example.test/newer.mp3',
+            });
+          },
+        ),
+      );
+      await created.close();
+      return databasePath;
+    }
+
+    test('a newly played row sorts above NULL rows and reopen is idempotent',
+        () async {
+      final directory = await Directory.systemTemp.createTemp('history-null-');
+      final databasePath = await writeV4(directory);
+      var db = await openAnycastDatabase(databasePath, factory: databaseFactoryFfi);
+      try {
+        await HistoryEpisodeModel.insert(
+          db,
+          HistoryEpisodeModel.fromMap(<String, dynamic>{
+            'title': 'fresh',
+            'enclosureUrl': 'https://example.test/fresh.mp3',
+          }),
+        );
+        var listed = await HistoryEpisodeModel.listAll(db);
+        expect(
+          listed.map((episode) => episode.enclosureUrl).toList(),
+          <String?>[
+            'https://example.test/fresh.mp3',
+            'https://example.test/newer.mp3',
+            'https://example.test/older.mp3',
+          ],
+        );
+        expect(listed.first.lastPlayedAt, isNotNull);
+        expect(listed.skip(1).every((e) => e.lastPlayedAt == null), isTrue);
+
+        await db.close();
+        db = await openAnycastDatabase(databasePath, factory: databaseFactoryFfi);
+        expect(await db.getVersion(), databaseSchemaVersion);
+        listed = await HistoryEpisodeModel.listAll(db);
+        expect(listed, hasLength(3));
+        expect(listed.skip(1).every((e) => e.lastPlayedAt == null), isTrue);
+      } finally {
+        await db.close();
+        await directory.delete(recursive: true);
+      }
+    });
+
+    test('a failing migration leaves the v4 file at version 4', () async {
+      final directory = await Directory.systemTemp.createTemp('history-fail-');
+      final databasePath = await writeV4(directory);
+      final prepared = await databaseFactoryFfi.openDatabase(
+        databasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      // Make the 4 -> 5 ALTER fail: the column already exists.
+      await prepared.execute(
+          'ALTER TABLE historyEpisode ADD COLUMN lastPlayedAt INTEGER');
+      await prepared.close();
+
+      await expectLater(
+        openAnycastDatabase(databasePath, factory: databaseFactoryFfi),
+        throwsA(anything),
+      );
+
+      final check = await databaseFactoryFfi.openDatabase(
+        databasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      try {
+        expect(await check.getVersion(), 4);
+        final rows = await check.query('historyEpisode', orderBy: 'id');
+        expect(rows.map((row) => row['title']).toList(), <Object?>['older', 'newer']);
+      } finally {
+        await check.close();
+        await directory.delete(recursive: true);
+      }
+    });
   });
 }

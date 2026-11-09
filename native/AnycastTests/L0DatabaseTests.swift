@@ -32,7 +32,7 @@ struct L0DatabaseTests {
             }
             #expect(version == Schema.version, "\(bucket): user_version")
 
-            // lastPlayedAt is filled on upgrade from the pre-v5 id order and
+            // lastPlayedAt is added on upgrade (NULL for existing rows) and
             // is not part of the v4 golden dumps.
             let comparison = try await G15.compare(
                 database: database, goldenBucket: bucket, sandbox: sandbox,
@@ -65,9 +65,11 @@ struct L0DatabaseTests {
         let history = try await database.historyRepository().listAll()
         let playedAt = history.map { $0.lastPlayedAt ?? Int64.min }
         #expect(playedAt == playedAt.sorted(by: >), "history lastPlayedAt DESC")
-        // Released fixtures predate the column. The v5 migration copies id,
-        // so the previous id-DESC order and the new sort key agree.
-        #expect(history.allSatisfy { $0.lastPlayedAt == $0.id }, "migrated lastPlayedAt falls back to id")
+        // Released fixtures predate the column. The v5 migration leaves it
+        // NULL (unknown play time); the id tie-break keeps the old order.
+        #expect(history.allSatisfy { $0.lastPlayedAt == nil }, "migrated lastPlayedAt stays NULL")
+        let historyIds = history.compactMap(\.id)
+        #expect(historyIds == historyIds.sorted(by: >), "NULL rows keep id DESC")
 
         // SQLite BINARY collation is byte order — compare against the
         // database's own ordering, never a localized Swift sort.

@@ -74,6 +74,23 @@ public struct HistoryRepository: Sendable {
         }
     }
 
+    /// Deletes `urls` except rows played at or after `cutoff`, so a play that
+    /// lands during a clear's Undo window is not deleted with the clear.
+    @concurrent
+    public func deleteMany(_ urls: [String], notPlayedSince cutoff: Int64) async throws {
+        try await database.queue.write { db in
+            for url in urls {
+                try db.execute(
+                    sql: """
+                    DELETE FROM historyEpisode
+                    WHERE enclosureUrl = ? AND (lastPlayedAt IS NULL OR lastPlayedAt < ?)
+                    """,
+                    arguments: [url, cutoff]
+                )
+            }
+        }
+    }
+
     /// Drops the oldest plays past `max`, ordered by `lastPlayedAt`.
     @discardableResult
     @concurrent

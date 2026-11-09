@@ -31,12 +31,12 @@ const Map<int, List<String>> migrations = {
   4: <String>[
     'ALTER TABLE settings ADD COLUMN continuousPlaying INTEGER DEFAULT 1',
   ],
-  // 4 -> 5. lastPlayedAt is the history sort key. Copying id gives rows
-  // that predate the column a monotonic fallback, so the old id-DESC order
-  // is preserved until something is played again.
+  // 4 -> 5. lastPlayedAt is the history sort key. Rows that predate the
+  // column keep NULL (their real play time is unknown). SQLite sorts NULL
+  // last under DESC, so they stay below every newly played row, in the old
+  // id-DESC order via the tie-break.
   5: <String>[
     'ALTER TABLE historyEpisode ADD COLUMN lastPlayedAt INTEGER',
-    'UPDATE historyEpisode SET lastPlayedAt = id WHERE lastPlayedAt IS NULL',
   ],
 };
 

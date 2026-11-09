@@ -48,6 +48,24 @@ struct SettingsStepWriter {
     }
 }
 
+/// Commits a held History Limit when Settings closes: persist through the
+/// coordinator, then trim History to it. The trim runs only if the new limit
+/// actually landed, so a failed write never deletes rows under the old
+/// setting. Returns the remaining history count (nil if the read failed).
+struct SettingsHistoryLimitCommit {
+
+    let coordinator: SettingsCoordinator
+    let settingsBox: SettingsBox
+    let history: HistoryRepository
+
+    func run(_ limit: Int64) async -> Int? {
+        await coordinator.updateMaxHistoryEpisodes(limit)
+        guard settingsBox.current.maxHistoryEpisodes == limit else { return nil }
+        _ = try? await history.trim(keeping: limit)
+        return try? await history.count()
+    }
+}
+
 /// Settings sheet (lib/pages/settings.dart, 03 §2.13) in the restrained 2.0
 /// Settings direction adopted 2026-10-21: grouped plates on the container
 /// page, rows with values and chevrons, in-row steppers for the numeric
@@ -82,6 +100,8 @@ final class SettingsViewController: UIViewController {
     /// the current sections, so it reads them through this box.
     private final class SectionStore {
         var sections: [SettingsPageModel.Section] = []
+        /// The line under Listening while a lowered History Limit is held.
+        var historyRemovalNotice: String?
     }
 
     private let sectionStore: SectionStore
@@ -105,6 +125,11 @@ final class SettingsViewController: UIViewController {
     private var notificationObservers: [NSObjectProtocol] = []
     /// Nil until the history count read finishes. The row then shows None / N episodes.
     private var historyCount: Int?
+    /// A History Limit stepped in this sheet, held until Settings closes
+    /// (nil when the stepper shows the stored value).
+    private var pendingHistoryLimit: Int64?
+    /// Listening History was tapped; a second tap must not dismiss twice.
+    private var isOpeningHistory = false
 
     init(context: UIContext) {
         self.context = context
@@ -147,6 +172,8 @@ final class SettingsViewController: UIViewController {
             // the system grouped gray over it.
             config.backgroundColor = .clear
             config.headerMode = section?.header == nil ? .none : .supplementary
+            config.footerMode = section?.rows.contains(.maxHistoryEpisodes) == true
+                && store.historyRemovalNotice != nil ? .supplementary : .none
             // The gold Upgrade plate sits 12 below the identity row.
             let isUpgradePlate = section?.rows == [.plusUpgrade]
             config.headerTopPadding = sectionIndex == 0
@@ -245,6 +272,17 @@ final class SettingsViewController: UIViewController {
         ScrollEdgeChrome.clearTop(of: collectionView, to: titleLabel.frame.maxY + Spacing.xs)
     }
 
+    /// Settings closing for real (not a cancelled interactive swipe, which
+    /// never reaches here, and not a child presented over it) commits a
+    /// held History Limit. The task keeps this controller alive until the
+    /// write finishes.
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        guard pendingHistoryLimit != nil, presentedViewController == nil,
+              isBeingDismissed || presentingViewController == nil else { return }
+        Task { await commitHistoryLimit() }
+    }
+
     deinit {
         accountTask?.cancel()
         // UI teardown runs on the main thread; the observer tokens are not
@@ -296,6 +334,12 @@ final class SettingsViewController: UIViewController {
             header.backgroundConfiguration = .clear()
         }
 
+        let footerRegistration = UICollectionView.SupplementaryRegistration<UICollectionViewListCell>(
+            elementKind: UICollectionView.elementKindSectionFooter
+        ) { [weak self] footer, _, _ in
+            self?.configureHistoryRemovalFooter(footer)
+        }
+
         let dataSource = UICollectionViewDiffableDataSource<Int, SettingsPageModel.Row>(
             collectionView: collectionView
         ) { collectionView, indexPath, row in
@@ -318,9 +362,10 @@ final class SettingsViewController: UIViewController {
                 )
             }
         }
-        dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
+        dataSource.supplementaryViewProvider = { collectionView, kind, indexPath in
             collectionView.dequeueConfiguredReusableSupplementary(
-                using: headerRegistration, for: indexPath
+                using: kind == UICollectionView.elementKindSectionFooter ? footerRegistration : headerRegistration,
+                for: indexPath
             )
         }
         self.dataSource = dataSource
@@ -336,7 +381,74 @@ final class SettingsViewController: UIViewController {
             guard let count = try? await context.database.historyRepository().count() else { return }
             self.historyCount = count
             self.reconfigureVisible()
+            self.updateHistoryRemovalNotice()
         }
+    }
+
+    // MARK: - Held History Limit
+
+    /// The settings the rows render: the stored ones with a held History
+    /// Limit laid over them.
+    private var displayedSettings: AppSettings {
+        var shown = settings
+        if let pendingHistoryLimit { shown.maxHistoryEpisodes = pendingHistoryLimit }
+        return shown
+    }
+
+    private func configureHistoryRemovalFooter(_ footer: UICollectionViewListCell) {
+        var config = footer.defaultContentConfiguration()
+        config.text = sectionStore.historyRemovalNotice
+        config.textProperties.color = Theme.onSurfaceVariant
+        config.textProperties.font = TypographyV2.meta.font()
+        config.textProperties.adjustsFontForContentSizeCategory = true
+        // Text lines up with the row text, 8 under the plate.
+        config.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: Spacing.md, leading: SettingsRowCell.horizontalInset,
+            bottom: 0, trailing: SettingsRowCell.horizontalInset
+        )
+        footer.contentConfiguration = config
+        footer.backgroundConfiguration = .clear()
+    }
+
+    /// Shows, rewrites or hides the "Oldest N episodes will be removed."
+    /// line from the held limit and the stored count.
+    private func updateHistoryRemovalNotice() {
+        let notice: String? = pendingHistoryLimit.flatMap { pending in
+            historyCount.flatMap {
+                SettingsPageModel.historyRemovalNotice(pendingLimit: pending, historyCount: $0)
+            }
+        }
+        let hadNotice = sectionStore.historyRemovalNotice != nil
+        sectionStore.historyRemovalNotice = notice
+        if hadNotice != (notice != nil) {
+            UIView.animate(withDuration: Motion.reduceMotion ? 0 : 0.25) {
+                self.collectionView.collectionViewLayout.invalidateLayout()
+                self.collectionView.layoutIfNeeded()
+            }
+        } else if notice != nil,
+                  let index = sections.firstIndex(where: { $0.rows.contains(.maxHistoryEpisodes) }),
+                  let footer = collectionView.supplementaryView(
+                      forElementKind: UICollectionView.elementKindSectionFooter,
+                      at: IndexPath(item: 0, section: index)
+                  ) as? UICollectionViewListCell {
+            configureHistoryRemovalFooter(footer)
+        }
+    }
+
+    /// Writes the held History Limit and trims History to it, once. The
+    /// limit is only cleared after the write, so the row never flips back.
+    private func commitHistoryLimit() async {
+        guard let limit = pendingHistoryLimit else { return }
+        let commit = SettingsHistoryLimitCommit(
+            coordinator: context.settingsCoordinator,
+            settingsBox: context.settingsBox,
+            history: context.database.historyRepository()
+        )
+        let remaining = await commit.run(limit)
+        pendingHistoryLimit = nil
+        if let remaining { historyCount = remaining }
+        refreshFromBox()
+        updateHistoryRemovalNotice()
     }
 
     private func applySnapshot() {
@@ -445,12 +557,13 @@ final class SettingsViewController: UIViewController {
 
     /// A numeric-limit row: title, value, and the − | + stepper.
     private func configureStepperCell(_ cell: SettingsStepperRowCell, for row: SettingsPageModel.Row) {
+        let shown = displayedSettings
         guard let choices = SettingsPageModel.stepperChoices(for: row),
-              let current = SettingsPageModel.stepperValue(for: row, settings: settings),
+              let current = SettingsPageModel.stepperValue(for: row, settings: shown),
               let labels = SettingsPageModel.stepperAccessibilityLabels(for: row) else { return }
         cell.configure(
             title: SettingsPageModel.title(for: row),
-            value: SettingsPageModel.value(for: row, settings: settings) ?? "",
+            value: SettingsPageModel.value(for: row, settings: shown) ?? "",
             labels: labels,
             canDecrease: SettingsPageModel.canDecrease(from: current, in: choices),
             canIncrease: SettingsPageModel.canIncrease(from: current, in: choices)
@@ -469,6 +582,10 @@ final class SettingsViewController: UIViewController {
     /// One stepper tap: write the neighbouring choice immediately, then
     /// re-render the row.
     private func step(_ row: SettingsPageModel.Row, _ direction: SettingsPageModel.StepDirection) {
+        if row == .maxHistoryEpisodes {
+            stepHistoryLimit(direction)
+            return
+        }
         let latest = context.settingsBox.current
         guard let choices = SettingsPageModel.stepperChoices(for: row),
               let current = SettingsPageModel.stepperValue(for: row, settings: latest) else { return }
@@ -593,15 +710,40 @@ final class SettingsViewController: UIViewController {
 
     /// Dismiss Settings first, then present History from the page underneath.
     /// History must not stack on the Settings sheet.
+    ///
+    /// A held History Limit is committed (and History trimmed) first, so the
+    /// sheet never shows rows that are about to go.
     private func presentHistory() {
+        guard !isOpeningHistory else { return }
+        isOpeningHistory = true
         let context = context
-        guard let presenter = presentingViewController else {
-            HistoryDialogViewController.present(from: self, context: context)
-            return
+        Task { [weak self] in
+            await self?.commitHistoryLimit()
+            guard let self else { return }
+            guard let presenter = self.presentingViewController else {
+                self.isOpeningHistory = false
+                HistoryDialogViewController.present(from: self, context: context)
+                return
+            }
+            self.dismiss(animated: true) {
+                HistoryDialogViewController.present(from: presenter.topMostPresented(), context: context)
+            }
         }
-        dismiss(animated: true) {
-            HistoryDialogViewController.present(from: presenter.topMostPresented(), context: context)
-        }
+    }
+
+    /// History Limit steps are held, not written: lowering below the stored
+    /// count deletes nothing until Settings closes, and stepping back up
+    /// cancels it.
+    private func stepHistoryLimit(_ direction: SettingsPageModel.StepDirection) {
+        guard let choices = SettingsPageModel.stepperChoices(for: .maxHistoryEpisodes) else { return }
+        var draft = SettingsPageModel.HistoryLimitDraft(
+            stored: context.settingsBox.current.maxHistoryEpisodes, pending: pendingHistoryLimit
+        )
+        draft.step(direction, in: choices)
+        guard draft.pending != pendingHistoryLimit else { return }
+        pendingHistoryLimit = draft.pending
+        reconfigureVisible()
+        updateHistoryRemovalNotice()
     }
 
     private func presentCountrySheet() {

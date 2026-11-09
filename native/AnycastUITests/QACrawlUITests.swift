@@ -1073,8 +1073,7 @@ final class QACrawlUITests: XCTestCase {
                                return false
                            }
                            return s.waitUntil(timeout: 6) {
-                               s.app.buttons["Clear All"].exists
-                                   || s.app.buttons["history-clear-all"].exists
+                               s.app.buttons["Hold to Clear History"].exists
                                    || s.app.staticTexts["Play an episode and it shows up here."].exists
                                    || s.app.buttons["history-explore"].exists
                            }

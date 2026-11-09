@@ -18,11 +18,11 @@ public enum Schema {
             "ALTER TABLE settings ADD COLUMN continuousPlaying INTEGER DEFAULT 1",
         ],
         // 4 -> 5. `lastPlayedAt` is the history sort key. Rows written before
-        // the column existed have no real play time; copying `id` keeps the
-        // previous id-DESC order as a monotonic fallback.
+        // the column existed keep NULL (play time unknown); SQLite sorts NULL
+        // last under DESC, so they stay below newly played rows, in the old
+        // id-DESC order via the tie-break.
         5: [
             "ALTER TABLE historyEpisode ADD COLUMN lastPlayedAt INTEGER",
-            "UPDATE historyEpisode SET lastPlayedAt = id WHERE lastPlayedAt IS NULL",
         ],
     ]
 
