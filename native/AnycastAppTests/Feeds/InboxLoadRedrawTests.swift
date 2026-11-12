@@ -55,46 +55,6 @@ struct InboxLoadRedrawTests {
         #expect(InboxHeaderStatus.newRowCount(known: ["a", "b", "c"], current: rows) == 0)
     }
 
-    // MARK: - Description resolver
-
-    private nonisolated final class ParseCounter: @unchecked Sendable {
-        private let lock = NSLock()
-        private var seen: [String] = []
-        func record(_ html: String) { lock.lock(); seen.append(html); lock.unlock() }
-        var calls: [String] { lock.lock(); defer { lock.unlock() }; return seen }
-    }
-
-    private func row(_ url: String?, _ html: String?) -> FeedEpisodeRow {
-        FeedEpisodeRow(description: html, enclosureUrl: url)
-    }
-
-    @Test("Plain text is resolved before render and reused without re-parsing")
-    func resolverResolvesOnceAndReuses() async {
-        let counter = ParseCounter()
-        let parse: @Sendable (String) -> String = { html in counter.record(html); return "plain:" + html }
-        let rows = [row("a", "<p>A</p>"), row("b", "<p>B</p>"), row("c", nil), row(nil, "<p>no url</p>")]
-
-        let first = await InboxDescriptionResolver.resolve(rows: rows, existing: [:], parse: parse)
-        #expect(Set(counter.calls) == ["<p>A</p>", "<p>B</p>"])
-        #expect(InboxDescriptionResolver.plainText(for: rows[0], in: first) == "plain:<p>A</p>")
-        #expect(InboxDescriptionResolver.plainText(for: rows[2], in: first) == "", "nil description is resolved empty")
-        #expect(InboxDescriptionResolver.plainText(for: rows[3], in: first) == nil, "no URL: cell HTML fallback")
-
-        // Same rows again: nothing is parsed.
-        let second = await InboxDescriptionResolver.resolve(rows: rows, existing: first, parse: parse)
-        #expect(counter.calls.count == 2, "resolved rows were parsed again")
-        #expect(second == first)
-
-        // One changed HTML re-parses only that row; a row that left drops out.
-        let changed = [row("a", "<p>A2</p>"), row("b", "<p>B</p>")]
-        let third = await InboxDescriptionResolver.resolve(rows: changed, existing: second, parse: parse)
-        #expect(counter.calls.count == 3 && counter.calls.last == "<p>A2</p>")
-        #expect(third["c"] == nil)
-        #expect(InboxDescriptionResolver.plainText(for: changed[0], in: third) == "plain:<p>A2</p>")
-        // A stale entry never answers for newer HTML.
-        #expect(InboxDescriptionResolver.plainText(for: changed[0], in: second) == nil)
-    }
-
     // MARK: - Hosted first layout
 
     private final class CardSource: NSObject, UICollectionViewDataSource {
@@ -106,13 +66,12 @@ struct InboxLoadRedrawTests {
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: InboxEpisodeCardCell.reuseIdentifier, for: indexPath
             )
-            let long = String(repeating: "A description that is long enough to wrap onto a second line. ", count: 4)
-            let plain = indexPath.item.isMultiple(of: 2) ? long : "Short"
+            // Alternating one- and two-line titles: the row height depends on
+            // the title alone (no async description), so it settles at once.
+            let long = "Episode \(indexPath.item) with a title long enough to need a couple of lines in a row"
             (cell as? InboxEpisodeCardCell)?.configure(InboxCardContent(
-                title: "Episode \(indexPath.item) with a title long enough to need a couple of lines in a card",
-                showName: "Show", metaText: "1d ago · 30m",
-                descriptionHTML: "<p>\(plain)</p>", imageURL: nil,
-                descriptionPlainText: plain
+                title: indexPath.item.isMultiple(of: 2) ? long : "Short",
+                showName: "Show", dateText: "1d ago", durationText: "30m"
             ))
             return cell
         }
@@ -122,7 +81,7 @@ struct InboxLoadRedrawTests {
         (0..<count).map { collectionView.cellForItem(at: IndexPath(item: $0, section: 0))?.frame.height ?? -1 }
     }
 
-    @Test("Cards in a hosted list have their settled height on the first layout")
+    @Test("Rows in a hosted list have their settled height on the first layout")
     func firstLayoutHeightsAreSettled() async throws {
         let scene = try #require(
             UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first,
@@ -227,8 +186,7 @@ struct InboxChromeLayoutTests {
             default:
                 let cell = collectionView.dequeueReusableCell(withReuseIdentifier: InboxEpisodeCardCell.reuseIdentifier, for: indexPath)
                 (cell as? InboxEpisodeCardCell)?.configure(InboxCardContent(
-                    title: "Episode", showName: "Show", metaText: "1d ago",
-                    descriptionHTML: nil, imageURL: nil, descriptionPlainText: "A description"
+                    title: "Episode", showName: "Show", dateText: "1d ago", durationText: "30m"
                 ))
                 return cell
             }
@@ -247,8 +205,8 @@ struct InboxChromeLayoutTests {
 
         let layout = UICollectionViewCompositionalLayout { index, environment in
             switch index {
-            case 0: return InboxPageViewController.chromeSection(height: ShowsShelfLayout.itemSide, bottomInset: InboxEpisodeCardCell.verticalGap)
-            case 1: return InboxPageViewController.chromeSection(height: CategoryStripView.chipHeight, bottomInset: InboxEpisodeCardCell.verticalGap)
+            case 0: return InboxPageViewController.chromeSection(height: ShowsShelfLayout.itemSide, bottomInset: Spacing.gap)
+            case 1: return InboxPageViewController.chromeSection(height: CategoryStripView.chipHeight, bottomInset: Spacing.gap)
             default:
                 var config = UICollectionLayoutListConfiguration(appearance: .plain)
                 config.showsSeparators = false

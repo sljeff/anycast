@@ -12,13 +12,13 @@ import AnycastKit
 /// auto fetch, a periodic auto fetch every `autoRefreshInterval` seconds
 /// (DB default 300, restarted on settings change, K36), and the Tab0
 /// re-tap path. Every 60 s the inbox/history overage trim runs
-/// (states/player.dart:344-349). Cards are the v2 text-forward
-/// InboxEpisodeCardCell; actions follow `InboxActionPlanner` exactly
-/// (play / add-with-fly-in / remove) through the native-first surfaces:
-/// whole-card tap opens Detail, long-press opens the context menu, the
-/// card's `more` button pulls the same menu down, a leading swipe adds to
-/// the playlist and a trailing swipe removes (09 §7a-C1; 05 §6.3 P0). Card
-/// badges follow the playing episode and the playlist.
+/// (states/player.dart:344-349). The episodes are rows of ONE grouped plate
+/// (InboxEpisodeCardCell on `GroupedPlateView`); actions follow
+/// `InboxActionPlanner` exactly (play / add-with-fly-in / remove) through
+/// the native-first surfaces: whole-row tap opens Detail, long-press opens
+/// the context menu, a leading swipe adds to the playlist and a trailing
+/// swipe removes (09 §7a-C1; 05 §6.3 P0). Row badges follow the playing
+/// episode and the playlist.
 final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     /// Scroll-column sections (Figma column order). The shelf shows only
@@ -74,12 +74,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     private var didPlayEntrance = false
     private var lastChromeHeight: CGFloat = 0
 
-    /// Plain text for the card descriptions, keyed by enclosure URL and
-    /// resolved in `reload()` BEFORE the list renders, so a card is final on
-    /// its first layout. Every render path reads rows already in `episodes`,
-    /// which this covers; entries for rows that left the list drop at the
-    /// next reload.
-    private var descriptions: [String: InboxResolvedDescription] = [:]
     /// The first `reload()` has landed; a refresh before it cannot tell
     /// new rows from rows the list simply had not loaded yet.
     private var didLoadOnce = false
@@ -121,9 +115,11 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // Scroll-flow chrome (09 §10 批次1): shelf/strip are list
         // cells now, the card section is a list section so it can carry
         // native swipe actions, and the history pill closes the column.
-        collection.collectionViewLayout = UICollectionViewCompositionalLayout { [weak self] index, environment in
+        let layout = UICollectionViewCompositionalLayout { [weak self] index, environment in
             self?.makeSection(index: index, environment: environment)
         }
+        layout.register(GroupedPlateView.self, forDecorationViewOfKind: GroupedPlateView.elementKind)
+        collection.collectionViewLayout = layout
     }
 
     @available(*, unavailable)
@@ -291,8 +287,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     ) -> NSCollectionLayoutSection? {
         guard let section = makeSectionBody(index: index, environment: environment) else { return nil }
         if index == 0 {
-            let cardsBake = sections[0] == .cards ? InboxEpisodeCardCell.verticalGap : 0
-            section.contentInsets.top += Spacing.gap - Spacing.xs - cardsBake
+            section.contentInsets.top += Spacing.gap - Spacing.xs
         }
         return section
     }
@@ -302,7 +297,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     ) -> NSCollectionLayoutSection? {
         guard sections.indices.contains(index) else { return nil }
         let next = sections.indices.contains(index + 1) ? sections[index + 1] : nil
-        let gapBeforeCards = InboxEpisodeCardCell.verticalGap
+        let gapBeforeCards = Spacing.gap
         switch sections[index] {
         case .shelf:
             return Self.chromeSection(
@@ -310,7 +305,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
                 bottomInset: next == .cards ? gapBeforeCards : Spacing.xs
             )
         case .strip:
-            // 6 here + the card cell's 6pt top inset = the 12pt column gap.
             return Self.chromeSection(height: CategoryStripView.chipHeight, bottomInset: gapBeforeCards)
         case .cards:
             var config = UICollectionLayoutListConfiguration(appearance: .plain)
@@ -326,10 +320,28 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             config.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
                 self?.trailingSwipeActions(at: indexPath)
             }
-            return NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
+            return Self.rowsSection(config: config, environment: environment)
         case .tail:
             return Self.chromeSection(height: nil, bottomInset: Spacing.gap)
         }
+    }
+
+    /// The episode rows as one list section (swipe actions come with the
+    /// list configuration) on a grouped plate inset 16 from the edges — the
+    /// same `GroupedPlateView` decoration Discover and Channel lists use.
+    static func rowsSection(
+        config: UICollectionLayoutListConfiguration, environment: NSCollectionLayoutEnvironment
+    ) -> NSCollectionLayoutSection {
+        let section = NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
+        section.contentInsets = NSDirectionalEdgeInsets(
+            top: 0, leading: Spacing.pageH, bottom: Spacing.sm, trailing: Spacing.pageH
+        )
+        let plate = NSCollectionLayoutDecorationItem.background(elementKind: GroupedPlateView.elementKind)
+        plate.contentInsets = NSDirectionalEdgeInsets(
+            top: 0, leading: Spacing.pageH, bottom: 0, trailing: Spacing.pageH
+        )
+        section.decorationItems = [plate]
+        return section
     }
 
     /// One chrome row (shelf / strip / history pill). The shelf and the
@@ -436,31 +448,22 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         reloadGeneration += 1
         let generation = reloadGeneration
         let repository = context.database.feedRepository()
-        guard let firstRead = try? await repository.listAll() else {
+        guard let rows = try? await repository.listAll() else {
             // A failed read keeps the current list — rendering the empty
             // state here would claim the inbox has no episodes at all.
             return
         }
-        // Plain text first: the list must not render a card whose
-        // description is still being parsed. `episodes` and its text land
-        // together so no render sees one without the other.
-        var resolved = await InboxDescriptionResolver.resolve(rows: firstRead, existing: descriptions)
-        // Parsing can take a while, so read again: a card removed meanwhile
-        // must not come back. Anything already parsed costs nothing here.
-        let rows = (try? await repository.listAll()) ?? firstRead
-        resolved = await InboxDescriptionResolver.resolve(rows: rows, existing: resolved)
         // A newer reload owns the list; this older read must not replace it.
         guard generation == reloadGeneration else { return }
         // Categories first: nothing may suspend between assigning the rows
         // and rendering them, or a layout pass could see the new rows
         // before the diff that announces them.
         await reloadCategories()
-        // The rows and their text commit inside the render (inside the batch
-        // update when the list is diffed), never ahead of it.
+        // The rows commit inside the render (inside the batch update when
+        // the list is diffed), never ahead of it.
         renderList(allowsDiff: true, incoming: rows, generation: generation) { [weak self] in
             guard let self else { return }
             self.episodes = rows
-            self.descriptions = resolved
             self.didLoadOnce = true
         }
         prefetchCovers()
@@ -570,6 +573,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         collectionView.backgroundView = displayedEpisodes.isEmpty ? emptyStateView : nil
         historyFooterButton.refresh(pageIsEmpty: displayedEpisodes.isEmpty, database: context.database)
         refreshChromeStatus()
+        refreshVisibleRowPositions()
         playEntranceIfNeeded()
     }
 
@@ -600,6 +604,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             completion: { [weak self] in
                 guard let self else { return }
                 if !animated { self.restore(anchors, signature: signature) }
+                self.refreshVisibleRowPositions()
                 self.updateGate.end()
             }
         )
@@ -1066,6 +1071,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         collectionView.backgroundView = displayedEpisodes.isEmpty ? emptyStateView : nil
         historyFooterButton.refresh(pageIsEmpty: displayedEpisodes.isEmpty, database: context.database)
         refreshChromeStatus()
+        refreshVisibleRowPositions()
         updateGate.end()
     }
 
@@ -1289,26 +1295,40 @@ extension InboxPageViewController: UICollectionViewDataSource {
         let content = InboxCardContent(
             title: episode.title ?? "",
             showName: episode.channelTitle ?? "",
-            metaText: Self.metaText(for: episode),
-            descriptionHTML: episode.description,
+            dateText: episode.pubDate.map { RelativeTimeFormatter.format($0) } ?? "",
+            durationText: Self.durationText(for: episode),
             imageURL: episode.imageUrl,
-            descriptionPlainText: InboxDescriptionResolver.plainText(for: episode, in: descriptions),
             status: status(for: episode)
         )
         card.configure(content)
-        // The same payload feeds the long-press context menu, the card's
-        // `more` pull-down, and the VoiceOver custom actions (09 §7a-C1).
+        card.setPosition(
+            isFirst: indexPath.item == 0,
+            isLast: indexPath.item == displayedEpisodes.count - 1
+        )
+        // The same payload feeds the long-press context menu and the
+        // VoiceOver custom actions (09 §7a-C1).
         card.menuActions = actions(for: episode, at: indexPath)
         card.onCardTap = { [weak self] in
             self?.presentDetail(episode: episode)
         }
     }
 
-    /// "4d ago · 30m" — the card's relative date with the duration when known.
-    static func metaText(for episode: FeedEpisodeRow) -> String {
-        RelativeTimeFormatter.dateAndDuration(
-            pubDateMilliseconds: episode.pubDate, durationMilliseconds: episode.duration
-        )
+    /// "44m" — the row's trailing duration; empty when unknown.
+    static func durationText(for episode: FeedEpisodeRow) -> String {
+        guard let duration = episode.duration, duration > 0 else { return "" }
+        return TimeFormats.formatDuration(duration)
+    }
+
+    /// The first and last rows round the plate's corners and the first has
+    /// no hairline, so rows that stayed through an insert or a removal
+    /// re-resolve their place.
+    private func refreshVisibleRowPositions() {
+        let count = displayedEpisodes.count
+        for indexPath in collectionView.indexPathsForVisibleItems
+        where sectionKind(indexPath.section) == .cards {
+            (collectionView.cellForItem(at: indexPath) as? InboxEpisodeCardCell)?
+                .setPosition(isFirst: indexPath.item == 0, isLast: indexPath.item == count - 1)
+        }
     }
 
     private func status(for episode: FeedEpisodeRow) -> InboxCardContent.Status {
