@@ -274,8 +274,14 @@ final class LibrarySheetViewController: UIViewController {
         // the detent counts on, and scrolls clear of it when the content is
         // taller than the sheet.
         collectionView.contentInset.bottom = ShowsSheetLayout.bottomGap(safeAreaBottom: safeBottom)
-        let measured = collectionView.collectionViewLayout.collectionViewContentSize.height
         guard width > 0 else { return }
+        // Rows still below the fold are counted at the list's small estimate
+        // until they are laid out, which cut the last row off; never fit
+        // the sheet to less than the per-row estimate of what is listed.
+        let measured = max(
+            collectionView.collectionViewLayout.collectionViewContentSize.height,
+            estimatedContentHeight(gridWidth: width)
+        )
         guard width != gridWidth || safeBottom != safeAreaBottom || abs(measured - (contentHeight ?? 0)) > 0.5
         else { return }
         gridWidth = width
@@ -324,6 +330,9 @@ final class LibrarySheetViewController: UIViewController {
             return false
         })
         dataSource.apply(snapshot, animatingDifferences: false)
+        // New rows change the content height without changing the view's
+        // bounds, so ask for the layout pass that refits the detent.
+        view.setNeedsLayout()
     }
 
     // MARK: - Cells
