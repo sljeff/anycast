@@ -35,7 +35,9 @@ enum LyricDocument {
                 lines.append(LyricLine(
                     startMilliseconds: milliseconds,
                     text: extracted.text,
-                    translation: translationMap[milliseconds]
+                    // A blank `[end]` spacer shares its stamp with the next
+                    // line's start; it must not pick up that line's translation.
+                    translation: extracted.text.isEmpty ? nil : translationMap[milliseconds]
                 ))
             }
         }
