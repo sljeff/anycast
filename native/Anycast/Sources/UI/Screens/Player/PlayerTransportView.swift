@@ -12,9 +12,8 @@ final class PlayerTransportView: UIView {
     enum Layout {
         /// The transport's touch slots (UI kit `playerControls` container).
         static let transportSlot: CGFloat = 72
-        /// Gap between the play slot and the skip slots (glyph centers
-        /// ~100 pt apart, as in the UI kit).
-        static let transportGap = Spacing.sectionGap
+        /// The round accessory buttons at the row ends (speed, sleep).
+        static let accessorySlot = AnycastIconButton.standardDiameter
         /// The one vertical rhythm, measured between VISIBLE edges (see the
         /// main page): time labels → transport glyphs.
         static let rhythm: CGFloat = 28
@@ -55,18 +54,13 @@ final class PlayerTransportView: UIView {
     private let stack = UIStackView()
     private var scrubberFooter: UIView?
 
-    /// Play-to-skip slot gap; pages with row-end accessories pass a tighter
-    /// one so the skip glyphs clear the 44 pt accessory buttons.
-    private let transportGap: CGFloat
-
     /// When set, the play button runs this instead of toggling the current
     /// item. The transcript page uses it to adopt a browsed episode without
     /// the button pausing whatever is already playing.
     var onPlay: (() -> Void)?
 
-    init(context: UIContext, transportGap: CGFloat = Layout.transportGap) {
+    init(context: UIContext) {
         self.context = context
-        self.transportGap = transportGap
         super.init(frame: .zero)
         build()
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (self: Self, _) in
@@ -219,6 +213,10 @@ final class PlayerTransportView: UIView {
             button.translatesAutoresizingMaskIntoConstraints = false
             controlsRow.addSubview(button)
         }
+        let leadingSpan = UILayoutGuide()
+        let trailingSpan = UILayoutGuide()
+        controlsRow.addLayoutGuide(leadingSpan)
+        controlsRow.addLayoutGuide(trailingSpan)
         let playWidth = playPauseButton.widthAnchor.constraint(equalToConstant: Layout.transportSlot)
         let playHeight = playPauseButton.heightAnchor.constraint(equalToConstant: Layout.transportSlot)
         let glyphWidth = playPauseIcon.widthAnchor.constraint(equalToConstant: IconStyle.playerPrimary.pointSize)
@@ -236,12 +234,16 @@ final class PlayerTransportView: UIView {
             // to stretch the control past its slot (R2).
             glyphWidth, glyphHeight,
 
+            // Five controls on equal centers: each skip sits midway between
+            // the play button and the row-end accessory slot.
+            leadingSpan.leadingAnchor.constraint(equalTo: controlsRow.leadingAnchor, constant: Layout.accessorySlot / 2),
+            leadingSpan.trailingAnchor.constraint(equalTo: playPauseButton.centerXAnchor),
+            trailingSpan.leadingAnchor.constraint(equalTo: playPauseButton.centerXAnchor),
+            trailingSpan.trailingAnchor.constraint(equalTo: controlsRow.trailingAnchor, constant: -Layout.accessorySlot / 2),
             replayButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            replayButton.trailingAnchor.constraint(equalTo: playPauseButton.leadingAnchor, constant: -transportGap),
-            replayButton.leadingAnchor.constraint(greaterThanOrEqualTo: controlsRow.leadingAnchor),
+            replayButton.centerXAnchor.constraint(equalTo: leadingSpan.centerXAnchor),
             forwardButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            forwardButton.leadingAnchor.constraint(equalTo: playPauseButton.trailingAnchor, constant: transportGap),
-            forwardButton.trailingAnchor.constraint(lessThanOrEqualTo: controlsRow.trailingAnchor),
+            forwardButton.centerXAnchor.constraint(equalTo: trailingSpan.centerXAnchor),
         ])
         applyTransportMetrics()
     }

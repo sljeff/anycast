@@ -33,3 +33,10 @@ extension HTMLContentRenderer {
             .topMostPresented()
     }
 }
+
+/// Geometry every player page shares, so the three pages cannot drift.
+enum PlayerLayout {
+    /// The one content column: side inset of every player page, the sheet
+    /// content inset used app-wide (concentric with the sheet's corners).
+    static let column = Spacing.sheetContent
+}

@@ -222,7 +222,7 @@ final class SettingsOptionRowCell: UICollectionViewListCell {
 /// stay real, touchable views.
 class SettingsRowCell: UICollectionViewListCell {
 
-    static let horizontalInset: CGFloat = 24
+    static let horizontalInset: CGFloat = Spacing.pageH
     static let minimumHeight: CGFloat = 56
     /// Rows whose trailing control is taller than the text block shrink the
     /// outer inset and pad the text block instead (see `SettingsStepperRowCell`).

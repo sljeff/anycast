@@ -153,7 +153,7 @@ final class PaywallCardView: UIView {
         artwork.backgroundColor = Theme.playerWarm
         artwork.isAccessibilityElement = false
         artwork.translatesAutoresizingMaskIntoConstraints = false
-        artwork.setArtwork(episode.artworkURL, title: episode.showName)
+        artwork.setArtwork(episode.artworkURL, title: episode.showName, side: 56)
 
         let title = Self.label(episode.title, font: TypographyV2.emphasis.font(), color: Theme.playerText)
         let meta = Self.label(episode.metaLine, font: TypographyV2.meta.font(), color: Theme.playerSecondary)

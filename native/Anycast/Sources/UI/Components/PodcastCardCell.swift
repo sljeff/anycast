@@ -50,14 +50,33 @@ final class PodcastCardCell: UICollectionViewCell {
         coverView.kf.cancelDownloadTask()
     }
 
+    /// A static placeholder row at the real row height (title on one line,
+    /// description on two): the loading rule's skeleton, no shimmer.
+    func configureSkeleton() {
+        content = nil
+        coverView.kf.cancelDownloadTask()
+        coverView.image = nil
+        func bar(_ text: String, _ font: UIFont) -> NSAttributedString {
+            NSAttributedString(string: text, attributes: [
+                .font: font, .foregroundColor: UIColor.clear, .backgroundColor: AnycastColor.sandAlpha4,
+            ])
+        }
+        titleLabel.attributedText = bar("Placeholder channel title", titleLabel.font)
+        descriptionLabel.attributedText = bar("Placeholder description that runs long\nand a second line", descriptionLabel.font)
+        contentView.isUserInteractionEnabled = false
+        contentView.isAccessibilityElement = false
+    }
+
     func configure(_ content: PodcastCardContent) {
         self.content = content
+        contentView.isUserInteractionEnabled = true
+        contentView.isAccessibilityElement = true
         contentView.accessibilityLabel = content.title
 
         titleLabel.text = content.title
         descriptionLabel.text = content.description
 
-        coverView.setArtwork(content.imageURL.flatMap(URL.init(string:)), title: content.title)
+        coverView.setArtwork(content.imageURL.flatMap(URL.init(string:)), title: content.title, side: Self.coverSide)
     }
 
     /// Where the row sits on its plate: the first row has no hairline, and

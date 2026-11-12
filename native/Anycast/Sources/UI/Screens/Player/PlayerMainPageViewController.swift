@@ -27,7 +27,7 @@ final class PlayerMainPageViewController: UIViewController {
     )
     private let shareSpinner = UIActivityIndicatorView(style: .medium)
     private let titleBlock = PlayerTitleBlockView()
-    private lazy var transport = PlayerTransportView(context: context, transportGap: Spacing.gap)
+    private lazy var transport = PlayerTransportView(context: context)
     private lazy var speedSleep = PlayerSpeedSleepControls(context: context)
     private let chapterButton = UIButton(type: .system)
     private var chapters: [EpisodeChapter] = []
@@ -37,24 +37,22 @@ final class PlayerMainPageViewController: UIViewController {
     private enum Layout {
         /// The page's one content column: the artwork, title row, scrubber
         /// and transport all share these side insets.
-        static let columnInset = Spacing.pageHeader
+        static let columnInset = PlayerLayout.column
         /// Frame-to-ink slack at the share button's trailing side (the
         /// 20 pt `square.and.arrow.up` is ~22.5 pt of ink centered in the
         /// 44 pt hit target, measured), hung outside the column so the
         /// glyph's ink, not the frame, meets the column's trailing edge.
         static let shareInkInset: CGFloat = 10.75
-        /// The one vertical rhythm, measured between VISIBLE edges: subtitle
-        /// → scrubber track, time labels → transport glyphs and transport
-        /// glyphs → page selector.
-        static let rhythm: CGFloat = 28
-        /// Frame-to-ink slack hidden inside each block (measured on device),
-        /// subtracted so the rhythm is the gap the eye sees: the scrubber
-        /// track and the show-name text sit well inside their frames, the
-        /// time-label band and the 72 pt transport slot pad the skip glyphs.
-        static let titleToScrubber = rhythm - 24
+        /// Title block → scrubber frame. The title belongs to the scrubber
+        /// ("what is playing, and where in it"), so the two sit close; the
+        /// scrubber frame hides ~20 pt of slack above its track.
+        static let titleToScrubber: CGFloat = -6
+        /// Least air between the artwork and the title block.
+        static let coverToTitle: CGFloat = Spacing.pageHeader
         static let transportToSelector = PlayerTransportView.Layout.toSelector
-        /// Clears the sheet's system grabber (as on This episode).
-        static let contentTop: CGFloat = 36
+        /// Clears the sheet's system grabber; the artwork is centered in
+        /// what is left between here and the title.
+        static let contentTop: CGFloat = 20
     }
 
     init(context: UIContext) {
@@ -159,12 +157,26 @@ final class PlayerMainPageViewController: UIViewController {
         // the artwork gives way first, not the title or the controls.
         let coverWidth = coverFrame.widthAnchor.constraint(equalTo: column.widthAnchor)
         coverWidth.priority = UILayoutPriority(700)
+        let aboveCover = UILayoutGuide()
+        let belowCover = UILayoutGuide()
+        view.addLayoutGuide(aboveCover)
+        view.addLayoutGuide(belowCover)
+        let balanced = aboveCover.heightAnchor.constraint(equalTo: belowCover.heightAnchor)
+        balanced.priority = UILayoutPriority(750)
 
         NSLayoutConstraint.activate([
             column.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.columnInset),
             column.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.columnInset),
 
-            coverFrame.topAnchor.constraint(equalTo: view.topAnchor, constant: Layout.contentTop),
+            // The artwork floats centered between the grabber and the
+            // title: equal air above and below, so the page has one clear
+            // subject and no hole between the title and the controls.
+            aboveCover.topAnchor.constraint(equalTo: view.topAnchor, constant: Layout.contentTop),
+            aboveCover.bottomAnchor.constraint(equalTo: coverFrame.topAnchor),
+            belowCover.topAnchor.constraint(equalTo: coverFrame.bottomAnchor),
+            belowCover.bottomAnchor.constraint(equalTo: titleRow.topAnchor),
+            belowCover.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.coverToTitle),
+            balanced,
 
             coverFrame.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             coverWidth,
@@ -175,12 +187,12 @@ final class PlayerMainPageViewController: UIViewController {
             coverView.leadingAnchor.constraint(equalTo: coverFrame.leadingAnchor),
             coverView.trailingAnchor.constraint(equalTo: coverFrame.trailingAnchor),
 
-            titleRow.topAnchor.constraint(equalTo: coverFrame.bottomAnchor, constant: Spacing.pageHeader),
             titleRow.leadingAnchor.constraint(equalTo: column.leadingAnchor),
             titleRow.trailingAnchor.constraint(equalTo: column.trailingAnchor, constant: Layout.shareInkInset),
 
-            // The slack: the controls stay down by the selector.
-            bottomStack.topAnchor.constraint(greaterThanOrEqualTo: titleRow.bottomAnchor, constant: Layout.titleToScrubber),
+            // The title sits on the scrubber; the controls stay down by the
+            // selector, in the thumb zone.
+            bottomStack.topAnchor.constraint(equalTo: titleRow.bottomAnchor, constant: Layout.titleToScrubber),
             bottomStack.leadingAnchor.constraint(equalTo: column.leadingAnchor),
             bottomStack.trailingAnchor.constraint(equalTo: column.trailingAnchor),
             bottomStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.transportToSelector),
@@ -244,7 +256,7 @@ final class PlayerMainPageViewController: UIViewController {
         if coverURL != renderedCoverURL || coverURL == nil {
             renderedCoverURL = coverURL
             coverView.kf.cancelDownloadTask()
-            coverView.setArtwork(coverURL, title: episode?.channelTitle)
+            coverView.setArtwork(coverURL, title: episode?.channelTitle, side: ArtworkSizing.large)
         }
 
         titleBlock.update(

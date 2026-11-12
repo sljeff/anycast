@@ -125,15 +125,13 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        avatarView.layer.cornerRadius = avatarView.bounds.height / 2
-    }
-
     /// Avatar disc tracks title2 with the glyph, from the 44 pt design size.
     private func applyAvatarMetrics() {
         let side = IconMetrics.scaledUp(Self.avatarSize, textStyle: .title2, compatibleWith: traitCollection)
         for constraint in avatarSideConstraints { constraint.constant = side }
+        // From the constraint, not the bounds: the disc sits inside a stack
+        // that has not laid out yet when the cell's own layout pass runs.
+        avatarView.layer.cornerRadius = side / 2
     }
 
     /// Identity row on the surface plate.

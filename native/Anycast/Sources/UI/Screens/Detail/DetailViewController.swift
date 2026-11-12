@@ -621,7 +621,7 @@ final class DetailViewController: UIViewController {
         artwork.layer.cornerRadius = Radius.concentric(insetFromSheetEdge: Layout.inset)
         artwork.layer.cornerCurve = .continuous
         artwork.backgroundColor = Theme.surfaceContainerHighest
-        artwork.setArtwork(episode.imageURL.flatMap(URL.init(string:)), title: episode.channelTitle)
+        artwork.setArtwork(episode.imageURL.flatMap(URL.init(string:)), title: episode.channelTitle, side: Layout.artworkLarge)
         artwork.isAccessibilityElement = true
         artwork.accessibilityLabel = "Episode artwork"
         artwork.translatesAutoresizingMaskIntoConstraints = false

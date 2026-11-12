@@ -30,6 +30,144 @@ enum InboxRefreshTrigger: Equatable {
     }
 }
 
+extension InboxRefreshTrigger {
+
+    /// Only a user-initiated trigger shows the refresh control and reveals
+    /// it. Every automatic trigger (and the subscription-change path) runs
+    /// silently: the list a reader is looking at never moves.
+    var revealsRefreshControl: Bool {
+        switch self {
+        case .pull, .tabRetapAtTop: return true
+        case .firstAppear, .delayedAuto, .periodicAuto: return false
+        }
+    }
+}
+
+/// The header status line, pure. The line is always one line of the same
+/// font (never nil), so the header's height never changes with the state.
+enum InboxHeaderStatus {
+
+    /// A silent refresh in flight reads "Updating…"; a finished one that
+    /// added `newCount` rows reads "N new · updated {relative}"; everything
+    /// else is "updated {relative} · {n} unlistened".
+    static func text(
+        isUpdating: Bool,
+        newCount: Int,
+        lastRefresh: Date?,
+        episodeCount: Int,
+        now: Date = Date()
+    ) -> String {
+        if isUpdating { return "Updating…" }
+        let relative: String
+        if let lastRefresh {
+            let milliseconds = Int64(lastRefresh.timeIntervalSince1970 * 1000)
+            relative = RelativeTimeFormatter.format(milliseconds, now: now)
+        } else {
+            relative = "—"
+        }
+        let visibleNew = min(newCount, episodeCount)
+        if visibleNew > 0 { return "\(visibleNew) new · updated \(relative)" }
+        return "updated \(relative) · \(episodeCount) unlistened"
+    }
+
+    /// Rows in `current` whose enclosure URL was not in `known`.
+    static func newRowCount(known: Set<String>, current: [FeedEpisodeRow]) -> Int {
+        current.reduce(0) { count, row in
+            guard let url = row.enclosureUrl, !known.contains(url) else { return count }
+            return count + 1
+        }
+    }
+}
+
+/// Plain text for the inbox card descriptions, resolved before the list
+/// renders so a card is final on its first layout.
+struct InboxResolvedDescription: Equatable, Sendable {
+    let html: String
+    let plainText: String
+}
+
+nonisolated enum InboxDescriptionResolver {
+
+    /// Resolves `rows` against `existing`: rows already resolved with the same
+    /// HTML cost nothing, new or changed rows are parsed in parallel off the
+    /// main actor, rows that left the list are dropped. Rows without an
+    /// enclosure URL have no key and stay on the cell's HTML fallback.
+    static func resolve(
+        rows: [FeedEpisodeRow],
+        existing: [String: InboxResolvedDescription],
+        parse: @escaping @Sendable (String) -> String = { DisplayText.singleLine(fromHTML: $0) }
+    ) async -> [String: InboxResolvedDescription] {
+        var result: [String: InboxResolvedDescription] = [:]
+        var pending: [(url: String, html: String)] = []
+        for row in rows {
+            guard let url = row.enclosureUrl, result[url] == nil else { continue }
+            let html = row.description ?? ""
+            if let known = existing[url], known.html == html {
+                result[url] = known
+            } else if html.isEmpty {
+                result[url] = InboxResolvedDescription(html: "", plainText: "")
+            } else {
+                pending.append((url, html))
+            }
+        }
+        guard !pending.isEmpty else { return result }
+        await withTaskGroup(of: (String, InboxResolvedDescription).self) { group in
+            for item in pending {
+                group.addTask {
+                    (item.url, InboxResolvedDescription(html: item.html, plainText: parse(item.html)))
+                }
+            }
+            for await (url, resolved) in group {
+                result[url] = resolved
+            }
+        }
+        return result
+    }
+
+    /// The plain text for `row` when it is resolved against its CURRENT HTML.
+    static func plainText(
+        for row: FeedEpisodeRow, in resolved: [String: InboxResolvedDescription]
+    ) -> String? {
+        guard let url = row.enclosureUrl, let entry = resolved[url],
+              entry.html == (row.description ?? "")
+        else { return nil }
+        return entry.plainText
+    }
+}
+
+/// How the inbox card list moves from one render to the next, pure. A list
+/// whose rows only appeared or left (everything else in the same order) is
+/// applied as inserts and removes so unchanged cards stay put; anything else
+/// falls back to a plain `reloadData`.
+nonisolated enum InboxListDiff {
+
+    enum Plan: Equatable {
+        /// Same rows in the same order: nothing to apply.
+        case unchanged
+        /// Rebuild the whole list.
+        case reload
+        /// Indices in the OLD list to remove and in the NEW list to insert.
+        case batch(removes: [Int], inserts: [Int])
+    }
+
+    static func plan(old: [String?], new: [String?], sectionsUnchanged: Bool) -> Plan {
+        guard sectionsUnchanged, !old.isEmpty, !new.isEmpty else { return .reload }
+        let oldURLs = old.compactMap { $0 }
+        let newURLs = new.compactMap { $0 }
+        // A nil URL has no identity, a duplicate has an ambiguous one.
+        guard oldURLs.count == old.count, newURLs.count == new.count,
+              Set(oldURLs).count == oldURLs.count, Set(newURLs).count == newURLs.count
+        else { return .reload }
+        if oldURLs == newURLs { return .unchanged }
+        let oldSet = Set(oldURLs), newSet = Set(newURLs)
+        // Rows that stayed must keep their relative order, else a row moved.
+        guard oldURLs.filter(newSet.contains) == newURLs.filter(oldSet.contains) else { return .reload }
+        let removes = oldURLs.indices.filter { !newSet.contains(oldURLs[$0]) }
+        let inserts = newURLs.indices.filter { !oldSet.contains(newURLs[$0]) }
+        return .batch(removes: removes, inserts: inserts)
+    }
+}
+
 /// `lastRefresh` bookkeeping for the inbox (states/feed_episode.dart).
 /// `autoFetch` skips when the last refresh is under a minute old;
 /// `fetchNewEpisodes` stamps `lastRefresh = DateTime.now()` at its start —

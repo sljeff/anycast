@@ -39,8 +39,11 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
     /// Half of the 12 pt column gap on each side of the card.
     static let verticalGap: CGFloat = Spacing.sm
 
+    /// The show artwork's side; the inbox prefetches covers at this size.
+    static let artworkSide: CGFloat = 36
+
     private enum Layout {
-        static let artworkSide: CGFloat = 36
+        static let artworkSide = InboxEpisodeCardCell.artworkSide
         static let badgeSide: CGFloat = 18
     }
 
@@ -67,6 +70,8 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
     /// Guards the description resolve: a reconfigure with the same HTML must
     /// not blank the text and restart the async parse each time.
     private var renderedDescriptionHTML: String?
+    /// The async parse started for `renderedDescriptionHTML` has not landed.
+    private var descriptionPending = false
     /// Guards the cover load against reconfigure storms (an unconditional
     /// reload restarts an in-flight download).
     private var renderedCoverURL: URL?
@@ -83,7 +88,13 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         super.prepareForReuse()
         descriptionTask?.cancel()
         descriptionTask = nil
-        renderedDescriptionHTML = nil
+        // Fallback rows only: a recycled cell that comes back with the same
+        // HTML keeps its text instead of blanking, unless the parse never
+        // landed.
+        if descriptionPending {
+            descriptionPending = false
+            renderedDescriptionHTML = nil
+        }
         onCardTap = nil
         menuActions = []
         // A reused cell must never inherit a card-entrance pose.
@@ -104,15 +115,19 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
 
         if let plain = content.descriptionPlainText {
             renderedDescriptionHTML = nil
+            descriptionPending = false
+            descriptionTask?.cancel()
             descriptionLabel.text = plain
         } else if let html = content.descriptionHTML {
             if html != renderedDescriptionHTML {
                 renderedDescriptionHTML = html
                 descriptionTask?.cancel()
                 descriptionLabel.text = ""
+                descriptionPending = true
                 descriptionTask = Task { [weak self] in
                     let text = await PlainTextHTMLCache.shared.plainText(for: html)
                     guard let self, !Task.isCancelled else { return }
+                    self.descriptionPending = false
                     self.descriptionLabel.text = text
                     // Resolve the label's frame in THIS turn — walk-based
                     // tests otherwise see "text but zero height" mid-flight;
@@ -128,6 +143,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
             }
         } else {
             renderedDescriptionHTML = nil
+            descriptionPending = false
             descriptionLabel.text = ""
         }
 
@@ -135,7 +151,7 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         if url != renderedCoverURL {
             renderedCoverURL = url
             coverView.kf.cancelDownloadTask()
-            coverView.setArtwork(url, title: content.showName)
+            coverView.setArtwork(url, title: content.showName, side: Layout.artworkSide)
         }
     }
 
@@ -250,8 +266,8 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
             cardContainer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Self.verticalGap),
             cardContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -Self.verticalGap),
 
-            textColumn.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.cardInner),
-            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.cardInner),
+            textColumn.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.pageH),
+            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.pageH),
             textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.pageH),
 
             // Bottom row: its height and the text column above it define

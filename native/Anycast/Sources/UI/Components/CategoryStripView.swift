@@ -63,8 +63,18 @@ final class CategoryStripView: UIView {
 
     /// Reloads the strip. `selected` not present in `categories` resets to all.
     func configure(categories: [String], selected: String?) {
-        chips = CategoryStripModel.chips(categories: categories)
-        selectedValue = chips.contains { $0.value == selected } ? selected : nil
+        let newChips = CategoryStripModel.chips(categories: categories)
+        let newSelection = newChips.contains { $0.value == selected } ? selected : nil
+        // Same chips and selection: keep the buttons (rebuilding them
+        // mid-refresh made the strip flicker and dropped a touch in flight).
+        if newChips.map(\.value) == chips.map(\.value),
+           newChips.map(\.label) == chips.map(\.label), !buttons.isEmpty {
+            selectedValue = newSelection
+            applySelection()
+            return
+        }
+        chips = newChips
+        selectedValue = newSelection
 
         buttons.forEach { $0.removeFromSuperview() }
         buttons = chips.map { chip in

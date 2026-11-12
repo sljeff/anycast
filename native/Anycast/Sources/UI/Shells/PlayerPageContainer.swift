@@ -429,9 +429,30 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         guard urlString != backdropImageURL else { return }
         backdropImageURL = urlString
         backdropImageView.kf.cancelDownloadTask()
-        backdropImageView.image = nil
-        guard let urlString, let url = URL(string: urlString) else { return }
-        backdropImageView.kf.setImage(with: url)
+        guard let urlString, let url = URL(string: urlString) else {
+            backdropImageView.image = nil
+            return
+        }
+        // The old backdrop stays until the new one is ready, then crossfades
+        // (no empty frame between two episodes, no placeholder).
+        backdropImageView.setBackdrop(url)
+    }
+}
+
+extension UIImageView {
+    /// Loads a player backdrop: the current image stays until the new one is
+    /// ready, then the two crossfade over `Motion.standard` (none under
+    /// Reduce Motion).
+    @MainActor
+    func setBackdrop(_ url: URL) {
+        kf.setImage(
+            with: url,
+            options: [
+                .keepCurrentImageWhileLoading,
+                .transition(Motion.reduceMotion ? .none : .fade(Motion.standard)),
+                .forceTransition,
+            ]
+        )
     }
 }
 

@@ -31,7 +31,7 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     // active line anchored 30% from the top. The content column already
     // carries the page inset, so the cell padding only tops it up to ~28.
     static let lineGap: CGFloat = 20
-    static let horizontalPadding: CGFloat = 8
+    static let horizontalPadding: CGFloat = 0
     static let topPadding: CGFloat = 36
     /// Minimum bottom padding; the layout raises it so the last line can
     /// still reach the anchor.

@@ -160,6 +160,27 @@ enum ChannelSubscriptionDisplay: Equatable {
     }
 }
 
+/// What the Channel body shows under the header while its feed loads (P1.4
+/// loading rule): rows when there are any, a skeleton only after the wait
+/// passes 300 ms and only once the page has its title (before that the
+/// full-page spinner owns loading).
+enum ChannelBodyDisplay: Equatable {
+    case rows
+    case skeleton
+    case blank
+    case empty
+}
+
+enum ChannelBodyReducer {
+    static func display(
+        hasEpisodes: Bool, isLoading: Bool, hasTitle: Bool, skeletonDue: Bool
+    ) -> ChannelBodyDisplay {
+        if hasEpisodes { return .rows }
+        if isLoading { return hasTitle && skeletonDue ? .skeleton : .blank }
+        return .empty
+    }
+}
+
 /// Header byline: a search-result seed often has no author, so the feed's
 /// `itunes:author` fills it; nil (no line shown) when neither has one.
 enum ChannelHeaderLogic {
@@ -299,7 +320,17 @@ final class ChannelViewModel {
         self.subscriptions = subscriptions
         self.feeds = feeds
         self.palette = palette
+        // A colour already known for the seed's cover opens the header in
+        // its final colour; otherwise it crossfades in when extraction lands.
+        if let url = seed.imageUrl, !url.isEmpty, let cached = palette.cachedDominantColor(for: url) {
+            dominantColor = cached
+            paletteURL = url
+        }
     }
+
+    /// The cover URL the current `dominantColor` belongs to (or whose
+    /// extraction is running), so the same URL is never extracted twice.
+    private var paletteURL: String?
 
     var showEpisodes: [FeedEpisodeRow] {
         ChannelOrderMapping.showEpisodes(episodes, isReversed: isReversed)
@@ -320,6 +351,14 @@ final class ChannelViewModel {
             // (states/channel.dart:31-32 — no failure path), so a transient
             // read error must not render as "not subscribed".
         }
+        // Rows this show already has in the inbox appear at once; the
+        // network fetch below replaces them with the full list.
+        if episodes.isEmpty,
+           let local = try? await feeds.list(byRSSFeedURL: rssFeedURL), !local.isEmpty {
+            episodes = local
+        }
+        // Colour extraction runs beside the RSS fetch, not after it.
+        let seedPalette = startPalette()
         let podcasts = await fetcher.fetchPodcasts(urls: [rssFeedURL], onlyFirstEpisode: false)
         if let podcast = podcasts.first {
             episodes = podcast.feedEpisodes
@@ -329,13 +368,24 @@ final class ChannelViewModel {
             channel.author = ChannelHeaderLogic.author(seed: channel.author, feed: podcast.subscription.author)
         }
         isLoading = false
-        await updatePalette()
+        // The feed may have supplied the cover (a seed without an image).
+        await startPalette()?.value
+        await seedPalette?.value
     }
 
     /// _updateColor (states/channel.dart:37-43): no URL → keep current color.
-    private func updatePalette() async {
-        guard let urlString = channel.imageUrl, !urlString.isEmpty else { return }
-        dominantColor = await palette.dominantColor(from: urlString)
+    /// Starts extraction for the current cover URL unless that URL is already
+    /// handled; returns the running task.
+    @discardableResult
+    private func startPalette() -> Task<Void, Never>? {
+        guard let urlString = channel.imageUrl, !urlString.isEmpty, urlString != paletteURL else { return nil }
+        paletteURL = urlString
+        let palette = self.palette
+        return Task { [weak self] in
+            let color = await palette.dominantColor(from: urlString)
+            guard let self, self.paletteURL == urlString else { return }
+            self.dominantColor = color
+        }
     }
 
     /// subscribe() (states/channel.dart:55-63): newest episode enters the

@@ -149,7 +149,7 @@ private final class ShowShelfCoverButton: UIControl {
             shownKey = key
             coverView.kf.cancelDownloadTask()
             if let show {
-                coverView.setArtwork(show.imageUrl.flatMap(URL.init(string:)), title: show.title)
+                coverView.setArtwork(show.imageUrl.flatMap(URL.init(string:)), title: show.title, side: ShowsShelfLayout.itemSide)
                 accessibilityLabel = show.title
             } else {
                 coverView.image = nil

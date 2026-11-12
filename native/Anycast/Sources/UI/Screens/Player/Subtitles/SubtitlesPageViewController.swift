@@ -38,7 +38,7 @@ final class SubtitlesPageViewController: UIViewController {
     private let titleLabel = UILabel()
     private let contentHost = UIView()
     private let capsule = TranscriptStatusCapsuleView()
-    private lazy var transport = PlayerTransportView(context: context, transportGap: Spacing.gap)
+    private lazy var transport = PlayerTransportView(context: context)
     /// Speed + sleep: the same buttons, menus and rendering as the main page.
     private lazy var speedSleep = PlayerSpeedSleepControls(context: context)
     private let moreButton = AnycastIconButton(
@@ -236,14 +236,14 @@ final class SubtitlesPageViewController: UIViewController {
         speedSleep.install(in: transport)
 
         NSLayoutConstraint.activate([
-            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: PlayerLayout.column),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -PlayerLayout.column),
             header.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
             headerArtwork.widthAnchor.constraint(equalToConstant: Layout.headerArtwork),
             headerArtwork.heightAnchor.constraint(equalToConstant: Layout.headerArtwork),
 
-            contentHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            contentHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            contentHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: PlayerLayout.column),
+            contentHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -PlayerLayout.column),
             contentHost.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.gap),
 
             lyricsView.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
@@ -351,7 +351,7 @@ final class SubtitlesPageViewController: UIViewController {
         guard imageURL != headerArtworkURL else { return }
         headerArtworkURL = imageURL
         headerArtwork.kf.cancelDownloadTask()
-        headerArtwork.setArtwork(URL(string: imageURL), title: pinned.channelTitle)
+        headerArtwork.setArtwork(URL(string: imageURL), title: pinned.channelTitle, side: Layout.headerArtwork)
     }
 
     private func loadTranscriptRow(url: String) {
@@ -421,7 +421,7 @@ final class SubtitlesPageViewController: UIViewController {
         guard imageURL != headerArtworkURL else { return }
         headerArtworkURL = imageURL
         headerArtwork.kf.cancelDownloadTask()
-        headerArtwork.setArtwork(URL(string: imageURL), title: episode?.channelTitle)
+        headerArtwork.setArtwork(URL(string: imageURL), title: episode?.channelTitle, side: Layout.headerArtwork)
     }
 
     // MARK: - Rendering

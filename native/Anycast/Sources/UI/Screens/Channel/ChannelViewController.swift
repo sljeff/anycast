@@ -30,7 +30,9 @@ final class ChannelViewController: UIViewController {
     private let collectionView: UICollectionView
     private let playerBar: PlayerBarView
     private let playerBarHeight: NSLayoutConstraint
-    private let episodeListSpinner = UIActivityIndicatorView(style: .large)
+    private let skeletonDelay = LoadingDelay()
+    private var showsSkeleton = false
+    static let skeletonRowCount = 6
     private let fullPageSpinner = UIActivityIndicatorView(style: .large)
     private let emptyChannelLabel = UILabel()
 
@@ -184,11 +186,6 @@ final class ChannelViewController: UIViewController {
         let bottomFade = ScrollEdgeFade(edge: .bottom)
         view.insertSubview(bottomFade, belowSubview: playerBar)
 
-        episodeListSpinner.color = Theme.primary
-        episodeListSpinner.hidesWhenStopped = true
-        episodeListSpinner.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(episodeListSpinner)
-
         fullPageSpinner.color = Theme.primary
         fullPageSpinner.hidesWhenStopped = true
         fullPageSpinner.translatesAutoresizingMaskIntoConstraints = false
@@ -230,11 +227,6 @@ final class ChannelViewController: UIViewController {
             bottomFade.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             bottomFade.topAnchor.constraint(
                 equalTo: actionRow.topAnchor, constant: -ScrollEdgeFade.fadeLength
-            ),
-
-            episodeListSpinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            episodeListSpinner.centerYAnchor.constraint(
-                equalTo: collectionView.centerYAnchor, constant: 100
             ),
 
             fullPageSpinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -350,7 +342,7 @@ final class ChannelViewController: UIViewController {
             )
             let section = NSCollectionLayoutSection(group: group)
             // The plate starts under the header and the order row.
-            if !(self.viewModel?.showEpisodes.isEmpty ?? true) {
+            if !(self.viewModel?.showEpisodes.isEmpty ?? true) || self.showsSkeleton {
                 let plate = NSCollectionLayoutDecorationItem.background(elementKind: GroupedPlateView.elementKind)
                 plate.contentInsets = NSDirectionalEdgeInsets(
                     top: maxExtent + ChannelBodyHeaderCell.fixedHeight, leading: 16, bottom: 0, trailing: 16
@@ -388,25 +380,36 @@ final class ChannelViewController: UIViewController {
         headerView?.configure(channel: viewModel.channel, dominant: viewModel.dominantColor)
         renderActionRow()
 
+        // The loading rule: with a title and no rows yet, static skeleton
+        // rows appear only after 300 ms; rows already on hand (the inbox's
+        // own, or a finished fetch) show at once. No list spinner.
+        let waitingEmpty = viewModel.episodes.isEmpty && viewModel.isLoading && viewModel.hasTitle
+        if waitingEmpty {
+            skeletonDelay.start { [weak self] in self?.render() }
+        } else {
+            skeletonDelay.cancel()
+        }
+        let skeleton = ChannelBodyReducer.display(
+            hasEpisodes: !viewModel.episodes.isEmpty, isLoading: viewModel.isLoading,
+            hasTitle: viewModel.hasTitle, skeletonDue: skeletonDelay.isDue
+        ) == .skeleton
+
         // Plain no-animation rebuild (08 §7.2 — the Flutter Obx rebuild).
         let signature = viewModel.showEpisodes.map(\.enclosureUrl)
-        if signature != lastEpisodeSignature {
+        if signature != lastEpisodeSignature || skeleton != showsSkeleton {
+            let startsSkeleton = skeleton && !showsSkeleton
             lastEpisodeSignature = signature
+            showsSkeleton = skeleton
             UIView.performWithoutAnimation {
                 collectionView.reloadData()
             }
             refreshVisibleCards()
-        }
-
-        // Dart gates the whole page on the title (channel.dart:47-49): while
-        // the full-page spinner shows, the list spinner must not — one
-        // loading affordance at a time.
-        let showListSpinner = viewModel.episodes.isEmpty && viewModel.isLoading && viewModel.hasTitle
-        episodeListSpinner.isHidden = !showListSpinner
-        if showListSpinner {
-            episodeListSpinner.startAnimating()
-        } else {
-            episodeListSpinner.stopAnimating()
+            if startsSkeleton, !Motion.reduceMotion {
+                for cell in collectionView.visibleCells where cell is ChannelEpisodeRowCell { cell.alpha = 0 }
+                UIView.animate(withDuration: Motion.quick) {
+                    for cell in self.collectionView.visibleCells { cell.alpha = 1 }
+                }
+            }
         }
 
         renderPlayerBar()
@@ -605,7 +608,7 @@ final class ChannelViewController: UIViewController {
 extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        1 + (viewModel?.showEpisodes.count ?? 0)
+        1 + (showsSkeleton ? Self.skeletonRowCount : (viewModel?.showEpisodes.count ?? 0))
     }
 
     func collectionView(
@@ -637,6 +640,11 @@ extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDel
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: ChannelEpisodeRowCell.reuseIdentifier, for: indexPath
         ) as! ChannelEpisodeRowCell
+        if showsSkeleton {
+            cell.setPosition(isFirst: indexPath.item == 1, isLast: indexPath.item == Self.skeletonRowCount)
+            cell.configureSkeleton()
+            return cell
+        }
         configureRow(cell, at: indexPath.item - 1)
         return cell
     }
@@ -745,7 +753,11 @@ final class ChannelHeaderView: UICollectionReusableView {
     /// Dominant color last applied to the header gradient (re-applied on
     /// trait flips).
     private var headerDominant: UIColor = ChannelViewModel.playerWarmColor
+    private var didConfigure = false
     private let coverView = UIImageView()
+    /// The URL the cover was last asked to load; a render with the same URL
+    /// must not cancel and reset the cover.
+    private var renderedCoverURL: URL?
     private let titleBlock = UIStackView()
     private let titleLabel = UILabel()
     private let authorLabel = UILabel()
@@ -864,17 +876,24 @@ final class ChannelHeaderView: UICollectionReusableView {
     // MARK: Configure
 
     func configure(channel: SubscriptionRow, dominant: UIColor) {
-        coverView.kf.cancelDownloadTask()
         let imageURL = channel.imageUrl.flatMap(URL.init(string:))
             ?? URL(string: "https://placeholder.co/120.png?text=Waiting")
-        coverView.kf.setImage(with: imageURL, placeholder: nil, options: [.transition(.none)])
+        if imageURL != renderedCoverURL {
+            renderedCoverURL = imageURL
+            coverView.kf.cancelDownloadTask()
+            coverView.kf.setImage(with: imageURL, placeholder: nil, options: [.transition(.none)])
+        }
 
         titleLabel.text = channel.title ?? ""
         authorLabel.text = channel.author
         authorLabel.isHidden = (channel.author ?? "").isEmpty
         descriptionText.text = DisplayText.plainText(fromHTML: channel.description ?? "No description")
 
-        applyHeaderGradient(dominant: dominant)
+        // The colour landing after the header is up crossfades; the first
+        // configure (and a colour already known) is set outright.
+        let changes = didConfigure && !headerDominant.isEqual(dominant)
+        didConfigure = true
+        applyHeaderGradient(dominant: dominant, animated: changes)
         measureContentIfNeeded()
         setNeedsLayout()
     }
@@ -904,12 +923,21 @@ final class ChannelHeaderView: UICollectionReusableView {
     /// view's traits so the header matches the page in light and dark and
     /// the dynamic header ink stays readable. CGColors freeze at
     /// assignment (09 §9a), so the layer is rebuilt on appearance changes.
-    func applyHeaderGradient(dominant: UIColor) {
+    func applyHeaderGradient(dominant: UIColor, animated: Bool = false) {
         headerDominant = dominant
-        gradientLayer.colors = [
+        let colors = [
             ChannelFoldGeometry.blendOverBackground(dominant, traits: traitCollection).cgColor,
             Theme.background.resolvedColor(with: traitCollection).cgColor,
         ]
+        if animated, !Motion.reduceMotion {
+            let fade = CABasicAnimation(keyPath: "colors")
+            fade.fromValue = gradientLayer.presentation()?.colors ?? gradientLayer.colors
+            fade.toValue = colors
+            fade.duration = Motion.standard
+            fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            gradientLayer.add(fade, forKey: "headerColorFade")
+        }
+        gradientLayer.colors = colors
     }
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -1109,7 +1137,23 @@ final class ChannelEpisodeRowCell: UICollectionViewCell {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    /// A static placeholder row at the row's resting height (one title line
+    /// and the meta line): the loading rule's skeleton, no shimmer.
+    func configureSkeleton() {
+        func bar(_ text: String, _ font: UIFont) -> NSAttributedString {
+            NSAttributedString(string: text, attributes: [
+                .font: font, .foregroundColor: UIColor.clear, .backgroundColor: AnycastColor.sandAlpha4,
+            ])
+        }
+        titleLabel.attributedText = bar("Placeholder episode title text", titleLabel.font)
+        metaLabel.attributedText = bar("Placeholder meta", metaLabel.font)
+        contentView.isUserInteractionEnabled = false
+        contentView.isAccessibilityElement = false
+    }
+
     func configure(title: String, meta: String) {
+        contentView.isUserInteractionEnabled = true
+        contentView.isAccessibilityElement = true
         titleLabel.text = title
         metaLabel.text = meta
         contentView.accessibilityLabel = title
@@ -1166,15 +1210,15 @@ final class ChannelEpisodeRowCell: UICollectionViewCell {
         NSLayoutConstraint.activate([
             contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: Self.minimumHeight),
 
-            text.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.gap),
-            text.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.gap),
+            text.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageH),
+            text.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageH),
             text.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.gap),
             text.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -Spacing.gap),
             text.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
 
             separator.topAnchor.constraint(equalTo: contentView.topAnchor),
             separator.leadingAnchor.constraint(equalTo: text.leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.gap),
+            separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageH),
             separator.heightAnchor.constraint(equalToConstant: 0.5),
         ])
     }

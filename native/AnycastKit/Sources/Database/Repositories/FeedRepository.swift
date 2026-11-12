@@ -15,6 +15,19 @@ public struct FeedRepository: Sendable {
         }
     }
 
+    /// The inbox rows of one show, newest first. Read-only: the Channel page
+    /// shows these while its network fetch runs.
+    @concurrent
+    public func list(byRSSFeedURL rssFeedURL: String) async throws -> [FeedEpisodeRow] {
+        try await database.queue.read { db in
+            try FeedEpisodeRow.fetchAll(
+                db,
+                sql: "SELECT * FROM feedEpisode WHERE rssFeedUrl = ? ORDER BY pubDate DESC",
+                arguments: [rssFeedURL]
+            )
+        }
+    }
+
     /// Batch INSERT OR REPLACE keyed on the enclosureUrl unique constraint
     /// (feed_episode.dart:79-87); one transaction, like the sqflite batch.
     @concurrent
