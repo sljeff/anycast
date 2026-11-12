@@ -39,6 +39,10 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     static let lineSpacing: CGFloat = 3
     /// Length of the top/bottom fade ramps.
     static let edgeLength: CGFloat = 48
+    /// A kept line's mark: a 2 pt bar this far left of the text, in the
+    /// page's own side margin, so the text never moves.
+    static let keptBarWidth: CGFloat = 2
+    static let keptBarOffset: CGFloat = 12
     /// How long after a tap-jump position ticks that still report the old
     /// line are ignored (the seek is asynchronous).
     private static let jumpGraceSeconds: TimeInterval = 1.5
@@ -51,6 +55,21 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     var contextMenuProvider: ((Int) -> UIMenu?)?
 
     private(set) var lines: [LyricLine] = []
+    /// Start times of the lines the user kept as moments; each gets the
+    /// leading bar.
+    var keptStarts: Set<Int> = [] {
+        didSet {
+            guard keptStarts != oldValue else { return }
+            reconfigureVisibleCells()
+        }
+    }
+    /// A blank spacer line shares its stamp with the next line, so only
+    /// lines with text carry the mark.
+    private func isKept(_ line: LyricLine) -> Bool {
+        keptStarts.contains(line.startMilliseconds)
+            && !line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private(set) var activeIndex: Int = 0
     /// Characters of the active line already spoken (word-snapped).
     private var activeSpoken: Int = 0
@@ -89,6 +108,9 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
         layout.view = self
 
         collectionView.backgroundColor = .clear
+        // The kept-line bar sits in the page margin beside the column; the
+        // fade host's mask is what bounds the list vertically.
+        collectionView.clipsToBounds = false
         collectionView.showsVerticalScrollIndicator = false
         collectionView.showsHorizontalScrollIndicator = false
         collectionView.dataSource = self
@@ -122,6 +144,7 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
                 line: self.lines[indexPath.item],
                 state: self.state(forLine: indexPath.item),
                 isActive: indexPath.item == self.activeIndex,
+                isKept: self.isKept(self.lines[indexPath.item]),
                 traits: self.traitCollection
             )
             cell.onActivate = { [weak self] in self?.onTapLine?(indexPath.item) }
@@ -143,7 +166,7 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
         let ramp = min(Self.edgeLength / height, 0.5)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        fadeMask.frame = fadeHost.bounds
+        fadeMask.frame = fadeHost.bounds.insetBy(dx: -(Self.keptBarOffset + Self.keptBarWidth), dy: 0)
         fadeMask.locations = [0, NSNumber(value: ramp), NSNumber(value: 1 - ramp), 1]
         CATransaction.commit()
     }
@@ -369,7 +392,9 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
         else { return }
         cell.configure(
             line: lines[activeIndex], state: state(forLine: activeIndex),
-            isActive: true, traits: traitCollection
+            isActive: true,
+            isKept: isKept(lines[activeIndex]),
+            traits: traitCollection
         )
     }
 
@@ -404,6 +429,12 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
 final class LyricLineCell: UICollectionViewCell {
 
     private let label = UILabel()
+    private let keptBar = UIView()
+    /// Whether the kept-moment bar is showing, and its frame in the cell's
+    /// content view (the label's frame is `label` below; tests compare them).
+    var showsKeptMark: Bool { !keptBar.isHidden }
+    var keptMarkFrame: CGRect { keptBar.frame }
+    var textFrame: CGRect { label.frame }
 
     /// VoiceOver double-tap on the line — the same jump-to-line the
     /// collection view's didSelectItemAt serves for touch. Deliberately NO
@@ -417,7 +448,19 @@ final class LyricLineCell: UICollectionViewCell {
         label.backgroundColor = .clear
         label.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(label)
+        keptBar.backgroundColor = Theme.primary
+        keptBar.layer.cornerRadius = LyricsView.keptBarWidth / 2
+        keptBar.isHidden = true
+        keptBar.isUserInteractionEnabled = false
+        keptBar.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(keptBar)
         NSLayoutConstraint.activate([
+            keptBar.widthAnchor.constraint(equalToConstant: LyricsView.keptBarWidth),
+            keptBar.trailingAnchor.constraint(
+                equalTo: label.leadingAnchor, constant: -(LyricsView.keptBarOffset - LyricsView.keptBarWidth)
+            ),
+            keptBar.topAnchor.constraint(equalTo: contentView.topAnchor),
+            keptBar.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: LyricsView.horizontalPadding),
             label.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -LyricsView.horizontalPadding),
             label.topAnchor.constraint(equalTo: contentView.topAnchor),
@@ -440,8 +483,10 @@ final class LyricLineCell: UICollectionViewCell {
         line: LyricLine,
         state: LyricsTextStyling.LineState,
         isActive: Bool,
+        isKept: Bool = false,
         traits: UITraitCollection?
     ) {
+        keptBar.isHidden = !isKept
         label.attributedText = LyricsTextStyling.attributedText(
             for: line, state: state, traits: traits
         )
@@ -450,6 +495,7 @@ final class LyricLineCell: UICollectionViewCell {
             .joined(separator: ", ")
         accessibilityTraits = isActive ? [.staticText, .selected] : .staticText
         accessibilityHint = "Plays from this line"
+        if isKept { accessibilityValue = "Kept moment" } else { accessibilityValue = nil }
     }
 }
 

@@ -632,96 +632,13 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
     }
 
     private func presentDetail(_ episode: HistoryEpisodeRow) {
-        let detailEpisode = DetailViewController.Episode(
-            title: episode.title ?? "",
-            channelTitle: episode.channelTitle ?? "",
-            pubDateMilliseconds: episode.pubDate,
-            durationMilliseconds: episode.duration,
-            imageURL: episode.imageUrl,
-            rssFeedURL: episode.rssFeedUrl ?? "",
-            enclosureURL: episode.enclosureUrl ?? "",
-            descriptionHTML: episode.description ?? ""
+        HistoryEpisodeActions.presentDetail(
+            episode, from: self, context: context,
+            // `playByEpisode` awaits the history write before it returns,
+            // so the replayed row is on top at reload.
+            didPlay: { [weak self] in await self?.reload() },
+            remove: { [weak self] url in self?.deleteEpisode(url: url) }
         )
-        DetailViewController.present(
-            from: self,
-            episode: detailEpisode,
-            actions: [
-                EpisodeCardAction(
-                    icon: AppIcons.play,
-                    accessibilityLabel: "Play"
-                ) { [weak self] in
-                    // `playByEpisode` awaits the history write before it
-                    // returns, so the replayed row is on top at reload.
-                    Task { [weak self] in
-                        await self?.playFromHistory(episode)
-                        await self?.reload()
-                    }
-                },
-                EpisodeCardAction(
-                    icon: AppIcons.remove,
-                    accessibilityLabel: "Remove"
-                ) { [weak self] in
-                    guard let url = episode.enclosureUrl else { return }
-                    self?.deleteEpisode(url: url)
-                },
-            ],
-            htmlRenderer: HTMLContentRenderer(),
-            shortenURL: { [weak self] url in
-                await self?.context.api.getShortURL(for: url) ?? url
-            },
-            transcript: DetailTranscriptCoordinator(
-                context: context,
-                episode: detailEpisode,
-                prepareEpisode: { [weak self] in
-                    guard let self else { return nil }
-                    return await self.prepareTranscriptEpisode(episode)
-                }
-            )
-        )
-    }
-
-    /// Same insert as play, without starting audio.
-    private func prepareTranscriptEpisode(_ episode: HistoryEpisodeRow) async -> PlaylistEpisodeRow? {
-        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return nil }
-        let playlistId = ChannelPlaylistLogic.defaultPlaylistID
-        var row = PlaylistEpisodeRow(
-            title: episode.title,
-            description: episode.description,
-            duration: episode.duration,
-            enclosureUrl: episode.enclosureUrl,
-            pubDate: episode.pubDate,
-            imageUrl: episode.imageUrl,
-            channelTitle: episode.channelTitle,
-            rssFeedUrl: episode.rssFeedUrl,
-            playlistId: playlistId
-        )
-        let repository = context.database.playlistRepository()
-        try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: 0)
-        if let stored = try? await repository.episode(byEnclosureURL: enclosureURL) {
-            row = stored
-        }
-        return row
-    }
-
-    private func playFromHistory(_ episode: HistoryEpisodeRow) async {
-        let playlistId = ChannelPlaylistLogic.defaultPlaylistID
-        var row = PlaylistEpisodeRow(
-            title: episode.title,
-            description: episode.description,
-            duration: episode.duration,
-            enclosureUrl: episode.enclosureUrl,
-            pubDate: episode.pubDate,
-            imageUrl: episode.imageUrl,
-            channelTitle: episode.channelTitle,
-            rssFeedUrl: episode.rssFeedUrl,
-            playlistId: playlistId
-        )
-        let repository = context.database.playlistRepository()
-        try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: 0)
-        if let stored = try? await repository.episode(byEnclosureURL: episode.enclosureUrl ?? "") {
-            row = stored
-        }
-        await context.playback.playByEpisode(row)
     }
 }
 
@@ -734,7 +651,24 @@ final class HistoryRowCell: UICollectionViewListCell {
 
     static let coverSize: CGFloat = 44
     /// Where the text column (and the row separator) starts.
-    static let textColumnLeading = Spacing.sheetContent + coverSize + Spacing.gap
+    static let textColumnLeading = textColumnLeading(inset: Spacing.sheetContent)
+
+    /// Where the text column starts when the row's content is inset
+    /// `inset` from the cell edge.
+    static func textColumnLeading(inset: CGFloat) -> CGFloat {
+        inset + coverSize + Spacing.gap
+    }
+
+    /// Cover and text sit this far inside the cell. The History sheet's
+    /// rows run edge to edge (28); the Library's sit on a plate (16).
+    var horizontalInset: CGFloat = Spacing.sheetContent {
+        didSet {
+            coverLeading?.constant = horizontalInset
+            textTrailing?.constant = -horizontalInset
+        }
+    }
+    private var coverLeading: NSLayoutConstraint?
+    private var textTrailing: NSLayoutConstraint?
 
     var onDelete: (() -> Void)?
     var onTap: (() -> Void)?
@@ -790,14 +724,22 @@ final class HistoryRowCell: UICollectionViewListCell {
         textColumn.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(textColumn)
 
+        let coverLeading = coverView.leadingAnchor.constraint(
+            equalTo: contentView.leadingAnchor, constant: horizontalInset
+        )
+        let textTrailing = textColumn.trailingAnchor.constraint(
+            equalTo: contentView.trailingAnchor, constant: -horizontalInset
+        )
+        self.coverLeading = coverLeading
+        self.textTrailing = textTrailing
         NSLayoutConstraint.activate([
-            coverView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.sheetContent),
+            coverLeading,
+            textTrailing,
             coverView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             coverView.widthAnchor.constraint(equalToConstant: Self.coverSize),
             coverView.heightAnchor.constraint(equalToConstant: Self.coverSize),
 
             textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
-            textColumn.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.sheetContent),
             textColumn.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.row),
             textColumn.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),

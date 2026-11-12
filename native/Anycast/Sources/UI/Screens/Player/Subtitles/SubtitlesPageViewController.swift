@@ -72,6 +72,9 @@ final class SubtitlesPageViewController: UIViewController {
     private let stateLoop = ObservationLoop()
     private let progressLoop = ObservationLoop()
     private var languageObserver: NSObjectProtocol?
+    private var momentsObserver: NSObjectProtocol?
+    /// Where kept moments live; tests inject their own.
+    var momentStore: MomentStore = .shared
 
     #if DEBUG
     private var demoMode = false
@@ -147,6 +150,13 @@ final class SubtitlesPageViewController: UIViewController {
             }
         }
 
+        // A moment kept or removed elsewhere (the Library) moves the marks.
+        momentsObserver = NotificationCenter.default.addObserver(
+            forName: MomentStore.didChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncKeptMarks() }
+        }
+
         #if DEBUG
         configureDemoIfRequested()
         #endif
@@ -179,6 +189,9 @@ final class SubtitlesPageViewController: UIViewController {
             jumpUndo.clear()
             if let languageObserver {
                 NotificationCenter.default.removeObserver(languageObserver)
+            }
+            if let momentsObserver {
+                NotificationCenter.default.removeObserver(momentsObserver)
             }
         }
     }
@@ -622,6 +635,18 @@ final class SubtitlesPageViewController: UIViewController {
             lines: currentLyricLines(),
             positionMilliseconds: Int(context.playback.positionData.positionMilliseconds)
         )
+        syncKeptMarks()
+    }
+
+    /// Marks the lines of this transcript that are kept as moments.
+    private func syncKeptMarks() {
+        guard let url = loadedURL, !url.isEmpty else {
+            lyricsView.keptStarts = []
+            return
+        }
+        lyricsView.keptStarts = Set(
+            momentStore.all.filter { $0.enclosureURL == url }.map(\.startMilliseconds)
+        )
     }
 
     private func currentLyricLines() -> [LyricLine] {
@@ -649,6 +674,7 @@ final class SubtitlesPageViewController: UIViewController {
             UIAction(title: "Play from here", image: AppIcons.play) { [weak self] _ in
                 self?.jumpToLine(index)
             },
+            keepMomentAction(for: index),
             UIAction(title: "Copy", image: AppIcons.copy) { [weak self] _ in
                 UIPasteboard.general.string = text
                 self?.showToast("Copied")
@@ -659,6 +685,61 @@ final class SubtitlesPageViewController: UIViewController {
                 self?.topMostPresented().present(activity, animated: true)
             },
         ])
+    }
+
+    // MARK: - Moments
+
+    /// The transcript being shown, as a moment records it: the pinned
+    /// episode when browsing another one, otherwise the playing episode.
+    private func momentSource() -> (
+        enclosureURL: String, rssFeedURL: String?, episodeTitle: String, showTitle: String, artworkURL: String?
+    )? {
+        guard let url = loadedURL, !url.isEmpty else { return nil }
+        if let pinned = pinnedTranscript, pinned.enclosureURL == url {
+            return (url, nil, pinned.title, pinned.channelTitle ?? "", pinned.imageURL)
+        }
+        if let episode = context.playback.currentEpisode, episode.enclosureUrl == url {
+            return (url, episode.rssFeedUrl, episode.title ?? "", episode.channelTitle ?? "", episode.imageUrl)
+        }
+        #if DEBUG
+        if demoMode { return (url, nil, "Demo episode", "Demo show", nil) }
+        #endif
+        return nil
+    }
+
+    /// "Keep moment" for a line, "Remove moment" when it is already kept.
+    private func keepMomentAction(for index: Int) -> UIAction {
+        let start = lyricsView.lines[index].startMilliseconds
+        let isKept = loadedURL.map { momentStore.contains(episode: $0, start: start) } ?? false
+        return UIAction(
+            title: isKept ? "Remove moment" : "Keep moment",
+            image: isKept ? AppIcons.remove : AppIcons.keepMoment,
+            attributes: isKept || momentSource() != nil ? [] : .disabled
+        ) { [weak self] _ in
+            self?.toggleMoment(at: index)
+        }
+    }
+
+    func toggleMoment(at index: Int) {
+        guard lyricsView.lines.indices.contains(index), let source = momentSource() else { return }
+        let line = lyricsView.lines[index]
+        Haptics.tap()
+        if momentStore.contains(episode: source.enclosureURL, start: line.startMilliseconds) {
+            momentStore.remove(episode: source.enclosureURL, start: line.startMilliseconds)
+            showToast("Moment removed")
+            return
+        }
+        let result = momentStore.add(Moment(
+            enclosureURL: source.enclosureURL,
+            rssFeedURL: source.rssFeedURL,
+            episodeTitle: source.episodeTitle,
+            showTitle: source.showTitle,
+            artworkURL: source.artworkURL,
+            startMilliseconds: line.startMilliseconds,
+            text: line.text.trimmingCharacters(in: .whitespacesAndNewlines),
+            translation: line.translation
+        ))
+        showToast(result == .failed ? "Couldn't keep this moment" : "Moment kept")
     }
 
     // MARK: - ••• menu
@@ -825,6 +906,9 @@ final class SubtitlesPageViewController: UIViewController {
 
     /// Lyric lines on screen (smoke-test probe).
     var demoLines: [LyricLine] { lyricsView.lines }
+
+    /// The lyrics list itself (visual-check probe).
+    var demoLyricsView: LyricsView { lyricsView }
 
     /// 60 four-second segments so the demo list scrolls well past a
     /// viewport (the first lines are fixed samples of the styles).

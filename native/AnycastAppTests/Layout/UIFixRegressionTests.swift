@@ -1222,15 +1222,16 @@ struct UIFixRegressionTests {
 
         allShows.sendActions(for: .touchUpInside)
         try await Self.settle(window, seconds: 1.5)
-        guard let sheet = Self.find(ShowsSheetViewController.self, in: window.rootViewController),
+        guard let sheet = Self.find(LibrarySheetViewController.self, in: window.rootViewController),
               let grid = Self.firstView(in: sheet.view, where: { $0 is UICollectionView })
                 as? UICollectionView else {
-            Issue.record("All shows did not open the Shows sheet"); return
+            Issue.record("All shows did not open the Library sheet"); return
         }
         #expect(sheet.sheetPresentationController?.prefersGrabberVisible == true)
-        grid.delegate?.collectionView?(grid, didSelectItemAt: IndexPath(item: 0, section: 0))
+        // Section 0 is the "Shows" title; the covers are section 1.
+        grid.delegate?.collectionView?(grid, didSelectItemAt: IndexPath(item: 0, section: 1))
         try await Self.settle(window, seconds: 2.0)
-        #expect(Self.find(ShowsSheetViewController.self, in: window.rootViewController) == nil,
+        #expect(Self.find(LibrarySheetViewController.self, in: window.rootViewController) == nil,
                 "the sheet did not dismiss after a show was picked")
         #expect(Self.find(ChannelViewController.self, in: window.rootViewController) != nil,
                 "a show picked in the sheet did not open its Channel")

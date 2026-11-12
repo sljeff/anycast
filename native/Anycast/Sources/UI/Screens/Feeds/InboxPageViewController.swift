@@ -1088,7 +1088,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     }
 
     private func presentShowsSheet() {
-        ShowsSheetViewController.present(from: topMostPresented(), shows: shows) { [weak self] show in
+        LibrarySheetViewController.present(from: topMostPresented(), context: context, shows: shows) { [weak self] show in
             self?.openChannel(show)
         }
     }
