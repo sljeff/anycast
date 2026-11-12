@@ -2,7 +2,7 @@ import UIKit
 import Testing
 @testable import Anycast
 
-/// Player main page: one 24 pt content column (artwork, title row, scrubber,
+/// Player main page: one 28 pt content column (artwork, title row, scrubber,
 /// transport) with speed and sleep beside it; This episode page: chapters
 /// and notes scroll under a fixed header. Hosts the real container (live context, seeded data
 /// not required) in a private window of an exact size.
@@ -12,12 +12,12 @@ struct PlayerPageAlignmentTests {
 
     // MARK: - Main page
 
-    @Test("Main page: artwork, title row and scrubber share one 24 pt column; share glyph meets its edge")
+    @Test("Main page: artwork, title row and scrubber share one 28 pt column; share glyph meets its edge")
     func mainColumn() async throws {
         guard let host = await Host.make(size: CGSize(width: 402, height: 812)) else { return }
         defer { host.discard() }
         let page = try #require(host.showMain())
-        let column = CGRect(x: 24, y: 0, width: 402 - 48, height: 0)
+        let column = CGRect(x: 28, y: 0, width: 402 - 56, height: 0)
 
         let cover = try #require(Host.firstView(in: page.view) { ($0 as? UIImageView)?.accessibilityLabel == "Episode artwork" })
         let coverFrame = page.view.convert(cover.bounds, from: cover)
@@ -72,7 +72,7 @@ struct PlayerPageAlignmentTests {
             let coverFrame = page.view.convert(cover.bounds, from: cover)
             #expect(coverFrame.width <= size.width - 48 + 0.5)
             #expect(abs(coverFrame.midX - page.view.bounds.midX) < 1, "cover off center at \(size)")
-            #expect(coverFrame.minY >= 24 - 0.5, "cover crammed at \(size): \(coverFrame)")
+            #expect(coverFrame.minY >= 20 - 0.5, "cover crammed at \(size): \(coverFrame)")
             let play = try #require(Host.firstView(in: page.view) { ($0 as? UIButton)?.accessibilityLabel == "Play or pause" })
             let playFrame = page.view.convert(play.bounds, from: play)
             #expect(playFrame.maxY <= page.view.bounds.maxY, "controls pushed off-screen at \(size)")
@@ -95,7 +95,7 @@ struct PlayerPageAlignmentTests {
         #expect(playFrame.maxY <= page.view.bounds.maxY)
         let cover = try #require(Host.firstView(in: page.view) { ($0 as? UIImageView)?.accessibilityLabel == "Episode artwork" })
         let coverFrame = page.view.convert(cover.bounds, from: cover)
-        #expect(coverFrame.minY >= 24 - 0.5)
+        #expect(coverFrame.minY >= 20 - 0.5)
         #expect(abs(coverFrame.midX - page.view.bounds.midX) < 1)
     }
 
@@ -111,7 +111,7 @@ struct PlayerPageAlignmentTests {
             let frame = page.view.convert(button.bounds, from: button)
             #expect(frame.width >= 44 && frame.height >= 44, "\(identifier) hit target \(frame.size)")
             #expect(abs(frame.midY - playFrame.midY) < 0.5, "\(identifier) off the transport row")
-            #expect(isLeading ? abs(frame.minX - 24) < 0.5 : abs(frame.maxX - (402 - 24)) < 0.5, "\(identifier) at \(frame)")
+            #expect(isLeading ? abs(frame.minX - 28) < 0.5 : abs(frame.maxX - (402 - 28)) < 0.5, "\(identifier) at \(frame)")
             #expect(button.showsMenuAsPrimaryAction && button.menu != nil)
             #expect(frame.minY > page.view.bounds.height / 2, "\(identifier) left the thumb zone")
         }
@@ -131,7 +131,7 @@ struct PlayerPageAlignmentTests {
         let notes = try #require(Host.firstView(in: page.view) { $0.accessibilityIdentifier == "player-episode-notes" })
         #expect(scroll.contentSize.height > scroll.bounds.height + 100, "long notes must scroll: \(scroll.contentSize)")
         let notesFrame = page.view.convert(notes.bounds, from: notes)
-        #expect(abs(notesFrame.minX - 24) < 0.5 && abs(notesFrame.maxX - (402 - 24)) < 0.5, "notes column \(notesFrame)")
+        #expect(abs(notesFrame.minX - 28) < 0.5 && abs(notesFrame.maxX - (402 - 28)) < 0.5, "notes column \(notesFrame)")
         let selector = try #require(Host.firstView(in: host.container.view) { $0 is PlayerPageTabView })
         let selectorTop = host.container.view.convert(selector.bounds, from: selector).minY
         let pageBottom = host.container.view.convert(page.view.bounds, from: page.view).maxY

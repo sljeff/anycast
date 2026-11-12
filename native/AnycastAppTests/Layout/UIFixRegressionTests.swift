@@ -64,7 +64,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Player page distribution (1) + thumb height (2)
 
-    @Test("Player main page: square column-width cover, 28 pt rhythm, centered play")
+    @Test("Player main page: square cover centered above the title, centered play")
     func playerPageDistribution() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -111,22 +111,22 @@ struct UIFixRegressionTests {
         let bottomFrame = frameInPage(bottomStack)
         let playFrame = frameInPage(playPause)
 
-        // Square, at most the 24 pt content column's width, horizontally centered.
+        // Square, at most the 28 pt content column's width, horizontally centered.
         #expect(abs(coverFrame.width - coverFrame.height) < 1.5, "cover is not square: \(coverFrame)")
-        #expect(coverFrame.width <= page.bounds.width - 48 + 0.5, "cover exceeds the column: \(coverFrame.width)")
+        #expect(coverFrame.width <= page.bounds.width - 56 + 0.5, "cover exceeds the column: \(coverFrame.width)")
         #expect(abs(coverFrame.midX - page.bounds.midX) < 1, "cover is off center")
 
-        // One 28 pt VISIBLE rhythm (subtitle → track, labels → transport,
-        // transport → selector); the frames carry the hidden slack, so the
-        // frame gaps are at least 28 - 24 and exactly 28 - 13 (the page ends
-        // at the selector's top). The cover sits just under the grabber and
-        // the slack goes between the title and the scrubber, keeping the
-        // controls in the thumb zone.
-        let topGap = coverFrame.minY
+        // The artwork floats centered between the grabber clearance (20) and
+        // the title: equal air above and below. The title sits on the
+        // scrubber (frames overlap by 6, the scrubber hides ~20 of slack),
+        // and the page ends 15 above the selector.
+        let airAbove = coverFrame.minY - 20
+        let airBelow = titleFrame.minY - coverFrame.maxY
         let middleGap = bottomFrame.minY - titleFrame.maxY
         let bottomGap = page.bounds.maxY - bottomFrame.maxY
-        #expect(abs(topGap - 36) < 0.5, "cover should sit just under the grabber: \(topGap)")
-        #expect(middleGap >= 4 - 0.5, "title → scrubber frame gap is \(middleGap), expected at least 4")
+        #expect(abs(airAbove - airBelow) < 1.0, "cover is not centered above the title: \(airAbove) vs \(airBelow)")
+        #expect(airBelow >= 24 - 0.5, "cover crowds the title: \(airBelow)")
+        #expect(abs(middleGap + 6) < 0.5, "title → scrubber frame gap is \(middleGap), expected -6")
         #expect(abs(bottomGap - 15) < 1.0, "transport → selector frame gap is \(bottomGap), expected 15")
 
         // Play sits exactly on the page's center line.
