@@ -272,35 +272,38 @@ struct LayoutSanityTests {
         #expect(desc?.bounds.height ?? 0 > 0, "description label collapsed")
     }
 
-    /// The inbox card (UI kit form): the description and the bottom row both
-    /// resolve real frames off the autolayout height chain (a broken chain
-    /// shows up as a collapsed description).
-    @Test("inbox card lays out description and bottom row")
-    func inboxV2CardLayout() {
+    /// The inbox row: title, "Show · date" line and the trailing duration
+    /// all resolve real frames, the duration sits right of the text column
+    /// on the content edge, and a two-line title stays within two lines.
+    @Test("inbox row lays out title, show line and duration")
+    func inboxRowLayout() {
         let cell = InboxEpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 370, height: 200))
         cell.configure(
             InboxCardContent(
-                title: "An episode title that wraps",
-                showName: "Just pod",
-                metaText: "Nov 21, 2025 · 45 min",
-                descriptionHTML: nil,
-                imageURL: nil,
-                descriptionPlainText: "A description line that also wraps a little"
+                title: "An episode title that is long enough to wrap onto a second line and then some more words beyond it",
+                showName: "Just pod", dateText: "10h ago", durationText: "44m"
             )
         )
         cell.layoutIfNeeded()
         let labels = Self.subviewsRecursive(in: cell).compactMap { $0 as? UILabel }
-        let desc = labels.first { $0.accessibilityIdentifier == "episode-card-description" }
-        #expect(desc?.text == "A description line that also wraps a little")
-        #expect(desc?.bounds.height ?? 0 > 0, "v2 description label collapsed")
-        // Sentence-case title, show line in the feed's own casing.
-        #expect(labels.contains { $0.text == "An episode title that wraps" }, "title recased")
-        #expect(labels.contains { $0.text == "Just pod" }, "show name was recased")
-        // The more button gets its menu from the mirrored payload.
+        let title = labels.first { $0.text?.hasPrefix("An episode title") == true }
+        let show = labels.first { $0.text == "Just pod \u{00B7} 10h ago" }
+        let duration = labels.first { $0.text == "44m" }
+        #expect(title != nil && show != nil && duration != nil, "row labels missing")
+        guard let title, let show, let duration else { return }
+        // Feed casing kept; no sentence-casing of the show line.
+        #expect(title.bounds.height > 0 && show.bounds.height > 0 && duration.bounds.height > 0)
+        #expect(title.numberOfLines == 2 && show.numberOfLines == 1)
+        let inCell = { (view: UIView) in view.convert(view.bounds, to: cell.contentView) }
+        #expect(inCell(duration).maxX == 370 - Spacing.pageH, "duration is off the content edge")
+        #expect(inCell(title).maxX <= inCell(duration).minX, "text column runs under the duration")
+        #expect(abs(inCell(title).minX - (Spacing.pageH + InboxEpisodeCardCell.artworkSide + Spacing.gap)) < 0.5,
+                "text column starts at \(inCell(title).minX)")
+        // The menu payload mirrors onto VoiceOver custom actions.
         cell.menuActions = [
             EpisodeCardAction(icon: UIImage(), accessibilityLabel: "Play") {},
         ]
-        #expect(cell.moreButton.menu?.children.count == 1, "more menu not built")
+        #expect(cell.contentView.accessibilityCustomActions?.count == 1, "custom actions not built")
     }
 
     /// Reconfigure storms (expand taps, playback ticks, membership refresh)
@@ -320,23 +323,6 @@ struct LayoutSanityTests {
         try await Self.waitForText(desc)
         let resolved = desc.text
         cell.configure(content, actions: [])
-        #expect(desc.text == resolved, "same-HTML reconfigure blanked the description")
-    }
-
-    @Test("inbox card keeps a resolved description across same-HTML reconfigure")
-    func inboxCardDescriptionSurvivesReconfigure() async throws {
-        let cell = InboxEpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 370, height: 200))
-        let content = InboxCardContent(
-            title: "Episode", showName: "Show", metaText: "1 min",
-            descriptionHTML: "<p>Same description</p>", imageURL: nil
-        )
-        cell.configure(content)
-        let desc = try #require(Self.subviewsRecursive(in: cell)
-            .compactMap { $0 as? UILabel }
-            .first { $0.accessibilityIdentifier == "episode-card-description" })
-        try await Self.waitForText(desc)
-        let resolved = desc.text
-        cell.configure(content)
         #expect(desc.text == resolved, "same-HTML reconfigure blanked the description")
     }
 

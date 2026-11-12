@@ -383,7 +383,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Inbox native-first card interactions (6a)
 
-    @Test("Inbox card: tap opens Detail; context menu + more button carry the 3 actions")
+    @Test("Inbox row: tap opens Detail; context menu + VoiceOver actions carry the 3 actions")
     func inboxNativeCardInteractions() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -410,11 +410,6 @@ struct UIFixRegressionTests {
         // card as custom actions (09 §7a-C1).
         #expect(cell.menuActions.count == 3,
                 "menu actions not mirrored (count \(cell.menuActions.count))")
-
-        // The more button pulls the same menu down (批次1).
-        let moreTitles = cell.moreButton.menu?.children.compactMap { ($0 as? UIAction)?.title }
-        #expect(moreTitles == ["Play", "Add to playlist", "Remove from inbox"],
-                "more menu children \(moreTitles ?? [])")
 
         // The long-press menu itself: Play / Add to playlist / Remove from inbox.
         guard let menu = inbox.contextMenu(at: path) else {

@@ -79,62 +79,6 @@ enum InboxHeaderStatus {
     }
 }
 
-/// Plain text for the inbox card descriptions, resolved before the list
-/// renders so a card is final on its first layout.
-struct InboxResolvedDescription: Equatable, Sendable {
-    let html: String
-    let plainText: String
-}
-
-nonisolated enum InboxDescriptionResolver {
-
-    /// Resolves `rows` against `existing`: rows already resolved with the same
-    /// HTML cost nothing, new or changed rows are parsed in parallel off the
-    /// main actor, rows that left the list are dropped. Rows without an
-    /// enclosure URL have no key and stay on the cell's HTML fallback.
-    static func resolve(
-        rows: [FeedEpisodeRow],
-        existing: [String: InboxResolvedDescription],
-        parse: @escaping @Sendable (String) -> String = { DisplayText.singleLine(fromHTML: $0) }
-    ) async -> [String: InboxResolvedDescription] {
-        var result: [String: InboxResolvedDescription] = [:]
-        var pending: [(url: String, html: String)] = []
-        for row in rows {
-            guard let url = row.enclosureUrl, result[url] == nil else { continue }
-            let html = row.description ?? ""
-            if let known = existing[url], known.html == html {
-                result[url] = known
-            } else if html.isEmpty {
-                result[url] = InboxResolvedDescription(html: "", plainText: "")
-            } else {
-                pending.append((url, html))
-            }
-        }
-        guard !pending.isEmpty else { return result }
-        await withTaskGroup(of: (String, InboxResolvedDescription).self) { group in
-            for item in pending {
-                group.addTask {
-                    (item.url, InboxResolvedDescription(html: item.html, plainText: parse(item.html)))
-                }
-            }
-            for await (url, resolved) in group {
-                result[url] = resolved
-            }
-        }
-        return result
-    }
-
-    /// The plain text for `row` when it is resolved against its CURRENT HTML.
-    static func plainText(
-        for row: FeedEpisodeRow, in resolved: [String: InboxResolvedDescription]
-    ) -> String? {
-        guard let url = row.enclosureUrl, let entry = resolved[url],
-              entry.html == (row.description ?? "")
-        else { return nil }
-        return entry.plainText
-    }
-}
-
 /// How the inbox card list moves from one render to the next, pure. A list
 /// whose rows only appeared or left (everything else in the same order) is
 /// applied as inserts and removes so unchanged cards stay put; anything else

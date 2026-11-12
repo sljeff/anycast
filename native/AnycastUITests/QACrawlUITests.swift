@@ -700,11 +700,10 @@ final class QACrawlUITests: XCTestCase {
     private func ensureDetailOpen() -> Bool {
         if app.buttons["More episode actions"].exists { return true }
         closeSheet()
-        // v2 inbox cards are located by their `more` menu button; the whole
-        // card opens Detail (09 §10 批次1).
-        let card = app.collectionViews.cells
-            .containing(.button, identifier: "inbox-card-more")
-            .firstMatch
+        // Inbox rows are located by their row identifier; the whole
+        // row opens Detail (09 §10 批次1).
+        let card = app.collectionViews.descendants(matching: .any)
+            .matching(identifier: "inbox-episode-row").firstMatch
         guard card.waitForExistence(timeout: 4) else { return false }
         tapElement(card)
         return app.buttons["More episode actions"].waitForExistence(timeout: 6)
@@ -794,9 +793,8 @@ final class QACrawlUITests: XCTestCase {
                            // The v2 card surfaces its actions through the
                            // long-press context menu (09 §7a-C1) — the v1
                            // strip and its offset-tap target are retired.
-                           let card = s.app.collectionViews.cells
-                               .containing(.button, identifier: "inbox-card-more")
-                               .firstMatch
+                           let card = s.app.collectionViews.descendants(matching: .any)
+                               .matching(identifier: "inbox-episode-row").firstMatch
                            guard card.waitForExistence(timeout: 5) else {
                                s.markSkipped("inbox-expanded", "inbox cards", "needs db_smoke")
                                return false
@@ -812,11 +810,11 @@ final class QACrawlUITests: XCTestCase {
                            // Cell subtrees merge into the cell's accessibility
                            // element, so the description identifier is not
                            // queryable — instead try cards (located by the
-                           // `more` button) until a Detail sheet renders a
+                           // row identifier) until a Detail sheet renders a
                            // real show-notes body (up to 3 visible cards).
                            // The sheet grabber tap closes.
-                           let cards = s.app.collectionViews.cells
-                               .containing(.button, identifier: "inbox-card-more")
+                           let cards = s.app.collectionViews.descendants(matching: .any)
+                               .matching(identifier: "inbox-episode-row")
                            guard cards.count > 0 else {
                                s.markSkipped("detail", "inbox cards", "needs db_smoke")
                                return false

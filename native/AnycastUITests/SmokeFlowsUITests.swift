@@ -232,17 +232,16 @@ final class SmokeFlowsUITests: XCTestCase {
     // MARK: - 6. Cover tap opens the Detail sheet (R1 regression)
 
     /// v2 cards are text-forward: the whole card opens the Detail sheet
-    /// (the v1 cover slot is gone, 09 §10 批次1); the card cell is located
-    /// by its `more` menu button. The Detail sheet is proven by its unique
+    /// (the v1 cover slot is gone, 09 §10 批次1); the row is located
+    /// by its identifier. The Detail sheet is proven by its unique
     /// overflow control ("More episode actions", which carries Share).
     func testCardTapOpensDetailSheet() throws {
         let app = XCUIApplication()
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        let card = app.collectionViews.cells
-            .containing(.button, identifier: "inbox-card-more")
-            .firstMatch
+        let card = app.collectionViews.descendants(matching: .any)
+            .matching(identifier: "inbox-episode-row").firstMatch
         guard card.waitForExistence(timeout: 8) else {
             throw XCTSkip("no inbox cards on this runner — Detail flow needs db_smoke")
         }
@@ -268,9 +267,8 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        let card = app.collectionViews.cells
-            .containing(.button, identifier: "inbox-card-more")
-            .firstMatch
+        let card = app.collectionViews.descendants(matching: .any)
+            .matching(identifier: "inbox-episode-row").firstMatch
         guard card.waitForExistence(timeout: 8) else {
             throw XCTSkip("no inbox cards on this runner — swipe flow needs db_smoke")
         }
@@ -337,13 +335,12 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        // v2 cards are located by their `more` menu button. Tapping the
+        // Inbox rows are located by their row identifier. Tapping the
         // card opens Detail, so the "Add to playlist" action is reached by
         // LONG-PRESS — the native context menu (09 §7a-C1; the strip and
         // its ➕ button are retired on Inbox).
-        let card = app.collectionViews.cells
-            .containing(.button, identifier: "inbox-card-more")
-            .firstMatch
+        let card = app.collectionViews.descendants(matching: .any)
+            .matching(identifier: "inbox-episode-row").firstMatch
         guard card.waitForExistence(timeout: 10) else {
             throw XCTSkip("no inbox cards on this runner — fly-in flow needs db_smoke")
         }
