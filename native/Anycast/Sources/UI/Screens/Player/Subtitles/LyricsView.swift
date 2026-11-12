@@ -27,11 +27,16 @@ import UIKit
 final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDelegate {
 
     // Dart _lyricStyle values (player.dart:981-986 over default1).
-    static let lineGap: CGFloat = 12
-    static let horizontalPadding: CGFloat = 20
-    static let topPadding: CGFloat = 100
+    // Aria "Words" look: 22 pt bold lines, 20 pt apart, 3 pt line spacing,
+    // active line anchored 30% from the top. The content column already
+    // carries the page inset, so the cell padding only tops it up to ~28.
+    static let lineGap: CGFloat = 20
+    static let horizontalPadding: CGFloat = 8
+    static let topPadding: CGFloat = 36
+    /// Minimum bottom padding; the layout raises it so the last line can
+    /// still reach the anchor.
     static let bottomPadding: CGFloat = 100
-    static let lineHeightMultiple: CGFloat = 1.35
+    static let lineSpacing: CGFloat = 3
     /// Length of the top/bottom fade ramps.
     static let edgeLength: CGFloat = 48
     /// How long after a tap-jump position ticks that still report the old
@@ -47,6 +52,8 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
 
     private(set) var lines: [LyricLine] = []
     private(set) var activeIndex: Int = 0
+    /// Characters of the active line already spoken (word-snapped).
+    private var activeSpoken: Int = 0
     private var follow = LyricsFollowStateMachine()
     private var scrollAnimator: UIViewPropertyAnimator?
     /// The line a tap just jumped to, until a position tick confirms it.
@@ -61,10 +68,9 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
         return text.isEmpty ? nil : text
     }
 
-    /// flutter_lyric `activeAnchorPosition` (default1's 0.48,
-    /// lyric_style.dart:168): the active line centers slightly above the
-    /// viewport middle.
-    static let activeAnchorFraction: CGFloat = 0.48
+    /// The active line's anchor point sits this far down the viewport
+    /// (Aria Words: `UnitPoint(y: 0.3)`).
+    static let activeAnchorFraction: CGFloat = 0.3
 
     private let layout = LyricsLinearLayout()
     private let fadeHost = UIView()
@@ -114,6 +120,7 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
             guard let self else { return }
             cell.configure(
                 line: self.lines[indexPath.item],
+                state: self.state(forLine: indexPath.item),
                 isActive: indexPath.item == self.activeIndex,
                 traits: self.traitCollection
             )
@@ -148,6 +155,7 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
     func updateDocument(lines: [LyricLine], positionMilliseconds: Int = 0) {
         self.lines = lines
         activeIndex = LyricDocument.activeLineIndex(lines: lines, positionMilliseconds: positionMilliseconds)
+        activeSpoken = spokenCount(positionMilliseconds: positionMilliseconds)
         pendingJump = nil
         layout.invalidateLayout()
         collectionView.reloadData()
@@ -175,8 +183,18 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
                 return
             }
         }
-        guard index != activeIndex else { return }
+        guard index != activeIndex else {
+            // Same line: only the word fill moves. Restyle the active cell
+            // in place (same font in every state, so no relayout).
+            let spoken = spokenCount(positionMilliseconds: positionMilliseconds)
+            if spoken != activeSpoken {
+                activeSpoken = spoken
+                refreshActiveCell()
+            }
+            return
+        }
         activeIndex = index
+        activeSpoken = spokenCount(positionMilliseconds: positionMilliseconds)
         reconfigureVisibleCells()
         layout.invalidateLayout()
         // Prepare synchronously: the target offset reads the layout's
@@ -195,6 +213,7 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
         pendingJump = (index, Date().addingTimeInterval(Self.jumpGraceSeconds))
         guard index != activeIndex else { return }
         activeIndex = index
+        activeSpoken = 0
         reconfigureVisibleCells()
         layout.invalidateLayout()
         collectionView.layoutIfNeeded()
@@ -271,7 +290,7 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
 
     // MARK: - Follow scrolling
 
-    /// Center the active line on the 0.48 active anchor. Duration ladder from
+    /// Put the active line on the 0.3 anchor. Duration ladder from
     /// default1 `scrollDurations` (240 / 500 ms) on easeOutCubic.
     private func scrollToActiveLine(animated: Bool) {
         guard collectionView.bounds.height > 0 else { return }
@@ -316,6 +335,41 @@ final class LyricsView: UIView, UICollectionViewDataSource, UICollectionViewDele
             0,
             layout.collectionViewContentSize.height + collectionView.contentInset.bottom
                 - collectionView.bounds.height
+        )
+    }
+
+    // MARK: - Word fill
+
+    private func state(forLine index: Int) -> LyricsTextStyling.LineState {
+        if index < activeIndex { return .spoken }
+        if index > activeIndex { return .upcoming }
+        return .active(spokenCharacters: activeSpoken)
+    }
+
+    /// Characters said so far in the active line: progress interpolated
+    /// across the line's start/end (the next line's start), snapped
+    /// forward to the end of a word — AriaSpokenLine.spokenCount.
+    private func spokenCount(positionMilliseconds: Int) -> Int {
+        guard lines.indices.contains(activeIndex) else { return 0 }
+        let line = lines[activeIndex]
+        let end = lines.indices.contains(activeIndex + 1)
+            ? lines[activeIndex + 1].startMilliseconds
+            : line.startMilliseconds + 4000
+        let span = Double(max(300, end - line.startMilliseconds))
+        let progress = min(1, max(0, Double(positionMilliseconds - line.startMilliseconds) / span))
+        let characters = Array(line.text)
+        var count = min(characters.count, Int(Double(characters.count) * progress) + 1)
+        while count < characters.count, characters[count] != " " { count += 1 }
+        return count
+    }
+
+    private func refreshActiveCell() {
+        guard lines.indices.contains(activeIndex),
+              let cell = collectionView.cellForItem(at: IndexPath(item: activeIndex, section: 0)) as? LyricLineCell
+        else { return }
+        cell.configure(
+            line: lines[activeIndex], state: state(forLine: activeIndex),
+            isActive: true, traits: traitCollection
         )
     }
 
@@ -382,9 +436,14 @@ final class LyricLineCell: UICollectionViewCell {
         return true
     }
 
-    func configure(line: LyricLine, isActive: Bool, traits: UITraitCollection?) {
+    func configure(
+        line: LyricLine,
+        state: LyricsTextStyling.LineState,
+        isActive: Bool,
+        traits: UITraitCollection?
+    ) {
         label.attributedText = LyricsTextStyling.attributedText(
-            for: line, isActive: isActive, traits: traits
+            for: line, state: state, traits: traits
         )
         accessibilityLabel = [line.text, line.translation ?? ""]
             .filter { !$0.isEmpty }
@@ -396,69 +455,87 @@ final class LyricLineCell: UICollectionViewCell {
 
 // MARK: - Text styling
 
-/// Lyric typography: `TypographyV2.body` for the line and `TypographyV2.meta`
-/// for its translation, with `height: 1.35` paragraphs; the follow highlight
-/// is brightness only (Anycast 2.0 transcript).
+/// Aria "Words" typography: every line is 22 pt bold (Dynamic Type via
+/// `.title2`) in every state, so heights never change when the highlight
+/// moves. State is colour only: spoken lines 0.42, upcoming 0.30, the
+/// active line full colour for the spoken part and 0.5 for the rest.
 enum LyricsTextStyling {
 
-    /// The active line's translation: one step below the active main line.
-    static let activeTranslationColor = Theme.playerSecondary
+    enum LineState: Equatable {
+        case spoken
+        case upcoming
+        /// `spokenCharacters` of the line's text are already said.
+        case active(spokenCharacters: Int)
+    }
 
-    /// The inactive line's translation: dimmer than the main line.
-    static let translationColor = Theme.playerSecondary.withAlphaComponent(0.55)
+    static let spokenAlpha: CGFloat = 0.42
+    static let upcomingAlpha: CGFloat = 0.30
+    static let activeRestAlpha: CGFloat = 0.5
+
+    private static let lineStyle = TypographyV2.Style(
+        size: 22, lineHeight: 28, weight: .bold, color: Theme.playerText, scalingTextStyle: .title2
+    )
 
     static func attributedText(
         for line: LyricLine,
-        isActive: Bool,
+        state: LineState,
         traits: UITraitCollection?
     ) -> NSAttributedString {
-        let mainColor = isActive ? Theme.playerText : Theme.playerSecondary
-        let translationColor = isActive
-            ? activeTranslationColor
-            : Self.translationColor
-
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineHeightMultiple = LyricsView.lineHeightMultiple
+        paragraph.lineSpacing = LyricsView.lineSpacing
         paragraph.paragraphSpacing = Self.translationParagraphSpacing
 
+        let font = lineStyle.font(traits: traits)
+        func main(_ text: String, _ alpha: CGFloat) -> NSAttributedString {
+            NSAttributedString(string: text, attributes: [
+                .font: font,
+                .foregroundColor: Theme.playerText.withAlphaComponent(alpha),
+                .paragraphStyle: paragraph,
+            ])
+        }
+
         let attributed = NSMutableAttributedString()
-        let mainAttributes: [NSAttributedString.Key: Any] = [
-            .font: TypographyV2.body.font(traits: traits),
-            .foregroundColor: mainColor,
-            .paragraphStyle: paragraph,
-        ]
-        attributed.append(NSAttributedString(string: line.text, attributes: mainAttributes))
+        let translationColor: UIColor
+        switch state {
+        case .spoken:
+            attributed.append(main(line.text, spokenAlpha))
+            translationColor = Theme.playerSecondary.withAlphaComponent(spokenAlpha)
+        case .upcoming:
+            attributed.append(main(line.text, upcomingAlpha))
+            translationColor = Theme.playerSecondary.withAlphaComponent(upcomingAlpha)
+        case .active(let spoken):
+            let characters = Array(line.text)
+            let cut = min(max(spoken, 0), characters.count)
+            attributed.append(main(String(characters[..<cut]), 1))
+            attributed.append(main(String(characters[cut...]), activeRestAlpha))
+            translationColor = Theme.playerSecondary
+        }
         if let translation = line.translation, !translation.isEmpty {
             let translationAttributes: [NSAttributedString.Key: Any] = [
                 .font: TypographyV2.meta.font(traits: traits),
                 .foregroundColor: translationColor,
                 .paragraphStyle: paragraph,
             ]
-            attributed.append(NSAttributedString(string: "\n"))
+            attributed.append(NSAttributedString(string: "\n", attributes: translationAttributes))
             attributed.append(NSAttributedString(string: translation, attributes: translationAttributes))
         }
         return attributed
     }
 
-    /// Text height at a given width for both active variants (the Dart
-    /// layout measures the normal and active painters of every line).
-    static func heights(
+    /// Text height at a given width. The font is the same in every state,
+    /// so one measurement serves all of them.
+    static func height(
         for line: LyricLine,
         width: CGFloat,
         traits: UITraitCollection?
-    ) -> (normal: CGFloat, active: CGFloat) {
-        let width = max(width, 1)
-        let constraint = CGSize(width: width, height: .greatestFiniteMagnitude)
+    ) -> CGFloat {
+        let constraint = CGSize(width: max(width, 1), height: .greatestFiniteMagnitude)
         let options: NSStringDrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
-        let normal = ceil(attributedText(for: line, isActive: false, traits: traits)
+        return ceil(attributedText(for: line, state: .upcoming, traits: traits)
             .boundingRect(with: constraint, options: options, context: nil).height)
-        let active = ceil(attributedText(for: line, isActive: true, traits: traits)
-            .boundingRect(with: constraint, options: options, context: nil).height)
-        return (normal, active)
     }
 
-    /// Static paragraph style for measurement calls that do not need the
-    /// attributed string itself.
+    /// Paragraph gap between a line and its translation.
     static let translationParagraphSpacing: CGFloat = 6
 }
 
@@ -485,16 +562,19 @@ final class LyricsLinearLayout: UICollectionViewLayout {
         var y = LyricsView.topPadding
         frames.removeAll(keepingCapacity: true)
         for (index, line) in view.lines.enumerated() {
-            let measured = LyricsTextStyling.heights(
+            let height = LyricsTextStyling.height(
                 for: line, width: textWidth, traits: collectionView.traitCollection
             )
-            let height = index == view.activeIndex ? measured.active : measured.normal
             frames.append(CGRect(x: 0, y: y, width: width, height: height))
             y += height + LyricsView.lineGap
         }
         if !frames.isEmpty {
             y -= LyricsView.lineGap
-            y += LyricsView.bottomPadding
+            // Enough room under the last line for it to reach the anchor.
+            y += max(
+                LyricsView.bottomPadding,
+                collectionView.bounds.height * (1 - LyricsView.activeAnchorFraction)
+            )
         }
         contentHeight = y
     }
@@ -521,12 +601,13 @@ final class LyricsLinearLayout: UICollectionViewLayout {
         newBounds.width != lastPreparedWidth
     }
 
-    /// Offset centering `index` on the ACTIVE anchor (flutter_lyric
-    /// `calcActiveLineOffsetY` → `lineOffsetY` at `activeAnchorPosition`,
-    /// 0.48 under the app's `anchorPosition: 0.5` copyWith).
+    /// Offset putting the line's anchor point (the same relative height
+    /// inside the line) on the viewport's anchor fraction, like SwiftUI's
+    /// `scrollTo(anchor: UnitPoint(y: 0.3))`.
     func targetOffset(forLine index: Int, viewportHeight: CGFloat) -> CGFloat {
         guard frames.indices.contains(index), viewportHeight > 0 else { return 0 }
-        return frames[index].midY - viewportHeight * LyricsView.activeAnchorFraction
+        let fraction = LyricsView.activeAnchorFraction
+        return frames[index].minY + frames[index].height * fraction - viewportHeight * fraction
     }
 
     private func attributes(at index: Int, frame: CGRect) -> UICollectionViewLayoutAttributes {
@@ -567,7 +648,7 @@ final class LyricLinePreviewViewController: UIViewController {
         let textLabel = UILabel()
         textLabel.numberOfLines = 0
         textLabel.attributedText = LyricsTextStyling.attributedText(
-            for: line, isActive: true, traits: traitCollection
+            for: line, state: .active(spokenCharacters: line.text.count), traits: traitCollection
         )
 
         let stack = UIStackView(arrangedSubviews: [timeLabel, textLabel])

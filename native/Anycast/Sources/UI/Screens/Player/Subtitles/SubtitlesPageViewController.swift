@@ -3,10 +3,12 @@ import AnycastKit
 
 /// Player page 2 (PlayerAI/Subtitles, 03 §2.10) in the Anycast 2.0
 /// transcript form (option A): a left-aligned header — the 44 pt episode
-/// cover beside "Transcript" over the episode title — then the transcript
+/// cover beside "Transcript" over the episode title, with ••• and Ask AI at
+/// its trailing side — then the transcript
 /// lines, ONE status capsule slot (following / back to now / jump undo /
 /// generation and translation states), and the shared scrubber + transport
-/// with the ••• menu and Ask AI flanking it, above the page selector.
+/// with speed and sleep flanking it (as on the main page), above the page
+/// selector.
 ///
 /// Row state is derived from the poll controllers plus async row fetches;
 /// polling cadence, K27 error policy and the K9 5-strike rule all live in
@@ -37,6 +39,8 @@ final class SubtitlesPageViewController: UIViewController {
     private let contentHost = UIView()
     private let capsule = TranscriptStatusCapsuleView()
     private lazy var transport = PlayerTransportView(context: context, transportGap: Spacing.gap)
+    /// Speed + sleep: the same buttons, menus and rendering as the main page.
+    private lazy var speedSleep = PlayerSpeedSleepControls(context: context)
     private let moreButton = AnycastIconButton(
         style: .tonal, icon: AppIcons.more, accessibilityLabel: "More transcript actions", glyphSize: 20
     )
@@ -84,6 +88,16 @@ final class SubtitlesPageViewController: UIViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     // MARK: - Lifecycle
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        speedSleep.pageWillAppear()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        speedSleep.pageDidDisappear()
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -192,8 +206,16 @@ final class SubtitlesPageViewController: UIViewController {
 
         let titles = UIStackView(arrangedSubviews: [headerTitleLabel, titleLabel])
         titles.axis = .vertical
-        let header = UIStackView(arrangedSubviews: [headerArtwork, titles])
+        // ••• and Ask AI sit at the header's trailing side; the transport
+        // row carries speed and sleep, exactly as on the main page.
+        buildHeaderActions()
+        let header = UIStackView(arrangedSubviews: [headerArtwork, titles, moreButton, askAIButton])
         header.axis = .horizontal
+        for button in [moreButton, askAIButton] {
+            button.setContentHuggingPriority(.required, for: .horizontal)
+            button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        }
+        titles.setContentHuggingPriority(.defaultLow, for: .horizontal)
         header.alignment = .center
         header.spacing = Spacing.gap
         header.translatesAutoresizingMaskIntoConstraints = false
@@ -211,7 +233,7 @@ final class SubtitlesPageViewController: UIViewController {
 
         transport.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(transport)
-        buildTransportAccessories()
+        speedSleep.install(in: transport)
 
         NSLayoutConstraint.activate([
             header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
@@ -240,10 +262,10 @@ final class SubtitlesPageViewController: UIViewController {
         ])
     }
 
-    /// ••• (menu) left and Ask AI right of the transport: 44 pt round
-    /// buttons with a subtle player-text fill. Player colors only — the
-    /// player is always dark, so nothing adapts to the appearance.
-    private func buildTransportAccessories() {
+    /// ••• (menu) and Ask AI in the header: 44 pt round buttons with a
+    /// subtle player-text fill. Player colors only — the player is always
+    /// dark, so nothing adapts to the appearance.
+    private func buildHeaderActions() {
         for button in [moreButton, askAIButton] {
             button.configuration?.baseBackgroundColor = Theme.playerText.withAlphaComponent(0.08)
             button.configuration?.baseForegroundColor = Theme.playerText
@@ -255,7 +277,6 @@ final class SubtitlesPageViewController: UIViewController {
             },
         ])
         askAIButton.addAction(UIAction { [weak self] _ in self?.openChat() }, for: .touchUpInside)
-        transport.setAccessories(leading: moreButton, trailing: askAIButton)
     }
 
     // MARK: - State refresh (observation → row loads → render)
