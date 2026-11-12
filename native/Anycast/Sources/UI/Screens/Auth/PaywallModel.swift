@@ -88,9 +88,7 @@ nonisolated struct PaywallModel: Equatable, Sendable {
     }
 
     struct Feature: Equatable, Sendable {
-        enum Icon: Equatable, Sendable {
-            case subtitles, transcripts, ask, export
-        }
+        typealias Icon = PlusOffer.Icon
         let icon: Icon
         let title: String
         let subtitle: String
@@ -160,10 +158,10 @@ nonisolated struct PaywallModel: Equatable, Sendable {
 
     // MARK: - Copy
 
-    static let standardHeadline = "Understand any podcast, in any language"
+    static let standardHeadline = PlusOffer.headline
     static let quotaHeadline = "Keep going with this episode"
-    static let featureLine = "Bilingual subtitles · 50 AI transcripts a month"
-    static let quotaContextLine = "You've used all 10 free AI transcripts"
+    static var featureLine: String { PlusOffer.shortLine }
+    static var quotaContextLine: String { "You've used all \(PlusOffer.freeTotal) free AI transcripts" }
     static let quotaPrompt = "Transcribe it now and read along in"
     static let demoMeta = "Example episode · 12:04"
     static let detailsLinkTitle = "What's in Plus"
@@ -175,11 +173,16 @@ nonisolated struct PaywallModel: Equatable, Sendable {
     static let termsLongTitle = "Terms of Use"
     static let privacyLongTitle = "Privacy Policy"
     static let unavailableMessage = "Prices aren't available right now"
+    static let loadingMessage = "Loading prices"
+    /// Ask to Buy and other purchases the store has accepted but not settled.
+    static let pendingAlertTitle = "Waiting for approval"
+    static let pendingAlertBody = "Plus turns on as soon as the App Store confirms the purchase."
+    static var welcomeToast: String { "Plus is on · \(PlusOffer.transcriptsLine)" }
     static let retryTitle = "Retry"
     static let featuresLabel = "What you get"
     static let timelineLabel = "How your free week works"
     static let monthlySubtitle = "Cancel anytime"
-    static let transcriptsPerMonth = 50
+    static var transcriptsPerMonth: Int { PlusOffer.plusTotal }
 
     var headline: String { isQuota ? Self.quotaHeadline : Self.standardHeadline }
 
@@ -282,15 +285,11 @@ nonisolated struct PaywallModel: Equatable, Sendable {
 
     // MARK: - Details sheet
 
-    /// The four "What's in Plus" rows.
+    /// The "What's in Plus" rows: the shared offer.
     var features: [Feature] {
-        let transcripts = perTranscript.map { "50 a month, \($0) each" } ?? "50 a month"
-        return [
-            Feature(icon: .subtitles, title: "Bilingual subtitles", subtitle: "Any episode, 11 languages"),
-            Feature(icon: .transcripts, title: "AI transcripts", subtitle: transcripts),
-            Feature(icon: .ask, title: "Ask the episode", subtitle: "Answers from what was said"),
-            Feature(icon: .export, title: "Export to notes", subtitle: "Lines and translations"),
-        ]
+        PlusOffer.benefits().map {
+            Feature(icon: $0.icon, title: $0.title, subtitle: $0.detail)
+        }
     }
 
     /// Today / Day 5 / Day 7, only for a trial-eligible user on Yearly.
@@ -299,10 +298,10 @@ nonisolated struct PaywallModel: Equatable, Sendable {
         return [
             TimelineStep(title: "Today", subtitle: "All of Plus, free", isCurrent: true),
             // The app sends no trial reminder (yet), so this step promises none.
-            TimelineStep(title: "Day 5", subtitle: "Cancel anytime in your App Store subscriptions", isCurrent: false),
+            TimelineStep(title: "Day 5", subtitle: "Cancel anytime in the App Store", isCurrent: false),
             TimelineStep(
                 title: "Day 7",
-                subtitle: "\(yearly.priceString)/yr starts. Cancel before, pay nothing.",
+                subtitle: "\(yearly.priceString)/yr starts",
                 isCurrent: false
             ),
         ]

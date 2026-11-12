@@ -71,7 +71,7 @@ struct AccountPageModelTests {
         #expect(AccountPageModel.identity(tier: .free, email: "a@b.co", remaining: 99, plus: nil).subtitle
             == "Free · 10 of 10 transcripts left")
         #expect(AccountPageModel.identity(tier: .free, email: "a@b.co", remaining: -2, plus: nil).subtitle
-            == "Free · 0 of 10 transcripts left")
+            == "Free · No transcripts left")
     }
 
     @Test("Signed in without an email: glyph avatar and 'Signed in' title")
@@ -103,8 +103,19 @@ struct AccountPageModelTests {
     @Test("Upgrade plate copy")
     func upgradePlateCopy() {
         #expect(AccountPageModel.upgradePlateTitle == "Anycast Plus")
-        #expect(AccountPageModel.upgradePlateSubtitle == "Bilingual subtitles and more")
+        #expect(AccountPageModel.upgradePlateSubtitle == "50 AI transcripts a month")
         #expect(AccountPageModel.upgradePlateAction == "Upgrade")
+        #expect(AccountPageModel.upgradePlateSubtitle(tier: .signedOut, remaining: nil) == "50 AI transcripts a month")
+        #expect(AccountPageModel.upgradePlateSubtitle(tier: .free, remaining: 4) == "50 AI transcripts a month")
+        #expect(AccountPageModel.upgradePlateSubtitle(tier: .free, remaining: 0)
+                == "You've used all 10 free transcripts")
+    }
+
+    @Test("Free identity row says when nothing is left")
+    func identityFreeExhausted() {
+        let content = AccountPageModel.identity(tier: .free, email: "a@b.co", remaining: 0, plus: nil)
+        #expect(content.subtitle == "Free · No transcripts left")
+        #expect(content.trailing == .chevron)
     }
 
     // MARK: - Status plate
@@ -151,9 +162,12 @@ struct AccountPageModelTests {
     @Test("Free plate upgrades; an unloaded Plus user never sees it")
     func plateFreeAndUnloaded() {
         let free = plate(isSubscribed: false, nil)
-        #expect(free.meta == "Bilingual subtitles and more")
+        #expect(free.meta == "50 AI transcripts a month")
         #expect(free.actionTitle == "Upgrade")
         #expect(free.action == .upgrade)
+        let spent = AccountPageModel.plate(isSubscribed: false, plus: nil, remaining: 0)
+        #expect(spent.meta == "You've used all 10 free transcripts")
+        #expect(spent.action == .upgrade)
 
         let unloaded = plate(isSubscribed: true, nil)
         #expect(unloaded.action == .manage)

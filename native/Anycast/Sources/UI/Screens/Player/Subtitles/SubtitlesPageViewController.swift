@@ -61,6 +61,10 @@ final class SubtitlesPageViewController: UIViewController {
     private var translationRowPhase: TranslationRowPhase = .idle
     private var translationRow: TranslationRow?
     private var renderedState: TranscriptVisualState?
+    /// The signed-in account's transcript allowance, read while the page
+    /// offers to generate so the prompt can say how many are left.
+    private var allowance: TranscriptAllowance?
+    private var allowanceTask: Task<Void, Never>?
 
     // MARK: Ready-state views (kept alive across state swaps so scroll and
     // follow position survive)
@@ -92,6 +96,7 @@ final class SubtitlesPageViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         speedSleep.pageWillAppear()
+        refreshAllowance()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -503,10 +508,13 @@ final class SubtitlesPageViewController: UIViewController {
                 })
             )
         case .prompt:
-            return .init(
-                id: "prompt", leading: .icon(AppIcons.aiTranscript),
-                message: "AI transcript",
-                action: ("Generate", { [weak self] in self?.generateTranscript() })
+            return .prompt(
+                DetailTranscriptState.reduce(
+                    status: nil,
+                    signedIn: AuthAccountSnapshot.current(context: context).signedIn,
+                    allowance: allowance
+                ),
+                onAction: { [weak self] action in self?.promptTapped(action) }
             )
         case .processing:
             // The server reports no percentage, so just a spinner.
@@ -590,6 +598,49 @@ final class SubtitlesPageViewController: UIViewController {
         Task { await context.playback.seek(Int64(milliseconds)) }
     }
 
+    /// Reads the allowance (cache first) for the prompt copy. A failed read
+    /// leaves the neutral prompt; it is not retried until the next visit.
+    private func refreshAllowance() {
+        let account = AuthAccountSnapshot.current(context: context)
+        guard let uid = account.uid, account.signedIn else {
+            allowance = nil
+            updateCapsule()
+            return
+        }
+        if let cached = TranscriptAllowanceCache.shared.current(uid: uid) {
+            allowance = cached
+            updateCapsule()
+            return
+        }
+        guard allowanceTask == nil else { return }
+        allowanceTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let fresh = await TranscriptRequests.refresh(context: self.context)
+            self.allowanceTask = nil
+            guard !Task.isCancelled else { return }
+            if let fresh { self.allowance = fresh }
+            self.updateCapsule()
+        }
+    }
+
+    private func promptTapped(_ action: DetailTranscriptAction?) {
+        switch action {
+        case .getPlus:
+            PaywallViewController.present(
+                from: topMostPresented(), context: context, variant: .quota(quotaEpisode() ?? Self.untitledEpisode)
+            ) { [weak self] in
+                TranscriptAllowanceCache.shared.invalidate()
+                self?.refreshAllowance()
+            }
+        default:
+            generateTranscript()
+        }
+    }
+
+    private static let untitledEpisode = PaywallModel.Episode(
+        title: "", showName: "", durationMilliseconds: nil, artworkURL: nil
+    )
+
     /// `controller.add(url)` with the K27 user-trigger surface. Login, the
     /// quota paywall, and the toast live in `TranscriptRequests` so the
     /// detail sheet and the playlist card use the same refusal.
@@ -599,10 +650,8 @@ final class SubtitlesPageViewController: UIViewController {
             enclosureURL: url,
             context: context,
             from: self,
-            episode: quotaEpisode() ?? PaywallModel.Episode(
-                title: "", showName: "", durationMilliseconds: nil, artworkURL: nil
-            )
-        )
+            episode: quotaEpisode() ?? Self.untitledEpisode
+        ) { [weak self] in self?.refreshAllowance() }
     }
 
     private func quotaEpisode() -> PaywallModel.Episode? {

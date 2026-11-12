@@ -39,10 +39,10 @@ nonisolated enum SettingsPageModel {
 
     /// Group structure of the 2.0 Settings page. Target Language is always
     /// present; it reads "Off" and is inert while translation is off. The
-    /// gold Upgrade plate follows the identity row for signed-in free users.
+    /// gold Upgrade plate follows the identity row for everyone who is not Plus.
     static func sections(tier: AccountPageModel.Tier) -> [Section] {
         var sections = [Section(header: nil, rows: [.account], plainStyle: false)]
-        if tier == .free {
+        if tier == .free || tier == .signedOut {
             sections.append(Section(header: nil, rows: [.plusUpgrade], plainStyle: false))
         }
         sections += [

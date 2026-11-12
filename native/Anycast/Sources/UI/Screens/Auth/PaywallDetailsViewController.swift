@@ -1,7 +1,7 @@
 import UIKit
 import SafariServices
 
-/// The "What's in Plus" sheet stacked over the paywall: the four feature
+/// The "What's in Plus" sheet stacked over the paywall: the feature
 /// rows, the Today / Day 5 / Day 7 trial timeline (only when the user is
 /// trial-eligible on Yearly), and the Terms and Privacy links. It shows a
 /// snapshot of the paywall model taken when it opens.
@@ -79,8 +79,7 @@ final class PaywallDetailsViewController: UIViewController {
         switch icon {
         case .subtitles: UIImage(systemName: "sparkles")
         case .transcripts: AppIcons.aiTranscript
-        case .ask: AppIcons.aiChat
-        case .export: AppIcons.exportFile
+        case .account: UIImage(systemName: "person.crop.circle")
         }
     }
 

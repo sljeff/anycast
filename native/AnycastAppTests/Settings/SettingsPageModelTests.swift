@@ -16,11 +16,12 @@ struct SettingsPageModelTests {
     func sectionRowOrder() {
         let sections = SettingsPageModel.sections(tier: .signedOut)
         #expect(sections.map(\.header) == [
-            nil, "Listening", "Downloads & Storage", "Subtitles & Translation",
+            nil, nil, "Listening", "Downloads & Storage", "Subtitles & Translation",
             "Content & Discovery", "Help", nil,
         ])
         #expect(sections.map(\.rows) == [
             [.account],
+            [.plusUpgrade],
             [.history, .maxHistoryEpisodes],
             [.cacheLimit],
             [.enableTranslation, .targetLanguage],
@@ -29,18 +30,19 @@ struct SettingsPageModelTests {
             [.privacyPolicy, .termsOfUse],
         ])
         // Only the trailing privacy links render outside a group plate.
-        #expect(sections.map(\.plainStyle) == [false, false, false, false, false, false, true])
+        #expect(sections.map(\.plainStyle) == [false, false, false, false, false, false, false, true])
     }
 
-    @Test("The gold Upgrade plate follows the identity row for free users only")
+    @Test("The gold Upgrade plate follows the identity row for everyone who is not Plus")
     func upgradePlateIsTierDependent() {
         let free = SettingsPageModel.sections(tier: .free)
         #expect(free.map(\.rows).prefix(3) == [[.account], [.plusUpgrade], [.history, .maxHistoryEpisodes]])
-        #expect(free.count == SettingsPageModel.sections(tier: .signedOut).count + 1)
+        #expect(free.count == SettingsPageModel.sections(tier: .plus).count + 1)
+        #expect(SettingsPageModel.sections(tier: .signedOut).map(\.rows).prefix(2) == [[.account], [.plusUpgrade]])
         #expect(free[1].header == nil)
         #expect(free[1].plainStyle == false)
 
-        for tier in [AccountPageModel.Tier.signedOut, .plus] {
+        for tier in [AccountPageModel.Tier.plus] {
             let rows = SettingsPageModel.sections(tier: tier).flatMap(\.rows)
             #expect(!rows.contains(.plusUpgrade))
         }

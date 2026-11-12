@@ -521,7 +521,9 @@ final class SettingsViewController: UIViewController {
     /// The identity row and the gold Upgrade plate.
     private func configureIdentityCell(_ cell: SettingsIdentityRowCell, for row: SettingsPageModel.Row) {
         if row == .plusUpgrade {
-            cell.configureUpgradePlate()
+            cell.configureUpgradePlate(subtitle: AccountPageModel.upgradePlateSubtitle(
+                tier: accountInfo.tier, remaining: accountInfo.remaining
+            ))
         } else {
             var content = AccountPageModel.identity(
                 tier: accountInfo.tier,
@@ -657,10 +659,7 @@ final class SettingsViewController: UIViewController {
 
             // A login-required answer is not escalated from Settings; the
             // quota just stays unknown.
-            var remaining: Int?
-            if let result = try? await self.context.api.getUser(), case .user(let user) = result {
-                remaining = user.remaining
-            }
+            let remaining = await AccountRemaining.fetch(context: self.context)
             guard !Task.isCancelled else { return }
             self.accountInfo.remaining = remaining
             self.applyAccountInfo()

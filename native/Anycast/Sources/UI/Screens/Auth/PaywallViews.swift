@@ -573,6 +573,7 @@ final class PaywallPlansStatusView: UIView {
         column.axis = .vertical
         column.alignment = .center
         column.spacing = Spacing.md
+        isAccessibilityElement = false
         column.translatesAutoresizingMaskIntoConstraints = false
         addSubview(column)
         NSLayoutConstraint.activate([
@@ -589,7 +590,8 @@ final class PaywallPlansStatusView: UIView {
 
     func setLoading(_ loading: Bool) {
         spinner.isHidden = !loading
-        messageLabel.isHidden = loading
+        messageLabel.text = loading ? PaywallModel.loadingMessage : PaywallModel.unavailableMessage
+        messageLabel.isHidden = false
         retryButton.isHidden = loading
         if loading { spinner.startAnimating() } else { spinner.stopAnimating() }
     }
