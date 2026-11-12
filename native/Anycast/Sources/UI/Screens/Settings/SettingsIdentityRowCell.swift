@@ -160,16 +160,13 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
     }
 
     /// The gold Upgrade plate: no avatar, 24 pt padding all round.
-    func configureUpgradePlate() {
-        apply(
-            style: .gold, title: AccountPageModel.upgradePlateTitle,
-            subtitle: AccountPageModel.upgradePlateSubtitle
-        )
+    func configureUpgradePlate(subtitle: String = AccountPageModel.upgradePlateSubtitle) {
+        apply(style: .gold, title: AccountPageModel.upgradePlateTitle, subtitle: subtitle)
         avatarView.isHidden = true
         actionLabel.text = AccountPageModel.upgradePlateAction
         actionLabel.isHidden = false
         chevronView.isHidden = true
-        accessibilityValue = AccountPageModel.upgradePlateSubtitle
+        accessibilityValue = subtitle
     }
 
     private func apply(style: PlateStyle, title: String, subtitle: String) {

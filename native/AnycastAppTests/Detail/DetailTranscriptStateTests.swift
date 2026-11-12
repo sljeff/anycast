@@ -15,18 +15,19 @@ struct DetailTranscriptStateTests {
 
     // MARK: - Account states
 
-    @Test("Signed out draws Generate and no count, even if an allowance is passed")
+    @Test("Signed out offers the free pool and a Sign In word, even if an allowance is passed")
     func signedOut() {
         let content = DetailTranscriptState.reduce(status: nil, signedIn: false, allowance: free)
         #expect(content.kind == .signedOut)
         #expect(content.title == "AI transcript")
-        #expect(content.value == nil)
-        #expect(content.actionTitle == "Generate")
+        #expect(content.value == "10 free")
+        #expect(content.actionTitle == "Sign In")
         #expect(content.rowAction == .generate)
-        #expect(content.accessibilityLabel == "AI transcript")
+        #expect(content.promptMessage == "10 free AI transcripts")
+        #expect(content.accessibilityLabel == "AI transcript, 10 free with an account")
         #expect(content.accessibilityHint == "Double-tap to sign in and generate")
         #expect(content.menu.map(\.title) == ["Generate transcript"])
-        #expect(content.menu.first?.subtitle == nil)
+        #expect(content.menu.first?.subtitle == "Sign in for 10 free")
         #expect(content.accessibilityCustomActions.isEmpty)
     }
 
@@ -34,13 +35,14 @@ struct DetailTranscriptStateTests {
     func freeWithRemaining() {
         let content = DetailTranscriptState.reduce(status: nil, signedIn: true, allowance: free)
         #expect(content.kind == .available)
-        #expect(content.value == "7 left")
+        #expect(content.value == "7 of 10 left")
         #expect(content.actionTitle == "Generate")
-        #expect(content.accessibilityLabel == "AI transcript, 7 free left")
+        #expect(content.promptMessage == "7 of 10 free transcripts left")
+        #expect(content.accessibilityLabel == "AI transcript, 7 of 10 free left")
         #expect(content.accessibilityHint == "Double-tap to generate")
         #expect(content.symbol == .sparkle)
         #expect(content.menu == [
-            DetailTranscriptMenuItem(title: "Generate transcript", subtitle: "7 free left", action: .generate),
+            DetailTranscriptMenuItem(title: "Generate transcript", subtitle: "7 of 10 free left", action: .generate),
         ])
     }
 
@@ -50,8 +52,8 @@ struct DetailTranscriptStateTests {
             status: nil, signedIn: true,
             allowance: TranscriptAllowance(remaining: 99, isSubscribed: false)
         )
-        #expect(high.value == "10 left")
-        #expect(high.menu.first?.subtitle == "10 free left")
+        #expect(high.value == "10 of 10 left")
+        #expect(high.menu.first?.subtitle == "10 of 10 free left")
 
         let negative = DetailTranscriptState.reduce(
             status: nil, signedIn: true,
@@ -59,12 +61,45 @@ struct DetailTranscriptStateTests {
         )
         #expect(negative.kind == .exhausted)
         #expect(negative.value == "None left")
+        #expect(negative.promptMessage == "No free transcripts left")
         #expect(negative.actionTitle == "Get Plus")
         #expect(negative.rowAction == .getPlus)
         #expect(negative.trailingUpgradesContrast)
         #expect(negative.accessibilityLabel == "AI transcript, no free transcripts left")
         #expect(negative.accessibilityHint == "Double-tap to see Plus")
         #expect(negative.menu.map(\.title) == ["Get Plus"])
+    }
+
+    @Test("A member with none left is not sold Plus and not handed a refused Generate")
+    func plusExhausted() {
+        let content = DetailTranscriptState.reduce(
+            status: nil, signedIn: true,
+            allowance: TranscriptAllowance(remaining: 0, isSubscribed: true)
+        )
+        #expect(content.kind == .plusExhausted)
+        #expect(content.value == "None left this month")
+        #expect(content.actionTitle == nil)
+        #expect(content.rowAction == nil)
+        #expect(content.trailingAction == nil)
+        #expect(content.menu.isEmpty)
+        #expect(content.promptMessage == "No transcripts left this month")
+    }
+
+    @Test("Prompt copy per account state (player capsule)")
+    func promptMessages() {
+        func prompt(_ signedIn: Bool, _ allowance: TranscriptAllowance?) -> (String, String?) {
+            let content = DetailTranscriptState.reduce(status: nil, signedIn: signedIn, allowance: allowance)
+            return (content.promptMessage, content.actionTitle)
+        }
+        #expect(prompt(false, nil) == ("10 free AI transcripts", "Sign In"))
+        #expect(prompt(true, nil) == ("AI transcript", "Generate"))
+        #expect(prompt(true, free) == ("7 of 10 free transcripts left", "Generate"))
+        #expect(prompt(true, TranscriptAllowance(remaining: 0, isSubscribed: false))
+                == ("No free transcripts left", "Get Plus"))
+        #expect(prompt(true, plusPlenty) == ("AI transcript", "Generate"))
+        #expect(prompt(true, plusLow) == ("3 transcripts left this month", "Generate"))
+        #expect(prompt(true, TranscriptAllowance(remaining: 0, isSubscribed: true))
+                == ("No transcripts left this month", nil))
     }
 
     @Test("Plus hides the count above the threshold and shows it at the threshold")
@@ -91,16 +126,6 @@ struct DetailTranscriptStateTests {
             allowance: TranscriptAllowance(remaining: 6, isSubscribed: true)
         )
         #expect(above.value == nil)
-
-        // Zero is still Generate — Plus is not the free paywall.
-        let empty = DetailTranscriptState.reduce(
-            status: nil, signedIn: true,
-            allowance: TranscriptAllowance(remaining: 0, isSubscribed: true)
-        )
-        #expect(empty.kind == .plus)
-        #expect(empty.value == "0 left this month")
-        #expect(empty.actionTitle == "Generate")
-        #expect(empty.rowAction == .generate)
     }
 
     @Test("A missing allowance draws no number")
@@ -255,7 +280,7 @@ struct DetailTranscriptStateTests {
             DetailTranscriptState.reduce(status: nil, signedIn: true, allowance: free),
             animated: false
         )
-        #expect(row.accessibilityLabel == "AI transcript, 7 free left")
+        #expect(row.accessibilityLabel == "AI transcript, 7 of 10 free left")
         #expect(row.accessibilityHint == "Double-tap to generate")
         #expect(row.accessibilityTraits.contains(.button))
         #expect(!row.usesMultilineLayout)

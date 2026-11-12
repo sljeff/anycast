@@ -57,6 +57,9 @@ final class RevenueCatController {
     /// Any active entitlement means Plus (02 §3.2: the shipped app checks
     /// `entitlements.active.isNotEmpty`; entitlement id `plus` for display).
     func isSubscribed() async -> Bool {
+        #if DEBUG
+        if let state = PlusDebug.state { return state.isSubscribed }
+        #endif
         guard configured, let info = try? await Purchases.shared.customerInfo() else { return false }
         return !info.entitlements.active.isEmpty
     }

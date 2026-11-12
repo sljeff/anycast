@@ -216,19 +216,20 @@ struct PaywallModelTests {
         var model = Self.ready(Self.usdPlans())
         #expect(model.timeline.map(\.title) == ["Today", "Day 5", "Day 7"])
         #expect(model.timeline.map(\.isCurrent) == [true, false, false])
-        #expect(model.timeline[2].subtitle == "$23.99/yr starts. Cancel before, pay nothing.")
+        #expect(model.timeline[2].subtitle == "$23.99/yr starts")
         model.select(.monthly)
         #expect(model.timeline.isEmpty)
     }
 
-    @Test("Four feature rows; transcripts quote the per-transcript price")
+    @Test("Feature rows are the shared offer; transcripts quote the per-transcript price")
     func features() {
         let features = Self.ready(Self.usdPlans()).features
         #expect(features.map(\.title) == [
-            "Bilingual subtitles", "AI transcripts", "Ask the episode", "Export to notes",
+            "50 AI transcripts a month", "Bilingual subtitles", "Follows your account",
         ])
-        #expect(features[1].subtitle == "50 a month, ≈4¢ each")
-        #expect(PaywallModel(variant: .standard).features[1].subtitle == "50 a month")
+        #expect(features[0].subtitle == "Free accounts get 10 in total")
+        #expect(features[1].subtitle == "Read along in 11 languages")
+        #expect(PaywallModel(variant: .standard).features[0].subtitle == "Free accounts get 10 in total")
     }
 
     // MARK: - Variant copy
@@ -238,7 +239,7 @@ struct PaywallModelTests {
         let standard = PaywallModel(variant: .standard)
         #expect(standard.headline == "Understand any podcast, in any language")
         #expect(standard.contextLine == nil)
-        #expect(PaywallModel.featureLine == "Bilingual subtitles · 50 AI transcripts a month")
+        #expect(PaywallModel.featureLine == "50 AI transcripts a month · bilingual subtitles")
 
         let quota = PaywallModel(variant: .quota(Self.episode))
         #expect(quota.headline == "Keep going with this episode")
