@@ -24,13 +24,13 @@ struct HTMLContentRendererTests {
         #expect(color === Theme.onSurface)
     }
 
-    @Test("Non-break markup in a plain (non-'<') payload stays literal")
-    func plainPayloadKeepsStrayMarkupLiteral() async {
+    @Test("Real tags in a plain (non-'<') payload render as markup")
+    func plainPayloadRendersEmbeddedMarkup() async {
         let renderer = HTMLContentRenderer()
         let result = await renderer.attributedString(
             for: "Listen to <em>Planet Money</em>", cacheKey: "k-stray"
         )
-        #expect(result.string == "Listen to <em>Planet Money</em>")
+        #expect(result.string.trimmingCharacters(in: .whitespacesAndNewlines) == "Listen to Planet Money")
     }
 
     @Test("Spacer paragraphs and stacked line breaks collapse to one blank line")

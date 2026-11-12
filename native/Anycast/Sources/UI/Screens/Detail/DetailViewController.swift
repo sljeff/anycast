@@ -1119,7 +1119,7 @@ final class DetailViewController: UIViewController {
         if case .text(let plain) = HtmlText.displayPayload(for: html) {
             descriptionTextView.setDocument(
                 ShowNotesStore.shared.attributedFallback(
-                    plain: plain, style: ShowNotesStyle(), traits: traits
+                    plain: DisplayText.plainText(fromHTML: plain), style: ShowNotesStyle(), traits: traits
                 ),
                 imageLoader: KingfisherShowNotesImageLoader.shared
             )

@@ -282,7 +282,7 @@ final class EpisodePageViewController: UIViewController {
         // collapses all whitespace.
         if case .text(let plain) = payload {
             setNotes(ShowNotesStore.shared.attributedFallback(
-                plain: plain, style: ShowNotesStyle(), traits: traits
+                plain: DisplayText.plainText(fromHTML: plain), style: ShowNotesStyle(), traits: traits
             ))
             return
         }
