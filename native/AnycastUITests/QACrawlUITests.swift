@@ -1073,9 +1073,9 @@ final class QACrawlUITests: XCTestCase {
                                return false
                            }
                            return s.waitUntil(timeout: 6) {
-                               s.app.buttons["Clear All"].exists
-                                   || s.app.staticTexts["No history"].exists
-                                   || s.app.buttons["Delete"].exists
+                               s.app.buttons["Hold to Clear History"].exists
+                                   || s.app.staticTexts["Play an episode and it shows up here."].exists
+                                   || s.app.buttons["history-explore"].exists
                            }
                        },
                        required: [],

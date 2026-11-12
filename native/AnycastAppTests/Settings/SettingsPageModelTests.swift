@@ -16,26 +16,26 @@ struct SettingsPageModelTests {
     func sectionRowOrder() {
         let sections = SettingsPageModel.sections(tier: .signedOut)
         #expect(sections.map(\.header) == [
-            nil, "Downloads & Storage", "Subtitles & Translation",
+            nil, "Listening", "Downloads & Storage", "Subtitles & Translation",
             "Content & Discovery", "Help", nil,
         ])
         #expect(sections.map(\.rows) == [
             [.account],
+            [.history, .maxHistoryEpisodes],
             [.cacheLimit],
             [.enableTranslation, .targetLanguage],
-            [.country, .autoRefreshInterval, .maxFeedEpisodes,
-             .maxHistoryEpisodes, .importExport, .history],
+            [.country, .autoRefreshInterval, .maxFeedEpisodes, .importExport],
             [.contactEmail],
             [.privacyPolicy, .termsOfUse],
         ])
         // Only the trailing privacy links render outside a group plate.
-        #expect(sections.map(\.plainStyle) == [false, false, false, false, false, true])
+        #expect(sections.map(\.plainStyle) == [false, false, false, false, false, false, true])
     }
 
     @Test("The gold Upgrade plate follows the identity row for free users only")
     func upgradePlateIsTierDependent() {
         let free = SettingsPageModel.sections(tier: .free)
-        #expect(free.map(\.rows).prefix(3) == [[.account], [.plusUpgrade], [.cacheLimit]])
+        #expect(free.map(\.rows).prefix(3) == [[.account], [.plusUpgrade], [.history, .maxHistoryEpisodes]])
         #expect(free.count == SettingsPageModel.sections(tier: .signedOut).count + 1)
         #expect(free[1].header == nil)
         #expect(free[1].plainStyle == false)
@@ -105,6 +105,9 @@ struct SettingsPageModelTests {
         #expect(SettingsPageModel.value(for: .maxFeedEpisodes, settings: settings) == "200 episodes")
         #expect(SettingsPageModel.value(for: .maxHistoryEpisodes, settings: settings) == "50 episodes")
         #expect(SettingsPageModel.value(for: .cacheLimit, settings: settings) == "20 episodes")
+        #expect(SettingsPageModel.historyCountDisplay(count: 0) == "None")
+        #expect(SettingsPageModel.historyCountDisplay(count: 1) == "1 episode")
+        #expect(SettingsPageModel.historyCountDisplay(count: 12) == "12 episodes")
         #expect(SettingsPageModel.value(for: .contactEmail, settings: settings) == "Email")
 
         settings.targetLanguage = ""
@@ -205,6 +208,46 @@ struct SettingsPageModelTests {
         #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "en-US") == "en")
         #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "en") == "en")
         #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "pt_BR") == "pt")
+    }
+
+    // MARK: - History Limit (held until Settings closes)
+
+    @Test("Removal notice: singular, plural, and hidden at or above the count")
+    func historyRemovalNotice() {
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 100, historyCount: 311)
+            == "Oldest 211 episodes will be removed.")
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 100, historyCount: 101)
+            == "Oldest episode will be removed.")
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 100, historyCount: 100) == nil)
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 300, historyCount: 100) == nil)
+        #expect(SettingsPageModel.historyRemovalNotice(pendingLimit: 100, historyCount: 0) == nil)
+    }
+
+    @Test("History Limit draft holds steps, steps back to cancel, and clamps")
+    func historyLimitDraft() throws {
+        let choices = try #require(SettingsPageModel.stepperChoices(for: .maxHistoryEpisodes))
+        let stored = choices[choices.count / 2]
+        var draft = SettingsPageModel.HistoryLimitDraft(stored: stored)
+        #expect(draft.shown == stored)
+        #expect(draft.pending == nil)
+
+        draft.step(.decrease, in: choices)
+        let lower = choices[choices.count / 2 - 1]
+        #expect(draft.shown == lower)
+        #expect(draft.pending == lower)
+        #expect(draft.stored == stored, "stepping never changes the stored value")
+
+        draft.step(.increase, in: choices)
+        #expect(draft.shown == stored)
+        #expect(draft.pending == nil, "stepping back to the stored value drops the held change")
+
+        draft.step(.increase, in: choices)
+        #expect(draft.pending == choices[choices.count / 2 + 1], "raising is held too")
+
+        var floor = SettingsPageModel.HistoryLimitDraft(stored: choices[0])
+        floor.step(.decrease, in: choices)
+        #expect(floor.pending == nil, "no step below the smallest choice")
+        #expect(SettingsPageModel.HistoryLimitDraft(stored: stored, pending: stored).pending == nil)
     }
 
     // MARK: - Deep links

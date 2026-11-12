@@ -504,7 +504,7 @@ Future<void> buildHeavy(FixtureSources sources) async {
   final eps = sources.feedEpisodes(limit: 300);
   await FeedEpisodeModel.insertMany(db, eps);
 
-  // history: played oldest->newest so id DESC == most-recently-played first
+  // history: played oldest->newest so lastPlayedAt DESC is most-recent first
   final oldestFirst = eps.reversed.toList();
   for (var i = 0; i < 300 && i < oldestFirst.length; i++) {
     await HistoryEpisodeModel.insert(
@@ -542,7 +542,7 @@ Future<void> buildUser(FixtureSources sources) async {
   final eps = sources.userFeedEpisodes(limit: 500);
   await FeedEpisodeModel.insertMany(db, eps);
 
-  // history: played oldest->newest so id DESC == most-recently-played first
+  // history: played oldest->newest so lastPlayedAt DESC is most-recent first
   final oldestFirst = eps.reversed.toList();
   for (var i = 0; i < 40 && i < oldestFirst.length; i++) {
     await HistoryEpisodeModel.insert(
@@ -615,6 +615,11 @@ Future<void> buildV3() async {
 
   final db = await databaseFactory.openDatabase(absPath(path));
   await db.execute('ALTER TABLE settings DROP COLUMN continuousPlaying');
+  // A regenerated source database is schema 5. v3 history has no lastPlayedAt.
+  final historyColumns = await db.rawQuery('PRAGMA table_info(historyEpisode)');
+  if (historyColumns.any((column) => column['name'] == 'lastPlayedAt')) {
+    await db.execute('ALTER TABLE historyEpisode DROP COLUMN lastPlayedAt');
+  }
   await db.execute('PRAGMA user_version = 3');
   await db.close();
 }
