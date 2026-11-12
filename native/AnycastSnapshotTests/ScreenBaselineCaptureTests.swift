@@ -75,7 +75,7 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S3 Shows sheet (the shelf's All shows)")
+    @Test("S3 Library sheet (the shelf's All shows)")
     func captureShows() async throws {
         try await Self.withRoot { root in
             guard let context = await Self.liveContext() else {
@@ -88,8 +88,8 @@ struct ScreenBaselineCaptureTests {
                 Self.missingBaselineInput("seeded subscriptions (S3)")
                 return
             }
-            ShowsSheetViewController.present(
-                from: root, shows: ShowsShelfLayout.ordered(subscriptions), onSelect: { _ in }
+            LibrarySheetViewController.present(
+                from: root, context: context, shows: ShowsShelfLayout.ordered(subscriptions), onSelect: { _ in }
             )
             try await Self.settle(1.5)
             try await Self.capture("S3-shows-sheet")
