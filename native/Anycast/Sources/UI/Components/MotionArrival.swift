@@ -1,26 +1,20 @@
 import UIKit
 
 /// First arrival of a list that today pops in over one frame. Staggered rise
-/// matches `CardEntranceAnimator` when motion is allowed; Reduce Motion, and
-/// the skeleton-only path, crossfade.
+/// matches `CardEntranceAnimator` when motion is allowed; Reduce Motion
+/// crossfades.
 @MainActor
 enum MotionArrival {
 
     static func reveal(
         in collectionView: UICollectionView,
         cells: [UICollectionViewCell],
-        skeleton: SkeletonListView?,
         staggered: Bool
     ) {
         collectionView.layoutIfNeeded()
         let targets = cells.isEmpty ? collectionView.visibleCells : cells
-        guard !targets.isEmpty else {
-            skeleton?.dismissAnimated()
-            return
-        }
-        let rise = staggered && !Motion.reduceMotion
-        if rise {
-            skeleton?.dismissAnimated()
+        guard !targets.isEmpty else { return }
+        if staggered && !Motion.reduceMotion {
             MotionListEntrance.play(cells: targets)
             return
         }
@@ -28,7 +22,6 @@ enum MotionArrival {
             cell.contentView.alpha = 0
             cell.contentView.transform = .identity
         }
-        skeleton?.dismissAnimated()
         UIView.animate(
             withDuration: Motion.quick,
             delay: 0,
