@@ -74,7 +74,7 @@ final class PlayerMainPageViewController: UIViewController {
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
                 _ = self.context.playback.playbackError
             },
             onChange: { [weak self] in self?.render() }

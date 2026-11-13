@@ -456,7 +456,7 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         // DB read here is the resync.
         let playback = context.playback
         queueObservation.track(
-            read: { _ = playback.queue.map(\.enclosureUrl) },
+            read: { _ = playback.queueEnclosureURLs },
             onChange: { [weak self] in
                 Task { await self?.reloadEpisodes() }
             }

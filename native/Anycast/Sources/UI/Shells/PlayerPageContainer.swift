@@ -313,7 +313,7 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         showPage(selection.selectedIndex, animated: false)
 
         backdropObservation.track(
-            read: { [weak self] in _ = self?.context.playback.currentEpisode?.imageUrl },
+            read: { [weak self] in _ = self?.context.playback.currentEpisodeContent?.imageUrl },
             onChange: { [weak self] in self?.updateBackdrop() }
         )
         updateBackdrop()

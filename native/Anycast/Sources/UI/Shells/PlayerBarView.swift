@@ -242,7 +242,7 @@ final class PlayerBarView: UIView {
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.playback.currentEpisode
+                _ = self.playback.currentEpisodeContent
                 _ = self.playback.isPlaying
                 _ = self.playback.isLoading
             },

@@ -114,7 +114,7 @@ final class ChannelSearchViewController: UIViewController {
         playbackObservation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
             },
             onChange: { [weak self] in self?.renderPlayerBar() }
         )

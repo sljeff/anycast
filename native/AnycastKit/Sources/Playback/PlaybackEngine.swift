@@ -54,8 +54,14 @@ public protocol PlaybackEngine: AnyObject {
 }
 
 public enum PlaybackEngineEvent: Sendable {
+    /// The play intent (just_audio `playing`): true from `play` until a
+    /// pause, including while the item waits to play.
     case playingChanged(Bool)
+    /// Item loading (attach until ready or failed).
     case loadingChanged(Bool)
+    /// Waiting to play (AVPlayer `.waitingToPlayAtSpecifiedRate`): the
+    /// buffering after a resume, a seek or a stall.
+    case bufferingChanged(Bool)
     /// `durationMilliseconds` is nil while the item duration is unknown
     /// (the Dart stream mapped nil to zero only at the UI edge).
     case positionTick(positionMilliseconds: Int64,

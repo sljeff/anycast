@@ -195,8 +195,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         playbackObservation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode?.enclosureUrl
-                _ = self.context.playback.queue.count
+                _ = self.context.playback.currentEpisodeContent?.enclosureUrl
+                _ = self.context.playback.queueEnclosureURLs.count
             },
             onChange: { [weak self] in self?.refreshVisibleCardStatus() }
         )

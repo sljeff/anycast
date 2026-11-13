@@ -184,7 +184,7 @@ final class PlaylistEpisodeListBinder: NSObject {
         let playback = context.playback
         playbackObservation.track(
             read: {
-                _ = playback.currentEpisode
+                _ = playback.currentEpisodeContent
                 _ = playback.isPlaying
                 _ = playback.isLoading
                 _ = playback.cacheStates

@@ -86,7 +86,7 @@ final class EpisodePageViewController: UIViewController {
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
                 _ = self.context.playback.positionData
             },
             onChange: { [weak self] in

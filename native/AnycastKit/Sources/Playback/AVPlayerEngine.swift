@@ -37,15 +37,17 @@ public final class AVPlayerEngine: PlaybackEngine {
         }
         self.timeObserver = observer
 
-        // Playing/loading state: AVPlayer.timeControlStatus covers playing
-        // (.playing) and buffering (.waitingToPlayAtSpecifiedRate); item
-        // status not-yet-ready is the "loading" leg of just_audio's
+        // Playing/buffering state: AVPlayer.timeControlStatus gives the play
+        // intent (anything but .paused, as just_audio's `playing` stays true
+        // while buffering) and buffering (.waitingToPlayAtSpecifiedRate);
+        // item status not-yet-ready is the "loading" leg of just_audio's
         // ProcessingState.loading.
         rateObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] player, _ in
             Task { @MainActor in
                 guard let self else { return }
-                self.events?(.playingChanged(player.timeControlStatus == .playing))
-                self.events?(.loadingChanged(player.timeControlStatus == .waitingToPlayAtSpecifiedRate))
+                let status = player.timeControlStatus
+                self.events?(.playingChanged(status != .paused))
+                self.events?(.bufferingChanged(status == .waitingToPlayAtSpecifiedRate))
             }
         }
 

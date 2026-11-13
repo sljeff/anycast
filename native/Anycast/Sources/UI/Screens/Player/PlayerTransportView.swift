@@ -1,9 +1,9 @@
 import UIKit
 import AnycastKit
 
-/// The player's scrubber + transport block (state message, progress bar,
-/// replay 10 / play-pause / forward 30), shared by the main page and the
-/// transcript page so play/pause is one component everywhere. It owns its
+/// The player's scrubber + transport block (progress bar with its state
+/// message, replay 10 / play-pause / forward 30), shared by the main page
+/// and the transcript page so play/pause is one component everywhere. It owns its
 /// own playback observation (episode, position, playing, loading) and the
 /// loading/disabled gating; hosts only place it and, optionally, pin
 /// accessory buttons to the ends of the transport row.
@@ -34,7 +34,6 @@ final class PlayerTransportView: UIView {
     private let context: UIContext
     private let observation = ObservationLoop()
 
-    private let stateMessageLabel = UILabel()
     private let progressBar = PlayerProgressBarView()
     private let replayButton = AnycastIconButton(
         style: .plain, icon: AppIcons.replay10, accessibilityLabel: "Seek back 10 seconds",
@@ -75,7 +74,7 @@ final class PlayerTransportView: UIView {
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
                 _ = self.context.playback.positionData
                 _ = self.context.playback.isPlaying
                 _ = self.context.playback.isLoading
@@ -126,23 +125,13 @@ final class PlayerTransportView: UIView {
     // MARK: - Build
 
     private func build() {
-        stateMessageLabel.font = TypographyV2.meta.font()
-        stateMessageLabel.textColor = Theme.playerSecondary
-        stateMessageLabel.textAlignment = .center
-        stateMessageLabel.adjustsFontForContentSizeCategory = true
-        // Two lines at the accessibility text sizes — the message must
-        // not truncate at AX5.
-        stateMessageLabel.numberOfLines = 2
-        stateMessageLabel.isHidden = true
-
         progressBar.setContentCompressionResistancePriority(UILayoutPriority(800), for: .vertical)
         buildControls()
 
         stack.axis = .vertical
-        for view in [stateMessageLabel, progressBar, controlsRow] {
+        for view in [progressBar, controlsRow] {
             stack.addArrangedSubview(view)
         }
-        stack.setCustomSpacing(Spacing.xs, after: stateMessageLabel)
         updateScrubberSpacing()
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
@@ -273,12 +262,6 @@ final class PlayerTransportView: UIView {
             isLoading: context.playback.isLoading,
             durationMilliseconds: position.durationMilliseconds
         )
-        if let message = state.message {
-            stateMessageLabel.text = message
-            stateMessageLabel.isHidden = false
-        } else {
-            stateMessageLabel.isHidden = true
-        }
         progressBar.setAllowsSeek(state.allowsSeek, statusMessage: state.message)
         progressBar.update(
             positionMilliseconds: position.positionMilliseconds,

@@ -166,7 +166,7 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         observePlaybackError()
         updateMiniPlayerVisibility(animated: false)
         visibilityObservation.track(
-            read: { [weak self] in _ = self?.context.playback.currentEpisode },
+            read: { [weak self] in _ = self?.context.playback.currentEpisodeContent },
             onChange: { [weak self] in self?.updateMiniPlayerVisibility(animated: true) }
         )
     }
