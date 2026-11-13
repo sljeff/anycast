@@ -30,6 +30,7 @@ final class PlaylistEpisodeListBinder: NSObject {
     private(set) var diskCachedURLs: Set<String> = []
 
     private let playbackObservation = ObservationLoop()
+    private let downloadObservation = ObservationLoop()
     private let positionObservation = ObservationLoop()
     private let aiObservation = ObservationLoop()
 
@@ -134,14 +135,34 @@ final class PlaylistEpisodeListBinder: NSObject {
     /// (play icon snapshot, AI four-state, download indicator) without a
     /// full data reload.
     func refreshVisibleCards() {
-        guard let collectionView else { return }
-        for path in collectionView.indexPathsForVisibleItems {
-            guard let cell = collectionView.cellForItem(at: path) as? EpisodeCardCell else { continue }
-            guard let episode = episode(at: path) else { continue }
-            let enclosureURL = episode.enclosureUrl ?? ""
+        forEachVisibleCard { cell, enclosureURL in
             updatePlayOverlay(on: cell, enclosureURL: enclosureURL)
             applyAIDisplay(on: cell, enclosureURL: enclosureURL)
             cell.updateDownload(downloadDisplay(for: enclosureURL))
+        }
+    }
+
+    /// Each live source refreshes only the part of the card it drives: a
+    /// download tick must not re-run the strip icons and play glyph of
+    /// every visible card.
+    private func refreshVisiblePlayOverlays() {
+        forEachVisibleCard { cell, enclosureURL in updatePlayOverlay(on: cell, enclosureURL: enclosureURL) }
+    }
+
+    private func refreshVisibleAIDisplays() {
+        forEachVisibleCard { cell, enclosureURL in applyAIDisplay(on: cell, enclosureURL: enclosureURL) }
+    }
+
+    private func refreshVisibleDownloads() {
+        forEachVisibleCard { cell, enclosureURL in cell.updateDownload(downloadDisplay(for: enclosureURL)) }
+    }
+
+    private func forEachVisibleCard(_ body: (EpisodeCardCell, String) -> Void) {
+        guard let collectionView else { return }
+        for path in collectionView.indexPathsForVisibleItems {
+            guard let cell = collectionView.cellForItem(at: path) as? EpisodeCardCell,
+                  let episode = episode(at: path) else { continue }
+            body(cell, episode.enclosureUrl ?? "")
         }
     }
 
@@ -184,12 +205,15 @@ final class PlaylistEpisodeListBinder: NSObject {
         let playback = context.playback
         playbackObservation.track(
             read: {
-                _ = playback.currentEpisode
+                _ = playback.currentEpisodeContent
                 _ = playback.isPlaying
                 _ = playback.isLoading
-                _ = playback.cacheStates
             },
-            onChange: { [weak self] in self?.refreshVisibleCards() }
+            onChange: { [weak self] in self?.refreshVisiblePlayOverlays() }
+        )
+        downloadObservation.track(
+            read: { _ = playback.cacheStates },
+            onChange: { [weak self] in self?.refreshVisibleDownloads() }
         )
         positionObservation.track(
             read: { _ = playback.positionData },
@@ -198,7 +222,7 @@ final class PlaylistEpisodeListBinder: NSObject {
         let subtitles = context.subtitles
         aiObservation.track(
             read: { _ = subtitles.statuses },
-            onChange: { [weak self] in self?.refreshVisibleCards() }
+            onChange: { [weak self] in self?.refreshVisibleAIDisplays() }
         )
     }
 
@@ -224,9 +248,13 @@ final class PlaylistEpisodeListBinder: NSObject {
         manualDownloadTasks[enclosureURL] = Task { [weak self] in
             let task = await cacheStore.startDownload(url: enclosureURL) { [weak self] progress in
                 Task { @MainActor [weak self] in
-                    guard let self, let progress else { return }
+                    guard let self, let progress,
+                          DownloadProgressStep.isVisibleChange(
+                              from: self.manualDownloadProgress[enclosureURL], to: progress
+                          )
+                    else { return }
                     self.manualDownloadProgress[enclosureURL] = progress
-                    self.refreshVisibleCards()
+                    self.refreshVisibleDownloads()
                 }
             }
             let downloadResult = try? await task.value
@@ -323,25 +351,22 @@ final class PlaylistEpisodeListBinder: NSObject {
                 guard let self else { return }
                 let signal = await self.context.subtitles.add(url: enclosureURL)
                 // K27: user-triggered failures stay visible; the poller
-                // itself is silent and routes 401 to login.
-                guard let signal, let window = self.owner.view?.window else { return }
-                switch signal {
-                case .errorMessage(let text):
-                    ToastPresenter.shared.show(text, in: window, duration: 3)
-                case .errorBody(let status, let body):
-                    ToastPresenter.shared.show("Error \(status): \(body)", in: window, duration: 3)
-                case .loginRequired:
-                    break
+                // itself is silent and routes 401 to login. A quota 403
+                // opens the same paywall the player capsule uses.
+                guard let signal else {
+                    let status = self.context.subtitles.statuses[enclosureURL]
+                    if AuthAccountSnapshot.current(context: self.context).signedIn,
+                       status == "processing" || status == "succeeded" {
+                        TranscriptAllowanceCache.shared.invalidate()
+                    }
+                    return
                 }
-            }
-        case .removeStaleRecord:
-            Task { [weak self] in
-                await self?.context.subtitles.remove(url: enclosureURL)
-                if let window = self?.owner.view?.window {
-                    ToastPresenter.shared.show(
-                        AITranscriptAction.failedToastMessage, in: window, duration: 3
-                    )
-                }
+                await TranscriptRequests.presentFailure(
+                    signal: signal,
+                    context: self.context,
+                    from: self.owner,
+                    episode: Self.paywallEpisode(for: episode)
+                )
             }
         case .toast(let message):
             if let window = owner.view?.window {
@@ -352,7 +377,7 @@ final class PlaylistEpisodeListBinder: NSObject {
         }
     }
 
-    /// Remove (playlists.dart:182-190): K3 — removing the playing episode
+    /// Remove (playlists.dart:182-190): removing the playing episode
     /// also stops playback and clears the player state. The current-track
     /// check is BY IDENTITY, captured before the first await (a reload
     /// landing mid-task would reshuffle indexes; a positional check can
@@ -364,10 +389,9 @@ final class PlaylistEpisodeListBinder: NSObject {
         Task { [weak self] in
             guard let self else { return }
             let repository = self.context.database.playlistRepository()
-            try? await repository.removeEpisodeCascade(byEnclosureURL: enclosureURL)
-            // The Dart remove cascaded into subtitle/translation/cache state.
-            await self.context.subtitles.remove(url: enclosureURL)
-            await self.context.translations.remove(url: enclosureURL)
+            try? await repository.removeEpisode(byEnclosureURL: enclosureURL)
+            // Only the queue row and cached audio go. Transcripts and their
+            // in-flight polling stay (the Dart K3 cascade is dropped).
             await self.context.cacheStore.remove(url: enclosureURL)
             if wasCurrent {
                 // The episode may have completed and advanced the queue on
@@ -418,8 +442,9 @@ final class PlaylistEpisodeListBinder: NSObject {
             overlay.widthAnchor.constraint(equalToConstant: overlay.size),
             overlay.heightAnchor.constraint(equalToConstant: overlay.size),
         ])
-        button.setImage(UIImage(), for: .normal)
+        cell.setStripIcon(UIImage(), at: Self.playActionTag)
         button.isAccessibilityElement = true
+        overlay.isAccessibilityElement = false
         updatePlayOverlay(on: cell, enclosureURL: enclosureURL)
     }
 
@@ -439,15 +464,15 @@ final class PlaylistEpisodeListBinder: NSObject {
         button.accessibilityLabel = overlay.accessibilityLabel
     }
 
-    /// AI four state (play_icon.dart AIIcon): sparkle / robot lottie /
-    /// green check / failed bubble. The lottie overlays the strip button;
-    /// the static tinted SF symbols cover the rest.
+    /// AI four state (play_icon.dart AIIcon): transcript mark / robot lottie /
+    /// green check / outline triangle. The lottie overlays the strip button;
+    /// the static tinted symbols cover the rest.
     private func applyAIDisplay(on cell: EpisodeCardCell, enclosureURL: String) {
         guard let button = Self.descendantButton(tagged: Self.aiActionTag, in: cell) else { return }
         let display = AITranscriptDisplay.display(status: context.subtitles.statuses[enclosureURL])
         switch display {
         case .processing:
-            button.setImage(UIImage(), for: .normal)
+            cell.setStripIcon(UIImage(), at: Self.aiActionTag)
             button.tintColor = Theme.onSurface
             // Reuse an in-flight robot: visible cards reconfigure on every
             // playback / download tick, and rebuilding the lottie restarts
@@ -464,8 +489,12 @@ final class PlaylistEpisodeListBinder: NSObject {
                 $0.stop()
                 $0.removeFromSuperview()
             }
-            button.setImage(display.icon, for: .normal)
+            cell.setStripIcon(display.icon, at: Self.aiActionTag)
             button.tintColor = display.tintColor
+            if var configuration = button.configuration {
+                configuration.baseForegroundColor = display.tintColor
+                button.configuration = configuration
+            }
         }
         button.accessibilityLabel = Self.aiAccessibilityLabel(for: display)
     }
@@ -496,6 +525,15 @@ final class PlaylistEpisodeListBinder: NSObject {
             ),
         ])
         return robot
+    }
+
+    private static func paywallEpisode(for episode: PlaylistEpisodeRow) -> PaywallModel.Episode {
+        PaywallModel.Episode(
+            title: episode.title ?? "",
+            showName: episode.channelTitle ?? "",
+            durationMilliseconds: episode.duration,
+            artworkURL: episode.imageUrl.flatMap(URL.init(string:))
+        )
     }
 
     private static func aiAccessibilityLabel(for display: AITranscriptDisplay) -> String {
@@ -575,8 +613,30 @@ final class PlaylistEpisodeListBinder: NSObject {
             htmlRenderer: HTMLContentRenderer(),
             shortenURL: { [weak self] url in
                 await self?.context.api.getShortURL(for: url) ?? url
-            }
+            },
+            transcript: DetailTranscriptCoordinator(
+                context: context,
+                episode: detailEpisode,
+                prepareEpisode: { [weak self] in
+                    await self?.prepareTranscriptEpisode(episode)
+                }
+            )
         )
+    }
+
+    /// Play's move-to-top without starting audio.
+    private func prepareTranscriptEpisode(_ episode: PlaylistEpisodeRow) async -> PlaylistEpisodeRow? {
+        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return nil }
+        var row = episode
+        row.playlistId = playlistId
+        try? await context.database.playlistRepository().insertOrUpdateByIndex(
+            row, playlistId: playlistId, index: 0
+        )
+        if let stored = try? await context.database.playlistRepository()
+            .episode(byEnclosureURL: enclosureURL) {
+            row = stored
+        }
+        return row
     }
 
     // MARK: - Helpers

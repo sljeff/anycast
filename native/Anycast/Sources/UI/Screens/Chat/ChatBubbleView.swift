@@ -20,7 +20,7 @@ final class ChatBubbleView: UIView {
         static let maxBubbleWidthFraction: CGFloat = 0.75
         /// At most this many jump buttons under one reply.
         static let maxJumps = 3
-        static let jumpHeight: CGFloat = 36
+        static let jumpHeight: CGFloat = 44
         static let jumpSpacing: CGFloat = 8
         static let jumpTopGap: CGFloat = 8
     }
@@ -161,8 +161,10 @@ final class ChatBubbleView: UIView {
             config.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
                 font: TypographyV2.meta.font(), scale: .small
             )
-            config.imagePadding = 6
-            config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
+            config.imagePadding = Spacing.sm
+            config.contentInsets = NSDirectionalEdgeInsets(
+                top: 0, leading: Spacing.gap, bottom: 0, trailing: Spacing.gap
+            )
             config.attributedTitle = AttributedString(
                 time, attributes: AttributeContainer([.font: TypographyV2.meta.font().monospacedDigits()])
             )

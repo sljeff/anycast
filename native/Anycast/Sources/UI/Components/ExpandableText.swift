@@ -29,6 +29,9 @@ final class ExpandableText: UIView {
     var presentFullText: ((String, UIViewController?) -> Void)?
 
     private let label = UILabel()
+    /// Truncated copy is a button. Two lines of body text can sit under 44 pt;
+    /// the extra space is the hit area.
+    private var minimumTapHeight: NSLayoutConstraint?
 
     init(text: String, style: Typography.Style = .defaultText, maxLines: Int = 2) {
         self.text = text
@@ -49,6 +52,9 @@ final class ExpandableText: UIView {
             label.bottomAnchor.constraint(equalTo: layoutMarginsGuide.bottomAnchor),
         ])
         layoutMargins = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        let minimumTapHeight = heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit)
+        minimumTapHeight.isActive = false
+        self.minimumTapHeight = minimumTapHeight
 
         addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTap)))
 
@@ -113,11 +119,13 @@ final class ExpandableText: UIView {
             isAccessibilityElement = true
             accessibilityTraits = [.button]
             accessibilityLabel = "Show full text"
+            if minimumTapHeight?.isActive == false { minimumTapHeight?.isActive = true }
         } else {
             backgroundColor = .clear
             layer.cornerRadius = 0
             label.text = text
             isAccessibilityElement = false
+            if minimumTapHeight?.isActive == true { minimumTapHeight?.isActive = false }
         }
         invalidateIntrinsicContentSize()
     }

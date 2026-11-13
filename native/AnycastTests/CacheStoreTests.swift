@@ -282,6 +282,36 @@ struct CacheStoreTests {
         #expect(await store.cachedFile(for: url) == nil)
     }
 
+    // MARK: - Settings: space used and clearing
+
+    @Test("cachedBytes sums the files on disk; clearCached keeps the named URL and removes the rest")
+    func usageAndClear() async throws {
+        let (store, directory, meta, _) = await makeStore()
+        defer { SandboxCleanup.remove(directory, closing: [meta.queue]) }
+        let playing = "https://cdn.example.com/playing.mp3"
+        let other = "https://cdn.example.com/other.mp3"
+        ServingProtocol.reset([
+            playing: stubAudio(contentType: "audio/mpeg"),
+            other: stubAudio(contentType: "audio/mpeg"),
+        ])
+        #expect(await store.cachedBytes() == 0)
+        let playingFile = try await(await store.startDownload(url: playing)).value
+        let otherFile = try await(await store.startDownload(url: other)).value
+        #expect(await store.cachedBytes() == Int64(mp3Bytes.count) * 2)
+
+        let removed = await store.clearCached(keeping: [playing])
+
+        #expect(removed == 1)
+        #expect(FileManager.default.fileExists(atPath: playingFile.path), "the episode playing now stays")
+        #expect(!FileManager.default.fileExists(atPath: otherFile.path))
+        #expect(await meta.entry(forURL: other) == nil)
+        #expect(await meta.entry(forURL: playing) != nil)
+        #expect(await store.cachedBytes() == Int64(mp3Bytes.count))
+
+        #expect(await store.clearCached(keeping: []) == 1)
+        #expect(await store.cachedBytes() == 0)
+    }
+
     // MARK: - Real-device fixture (db_device)
 
     @Test("real device meta DB maps URLs to Library/Caches files (write-back caliber)")

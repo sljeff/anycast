@@ -13,10 +13,11 @@ final class ChatInputBar: UIView {
         static let pillRadius: CGFloat = 24
         /// Single-line height, shared with the search field.
         static let pillHeight: CGFloat = 48
-        static let sendSide: CGFloat = 32
-        /// Send button inset from the pill's trailing and bottom edges
-        /// (centred for one line: (48 - 32) / 2).
-        static let sendInset: CGFloat = 8
+        /// Disc matches the standard icon button. Inset keeps a 48 pt pill:
+        /// (48 - 44) / 2. Trailing text padding stays 48.
+        static let sendSide: CGFloat = 44
+        /// Send button inset from the pill's trailing and bottom edges.
+        static let sendInset: CGFloat = 2
         static let barPadding: CGFloat = 8
         /// Sheet content inset: the pill sits 28 pt from the sides; the
         /// owner positions the bar's bottom edge.
@@ -77,15 +78,14 @@ final class ChatInputBar: UIView {
         placeholderLabel.isUserInteractionEnabled = false
 
         sendButton.setImage(UIImage(systemName: "arrow.up"), for: .normal)
-        sendButton.setPreferredSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 15, weight: .bold), forImageIn: .normal
-        )
+        applySendGlyph()
         sendButton.tintColor = Theme.playerBackground
         sendButton.backgroundColor = Theme.playerText
         sendButton.layer.cornerRadius = Metrics.sendSide / 2
         sendButton.isEnabled = false
         sendButton.isAccessibilityElement = true
         sendButton.accessibilityLabel = "Send message"
+        sendButton.enableIconLargeContentViewer()
         sendButton.addAction(
             UIAction { [weak self] _ in self?.submit() },
             for: .touchUpInside
@@ -152,6 +152,16 @@ final class ChatInputBar: UIView {
         placeholderTop?.constant = verticalPadding
         fieldHeightLimit?.constant = 3 * font.lineHeight + 2 * verticalPadding
         fieldScrollHeight?.constant = fieldHeightLimit?.constant ?? 0
+        applySendGlyph()
+    }
+
+    /// 15 pt bold at the default size, growing with body metrics inside the 44 pt disc.
+    private func applySendGlyph() {
+        let point = IconMetrics.scaledUp(15, style: TypographyV2.body, compatibleWith: traitCollection)
+        sendButton.setPreferredSymbolConfiguration(
+            UIImage.SymbolConfiguration(pointSize: point, weight: .bold),
+            forImageIn: .normal
+        )
     }
 
     private var isSending = false

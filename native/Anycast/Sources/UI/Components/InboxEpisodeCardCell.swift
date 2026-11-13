@@ -2,7 +2,7 @@ import UIKit
 import Kingfisher
 import AnycastKit
 
-/// Value payload for the inbox card.
+/// Value payload for the inbox row.
 struct InboxCardContent {
     /// The playback relation shown as a badge on the show artwork.
     enum Status: Equatable {
@@ -12,59 +12,56 @@ struct InboxCardContent {
     }
 
     var title: String
-    /// The show name beside the artwork.
+    /// The show name, first part of the second line.
     var showName: String
-    /// "Nov 21, 2025 · 45 min"-style meta beside the show name.
-    var metaText: String
-    var descriptionHTML: String?
+    /// "10h ago"-style relative date, second part of the second line.
+    var dateText: String = ""
+    /// "44m"-style duration, right-aligned beside the text column.
+    var durationText: String = ""
     var imageURL: String?
-    var descriptionPlainText: String?
     var status: Status = .none
 }
 
-/// The inbox card in the Anycast 2.0 UI kit form (`EpisodeCardCell`): the
-/// shared card plate (radius 32) carrying the title (emphasis, two lines,
-/// sentence case) over a two-line description, and a bottom row with the
-/// 36 pt circular show artwork — badged when the episode is playing or
-/// queued — the show name and date, and the `more` menu button. Whole-card
-/// tap opens the Detail sheet; the `more` button pulls down the same UIMenu
-/// the long-press context menu shows (09 §7a-C1).
-///
-/// The inter-card gap (12) is baked into the cell as 6 pt top + 6 pt
-/// bottom insets — the card section is a list section (swipe actions) and
-/// list sections carry no inter-item spacing.
+/// One inbox episode as a row of a grouped plate (`GroupedPlateView`, the
+/// section's background — see `PodcastCardCell.makeGroupedLayout`): a 44 pt
+/// cover — badged when the episode is playing or queued — the Emphasis
+/// title on up to two lines over the Meta "Show · date" line, and the
+/// duration right-aligned and never truncated. Rows after the first draw a
+/// hairline from the text on; touching fills the row (no scale). Whole-row
+/// tap opens the Detail sheet; the menu is the list's long-press context
+/// menu, mirrored here as VoiceOver custom actions.
 final class InboxEpisodeCardCell: UICollectionViewCell {
 
     static let reuseIdentifier = "InboxEpisodeCardCell"
-    /// Half of the 12 pt column gap on each side of the card.
-    static let verticalGap: CGFloat = Spacing.sm
+
+    /// The show artwork's side; the inbox prefetches covers at this size.
+    static let artworkSide: CGFloat = 44
+    /// 12 + the 44 pt cover + 12; the text column grows past it with a
+    /// second title line and Dynamic Type.
+    static let minimumHeight: CGFloat = artworkSide + Spacing.gap * 2
 
     private enum Layout {
-        static let artworkSide: CGFloat = 36
         static let badgeSide: CGFloat = 18
     }
 
-    /// Whole-card tap → open the Detail sheet.
+    /// Whole-row tap → open the Detail sheet.
     var onCardTap: (() -> Void)?
-    /// The context-menu payload, mirrored for VoiceOver custom actions and
-    /// rendered as the `more` button's pull-down menu (09 §7a-C1).
+    /// The context-menu payload, mirrored as VoiceOver custom actions
+    /// (rotor parity with the list's long-press menu, 09 §7a-C1).
     var menuActions: [EpisodeCardAction] = [] {
         didSet { applyMenuActions() }
     }
 
-    private let cardContainer = CardSurfaceView()
     private let titleLabel = UILabel()
-    private let descriptionLabel = UILabel()
+    private let subtitleLabel = UILabel()
+    private let durationLabel = UILabel()
     private let coverView = UIImageView()
     private let statusBadge = UIImageView()
-    private let showNameLabel = UILabel()
-    private let metaLabel = UILabel()
-    let moreButton = UIButton(type: .system)
+    private var badgeSideConstraints: [NSLayoutConstraint] = []
+    private let separator = UIView()
+    private var textTrailingToDuration: NSLayoutConstraint?
+    private var textTrailingToEdge: NSLayoutConstraint?
 
-    private var descriptionTask: Task<Void, Never>?
-    /// Guards the description resolve: a reconfigure with the same HTML must
-    /// not blank the text and restart the async parse each time.
-    private var renderedDescriptionHTML: String?
     /// Guards the cover load against reconfigure storms (an unconditional
     /// reload restarts an in-flight download).
     private var renderedCoverURL: URL?
@@ -79,11 +76,9 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        descriptionTask?.cancel()
-        descriptionTask = nil
-        renderedDescriptionHTML = nil
         onCardTap = nil
         menuActions = []
+        setPosition(isFirst: false, isLast: false)
         // A reused cell must never inherit a card-entrance pose.
         contentView.layer.removeAllAnimations()
         contentView.alpha = 1
@@ -95,45 +90,27 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
     func configure(_ content: InboxCardContent) {
         titleLabel.text = content.title
         // The show line keeps the feed's own casing.
-        showNameLabel.text = content.showName
-        showNameLabel.accessibilityLabel = content.showName
-        metaLabel.text = content.metaText
+        subtitleLabel.text = [content.showName, content.dateText]
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+        durationLabel.text = content.durationText
+        let hasDuration = !content.durationText.isEmpty
+        durationLabel.isHidden = !hasDuration
+        textTrailingToDuration?.isActive = hasDuration
+        textTrailingToEdge?.isActive = !hasDuration
         apply(status: content.status)
 
-        if let plain = content.descriptionPlainText {
-            renderedDescriptionHTML = nil
-            descriptionLabel.text = plain
-        } else if let html = content.descriptionHTML {
-            if html != renderedDescriptionHTML {
-                renderedDescriptionHTML = html
-                descriptionTask?.cancel()
-                descriptionLabel.text = ""
-                descriptionTask = Task { [weak self] in
-                    let text = await PlainTextHTMLCache.shared.plainText(for: html)
-                    guard let self, !Task.isCancelled else { return }
-                    self.descriptionLabel.text = text
-                    // Resolve the label's frame in THIS turn — walk-based
-                    // tests otherwise see "text but zero height" mid-flight;
-                    // the follow-up tick covers text landing before the list
-                    // section gave the cell its final frame.
-                    self.invalidateIntrinsicContentSize()
-                    self.setNeedsLayout()
-                    self.layoutIfNeeded()
-                    DispatchQueue.main.async { [weak self] in
-                        self?.layoutIfNeeded()
-                    }
-                }
-            }
-        } else {
-            renderedDescriptionHTML = nil
-            descriptionLabel.text = ""
-        }
+        contentView.accessibilityLabel = content.title
+        contentView.accessibilityValue = [subtitleLabel.text, content.durationText]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
 
         let url = content.imageURL.flatMap(URL.init(string:))
         if url != renderedCoverURL {
             renderedCoverURL = url
             coverView.kf.cancelDownloadTask()
-            coverView.setArtwork(url, title: content.showName)
+            coverView.setArtwork(url, title: content.showName, side: Self.artworkSide)
         }
     }
 
@@ -145,13 +122,36 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
         case .playing:
             statusBadge.isHidden = false
             statusBadge.image = UIImage(systemName: "waveform")
-            statusBadge.backgroundColor = AnycastColor.gold9
+            statusBadge.backgroundColor = Theme.primary
+            statusBadge.tintColor = Theme.onPrimary
             statusBadge.accessibilityLabel = "Playing"
         case .queued:
             statusBadge.isHidden = false
-            statusBadge.image = UIImage(systemName: "checkmark")
+            statusBadge.image = AppIcons.addedToList
             statusBadge.backgroundColor = AnycastColor.grass9
+            statusBadge.tintColor = Theme.onPrimary
             statusBadge.accessibilityLabel = "In playlist"
+        }
+    }
+
+    /// Where the row sits on its plate: the first row has no hairline, and
+    /// the first and last rows round their press fill into the plate.
+    func setPosition(isFirst: Bool, isLast: Bool) {
+        separator.isHidden = isFirst
+        var corners: CACornerMask = []
+        if isFirst { corners.formUnion([.layerMinXMinYCorner, .layerMaxXMinYCorner]) }
+        if isLast { corners.formUnion([.layerMinXMaxYCorner, .layerMaxXMaxYCorner]) }
+        contentView.layer.maskedCorners = corners
+        contentView.layer.cornerRadius = corners.isEmpty ? 0 : Radius.card
+    }
+
+    /// Grouped-plate rows answer a touch with a fill, never a scale.
+    override var isHighlighted: Bool {
+        didSet {
+            let fill = isHighlighted ? AnycastColor.sandAlpha5 : .clear
+            UIView.animate(withDuration: isHighlighted ? 0.1 : Motion.quick) {
+                self.contentView.backgroundColor = fill
+            }
         }
     }
 
@@ -159,122 +159,123 @@ final class InboxEpisodeCardCell: UICollectionViewCell {
 
     private func build() {
         contentView.backgroundColor = .clear
-
-        cardContainer.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(cardContainer)
-        cardContainer.addGestureRecognizer(
+        contentView.layer.cornerCurve = .continuous
+        contentView.isAccessibilityElement = true
+        contentView.accessibilityTraits = [.button]
+        contentView.accessibilityHint = "Opens episode details"
+        contentView.accessibilityIdentifier = "inbox-episode-row"
+        contentView.addGestureRecognizer(
             UITapGestureRecognizer(target: self, action: #selector(cardTapped))
         )
 
         titleLabel.font = TypographyV2.emphasis.font()
-        titleLabel.textColor = Theme.onSurface
+        titleLabel.textColor = TypographyV2.emphasis.color
         titleLabel.numberOfLines = 2
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.adjustsFontForContentSizeCategory = true
-        // The card action for VoiceOver (sighted users tap the whole card);
-        // the menu payload hangs off it as custom actions below.
-        titleLabel.isAccessibilityElement = true
-        titleLabel.accessibilityTraits = [.button]
 
-        descriptionLabel.font = TypographyV2.meta.font()
-        descriptionLabel.textColor = Theme.onSurfaceVariant
-        descriptionLabel.numberOfLines = 2
-        descriptionLabel.lineBreakMode = .byTruncatingTail
-        descriptionLabel.adjustsFontForContentSizeCategory = true
-        // Regression hook: tests assert the async description gains a
-        // non-zero frame once the text lands.
-        descriptionLabel.accessibilityIdentifier = "episode-card-description"
+        subtitleLabel.font = TypographyV2.meta.font()
+        subtitleLabel.textColor = TypographyV2.meta.color
+        subtitleLabel.numberOfLines = 1
+        subtitleLabel.lineBreakMode = .byTruncatingTail
+        subtitleLabel.adjustsFontForContentSizeCategory = true
 
-        let textColumn = UIStackView(arrangedSubviews: [titleLabel, descriptionLabel])
+        durationLabel.font = TypographyV2.meta.font().monospacedDigits()
+        durationLabel.textColor = TypographyV2.meta.color
+        durationLabel.numberOfLines = 1
+        durationLabel.textAlignment = .right
+        durationLabel.adjustsFontForContentSizeCategory = true
+        durationLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        durationLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+        let textColumn = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
         textColumn.axis = .vertical
-        textColumn.spacing = Spacing.xs
+        textColumn.spacing = Spacing.xxs
+        textColumn.alignment = .fill
 
         coverView.contentMode = .scaleAspectFill
         coverView.clipsToBounds = true
-        coverView.layer.cornerRadius = Layout.artworkSide / 2
+        coverView.layer.cornerRadius = Radius.sm
+        coverView.layer.cornerCurve = .continuous
         coverView.backgroundColor = Theme.surfaceContainerHighest
 
         statusBadge.contentMode = .center
-        statusBadge.tintColor = .white
-        statusBadge.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 9, weight: .bold)
+        statusBadge.tintColor = Theme.onPrimary
         statusBadge.layer.cornerRadius = Layout.badgeSide / 2
         statusBadge.layer.borderWidth = Spacing.hairline
         statusBadge.setDynamicBorderColor(Theme.surface)
         statusBadge.clipsToBounds = true
-        statusBadge.isAccessibilityElement = true
+        statusBadge.isAccessibilityElement = false
         statusBadge.isHidden = true
 
-        for label in [showNameLabel, metaLabel] {
-            label.font = TypographyV2.meta.font()
-            label.textColor = Theme.onSurfaceVariant
-            label.adjustsFontForContentSizeCategory = true
+        separator.backgroundColor = Theme.outline
+        separator.isUserInteractionEnabled = false
+
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (cell: InboxEpisodeCardCell, _) in
+            cell.applyBadgeMetrics()
         }
-        showNameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        metaLabel.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
-        var moreConfig = UIButton.Configuration.plain()
-        moreConfig.image = AppIcons.more
-        moreConfig.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
-        moreConfig.baseForegroundColor = AnycastColor.sandAlpha9
-        moreConfig.contentInsets = .zero
-        moreButton.configuration = moreConfig
-        moreButton.showsMenuAsPrimaryAction = true
-        moreButton.accessibilityLabel = "More actions"
-        moreButton.accessibilityIdentifier = "inbox-card-more"
-
-        for view in [textColumn, coverView, statusBadge, showNameLabel, metaLabel, moreButton] {
+        for view in [textColumn, coverView, statusBadge, durationLabel, separator] {
             view.translatesAutoresizingMaskIntoConstraints = false
-            cardContainer.addSubview(view)
+            contentView.addSubview(view)
         }
+
+        let badgeWidth = statusBadge.widthAnchor.constraint(equalToConstant: Layout.badgeSide)
+        let badgeHeight = statusBadge.heightAnchor.constraint(equalToConstant: Layout.badgeSide)
+        badgeSideConstraints = [badgeWidth, badgeHeight]
+        let toDuration = textColumn.trailingAnchor.constraint(
+            equalTo: durationLabel.leadingAnchor, constant: -Spacing.gap
+        )
+        let toEdge = textColumn.trailingAnchor.constraint(
+            equalTo: contentView.trailingAnchor, constant: -Spacing.pageH
+        )
+        textTrailingToDuration = toDuration
+        textTrailingToEdge = toEdge
+        toEdge.isActive = false
 
         NSLayoutConstraint.activate([
-            cardContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageH),
-            cardContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageH),
-            cardContainer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Self.verticalGap),
-            cardContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -Self.verticalGap),
+            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: Self.minimumHeight),
 
-            textColumn.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.cardInner),
-            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.cardInner),
-            textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.pageH),
+            coverView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageH),
+            coverView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            coverView.widthAnchor.constraint(equalToConstant: Self.artworkSide),
+            coverView.heightAnchor.constraint(equalToConstant: Self.artworkSide),
 
-            // Bottom row: its height and the text column above it define
-            // the card height.
-            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.pageH),
-            coverView.centerYAnchor.constraint(equalTo: moreButton.centerYAnchor),
-            coverView.widthAnchor.constraint(equalToConstant: Layout.artworkSide),
-            coverView.heightAnchor.constraint(equalToConstant: Layout.artworkSide),
-
-            statusBadge.widthAnchor.constraint(equalToConstant: Layout.badgeSide),
-            statusBadge.heightAnchor.constraint(equalToConstant: Layout.badgeSide),
+            badgeWidth, badgeHeight,
             statusBadge.centerXAnchor.constraint(equalTo: coverView.trailingAnchor, constant: -Spacing.xxs),
             statusBadge.centerYAnchor.constraint(equalTo: coverView.topAnchor, constant: Spacing.xxs),
 
-            showNameLabel.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
-            showNameLabel.centerYAnchor.constraint(equalTo: moreButton.centerYAnchor),
-            metaLabel.leadingAnchor.constraint(equalTo: showNameLabel.trailingAnchor, constant: Spacing.gap),
-            metaLabel.centerYAnchor.constraint(equalTo: moreButton.centerYAnchor),
-            metaLabel.trailingAnchor.constraint(lessThanOrEqualTo: moreButton.leadingAnchor, constant: -Spacing.xs),
+            textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
+            toDuration,
+            textColumn.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.gap),
+            textColumn.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -Spacing.gap),
+            textColumn.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
 
-            moreButton.topAnchor.constraint(equalTo: textColumn.bottomAnchor, constant: Spacing.xs + Spacing.sm),
-            moreButton.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.md),
-            moreButton.bottomAnchor.constraint(equalTo: cardContainer.bottomAnchor, constant: -Spacing.sm),
-            moreButton.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
-            moreButton.heightAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
+            durationLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageH),
+            durationLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+
+            separator.topAnchor.constraint(equalTo: contentView.topAnchor),
+            separator.leadingAnchor.constraint(equalTo: textColumn.leadingAnchor),
+            separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageH),
+            separator.heightAnchor.constraint(equalToConstant: 0.5),
         ])
+        applyBadgeMetrics()
+    }
+
+    /// Status badge stays at least 18 pt and grows with caption metrics.
+    private func applyBadgeMetrics() {
+        let side = IconMetrics.scaledUp(Layout.badgeSide, textStyle: .caption1, compatibleWith: traitCollection)
+        for constraint in badgeSideConstraints { constraint.constant = side }
+        statusBadge.layer.cornerRadius = side / 2
+        statusBadge.preferredSymbolConfiguration = IconMetrics.symbolConfiguration(
+            pointSize: 9, weight: .bold, textStyle: .caption1, compatibleWith: traitCollection
+        )
     }
 
     // MARK: - Actions
 
-    /// The menu payload in two shapes: the more button's pull-down menu,
-    /// and VoiceOver custom actions on the title (rotor parity with the
-    /// list's context menu).
     private func applyMenuActions() {
-        moreButton.menu = UIMenu(children: menuActions.map { action in
-            UIAction(title: action.accessibilityLabel, image: action.icon) { _ in
-                action.handler()
-            }
-        })
-        titleLabel.accessibilityCustomActions = menuActions.map { action in
+        contentView.accessibilityCustomActions = menuActions.map { action in
             UIAccessibilityCustomAction(name: action.accessibilityLabel) { _ in
                 action.handler()
                 return true

@@ -214,47 +214,39 @@ final class SettingsOptionRowCell: UICollectionViewListCell {
 }
 
 /// Settings list row (restrained 2.0 Settings direction, 2026-10-21): a
-/// title with an optional one-line subtitle, an optional trailing value,
-/// an optional control (switch / stepper) and an optional chevron, inset 24
+/// title, an optional trailing value, an optional control (stepper) and an
+/// optional chevron or external-link arrow, inset 24
 /// with 12 above and below and a 56 pt minimum height. The plate fill
 /// comes from the cell background; pressing fills `sandAlpha5` over it.
 /// Self-drawn rather than a content configuration so the trailing controls
 /// stay real, touchable views.
 class SettingsRowCell: UICollectionViewListCell {
 
-    static let horizontalInset: CGFloat = 24
+    static let horizontalInset: CGFloat = Spacing.pageH
     static let minimumHeight: CGFloat = 56
     /// Rows whose trailing control is taller than the text block shrink the
     /// outer inset and pad the text block instead (see `SettingsStepperRowCell`).
     class var verticalInset: CGFloat { 12 }
 
     let titleLabel = UILabel()
-    let subtitleLabel = UILabel()
     let valueLabel = UILabel()
     let textStack = UIStackView()
-    private let chevronView = UIImageView(
-        image: UIImage(systemName: "chevron.forward")?.applyingSymbolConfiguration(
-            UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        )
-    )
+    private let chevronView: UIImageView = {
+        let view = UIImageView(image: UIImage(systemName: "chevron.forward"))
+        view.preferredSymbolConfiguration = IconMetrics.disclosureConfiguration()
+        return view
+    }()
     private let rowStack = UIStackView()
-    private var usesPlate = true
-
-    /// Dimmed rows keep their layout but read as inert.
-    private(set) var isDimmed = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
 
         // Labels truncate rather than wrap (restrained Settings copy rule).
         titleLabel.font = TypographyV2.body.font()
+        titleLabel.textColor = Theme.onSurface
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
-        subtitleLabel.font = TypographyV2.meta.font()
-        subtitleLabel.textColor = Theme.onSurfaceVariant
-        subtitleLabel.adjustsFontForContentSizeCategory = true
-        subtitleLabel.numberOfLines = 1
         valueLabel.font = TypographyV2.meta.font()
         valueLabel.textColor = Theme.onSurfaceVariant
         valueLabel.adjustsFontForContentSizeCategory = true
@@ -266,7 +258,6 @@ class SettingsRowCell: UICollectionViewListCell {
         textStack.axis = .vertical
         textStack.spacing = Spacing.xxs
         textStack.addArrangedSubview(titleLabel)
-        textStack.addArrangedSubview(subtitleLabel)
         let textPadding = 12 - Self.verticalInset
         textStack.isLayoutMarginsRelativeArrangement = true
         textStack.directionalLayoutMargins = NSDirectionalEdgeInsets(
@@ -314,11 +305,7 @@ class SettingsRowCell: UICollectionViewListCell {
         configurationUpdateHandler = { [unowned self] _, state in
             var background = UIBackgroundConfiguration.clear()
             let pressed = state.isHighlighted || state.isSelected
-            if self.usesPlate {
-                background.backgroundColor = pressed ? Self.pressedPlateFill : Theme.surface
-            } else if pressed {
-                background.backgroundColor = AnycastColor.sandAlpha5
-            }
+            background.backgroundColor = pressed ? Self.pressedPlateFill : Theme.surface
             self.backgroundConfiguration = background
         }
     }
@@ -346,90 +333,24 @@ class SettingsRowCell: UICollectionViewListCell {
     /// the previous row's look.
     func configure(
         title: String,
-        subtitle: String? = nil,
         value: String? = nil,
         showsChevron: Bool = false,
-        isDimmed: Bool = false
+        opensExternally: Bool = false
     ) {
-        usesPlate = true
-        self.isDimmed = isDimmed
-        titleLabel.attributedText = nil
         titleLabel.text = title
-        titleLabel.textColor = isDimmed ? Theme.onSurfaceVariant : Theme.onSurface
-        titleLabel.textAlignment = .natural
-        subtitleLabel.text = subtitle
-        subtitleLabel.isHidden = subtitle == nil
         valueLabel.text = value
         valueLabel.isHidden = value == nil
-        chevronView.isHidden = !showsChevron
+        chevronView.image = opensExternally ? AppIcons.externalLink : AppIcons.disclosure
+        chevronView.isHidden = !(showsChevron || opensExternally)
         isAccessibilityElement = true
         accessibilityLabel = title
         accessibilityValue = value
         setNeedsUpdateConfiguration()
     }
 
-    /// Plain centered underlined link (Privacy / Terms), no plate.
-    func configureLink(title: String) {
-        configure(title: title)
-        usesPlate = false
-        titleLabel.attributedText = NSAttributedString(string: title, attributes: [
-            .font: TypographyV2.meta.font(),
-            .foregroundColor: Theme.onSurfaceVariant,
-            .underlineStyle: NSUnderlineStyle.single.rawValue,
-        ])
-        titleLabel.textAlignment = .center
-        accessibilityTraits = .link
-        setNeedsUpdateConfiguration()
-    }
-
     /// Installs a control between the value and the chevron.
     func setTrailingView(_ view: UIView) {
         rowStack.insertArrangedSubview(view, at: rowStack.arrangedSubviews.count - 1)
-    }
-}
-
-/// Switch row cell: the label and caption left, a sand-tinted AnycastSwitch
-/// right. A tap anywhere on the row toggles the switch (`toggle()`), the
-/// same path VoiceOver activation takes.
-final class SettingsSwitchListCell: SettingsRowCell {
-
-    var onSwitchChanged: ((Bool) -> Void)?
-
-    private let switchView = AnycastSwitch()
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        switchView.setContentHuggingPriority(.required, for: .horizontal)
-        switchView.setContentCompressionResistancePriority(.required, for: .horizontal)
-        switchView.addTarget(self, action: #selector(switchToggled), for: .valueChanged)
-        setTrailingView(switchView)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    func setOn(_ on: Bool, animated: Bool) {
-        switchView.setOn(on, animated: animated)
-    }
-
-    var isOn: Bool { switchView.isOn }
-
-    /// Flips the switch with animation and reports the change like a real
-    /// toggle. The cell is the row's single accessibility element (the real
-    /// switch is folded into it), so row taps and VoiceOver/Switch Control
-    /// activation both route here.
-    func toggle() {
-        switchView.setOn(!switchView.isOn, animated: true)
-        onSwitchChanged?(switchView.isOn)
-    }
-
-    override func accessibilityActivate() -> Bool {
-        toggle()
-        return true
-    }
-
-    @objc private func switchToggled() {
-        onSwitchChanged?(switchView.isOn)
     }
 }
 
@@ -468,6 +389,16 @@ final class SettingsStepperRowCell: SettingsRowCell {
         canIncrease: Bool
     ) {
         configure(title: title, value: value)
+        // Fixed-width digits and a right edge against the stepper, so the
+        // row does not shift while stepping.
+        let font = TypographyV2.meta.font()
+        valueLabel.font = UIFont(descriptor: font.fontDescriptor.addingAttributes([
+            .featureSettings: [[
+                UIFontDescriptor.FeatureKey.type: kNumberSpacingType,
+                UIFontDescriptor.FeatureKey.selector: kMonospacedNumbersSelector,
+            ]],
+        ]), size: font.pointSize)
+        valueLabel.textAlignment = .right
         stepper.minusButton.accessibilityLabel = labels.decrease
         stepper.plusButton.accessibilityLabel = labels.increase
         stepper.setEnabled(minus: canDecrease, plus: canIncrease)
@@ -477,71 +408,5 @@ final class SettingsStepperRowCell: SettingsRowCell {
         textStack.accessibilityLabel = title
         textStack.accessibilityValue = value
         accessibilityElements = [textStack, stepper.minusButton, stepper.plusButton]
-    }
-}
-
-/// Long-press info caption (07 §2.7): a small dark floating overlay shown
-/// ~2 s — the Dart `Tooltip(showDuration: 2000ms)` messages.
-enum SettingsTooltipOverlay {
-
-    static let displayDuration: TimeInterval = 2.0
-
-    private static weak var overlay: UIView?
-    private static var dismissalTask: Task<Void, Never>?
-
-    /// Shows `message` above `anchor` inside `container`, clamped to the
-    /// container's bounds (any window size; no screen-math).
-    @MainActor
-    static func show(message: String, above anchor: UIView, in container: UIView) {
-        overlay?.removeFromSuperview()
-        dismissalTask?.cancel()
-
-        let label = UILabel()
-        label.text = message
-        label.font = TypographyV2.body.font()
-        // Inverse pair: readable over any page in both appearances.
-        label.textColor = Theme.surface
-        label.numberOfLines = 0
-        label.textAlignment = .natural
-        label.adjustsFontForContentSizeCategory = true
-
-        let pill = UIView()
-        pill.backgroundColor = Theme.inverseSurface
-        pill.layer.cornerRadius = Radius.md
-        pill.layer.cornerCurve = .continuous
-        pill.alpha = 0
-        pill.translatesAutoresizingMaskIntoConstraints = false
-        label.translatesAutoresizingMaskIntoConstraints = false
-        pill.addSubview(label)
-        container.addSubview(pill)
-
-        let anchorTop = anchor.convert(anchor.bounds, to: container).minY
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 12),
-            label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -12),
-            label.topAnchor.constraint(equalTo: pill.topAnchor, constant: 8),
-            label.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -8),
-            pill.leadingAnchor.constraint(
-                equalTo: container.readableContentGuide.leadingAnchor
-            ),
-            pill.trailingAnchor.constraint(
-                lessThanOrEqualTo: container.readableContentGuide.trailingAnchor
-            ),
-            pill.bottomAnchor.constraint(
-                equalTo: container.topAnchor,
-                constant: max(8, anchorTop - 8)
-            ),
-        ])
-
-        overlay = pill
-        UIView.animate(withDuration: 0.15) { pill.alpha = 1 }
-
-        dismissalTask = Task {
-            try? await Task.sleep(for: .seconds(displayDuration))
-            guard !Task.isCancelled else { return }
-            UIView.animate(withDuration: 0.2, animations: { pill.alpha = 0 }) { _ in
-                pill.removeFromSuperview()
-            }
-        }
     }
 }

@@ -103,11 +103,10 @@ struct AITranscriptDisplayTests {
     @Test("Tap actions per state, with the exact Dart toast copy")
     func actions() {
         #expect(AITranscriptAction.action(display: .default) == .requestTranscript)
-        #expect(AITranscriptAction.action(display: .failed) == .removeStaleRecord)
+        #expect(AITranscriptAction.action(display: .failed) == .requestTranscript)
         #expect(AITranscriptAction.action(display: .unknown) == AITranscriptAction.none)
         #expect(AITranscriptAction.action(display: .succeeded) == .toast("You can check the transcript when playing."))
         #expect(AITranscriptAction.action(display: .processing) == .toast("Generating transcript may take 2 ~ 5 minutes..."))
-        #expect(AITranscriptAction.failedToastMessage == "Transcript generation failed, please try again later.")
     }
 
     @Test("Icons: sparkle default, SF check/bubble for terminal states")
@@ -115,6 +114,6 @@ struct AITranscriptDisplayTests {
         #expect(AITranscriptDisplay.display(status: nil).icon == AppIcons.aiTranscript)
         #expect(AITranscriptDisplay.display(status: "processing").icon == AppIcons.aiTranscript)
         #expect(AITranscriptDisplay.display(status: "succeeded").icon == AppIcons.checkCircle)
-        #expect(AITranscriptDisplay.display(status: "failed").icon == AppIcons.smsFailed)
+        #expect(AITranscriptDisplay.display(status: "failed").icon == AppIcons.transcriptFailed)
     }
 }

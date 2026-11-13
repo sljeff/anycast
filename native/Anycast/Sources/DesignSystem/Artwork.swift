@@ -43,41 +43,69 @@ enum ArtworkPlaceholder {
     }
 }
 
-extension UIImageView {
-    /// Loads a cover with the shared placeholder shown while loading and on
-    /// failure (no spinners or generic glyphs).
-    @MainActor
-    func setArtwork(_ url: URL?, title: String?) {
-        let placeholder = ArtworkPlaceholder.image(for: title)
-        setCover(url, placeholder: placeholder, failureImage: placeholder)
+/// How list covers are decoded and cached. Views never decode full-size art
+/// for a 36 pt slot: every cover is downsampled to one of a few buckets, so
+/// one cover costs at most three cache entries instead of one per view size.
+/// Views and prefetchers build their options here, because the cache key
+/// carries the processor: a mismatch makes a prefetch silently useless.
+enum ArtworkSizing {
+
+    /// Pixel-side buckets, in points: small rows (36 / 44 / 56 / 64), medium
+    /// tiles (88 / 120 / 160) and everything larger (player, large headers).
+    static let small: CGFloat = 64
+    static let medium: CGFloat = 160
+    static let large: CGFloat = 400
+
+    static func bucket(for side: CGFloat) -> CGFloat {
+        if side <= small { return small }
+        if side <= medium { return medium }
+        return large
     }
 
-    /// Loads a cover. A memory hit is applied immediately. A disk hit is read
-    /// on this queue (`loadDiskFileSynchronously`) so the letter tile is
-    /// replaced before the next paint — Kingfisher otherwise sets the
-    /// placeholder, then waits on its I/O queue. A network arrival crossfades
-    /// in `Motion.quick`; Reduce Motion and cache hits do not.
-    func setCover(_ url: URL?, placeholder: UIImage?, failureImage: UIImage?) {
+    /// The options that decide the cache key and the decode: shared by
+    /// `setArtwork` and `ImagePrefetcher`.
+    @MainActor
+    static func processingOptions(side: CGFloat) -> KingfisherOptionsInfo {
+        let bucketSide = bucket(for: side)
+        return [
+            .processor(DownsamplingImageProcessor(size: CGSize(width: bucketSide, height: bucketSide))),
+            .scaleFactor(UIScreen.main.scale),
+            .cacheOriginalImage,
+            .loadDiskFileSynchronously,
+        ]
+    }
+}
+
+extension UIImageView {
+    /// Loads a cover with the shared placeholder shown while loading and on
+    /// failure (no spinners or generic glyphs). `side` is the view's point
+    /// size (the largest it reaches); the image is decoded at its bucket.
+    /// A memory hit is applied immediately, before Kingfisher can swap in
+    /// the placeholder on a recycled cell. A network arrival crossfades in
+    /// `Motion.quick`; Reduce Motion and cache hits do not animate.
+    @MainActor
+    func setArtwork(_ url: URL?, title: String?, side: CGFloat) {
         applyArtworkHairline()
+        let placeholder = ArtworkPlaceholder.image(for: title)
         guard let url else {
             kf.cancelDownloadTask()
             image = placeholder
             return
         }
-        if let memory = ImageCache.default.retrieveImageInMemoryCache(forKey: url.absoluteString) {
+        let options = ArtworkSizing.processingOptions(side: side)
+        if let memory = ImageCache.default.retrieveImageInMemoryCache(
+            forKey: url.absoluteString, options: options
+        ) {
             kf.cancelDownloadTask()
             image = memory
             return
         }
         let transition: ImageTransition = Motion.reduceMotion ? .none : .fade(Motion.quick)
-        var options: KingfisherOptionsInfo = [
-            .loadDiskFileSynchronously,
-            .transition(transition),
-        ]
-        if let failureImage {
-            options.append(.onFailureImage(failureImage))
-        }
-        kf.setImage(with: url, placeholder: placeholder, options: options)
+        kf.setImage(
+            with: url,
+            placeholder: placeholder,
+            options: options + [.transition(transition), .onFailureImage(placeholder)]
+        )
     }
 
     /// The cover's 0.5 pt inner hairline (`sandAlpha4`). Content casts no

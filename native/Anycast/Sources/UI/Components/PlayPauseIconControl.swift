@@ -36,7 +36,10 @@ final class PlayPauseIconControl: UIControl {
         super.init(frame: CGRect(x: 0, y: 0, width: size, height: size))
 
         isAccessibilityElement = true
-        accessibilityTraits = [.image]
+        accessibilityTraits = [.button]
+        showsLargeContentViewer = true
+        scalesLargeContentImage = true
+        addInteraction(UILargeContentViewerInteraction())
 
         iconView.contentMode = .scaleAspectFit
         iconView.tintColor = tintColorValue
@@ -116,12 +119,16 @@ final class PlayPauseIconControl: UIControl {
             }
             iconView.isHidden = true
             accessibilityLabel = "Loading"
+            largeContentTitle = accessibilityLabel
+            largeContentImage = nil
         } else {
             lottieView?.isHidden = true
             iconView.isHidden = false
             iconView.image = playing ? AppIcons.pause : AppIcons.play
             iconView.tintColor = tintColorValue
             accessibilityLabel = playing ? "Pause" : "Play"
+            largeContentTitle = accessibilityLabel
+            largeContentImage = iconView.image
         }
     }
 

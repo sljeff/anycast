@@ -150,11 +150,6 @@ final class PlaybackStack {
             sleepTimer?.consumeEpisodeEnd() ?? false
         }
 
-        // K3 cascade: a removed queue entry drops out of both pollers.
-        playback.onEpisodeRemoved = { [weak subtitles, weak translations] url in
-            Task { await subtitles?.remove(url: url) }
-            Task { await translations?.remove(url: url) }
-        }
     }
 
     /// 08 §4.1: background suspends the pollers; foreground resumes them

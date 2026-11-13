@@ -275,9 +275,9 @@ final class PaywallViewController: UIViewController {
     private func makeDetailsLink() -> UIView {
         var configuration = UIButton.Configuration.plain()
         configuration.title = PaywallModel.detailsLinkTitle
-        configuration.image = UIImage(
-            systemName: "chevron.right",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+        configuration.image = AppIcons.disclosure
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
+            textStyle: .caption1, scale: .medium
         )
         configuration.imagePlacement = .trailing
         configuration.imagePadding = Spacing.sm
@@ -408,6 +408,16 @@ final class PaywallViewController: UIViewController {
         model.setLoading()
         if isViewLoaded { applyModel() }
         let store = store
+        #if DEBUG
+        if let products = PlusDebug.products {
+            switch products {
+            case .loading: return
+            case .loaded: setPlans(PlusDebug.samplePlans)
+            case .failed: setPlans(nil)
+            }
+            return
+        }
+        #endif
         loadTask = Task { @MainActor [weak self] in
             let plans = try? await store.loadPlans()
             guard !Task.isCancelled, let self else { return }
@@ -496,6 +506,10 @@ final class PaywallViewController: UIViewController {
                     )
                 } else if outcome == .purchased {
                     self.finishPurchased()
+                } else if outcome == .pending {
+                    self.presentAlert(
+                        title: PaywallModel.pendingAlertTitle, message: PaywallModel.pendingAlertBody
+                    )
                 }
             }
         }
@@ -522,7 +536,13 @@ final class PaywallViewController: UIViewController {
     /// An entitlement is active: close the sheet, then tell the presenter.
     private func finishPurchased() {
         let callback = onPurchased
-        dismiss(animated: true) { callback?() }
+        let window = view.window
+        dismiss(animated: true) {
+            if let window {
+                ToastPresenter.shared.show(PaywallModel.welcomeToast, in: window, duration: 3)
+            }
+            callback?()
+        }
     }
 
     private func presentAlert(title: String, message: String, onOK: (() -> Void)? = nil) {

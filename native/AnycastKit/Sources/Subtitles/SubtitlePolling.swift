@@ -59,8 +59,9 @@ public struct MainPollTimerFactory: PollTimerFactory {
 ///   keep the `processing` state and the poller running (the server is
 ///   idempotent by enclosure_url); only 401/login surfaces, to any page;
 ///   user-triggered `add()` still returns its error signal for a dialog;
-/// - a server `failed` answer deletes the local row and frees the UI back
-///   to the Generate button (old behavior, replicated);
+/// - a server `failed` answer deletes the local row and keeps an in-memory
+///   `failed` status for this run (Retry). A relaunch reseeds from the
+///   database, which no longer has the row, and the UI returns to Generate;
 /// - iteration runs over a snapshot key list — the old concurrent
 ///   modification crash (08 §12.1-6) is not ported.
 @MainActor
@@ -72,6 +73,13 @@ public final class SubtitlePollController {
     /// url → status ("processing" / "succeeded" / server strings pass
     /// through), the old `subtitleUrls` map.
     public private(set) var statuses: [String: String] = [:]
+    /// Every write to `statuses` re-renders each screen observing it (the
+    /// whole map is one observed property), so a status that did not
+    /// change is not written — a retrying translation stays `processing`
+    /// across rounds.
+    private func setStatus(_ status: String?, for url: String) {
+        if statuses[url] != status { statuses[url] = status }
+    }
     /// K27: 401 during background polling still routes to the login sheet.
     public var onLoginRequired: (() -> Void)?
 
@@ -128,11 +136,23 @@ public final class SubtitlePollController {
     /// stay visible; nil = no dialog).
     @discardableResult
     public func add(url: String) async -> APIClient.ErrorSignal? {
-        statuses[url] = "processing"
+        let previous = statuses[url]
+        setStatus("processing", for: url)
         do {
             let result = try await api.getSubtitles(enclosureURL: url)
-            return await apply(url: url, result: result, userTriggered: true)
+            let signal = await apply(url: url, result: result, userTriggered: true)
+            if signal != nil {
+                // A refused user trigger (quota 403 and any other
+                // dialog-worthy error) must not leave the optimistic
+                // processing flag. 401 returns nil from apply and keeps
+                // processing until the login sheet is dismissed. Background
+                // rounds never enter add(); they keep processing on
+                // transport errors (K27).
+                setStatus(previous, for: url)
+            }
+            return signal
         } catch {
+            setStatus(previous, for: url)
             return .errorBody(status: 0, body: error.localizedDescription)
         }
     }
@@ -158,7 +178,7 @@ public final class SubtitlePollController {
 
         switch result.status {
         case "succeeded":
-            statuses[url] = "succeeded"
+            setStatus("succeeded", for: url)
             let payload = SubtitleSegment.encode(result.segments ?? [])
             try? await subtitles.insert(SubtitleRow(
                 enclosureUrl: url,
@@ -168,7 +188,10 @@ public final class SubtitlePollController {
                 summary: nil
             ))
         case "failed":
-            statuses[url] = nil
+            // Visible for this run so the UI can offer Retry. The local row
+            // is deleted, so a relaunch — which reseeds from the database —
+            // returns to Generate.
+            setStatus("failed", for: url)
             try? await subtitles.delete(byEnclosureURL: url)
         default:
             break // still processing
@@ -176,9 +199,10 @@ public final class SubtitlePollController {
         return nil
     }
 
-    /// K3 cascade: removing a queue entry drops its subtitle state too.
+    /// Drops the URL's subtitle state and row. Not called on queue removal
+    /// or completion (no K3 cascade: transcripts are paid for and stay).
     public func remove(url: String) async {
-        statuses[url] = nil
+        setStatus(nil, for: url)
         try? await subtitles.delete(byEnclosureURL: url)
     }
 
@@ -196,7 +220,7 @@ public final class SubtitlePollController {
     /// snapshot, so clearing inside the loop cannot trap.
     public func cancelLoginGatedProcessing() {
         for (url, status) in statuses where status == "processing" {
-            statuses[url] = nil
+            setStatus(nil, for: url)
         }
     }
 }
@@ -221,6 +245,13 @@ public final class TranslationPollController {
     nonisolated public static let failureCap = 5
 
     public private(set) var statuses: [String: String] = [:]
+    /// Every write to `statuses` re-renders each screen observing it (the
+    /// whole map is one observed property), so a status that did not
+    /// change is not written — a retrying translation stays `processing`
+    /// across rounds.
+    private func setStatus(_ status: String?, for url: String) {
+        if statuses[url] != status { statuses[url] = status }
+    }
 
     private let api: APIClient
     private let translations: TranslationRepository
@@ -289,12 +320,12 @@ public final class TranslationPollController {
         else { return }
 
         if (try? await translations.get(byEnclosureURL: url, language: language)) != nil {
-            statuses[url] = "succeeded"
+            setStatus("succeeded", for: url)
             failureCounts[url] = 0
             return
         }
 
-        statuses[url] = "processing"
+        setStatus("processing", for: url)
         do {
             let result = try await api.getTranslation(enclosureURL: url, language: language)
             guard case .segments(let segments) = result else {
@@ -307,7 +338,7 @@ public final class TranslationPollController {
                 translation: SubtitleSegment.encode(segments),
                 language: language
             ))
-            statuses[url] = "succeeded"
+            setStatus("succeeded", for: url)
             failureCounts[url] = 0
         } catch {
             registerFailure(url)
@@ -318,7 +349,7 @@ public final class TranslationPollController {
         let count = (failureCounts[url] ?? 0) + 1
         failureCounts[url] = count
         if count >= Self.failureCap {
-            statuses[url] = "failed"
+            setStatus("failed", for: url)
         }
     }
 
@@ -329,9 +360,10 @@ public final class TranslationPollController {
         failureCounts.removeAll()
     }
 
-    /// K3 cascade.
+    /// Drops the URL's translation state and row. Not called on queue
+    /// removal or completion (no K3 cascade: translations are paid for).
     public func remove(url: String) async {
-        statuses[url] = nil
+        setStatus(nil, for: url)
         failureCounts[url] = nil
         try? await translations.delete(byEnclosureURL: url)
     }

@@ -1,5 +1,6 @@
 import UIKit
 import SafariServices
+import MessageUI
 import AnycastKit
 
 /// Language-change side effects (Dart `setTargetLanguage`, states/player.dart
@@ -30,7 +31,7 @@ struct SettingsLanguageChangeApplier {
     }
 }
 
-/// Stepper writes (Auto Refresh / Inbox / History / Cache limits): maps a
+/// Stepper writes (Inbox / History / Cache limits): maps a
 /// stepper row to its coordinator mutation. Extracted so tests can verify
 /// each row writes through the coordinator.
 struct SettingsStepWriter {
@@ -39,7 +40,6 @@ struct SettingsStepWriter {
 
     func write(_ value: Int64, for row: SettingsPageModel.Row) async {
         switch row {
-        case .autoRefreshInterval: await coordinator.updateAutoRefreshInterval(value)
         case .maxFeedEpisodes: await coordinator.updateMaxFeedEpisodes(value)
         case .maxHistoryEpisodes: await coordinator.updateMaxHistoryEpisodes(value)
         case .cacheLimit: await coordinator.updateMaxCacheCount(value)
@@ -48,12 +48,30 @@ struct SettingsStepWriter {
     }
 }
 
+/// Commits a held History Limit when Settings closes: persist through the
+/// coordinator, then trim History to it. The trim runs only if the new limit
+/// actually landed, so a failed write never deletes rows under the old
+/// setting. Returns the remaining history count (nil if the read failed).
+struct SettingsHistoryLimitCommit {
+
+    let coordinator: SettingsCoordinator
+    let settingsBox: SettingsBox
+    let history: HistoryRepository
+
+    func run(_ limit: Int64) async -> Int? {
+        await coordinator.updateMaxHistoryEpisodes(limit)
+        guard settingsBox.current.maxHistoryEpisodes == limit else { return nil }
+        _ = try? await history.trim(keeping: limit)
+        return try? await history.count()
+    }
+}
+
 /// Settings sheet (lib/pages/settings.dart, 03 §2.13) in the restrained 2.0
 /// Settings direction adopted 2026-10-21: grouped plates on the container
-/// page, rows with values and chevrons, in-row steppers for the numeric
-/// limits instead of the Dart scroll-wheel pickers, and a sand-tinted switch.
+/// page, rows with values and chevrons, and in-row steppers for the numeric
+/// limits instead of the Dart scroll-wheel pickers.
 /// Presented via AppSheets.presentExpand from the shell's gear button;
-/// children (Login/ImportExport/History) are presented from here.
+/// children (Login/ImportExport) are presented from here.
 final class SettingsViewController: UIViewController {
 
     /// What the account rows render from. Signed-in vs signed-out is read
@@ -71,7 +89,7 @@ final class SettingsViewController: UIViewController {
             AccountPageModel.tier(signedIn: snapshot.signedIn, isSubscribed: isSubscribed ?? false)
         }
 
-        /// Tier that drives the section list: the Upgrade plate waits for a
+        /// Tier that drives the section list: the Plus row waits for a
         /// definite free answer.
         var sectionTier: AccountPageModel.Tier {
             snapshot.signedIn && isSubscribed == nil ? .plus : tier
@@ -82,6 +100,8 @@ final class SettingsViewController: UIViewController {
     /// the current sections, so it reads them through this box.
     private final class SectionStore {
         var sections: [SettingsPageModel.Section] = []
+        /// The text under "Keep on this iPhone".
+        var keepFooter = SettingsPageModel.keepNote
     }
 
     private let sectionStore: SectionStore
@@ -101,8 +121,17 @@ final class SettingsViewController: UIViewController {
     private let titleLabel = UILabel()
     private var dataSource: UICollectionViewDiffableDataSource<Int, SettingsPageModel.Row>?
 
-    private let longPressRecognizer = UILongPressGestureRecognizer()
     private var notificationObservers: [NSObjectProtocol] = []
+    /// Inbox and History row counts, once read; they size the removal notices.
+    private var keptCounts: [SettingsPageModel.Row: Int] = [:]
+    /// Inbox / History limits stepped in this sheet, held until Settings
+    /// closes (a row is absent when its stepper shows the stored value).
+    private var pendingLimits: [SettingsPageModel.Row: Int64] = [:]
+    /// Shows followed (Export has nothing to export at zero) and the bytes
+    /// the played audio takes (Clear has nothing to clear at zero); both
+    /// read when the sheet loads.
+    private var subscriptionCount = 0
+    private var cachedBytes: Int64 = 0
 
     init(context: UIContext) {
         self.context = context
@@ -123,32 +152,18 @@ final class SettingsViewController: UIViewController {
     }
 
     /// Per-section list layout: inset-grouped plates 16 from the screen
-    /// edges with 24-inset `sandAlpha4` separators; the trailing Privacy
-    /// links sit outside any plate — plain appearance, no separators.
+    /// edges with 24-inset `sandAlpha4` separators.
     private static func makeLayout(store: SectionStore) -> UICollectionViewCompositionalLayout {
         UICollectionViewCompositionalLayout { sectionIndex, environment in
             let sections = store.sections
             let section = sections.indices.contains(sectionIndex) ? sections[sectionIndex] : nil
-            if section?.plainStyle == true {
-                var config = UICollectionLayoutListConfiguration(appearance: .plain)
-                config.backgroundColor = .clear
-                config.showsSeparators = false
-                let layoutSection = NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
-                layoutSection.contentInsets = NSDirectionalEdgeInsets(
-                    top: Spacing.pageHeader, leading: Spacing.pageH,
-                    bottom: Spacing.pageHeader, trailing: Spacing.pageH
-                )
-                return layoutSection
-            }
             var config = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
             // The page paints the container base; the list default would lay
             // the system grouped gray over it.
             config.backgroundColor = .clear
             config.headerMode = section?.header == nil ? .none : .supplementary
-            // The gold Upgrade plate sits 12 below the identity row.
-            let isUpgradePlate = section?.rows == [.plusUpgrade]
-            config.headerTopPadding = sectionIndex == 0
-                ? Spacing.md : (isUpgradePlate ? Spacing.gap : Spacing.pageHeader)
+            config.footerMode = section?.footer == nil ? .none : .supplementary
+            config.headerTopPadding = sectionIndex == 0 ? Spacing.md : Spacing.pageHeader
             config.itemSeparatorHandler = { _, proposed in
                 var separator = proposed
                 separator.color = AnycastColor.sandAlpha4
@@ -212,10 +227,6 @@ final class SettingsViewController: UIViewController {
         ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view, fadeColor: Theme.surfaceContainer)
         view.bringSubviewToFront(titleLabel)
 
-        longPressRecognizer.minimumPressDuration = 0.5
-        longPressRecognizer.addTarget(self, action: #selector(handleLongPress(_:)))
-        collectionView.addGestureRecognizer(longPressRecognizer)
-
         // Dynamic Type: re-render visible cells when the content size moves.
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) {
             [weak self] (_: SettingsViewController, _: UITraitCollection) in
@@ -229,11 +240,13 @@ final class SettingsViewController: UIViewController {
             SettingsCoordinator.countryCodeDidChange,
             SettingsCoordinator.targetLanguageDidChange,
             SettingsCoordinator.limitsDidChange,
+            ShowsShelfLayout.subscriptionsDidChange,
         ] {
             notificationObservers.append(center.addObserver(forName: name, object: nil, queue: .main) {
                 [weak self] _ in
                 guard let self, self.viewIfLoaded?.window != nil else { return }
                 self.refreshFromBox()
+                self.reloadShowsAndCache()
             })
         }
     }
@@ -241,6 +254,17 @@ final class SettingsViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         ScrollEdgeChrome.clearTop(of: collectionView, to: titleLabel.frame.maxY + Spacing.xs)
+    }
+
+    /// Settings closing for real (not a cancelled interactive swipe, which
+    /// never reaches here, and not a child presented over it) commits the
+    /// held limits. The task keeps this controller alive until the writes
+    /// finish.
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        guard !pendingLimits.isEmpty, presentedViewController == nil,
+              isBeingDismissed || presentingViewController == nil else { return }
+        Task { await commitHeldLimits() }
     }
 
     deinit {
@@ -260,10 +284,6 @@ final class SettingsViewController: UIViewController {
         let rowRegistration = UICollectionView.CellRegistration<SettingsRowCell, SettingsPageModel.Row> {
             [weak self] cell, _, row in
             self?.configure(cell, for: row)
-        }
-        let switchRegistration = UICollectionView.CellRegistration<SettingsSwitchListCell, SettingsPageModel.Row> {
-            [weak self] cell, _, row in
-            self?.configureSwitchCell(cell, for: row)
         }
         let stepperRegistration = UICollectionView.CellRegistration<SettingsStepperRowCell, SettingsPageModel.Row> {
             [weak self] cell, _, row in
@@ -294,6 +314,12 @@ final class SettingsViewController: UIViewController {
             header.backgroundConfiguration = .clear()
         }
 
+        let footerRegistration = UICollectionView.SupplementaryRegistration<UICollectionViewListCell>(
+            elementKind: UICollectionView.elementKindSectionFooter
+        ) { [weak self] footer, _, indexPath in
+            self?.configureFooter(footer, section: indexPath.section)
+        }
+
         let dataSource = UICollectionViewDiffableDataSource<Int, SettingsPageModel.Row>(
             collectionView: collectionView
         ) { collectionView, indexPath, row in
@@ -302,11 +328,7 @@ final class SettingsViewController: UIViewController {
                 return collectionView.dequeueConfiguredReusableCell(
                     using: identityRegistration, for: indexPath, item: row
                 )
-            case .enableTranslation:
-                return collectionView.dequeueConfiguredReusableCell(
-                    using: switchRegistration, for: indexPath, item: row
-                )
-            case .cacheLimit, .autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes:
+            case .cacheLimit, .maxFeedEpisodes, .maxHistoryEpisodes:
                 return collectionView.dequeueConfiguredReusableCell(
                     using: stepperRegistration, for: indexPath, item: row
                 )
@@ -316,13 +338,122 @@ final class SettingsViewController: UIViewController {
                 )
             }
         }
-        dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
+        dataSource.supplementaryViewProvider = { collectionView, kind, indexPath in
             collectionView.dequeueConfiguredReusableSupplementary(
-                using: headerRegistration, for: indexPath
+                using: kind == UICollectionView.elementKindSectionFooter ? footerRegistration : headerRegistration,
+                for: indexPath
             )
         }
         self.dataSource = dataSource
         applySnapshot()
+        reloadKeptCounts()
+        reloadShowsAndCache()
+    }
+
+    /// Followed shows and cached audio bytes: what Export and Clear can act on.
+    private func reloadShowsAndCache() {
+        Task { [weak self] in
+            guard let self else { return }
+            if let shows = try? await context.database.subscriptionRepository().listAll() {
+                subscriptionCount = shows.count
+            }
+            cachedBytes = await context.cacheStore.cachedBytes()
+            reconfigureVisible()
+        }
+    }
+
+    /// Inbox and History counts, read when the sheet loads (it is created
+    /// per presentation); they size the removal notices.
+    private func reloadKeptCounts() {
+        Task { [weak self] in
+            guard let self else { return }
+            let database = context.database
+            if let count = try? await database.feedRepository().count() {
+                keptCounts[.maxFeedEpisodes] = count
+            }
+            if let count = try? await database.historyRepository().count() {
+                keptCounts[.maxHistoryEpisodes] = count
+            }
+            updateKeepFooter()
+        }
+    }
+
+    // MARK: - Held Inbox / History limits
+
+    /// The settings the rows render: the stored ones with the held limits
+    /// laid over them.
+    private var displayedSettings: AppSettings {
+        var shown = settings
+        if let feed = pendingLimits[.maxFeedEpisodes] { shown.maxFeedEpisodes = feed }
+        if let history = pendingLimits[.maxHistoryEpisodes] { shown.maxHistoryEpisodes = history }
+        return shown
+    }
+
+    private func configureFooter(_ footer: UICollectionViewListCell, section: Int) {
+        guard sections.indices.contains(section) else { return }
+        var config = footer.defaultContentConfiguration()
+        switch sections[section].footer {
+        case .keep: config.text = sectionStore.keepFooter
+        case .shows: config.text = ImportCopy.exportFooter
+        case .version:
+            config.text = SettingsPageModel.versionLine(appVersion: Self.bundleValue("CFBundleShortVersionString"),
+                                                        build: Self.bundleValue("CFBundleVersion"))
+            config.textProperties.alignment = .center
+        case nil: break
+        }
+        config.textProperties.color = Theme.onSurfaceVariant
+        config.textProperties.font = TypographyV2.meta.font()
+        config.textProperties.adjustsFontForContentSizeCategory = true
+        // Text lines up with the row text, 8 under the plate.
+        config.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: Spacing.md, leading: SettingsRowCell.horizontalInset,
+            bottom: 0, trailing: SettingsRowCell.horizontalInset
+        )
+        footer.contentConfiguration = config
+        footer.backgroundConfiguration = .clear()
+    }
+
+    private static func bundleValue(_ key: String) -> String {
+        Bundle.main.object(forInfoDictionaryKey: key) as? String ?? "?"
+    }
+
+    /// Rewrites the "Keep on this iPhone" footer from the held limits and
+    /// the stored counts, resizing it when the line count changes.
+    private func updateKeepFooter() {
+        let text = SettingsPageModel.keepFooter(pendingLimits: pendingLimits, counts: keptCounts)
+        guard text != sectionStore.keepFooter else { return }
+        sectionStore.keepFooter = text
+        if let index = sections.firstIndex(where: { $0.footer == .keep }),
+           let footer = collectionView.supplementaryView(
+               forElementKind: UICollectionView.elementKindSectionFooter,
+               at: IndexPath(item: 0, section: index)
+           ) as? UICollectionViewListCell {
+            configureFooter(footer, section: index)
+        }
+        UIView.animate(withDuration: Motion.reduceMotion ? 0 : 0.25) {
+            self.collectionView.collectionViewLayout.invalidateLayout()
+            self.collectionView.layoutIfNeeded()
+        }
+    }
+
+    /// Writes the held limits once. Inbox: the limit only; the Inbox's own
+    /// 60 s trim applies it. History: the limit, then trim History to it.
+    /// A limit is only cleared after its write, so the row never flips back.
+    private func commitHeldLimits() async {
+        if let limit = pendingLimits[.maxFeedEpisodes] {
+            await context.settingsCoordinator.updateMaxFeedEpisodes(limit)
+        }
+        if let limit = pendingLimits[.maxHistoryEpisodes] {
+            let commit = SettingsHistoryLimitCommit(
+                coordinator: context.settingsCoordinator,
+                settingsBox: context.settingsBox,
+                history: context.database.historyRepository()
+            )
+            if let remaining = await commit.run(limit) { keptCounts[.maxHistoryEpisodes] = remaining }
+        }
+        pendingLimits = [:]
+        refreshFromBox()
+        updateKeepFooter()
     }
 
     private func applySnapshot() {
@@ -356,40 +487,40 @@ final class SettingsViewController: UIViewController {
 
     // MARK: - Cell configuration
 
-    private var translationIsOn: Bool {
-        SettingsPageModel.showsTargetLanguage(targetLanguage: settings.targetLanguage)
-    }
-
     private func configure(_ cell: SettingsRowCell, for row: SettingsPageModel.Row) {
-        let title = SettingsPageModel.title(for: row)
+        let opensSomething: Set<SettingsPageModel.Row> = [
+            .targetLanguage, .country, .importSubscriptions, .exportSubscriptions, .contactEmail,
+        ]
+        let opensExternally = row == .privacyPolicy || row == .termsOfUse
+        var value = SettingsPageModel.value(for: row, settings: settings)
         switch row {
-        case .privacyPolicy, .termsOfUse:
-            cell.configureLink(title: title)
-        default:
-            // Target Language is inert while translation is off.
-            let isDimmed = row == .targetLanguage && !translationIsOn
-            let opensSomething: Set<SettingsPageModel.Row> = [
-                .targetLanguage, .country, .importExport, .history,
-            ]
-            cell.configure(
-                title: title,
-                subtitle: SettingsPageModel.subtitle(for: row),
-                value: SettingsPageModel.value(for: row, settings: settings),
-                showsChevron: opensSomething.contains(row) && !isDimmed,
-                isDimmed: isDimmed
-            )
-            cell.accessibilityTraits = isDimmed ? [.button, .notEnabled] : .button
+        case .exportSubscriptions: value = SettingsPageModel.exportValue(subscriptionCount: subscriptionCount)
+        case .clearCache: value = SettingsPageModel.cacheUsageValue(bytes: cachedBytes)
+        default: break
         }
+        let enabled = isEnabled(row)
+        cell.configure(
+            title: SettingsPageModel.title(for: row),
+            value: value,
+            showsChevron: opensSomething.contains(row) && enabled,
+            opensExternally: opensExternally
+        )
+        // A row with nothing to act on reads as a note, not a button.
+        cell.titleLabel.textColor = enabled ? Theme.onSurface : Theme.onSurfaceVariant
+        cell.accessibilityTraits = !enabled ? .staticText : opensExternally ? .link : .button
         cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
-        if let tooltip = SettingsPageModel.tooltip(for: row) {
-            cell.accessibilityHint = tooltip
-        }
+        cell.accessibilityHint = SettingsPageModel.accessibilityHint(for: row)
     }
 
-    /// The identity row and the gold Upgrade plate.
+    /// The identity row and the Plus row.
     private func configureIdentityCell(_ cell: SettingsIdentityRowCell, for row: SettingsPageModel.Row) {
         if row == .plusUpgrade {
-            cell.configureUpgradePlate()
+            cell.configureUpgrade(
+                subtitle: AccountPageModel.upgradePlateSubtitle(
+                    tier: accountInfo.tier, remaining: accountInfo.remaining
+                ),
+                action: SettingsPageModel.plusActionTitle(tier: accountInfo.tier)
+            )
         } else {
             var content = AccountPageModel.identity(
                 tier: accountInfo.tier,
@@ -406,31 +537,15 @@ final class SettingsViewController: UIViewController {
         cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
     }
 
-    /// The translation switch row.
-    private func configureSwitchCell(_ cell: SettingsSwitchListCell, for row: SettingsPageModel.Row) {
-        let enabled = translationIsOn
-        cell.configure(
-            title: SettingsPageModel.title(for: row),
-            subtitle: SettingsPageModel.subtitle(for: row)
-        )
-        cell.setOn(enabled, animated: false)
-        cell.onSwitchChanged = { [weak self] isOn in
-            self?.translationSwitchToggled(isOn: isOn)
-        }
-        cell.accessibilityTraits = .button
-        // Spoken words, not the stored encoding ("1"/"0" read as "one"/"zero").
-        cell.accessibilityValue = enabled ? "On" : "Off"
-        cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
-    }
-
     /// A numeric-limit row: title, value, and the − | + stepper.
     private func configureStepperCell(_ cell: SettingsStepperRowCell, for row: SettingsPageModel.Row) {
+        let shown = displayedSettings
         guard let choices = SettingsPageModel.stepperChoices(for: row),
-              let current = SettingsPageModel.stepperValue(for: row, settings: settings),
+              let current = SettingsPageModel.stepperValue(for: row, settings: shown),
               let labels = SettingsPageModel.stepperAccessibilityLabels(for: row) else { return }
         cell.configure(
             title: SettingsPageModel.title(for: row),
-            value: SettingsPageModel.value(for: row, settings: settings) ?? "",
+            value: SettingsPageModel.value(for: row, settings: shown) ?? "",
             labels: labels,
             canDecrease: SettingsPageModel.canDecrease(from: current, in: choices),
             canIncrease: SettingsPageModel.canIncrease(from: current, in: choices)
@@ -439,16 +554,19 @@ final class SettingsViewController: UIViewController {
             self?.step(row, direction)
         }
         cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
-        if let tooltip = SettingsPageModel.tooltip(for: row) {
-            cell.accessibilityHint = tooltip
-        }
+        cell.accessibilityHint = SettingsPageModel.accessibilityHint(for: row)
     }
 
     // MARK: - Actions
 
-    /// One stepper tap: write the neighbouring choice immediately, then
-    /// re-render the row.
+    /// One stepper tap. Inbox and History steps are held until Settings
+    /// closes; the cache limit is written at once. (The stepper itself
+    /// fires the selection haptic on touch-down.)
     private func step(_ row: SettingsPageModel.Row, _ direction: SettingsPageModel.StepDirection) {
+        if row == .maxFeedEpisodes || row == .maxHistoryEpisodes {
+            stepHeldLimit(row, direction)
+            return
+        }
         let latest = context.settingsBox.current
         guard let choices = SettingsPageModel.stepperChoices(for: row),
               let current = SettingsPageModel.stepperValue(for: row, settings: latest) else { return }
@@ -457,34 +575,21 @@ final class SettingsViewController: UIViewController {
         let writer = SettingsStepWriter(coordinator: context.settingsCoordinator)
         Task {
             await writer.write(next, for: row)
-            refreshFromBox()
+            finishWrite(landed: SettingsPageModel.stepperValue(for: row, settings: context.settingsBox.current) == next)
         }
-    }
-
-    private func translationSwitchToggled(isOn: Bool) {
-        // Dart settings.dart:216-229: off writes '', on derives the system
-        // language (G9 locale split: first segment).
-        let language = isOn
-            ? SettingsPageModel.defaultTargetLanguage(
-                localeIdentifier: Locale.preferredLanguages.first ?? "en"
-            )
-            : ""
-        Task { await applyLanguageChange(language) }
     }
 
     private func applyLanguageChange(_ language: String) async {
         await languageApplier.apply(language)
-        refreshFromBox()
+        finishWrite(landed: context.settingsBox.current.targetLanguage == language)
     }
 
-    @objc private func handleLongPress(_ recognizer: UILongPressGestureRecognizer) {
-        guard recognizer.state == .began else { return }
-        let location = recognizer.location(in: collectionView)
-        guard let indexPath = collectionView.indexPathForItem(at: location),
-              let row = dataSource?.itemIdentifier(for: indexPath),
-              let tooltip = SettingsPageModel.tooltip(for: row),
-              let cell = collectionView.cellForItem(at: indexPath) else { return }
-        SettingsTooltipOverlay.show(message: tooltip, above: cell, in: view)
+    /// Re-renders the rows from the box; a write that did not land leaves
+    /// the old value there, so the row reverts, and the user is told.
+    private func finishWrite(landed: Bool) {
+        refreshFromBox()
+        guard !landed, let window = view.window else { return }
+        ToastPresenter.shared.show("Couldn't save. Try again.", in: window, duration: 3)
     }
 
     // MARK: - Child presentations
@@ -520,10 +625,7 @@ final class SettingsViewController: UIViewController {
 
             // A login-required answer is not escalated from Settings; the
             // quota just stays unknown.
-            var remaining: Int?
-            if let result = try? await self.context.api.getUser(), case .user(let user) = result {
-                remaining = user.remaining
-            }
+            let remaining = await AccountRemaining.fetch(context: self.context)
             guard !Task.isCancelled else { return }
             self.accountInfo.remaining = remaining
             self.applyAccountInfo()
@@ -567,25 +669,80 @@ final class SettingsViewController: UIViewController {
         controller.presentationController?.delegate = self
     }
 
-    private func presentImportExport() {
-        ImportExportDialogViewController.present(from: self, context: context)
+    /// Export and Clear have nothing to act on at zero.
+    private func isEnabled(_ row: SettingsPageModel.Row) -> Bool {
+        switch row {
+        case .exportSubscriptions: return subscriptionCount > 0
+        case .clearCache: return cachedBytes > 0
+        default: return true
+        }
     }
 
-    private func presentHistory() {
-        HistoryDialogViewController.present(from: self, context: context)
+    private func presentImport() {
+        ImportFlow.chooseFile(from: self, context: context)
+    }
+
+    private func presentExport(from sourceView: UIView) {
+        SubscriptionExport.present(from: self, context: context, sourceView: sourceView) { [weak self] in
+            guard let window = self?.view.window else { return }
+            ToastPresenter.shared.show(ImportCopy.exportFailed, in: window, duration: 3)
+        }
+    }
+
+    /// Confirm, then remove the cached audio files. The episode playing now
+    /// (and any download still running) stays; everything else downloads
+    /// again when played.
+    private func confirmClearCache() {
+        let bytes = cachedBytes
+        let alert = UIAlertController(
+            title: "Clear played audio?",
+            message: SettingsPageModel.clearCacheMessage(bytes: bytes),
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Clear", style: .destructive) { [weak self] _ in
+            self?.clearCache()
+        })
+        present(alert, animated: true)
+    }
+
+    private func clearCache() {
+        let keeping = Set([context.playback.currentEpisode?.enclosureUrl].compactMap { $0 })
+        Task { [weak self] in
+            guard let self else { return }
+            await context.cacheStore.clearCached(keeping: keeping)
+            context.playback.forgetCachedDownloads(keeping: keeping)
+            cachedBytes = await context.cacheStore.cachedBytes()
+            reconfigureVisible()
+        }
+    }
+
+    /// Inbox / History steps are held, not written: lowering below the
+    /// stored count removes nothing until Settings closes, and stepping back
+    /// up cancels it.
+    private func stepHeldLimit(_ row: SettingsPageModel.Row, _ direction: SettingsPageModel.StepDirection) {
+        guard let choices = SettingsPageModel.stepperChoices(for: row),
+              let stored = SettingsPageModel.stepperValue(for: row, settings: context.settingsBox.current)
+        else { return }
+        var draft = SettingsPageModel.LimitDraft(stored: stored, pending: pendingLimits[row])
+        draft.step(direction, in: choices)
+        guard draft.pending != pendingLimits[row] else { return }
+        pendingLimits[row] = draft.pending
+        reconfigureVisible()
+        updateKeepFooter()
     }
 
     private func presentCountrySheet() {
         let sheet = SettingsOptionSheetViewController(
             title: SettingsPageModel.title(for: .country),
-            options: SettingsPageModel.sortedCountries.map { ($0.name, $0.code) },
+            options: SettingsPageModel.sortedCountries().map { ($0.name, $0.code) },
             selectedCode: settings.countryCode
         )
         sheet.onSelect = { [weak self] code in
             guard let self else { return }
             Task {
                 await self.context.settingsCoordinator.updateCountryCode(code)
-                self.refreshFromBox()
+                self.finishWrite(landed: self.context.settingsBox.current.countryCode == code)
             }
         }
         sheet.present(from: self)
@@ -594,7 +751,7 @@ final class SettingsViewController: UIViewController {
     private func presentLanguageSheet() {
         let sheet = SettingsOptionSheetViewController(
             title: SettingsPageModel.title(for: .targetLanguage),
-            options: SettingsPageModel.languages.map { ($0.name, $0.code) },
+            options: SettingsPageModel.languageOptions.map { ($0.name, $0.code) },
             selectedCode: settings.targetLanguage
         )
         sheet.onSelect = { [weak self] code in
@@ -604,10 +761,40 @@ final class SettingsViewController: UIViewController {
         sheet.present(from: self)
     }
 
+    /// Mail composer with a diagnostics block; without a mail account, an
+    /// alert with the address to copy.
     private func openFeedbackMail() {
-        // The shipped app's mailto recipient lacks the dot shown on the row
-        // (settings.dart:451-461) — mirrored byte-for-byte.
-        UIApplication.shared.open(SettingsPageModel.feedbackMailtoURL)
+        let address = SettingsPageModel.feedbackAddress
+        guard MFMailComposeViewController.canSendMail() else {
+            let alert = UIAlertController(title: "Send Feedback", message: address, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Copy Address", style: .default) { _ in
+                UIPasteboard.general.string = address
+            })
+            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+            present(alert, animated: true)
+            return
+        }
+        let composer = MFMailComposeViewController()
+        composer.mailComposeDelegate = self
+        composer.setToRecipients([address])
+        composer.setSubject(SettingsPageModel.feedbackSubject)
+        composer.setMessageBody(SettingsPageModel.feedbackBody(
+            appVersion: Self.bundleValue("CFBundleShortVersionString"),
+            build: Self.bundleValue("CFBundleVersion"),
+            systemVersion: UIDevice.current.systemVersion,
+            deviceModel: Self.deviceModelIdentifier
+        ), isHTML: false)
+        present(composer, animated: true)
+    }
+
+    /// Hardware identifier such as "iPhone17,1" (the simulator reports its host's).
+    private static var deviceModelIdentifier: String {
+        if let simulated = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] { return simulated }
+        var info = utsname()
+        uname(&info)
+        return withUnsafeBytes(of: &info.machine) { buffer in
+            String(decoding: buffer.prefix { $0 != 0 }, as: UTF8.self)
+        }
     }
 
     private func presentSafari(_ url: URL) {
@@ -621,16 +808,12 @@ final class SettingsViewController: UIViewController {
 
 extension SettingsViewController: UICollectionViewDelegate {
 
-    /// Stepper rows (their controls own the taps) and the inert Target
-    /// Language row neither highlight nor select.
+    /// Stepper rows: their controls own the taps.
     private func isInteractive(_ row: SettingsPageModel.Row) -> Bool {
         switch row {
-        case .cacheLimit, .autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes:
-            return false
-        case .targetLanguage:
-            return translationIsOn
-        default:
-            return true
+        case .cacheLimit, .maxFeedEpisodes, .maxHistoryEpisodes: return false
+        case .exportSubscriptions, .clearCache: return isEnabled(row)
+        default: return true
         }
     }
 
@@ -649,12 +832,12 @@ extension SettingsViewController: UICollectionViewDelegate {
         case .account: presentAccount()
         case .plusUpgrade: presentUpgrade()
         case .country: presentCountrySheet()
-        case .enableTranslation:
-            (collectionView.cellForItem(at: indexPath) as? SettingsSwitchListCell)?.toggle()
         case .targetLanguage: presentLanguageSheet()
-        case .importExport: presentImportExport()
-        case .history: presentHistory()
-        case .cacheLimit, .autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes: break
+        case .importSubscriptions: presentImport()
+        case .exportSubscriptions:
+            presentExport(from: collectionView.cellForItem(at: indexPath) ?? collectionView)
+        case .clearCache: confirmClearCache()
+        case .cacheLimit, .maxFeedEpisodes, .maxHistoryEpisodes: break
         case .contactEmail: openFeedbackMail()
         case .privacyPolicy: presentSafari(SettingsPageModel.privacyPolicyURL)
         case .termsOfUse: presentSafari(SettingsPageModel.termsOfUseURL)
@@ -670,5 +853,15 @@ extension SettingsViewController: UIAdaptivePresentationControllerDelegate {
     /// account: re-read it.
     func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
         refreshAccount()
+    }
+}
+
+// MARK: - MFMailComposeViewControllerDelegate
+
+extension SettingsViewController: MFMailComposeViewControllerDelegate {
+
+    func mailComposeController(_ controller: MFMailComposeViewController,
+                               didFinishWith result: MFMailComposeResult, error: Error?) {
+        controller.dismiss(animated: true)
     }
 }

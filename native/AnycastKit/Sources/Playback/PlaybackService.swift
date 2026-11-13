@@ -39,13 +39,39 @@ public final class PlaybackService {
 
     // MARK: - UI state
 
+    /// The play intent (just_audio `playing`): true while playing AND while
+    /// a resumed item buffers, so the play/pause glyph does not flip back
+    /// to "play" for the instant AVPlayer spends waiting.
     public private(set) var isPlaying = false
+    /// An item load, or buffering that outlasted `bufferingGrace`.
     public private(set) var isLoading = false
     public private(set) var positionData = PositionData.zero
-    /// The current track (`playlistEpisode.value`).
-    public private(set) var currentEpisode: PlaylistEpisodeRow?
-    /// The current playlist's rows, position ASC; index 0 == current.
-    public private(set) var queue: [PlaylistEpisodeRow] = []
+    /// The current track (`playlistEpisode.value`). Its `playedDuration`
+    /// is rewritten by every progress save (2 s while playing, each pause):
+    /// screens observe `currentEpisodeContent` instead.
+    public private(set) var currentEpisode: PlaylistEpisodeRow? {
+        didSet {
+            let content = currentEpisode.map(Self.withoutProgress)
+            if content != currentEpisodeContent { currentEpisodeContent = content }
+        }
+    }
+    /// The current playlist's rows, position ASC; index 0 == current. Its
+    /// head's `playedDuration` changes with every progress save: screens
+    /// that only care about membership observe `queueEnclosureURLs`.
+    public private(set) var queue: [PlaylistEpisodeRow] = [] {
+        didSet {
+            let urls = queue.compactMap(\.enclosureUrl)
+            if urls != queueEnclosureURLs { queueEnclosureURLs = urls }
+        }
+    }
+    /// `currentEpisode` without its progress field, written only when
+    /// something else about the current track changes. Observation tracks
+    /// whole properties, so reading `currentEpisode?.enclosureUrl` would
+    /// still re-render on every progress save.
+    public private(set) var currentEpisodeContent: PlaylistEpisodeRow?
+    /// The queue's enclosure URLs in order, written only when membership or
+    /// order changes.
+    public private(set) var queueEnclosureURLs: [String] = []
     /// `player.currentPlaylistId`; nil = no playback state.
     public private(set) var currentPlaylistId: Int64?
     /// K6: last load/playback failure, cleared on retry/play.
@@ -65,9 +91,9 @@ public final class PlaybackService {
     private let nowMilliseconds: @Sendable () -> Int64
     private var settings: AppSettings
 
-    /// Set by the composition root: queue removals must also drop the URL
-    /// from the subtitle/translation pollers (the Dart removeTop cascaded
-    /// into both controllers).
+    /// Notified after a completed episode leaves the queue. Production sets
+    /// no pollers here: transcripts outlive the queue entry (not the Dart
+    /// removeTop cascade).
     public var onEpisodeRemoved: ((String) -> Void)?
     /// Asked once per completed episode; true holds the next episode paused
     /// even with continuous play on (the sleep timer's "End of episode").
@@ -77,6 +103,29 @@ public final class PlaybackService {
     /// `mediaItem.value?.id` comparison in seekAndPlayByEpisode).
     private var loadedEnclosureURL: String?
     private var lastProgressPersistAt: Int64 = 0
+
+    /// The engine is attaching an item (until ready or failed).
+    @ObservationIgnored private var isItemLoading = false
+    /// AVPlayer is waiting to play (resume, seek, stall).
+    @ObservationIgnored private var isBuffering = false
+    /// Either wait is shown as `isLoading` only once it outlasts
+    /// `bufferingGrace`: a cached file that is ready in a frame or two, or
+    /// a resume that buffers for a moment, never dims the transport or
+    /// swaps in the loading glyph.
+    @ObservationIgnored private var loadingGraceTask: Task<Void, Never>?
+    private let bufferingGrace: Duration
+
+    /// Audio is actually advancing — the gate for progress display and
+    /// persistence, which the intent-level `isPlaying` and the delayed
+    /// `isLoading` must not open while a fresh item still sits at 0 before
+    /// its initial seek lands.
+    private var isAudible: Bool { isPlaying && !isBuffering && !isItemLoading }
+
+    private static func withoutProgress(_ episode: PlaylistEpisodeRow) -> PlaylistEpisodeRow {
+        var copy = episode
+        copy.playedDuration = nil
+        return copy
+    }
 
     /// Fire-and-forget store writes, tracked so tests (and a future
     /// graceful-quit path) can await them.
@@ -89,8 +138,10 @@ public final class PlaybackService {
         settings: AppSettings,
         session: AudioSessionController,
         nowPlaying: NowPlayingController,
-        nowMilliseconds: @escaping @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) }
+        nowMilliseconds: @escaping @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) },
+        bufferingGrace: Duration = .milliseconds(400)
     ) {
+        self.bufferingGrace = bufferingGrace
         self.engine = engine
         self.cache = cache
         self.store = store
@@ -156,8 +207,11 @@ public final class PlaybackService {
         // episode that is no longer current.
         guard currentEpisode?.enclosureUrl == episode.enclosureUrl else { return }
         await session.activateForPlayback()
-        playbackError = nil
+        clearPlaybackError()
         engine.playImmediately()
+        // As in play(): the tapped card's glyph flips without waiting for
+        // the engine's status hop.
+        setPlaying(true)
     }
 
     /// Load without playing — the reorder-involving-index-0 path
@@ -181,7 +235,7 @@ public final class PlaybackService {
         let initialPosition = episode.playedDuration ?? 0
         loadedEnclosureURL = urlString
         lastProgressPersistAt = nowMilliseconds()
-        playbackError = nil
+        clearPlaybackError()
 
         // mediaItem timing: published the moment loading is initiated.
         nowPlaying.update(
@@ -221,7 +275,9 @@ public final class PlaybackService {
             guard let self else { return }
             let task = await self.cache.startDownload(url: urlString) { [weak self] progress in
                 Task { @MainActor in
-                    guard let self, let progress else { return }
+                    guard let self, let progress,
+                          DownloadProgressStep.isVisibleChange(from: self.cacheStates[urlString], to: progress)
+                    else { return }
                     self.cacheStates[urlString] = progress
                 }
             }
@@ -245,6 +301,15 @@ public final class PlaybackService {
         }
     }
 
+    /// After the audio cache was cleared: finished downloads no longer read
+    /// as downloaded on the cards. `keeping` stays as it is (the episode
+    /// still playing), and so do downloads that have not finished.
+    public func forgetCachedDownloads(keeping urls: Set<String>) {
+        for (url, state) in cacheStates where state >= 1 && !urls.contains(url) {
+            cacheStates.removeValue(forKey: url)
+        }
+    }
+
     /// Resume/pause entry (mini player, lock screen toggle, lyrics tap).
     public func play() async {
         if !engine.hasItem {
@@ -252,19 +317,24 @@ public final class PlaybackService {
             await playByEpisode(episode)
             return
         }
+        await session.activateForPlayback()
+        clearPlaybackError()
+        engine.playImmediately()
+        // The glyph flips now instead of after the engine's status hop; the
+        // engine's own playingChanged follows with the same value.
+        setPlaying(true)
         if let episode = currentEpisode {
             // K30: every resume re-inserts the history row (same id — the
-            // delete+INSERT(REPLACE) preserves it).
-            try? await store.insertHistory(episode: episode)
+            // delete+INSERT(REPLACE) preserves it). After the play call so
+            // the DB write never delays the audio or the glyph.
+            trackStoreWrite { try await self.store.insertHistory(episode: episode) }
         }
-        await session.activateForPlayback()
-        playbackError = nil
-        engine.playImmediately()
     }
 
     public func pause() {
         engine.pause()
         saveProgressNow()
+        setPlaying(false)
     }
 
     /// The completed-transition pause: Dart's pause here is handler-level
@@ -274,6 +344,7 @@ public final class PlaybackService {
     /// saved playedDuration.
     private func pauseEngineOnly() {
         engine.pause()
+        setPlaying(false)
     }
 
     public func togglePlay() async {
@@ -297,7 +368,7 @@ public final class PlaybackService {
         if engine.hasItem && loadedEnclosureURL == episode.enclosureUrl {
             engine.seek(toMilliseconds: positionMilliseconds)
             await session.activateForPlayback()
-            playbackError = nil
+            clearPlaybackError()
             engine.playImmediately()
             return
         }
@@ -306,7 +377,7 @@ public final class PlaybackService {
         currentEpisode = updated
         await setByEpisodeInner(updated)
         await session.activateForPlayback()
-        playbackError = nil
+        clearPlaybackError()
         engine.playImmediately()
     }
 
@@ -333,7 +404,7 @@ public final class PlaybackService {
         updated.playedDuration = position
         await setByEpisode(updated)
         await session.activateForPlayback()
-        playbackError = nil
+        clearPlaybackError()
         engine.playImmediately()
     }
 
@@ -375,14 +446,18 @@ public final class PlaybackService {
     private func handle(_ event: PlaybackEngineEvent) {
         switch event {
         case let .playingChanged(playing):
-            isPlaying = playing
+            setPlaying(playing)
             nowPlaying.updatePlaybackState(
                 positionMilliseconds: engine.positionMilliseconds,
                 speed: speed,
                 playing: playing
             )
         case let .loadingChanged(loading):
-            isLoading = loading
+            isItemLoading = loading
+            updateLoading()
+        case let .bufferingChanged(buffering):
+            isBuffering = buffering
+            updateLoading()
         case let .positionTick(position, buffered, duration):
             handleTick(position: position, buffered: buffered, duration: duration)
         case .completed:
@@ -393,8 +468,8 @@ public final class PlaybackService {
             // K6: a failure ends the loading attempt — clear the transport
             // flags so the loading lottie stops and the controls re-enable.
             // (The engine may never follow up with loadingChanged(false).)
-            isLoading = false
-            isPlaying = false
+            resetLoading()
+            setPlaying(false)
             // A status observation from the just-unloaded item can still
             // deliver its failure after a clear — no error toast for a
             // player that no longer has an episode.
@@ -409,6 +484,47 @@ public final class PlaybackService {
         }
     }
 
+    // MARK: - Transport flags (written only on change: every write
+    // re-renders each screen observing the flag)
+
+    private func setPlaying(_ playing: Bool) {
+        if isPlaying != playing { isPlaying = playing }
+    }
+
+    private func setLoading(_ loading: Bool) {
+        if isLoading != loading { isLoading = loading }
+    }
+
+    private func clearPlaybackError() {
+        if playbackError != nil { playbackError = nil }
+    }
+
+    /// Loading clears the moment both waits end; it appears only once a
+    /// wait (item load or buffering, back to back) has lasted
+    /// `bufferingGrace`.
+    private func updateLoading() {
+        guard isItemLoading || isBuffering else {
+            loadingGraceTask?.cancel()
+            loadingGraceTask = nil
+            setLoading(false)
+            return
+        }
+        guard !isLoading, loadingGraceTask == nil else { return }
+        let grace = bufferingGrace
+        loadingGraceTask = Task { [weak self] in
+            try? await Task.sleep(for: grace)
+            guard !Task.isCancelled, let self else { return }
+            self.loadingGraceTask = nil
+            if self.isItemLoading || self.isBuffering { self.setLoading(true) }
+        }
+    }
+
+    private func resetLoading() {
+        isItemLoading = false
+        isBuffering = false
+        updateLoading()
+    }
+
     /// K11 four-condition gate + K24 2 s persistence in the same place
     /// (08 §4.3).
     private func handleTick(position: Int64, buffered: Int64, duration: Int64?) {
@@ -419,15 +535,16 @@ public final class PlaybackService {
         )
 
         // K11: while paused/loading/at zero the progress UI must not move.
-        if isPlaying && !isLoading && position != 0 && buffered != 0 {
-            positionData = PositionData(
+        if isAudible && !isLoading && position != 0 && buffered != 0 {
+            let next = PositionData(
                 positionMilliseconds: position,
                 bufferedMilliseconds: buffered,
                 durationMilliseconds: duration ?? 0
             )
+            if next != positionData { positionData = next }
         }
 
-        guard isPlaying, currentEpisode?.enclosureUrl != nil else { return }
+        guard isAudible, currentEpisode?.enclosureUrl != nil else { return }
         let now = nowMilliseconds()
         if now - lastProgressPersistAt >= 2_000 {
             persistProgress(positionMilliseconds: position, at: now)
@@ -440,17 +557,20 @@ public final class PlaybackService {
         // its completed state).
         guard currentPlaylistId != nil else { return }
         guard let url = queue.first?.enclosureUrl else { return }
+        // Only the head that is actually playing can complete; anything else
+        // (a stray end-of-item) must never drop a queued row.
+        guard currentEpisode?.enclosureUrl == url else { return }
         let stopHere = shouldStopAtEpisodeEnd?() ?? false
 
         queue.removeFirst()
-        try? await store.removeEpisodeCascade(enclosureURL: url)
+        try? await store.removeEpisode(enclosureURL: url)
         await cache.remove(url: url)
         cacheStates[url] = nil
         onEpisodeRemoved?(url)
 
         if queue.isEmpty {
             // The completed-transition pause never persists (see
-            // pauseEngineOnly); the row is being cascaded away below.
+            // pauseEngineOnly); the row was removed above.
             pauseEngineOnly()
             await clearPlaybackState()
             return
@@ -483,9 +603,9 @@ public final class PlaybackService {
         currentPlaylistId = nil
         queue = []
         loadedEnclosureURL = nil
-        playbackError = nil
-        isPlaying = false
-        isLoading = false
+        clearPlaybackError()
+        resetLoading()
+        setPlaying(false)
         engine.unload()
         nowPlaying.clear()
         try? await store.clearPointer()
@@ -542,9 +662,9 @@ public final class PlaybackService {
 @MainActor
 public protocol PlaybackStore: AnyObject {
     func episodes(playlistId: Int64) async throws -> [PlaylistEpisodeRow]
-    /// One transaction: playlistEpisode + subtitle + translation rows
-    /// (the cache FILE deletion happens in the cache store, outside).
-    func removeEpisodeCascade(enclosureURL: String) async throws
+    /// Deletes the queue row only; transcripts stay (the cache FILE deletion
+    /// happens in the cache store, outside).
+    func removeEpisode(enclosureURL: String) async throws
     func updatePlayedDuration(_ milliseconds: Int64, enclosureURL: String) async throws
     func savePointer(playlistId: Int64?) async throws
     func clearPointer() async throws
@@ -568,8 +688,8 @@ public final class DatabasePlaybackStore: PlaybackStore {
         try await database.playlistRepository().listEpisodes(playlistId: playlistId)
     }
 
-    public func removeEpisodeCascade(enclosureURL: String) async throws {
-        try await database.playlistRepository().removeEpisodeCascade(byEnclosureURL: enclosureURL)
+    public func removeEpisode(enclosureURL: String) async throws {
+        try await database.playlistRepository().removeEpisode(byEnclosureURL: enclosureURL)
     }
 
     public func updatePlayedDuration(_ milliseconds: Int64, enclosureURL: String) async throws {
@@ -585,8 +705,9 @@ public final class DatabasePlaybackStore: PlaybackStore {
     }
 
     public func insertHistory(episode: PlaylistEpisodeRow) async throws {
+        // History keeps its own primary key. Copying playlistEpisode.id
+        // let a later queue row REPLACE an unrelated history row.
         let row = HistoryEpisodeRow(
-            id: episode.id,
             title: episode.title,
             description: episode.description,
             duration: episode.duration,

@@ -48,41 +48,53 @@ final class PlayerPageTabView: UIView {
 
     var onSelect: ((Int) -> Void)?
 
+    private let items: [Item]
     private var buttons: [UIButton] = []
+    private var iconViews: [UIImageView] = []
+    private var buttonSizeConstraints: [NSLayoutConstraint] = []
+    private var iconBoxConstraints: [NSLayoutConstraint] = []
     private(set) var selectedIndex = 0
 
     init(items: [Item]) {
+        self.items = items
         super.init(frame: .zero)
 
         for (index, item) in items.enumerated() {
             let button = UIButton(type: .custom)
-            // Brand SVGs load as 1 pt vector images (width="1em" in the
-            // source), so the glyph box is explicit, not image-size driven.
+            // Brand imagesets ignore symbol configuration, so the glyph box
+            // is explicit. SF Symbols use the same box plus a point size.
             let iconView = UIImageView(image: item.icon.withRenderingMode(.alwaysTemplate))
             iconView.contentMode = .scaleAspectFit
-            iconView.preferredSymbolConfiguration = IconStyle.groupAction.configuration
             iconView.isUserInteractionEnabled = false
             iconView.translatesAutoresizingMaskIntoConstraints = false
             button.addSubview(iconView)
             button.isAccessibilityElement = true
             button.accessibilityLabel = item.accessibilityLabel
             button.accessibilityIdentifier = "player-page-tab-\(index)"
-            button.layer.cornerRadius = AnycastIconButton.standardDiameter / 2
             button.layer.cornerCurve = .continuous
             button.addAction(
                 UIAction { [weak self] _ in self?.tapped(index: index) },
                 for: .touchUpInside
             )
             button.addPressFeedback()
+            button.enableIconLargeContentViewer(image: item.icon)
+            let boxWidth = iconView.widthAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs)
+            let boxHeight = iconView.heightAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs)
+            let buttonWidth = button.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter)
+            let buttonHeight = button.heightAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter)
             NSLayoutConstraint.activate([
                 iconView.centerXAnchor.constraint(equalTo: button.centerXAnchor),
                 iconView.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-                iconView.widthAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs),
-                iconView.heightAnchor.constraint(equalToConstant: IconStyle.groupAction.pointSize + Spacing.xs),
-                button.widthAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
-                button.heightAnchor.constraint(equalToConstant: AnycastIconButton.standardDiameter),
+                boxWidth, boxHeight, buttonWidth, buttonHeight,
             ])
+            iconBoxConstraints.append(contentsOf: [boxWidth, boxHeight])
+            buttonSizeConstraints.append(contentsOf: [buttonWidth, buttonHeight])
+            iconViews.append(iconView)
             buttons.append(button)
+        }
+        applyIconMetrics()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (view: PlayerPageTabView, _) in
+            view.applyIconMetrics()
         }
 
         let group = AnycastButtonGroup(
@@ -105,6 +117,43 @@ final class PlayerPageTabView: UIView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Page-tab glyphs track body metrics from the 20 pt group-action size.
+    /// The brand transcript mark is imageset artwork, so its box is what
+    /// scales; SF Symbols also take the point size.
+    private func applyIconMetrics() {
+        let glyph = IconMetrics.scaledUp(
+            IconStyle.groupAction.pointSize,
+            style: TypographyV2.body,
+            compatibleWith: traitCollection
+        )
+        let box = IconMetrics.scaledUp(
+            IconStyle.groupAction.pointSize + Spacing.xs,
+            style: TypographyV2.body,
+            compatibleWith: traitCollection
+        )
+        let side = IconMetrics.diameter(
+            AnycastIconButton.standardDiameter,
+            style: TypographyV2.body,
+            compatibleWith: traitCollection
+        )
+        let symbol = UIImage.SymbolConfiguration(pointSize: glyph, weight: IconStyle.groupAction.weight)
+        for constraint in iconBoxConstraints { constraint.constant = box }
+        for constraint in buttonSizeConstraints { constraint.constant = side }
+        for (index, iconView) in iconViews.enumerated() {
+            iconView.preferredSymbolConfiguration = symbol
+            let source = items[index].icon
+            if source.isSymbolImage == false, source.size != .zero {
+                iconView.image = source.withIconMetrics(
+                    pointSize: box,
+                    weight: IconStyle.groupAction.weight,
+                    compatibleWith: traitCollection
+                )
+            }
+            buttons[index].layer.cornerRadius = side / 2
+            buttons[index].largeContentImage = iconView.image
+        }
+    }
 
     func select(_ index: Int) {
         guard buttons.indices.contains(index), index != selectedIndex else { return }
@@ -142,8 +191,14 @@ final class PlayerPageTabView: UIView {
 @MainActor
 final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
 
+    /// Transcript page. Opening here does not change the close-reset, which
+    /// still returns to the main controls page.
+    static let transcriptPageIndex = 2
+
     private let context: UIContext
-    let selection = PlayerPageSelection(pageCount: 3, initialIndex: 1)
+    private let opensChat: Bool
+    private var didOpenChat = false
+    let selection: PlayerPageSelection
 
     private let pages: [UIViewController]
     private let pageController = UIPageViewController(
@@ -155,8 +210,21 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
     private let backdropObservation = ObservationLoop()
     private var backdropImageURL: String?
 
-    static func present(from presenter: UIViewController, context: UIContext) {
-        let controller = PlayerPageContainer(context: context)
+    static func present(
+        from presenter: UIViewController,
+        context: UIContext,
+        initialPage: Int = 1,
+        opensChat: Bool = false,
+        browse: TranscriptBrowseTarget? = nil,
+        onPlayBrowsed: (() async -> Bool)? = nil
+    ) {
+        let controller = PlayerPageContainer(
+            context: context,
+            openingPage: initialPage,
+            opensChat: opensChat,
+            browse: browse,
+            onPlayBrowsed: onPlayBrowsed
+        )
         controller.adoptSystemSheet()
         presenter.present(controller, animated: true)
     }
@@ -173,8 +241,16 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         }
     }
 
-    init(context: UIContext) {
+    init(
+        context: UIContext,
+        openingPage: Int = 1,
+        opensChat: Bool = false,
+        browse: TranscriptBrowseTarget? = nil,
+        onPlayBrowsed: (() async -> Bool)? = nil
+    ) {
         self.context = context
+        self.opensChat = opensChat
+        self.selection = PlayerPageSelection(pageCount: 3, initialIndex: 1)
         self.pages = [
             EpisodePageViewController(context: context),
             PlayerMainPageViewController(context: context),
@@ -183,9 +259,21 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         self.pageTab = PlayerPageTabView(items: [
             .init(icon: AppIcons.playerEpisode, accessibilityLabel: "This episode"),
             .init(icon: AppIcons.playerMain, accessibilityLabel: "Player main"),
-            .init(icon: AppIcons.topology ?? UIImage(), accessibilityLabel: "Player AI transcript"),
+            .init(icon: AppIcons.aiTranscript ?? UIImage(), accessibilityLabel: "Player AI transcript"),
         ])
         super.init(nibName: nil, bundle: nil)
+        if let browse, let subtitles = pages[Self.transcriptPageIndex] as? SubtitlesPageViewController {
+            subtitles.pinTranscript(browse) {
+                if let onPlayBrowsed {
+                    return await onPlayBrowsed()
+                }
+                return false
+            }
+        }
+        let opening = min(max(openingPage, 0), pages.count - 1)
+        if opening != selection.selectedIndex {
+            selection.select(opening)
+        }
         pageTab.onSelect = { [weak self] index in
             self?.pageTabSelected(index)
         }
@@ -231,10 +319,17 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         showPage(selection.selectedIndex, animated: false)
 
         backdropObservation.track(
-            read: { [weak self] in _ = self?.context.playback.currentEpisode?.imageUrl },
+            read: { [weak self] in _ = self?.context.playback.currentEpisodeContent?.imageUrl },
             onChange: { [weak self] in self?.updateBackdrop() }
         )
         updateBackdrop()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard opensChat, !didOpenChat else { return }
+        didOpenChat = true
+        (pages[Self.transcriptPageIndex] as? SubtitlesPageViewController)?.openChat()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -340,9 +435,30 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         guard urlString != backdropImageURL else { return }
         backdropImageURL = urlString
         backdropImageView.kf.cancelDownloadTask()
-        backdropImageView.image = nil
-        guard let urlString, let url = URL(string: urlString) else { return }
-        backdropImageView.kf.setImage(with: url)
+        guard let urlString, let url = URL(string: urlString) else {
+            backdropImageView.image = nil
+            return
+        }
+        // The old backdrop stays until the new one is ready, then crossfades
+        // (no empty frame between two episodes, no placeholder).
+        backdropImageView.setBackdrop(url)
+    }
+}
+
+extension UIImageView {
+    /// Loads a player backdrop: the current image stays until the new one is
+    /// ready, then the two crossfade over `Motion.standard` (none under
+    /// Reduce Motion).
+    @MainActor
+    func setBackdrop(_ url: URL) {
+        kf.setImage(
+            with: url,
+            options: [
+                .keepCurrentImageWhileLoading,
+                .transition(Motion.reduceMotion ? .none : .fade(Motion.standard)),
+                .forceTransition,
+            ]
+        )
     }
 }
 

@@ -23,7 +23,7 @@ struct OPMLWriterTests {
         return collector.rows
     }
 
-    @Test("Round-trip: writer reproduces the Dart-generated fixture byte for byte")
+    @Test("Round-trip: writer reproduces the Dart-generated fixture except that text now holds the title")
     func fixtureRoundTrip() throws {
         let url = TestRepoAssets.repoRoot
             .appendingPathComponent("test/fixtures/opml/app_export.opml")
@@ -31,8 +31,26 @@ struct OPMLWriterTests {
         let rows = try fixtureRows()
 
         #expect(rows.count > 10)   // a real export, not a stub
+        // The shipped writer put the description in `text`; the fixture is
+        // that output, so only the text attribute differs from ours.
+        let expected = fixture.components(separatedBy: "\n").map { line -> String in
+            guard line.contains("<outline "),
+                  let title = line.firstMatch(of: /title="([^"]*)"/)?.1,
+                  let text = line.firstMatch(of: /text="([^"]*)"/)
+            else { return line }
+            return line.replacingCharacters(in: text.range, with: "text=\"\(title)\"")
+        }.joined(separator: "\n")
         let written = OPMLWriter.document(subscriptions: rows)
-        #expect(written == fixture)
+        #expect(written == expected)
+    }
+
+    @Test("Export file name, and text carries the show title (not the description)")
+    func fileNameAndTextAttribute() {
+        #expect(ImportCopy.exportFileName == "Anycast Subscriptions.opml")
+        let row = SubscriptionRow(rssFeedUrl: "https://a.example/f", title: "Show Title", description: "A long blurb")
+        let written = OPMLWriter.document(subscriptions: [row])
+        #expect(written.contains(#"text="Show Title" title="Show Title" type="rss""#))
+        #expect(!written.contains("A long blurb"))
     }
 
     @Test("Skeleton: head title and empty body")
@@ -59,7 +77,7 @@ struct OPMLWriterTests {
         )
         let written = OPMLWriter.document(subscriptions: [row])
         #expect(written.contains(
-            "    <outline text=\"An example feed\" title=\"Example\" type=\"rss\" xmlUrl=\"https://example.com/feed.xml\"/>"
+            "    <outline text=\"Example\" title=\"Example\" type=\"rss\" xmlUrl=\"https://example.com/feed.xml\"/>"
         ))
     }
 

@@ -2,8 +2,21 @@ import UIKit
 
 /// Centralized icon accessors. The Dart baseline mixes five icon packs
 /// (03 §5.3); the native port maps them to the nearest SF Symbol, except the
-/// four brand SVGs that live in the asset catalog as template images
-/// (`BrandaiChat`, `BrandtablerTopology`, `BrandnewDoc`, `BrandaiTranscript`).
+/// two brand SVGs that live in the asset catalog as template imagesets
+/// (`BrandaiChat`, `BrandaiTranscript`).
+///
+/// Those imagesets are not symbol sets: `SymbolConfiguration` point size and
+/// weight do not affect them. Hosts scale them with `UIImage.withIconMetrics`.
+/// A symbol set needs an SF Symbols template (filled paths, margin guides,
+/// and weight variants). The source SVGs are stroke/fill artwork; dropping
+/// them into a symbol set would fail asset compilation, so they stay
+/// imagesets until a template export exists.
+///
+/// Fill means selected, in progress, or success (tab selection, subscribed,
+/// sleep on, transcript succeeded). Idle actions stay outline. Transport
+/// play/pause stay filled, which is how the HIG draws playback. Failures
+/// use `exclamationmark.triangle`, not a filled bubble. `xmark` is only
+/// Close / Dismiss; every Remove and Delete uses `trash`.
 ///
 /// Mapping table (dart icon → SF Symbol):
 ///
@@ -24,8 +37,8 @@ import UIKit
 ///   info                     → info.circle.fill
 ///   info_outline             → info.circle
 ///   exit_to_app              → rectangle.portrait.and.arrow.right
-///   close                    → xmark
-///   delete_outline           → trash
+///   close                    → xmark (Close / Dismiss only)
+///   delete_outline           → trash (every Remove and Delete)
 ///   question_mark_rounded    → questionmark
 ///   check                    → checkmark
 ///   podcasts_rounded         → dot.radiowaves.left.and.right
@@ -36,7 +49,8 @@ import UIKit
 ///   round_pause              → pause.fill
 ///   round_download           → arrow.down.circle
 ///   round_file_download      → arrow.down.circle
-///   round_clear / clear      → xmark
+///   round_clear / clear      → trash when it removes a row; xmark when it
+///                               dismisses a sheet
 ///   round_playlist_add       → text.badge.plus
 ///   round_playlist_add_check → checklist
 ///   round_ios_share          → square.and.arrow.up
@@ -45,6 +59,8 @@ import UIKit
 ///   round_help               → questionmark.circle
 ///   round_check_circle       → checkmark.circle.fill
 ///   round_sms_failed         → exclamationmark.bubble.fill
+///                               (legacy accessor; transcript failure uses
+///                               exclamationmark.triangle)
 ///   round_apple              → apple.logo
 ///   email                    → envelope
 ///   content_copy             → doc.on.doc
@@ -83,7 +99,7 @@ nonisolated enum AppIcons {
     static let pause = symbol("pause.fill")
     static let addToList = symbol("text.badge.plus")
     static let addedToList = symbol("checklist")
-    static let remove = symbol("xmark")
+    static let remove = symbol("trash")
     static let download = symbol("arrow.down.circle")
     static let downloadDone = symbol("checkmark.circle.fill")
 
@@ -100,6 +116,9 @@ nonisolated enum AppIcons {
     static let forward30 = symbol("goforward.30")
     static let playerEpisode = symbol("list.bullet")
     static let sleepTimer = symbol("moon")
+    /// Sleep timer engaged (end of episode). Countdown replaces the glyph
+    /// with the remaining minutes; fill is the on state when the glyph shows.
+    static let sleepTimerActive = symbol("moon.fill")
     static let playerMain = symbol("dot.radiowaves.left.and.right")
 
     // Settings & login (03 §2.13 / §2.14)
@@ -108,6 +127,15 @@ nonisolated enum AppIcons {
     static let recentSearch = symbol("clock.arrow.circlepath")
     static let close = symbol("xmark")
     static let delete = symbol("trash")
+    /// Forward disclosure. Mirrors in right-to-left layouts.
+    static let disclosure = symbol("chevron.forward")
+    /// Trailing mark on rows that open a web page.
+    static let externalLink = symbol("arrow.up.right")
+    static let retry = symbol("arrow.clockwise")
+    /// Transcript failure. Outline, shared by the playlist strip, the
+    /// transcript page, and the detail transcript row when generation
+    /// failed and Retry is offered (not `exclamationmark.bubble.fill`).
+    static let transcriptFailed = symbol("exclamationmark.triangle")
     static let check = symbol("checkmark")
     static let person = symbol("person")
     static let signInOut = symbol("rectangle.portrait.and.arrow.right")
@@ -127,11 +155,16 @@ nonisolated enum AppIcons {
     static let smsFailed = symbol("exclamationmark.bubble.fill")
     static let photo = symbol("photo")
     static let elbowIndent = symbol("arrow.turn.down.right")
+    /// Detail transcript row / menu: lines once a transcript exists.
+    static let transcriptLines = symbol("text.alignleft")
+    /// Detail ••• "Ask AI" — a bubble, not the player-page brand mark.
+    static let chatBubble = symbol("bubble.left")
+    /// Transcript line menu: keep the sentence as a moment.
+    static let keepMoment = symbol("text.quote")
 
-    /// Brand SVGs from the Dart sources (template images; tint with tintColor).
+    /// Brand SVGs (template imagesets; tint with tintColor). Ask AI is
+    /// `aiChat`; generating or opening a transcript is `aiTranscript`.
     static let aiChat = UIImage(named: "BrandaiChat")
-    static let topology = UIImage(named: "BrandtablerTopology")
-    static let newDoc = UIImage(named: "BrandnewDoc")
     static let aiTranscript = UIImage(named: "BrandaiTranscript")
 
     /// Every SF Symbol name referenced above — the registration test asserts
@@ -139,15 +172,17 @@ nonisolated enum AppIcons {
     static let symbolNames: [String] = [
         "house.fill", "play.rectangle.on.rectangle", "safari", "tray.fill",
         "books.vertical.fill", "play.fill", "pause.fill", "text.badge.plus",
-        "checklist", "xmark", "arrow.down.circle", "checkmark.circle.fill",
-        "square.and.arrow.up", "chevron.left", "gobackward.10",
-        "goforward.30", "gearshape", "dot.radiowaves.left.and.right", "gearshape.fill",
+        "checklist", "xmark", "trash", "arrow.down.circle", "checkmark.circle.fill",
+        "square.and.arrow.up", "chevron.left", "chevron.forward", "gobackward.10",
+        "goforward.30", "gearshape", "dot.radiowaves.left.and.right", "moon", "moon.fill",
+        "arrow.clockwise", "exclamationmark.triangle", "gearshape.fill",
         "magnifyingglass", "trash", "checkmark", "person",
         "rectangle.portrait.and.arrow.right", "info.circle.fill",
         "info.circle", "questionmark.circle", "questionmark", "ellipsis",
         "doc.on.doc", "safari.fill", "safari", "arrow.up.doc", "apple.logo",
         "envelope", "plus.circle", "exclamationmark.bubble.fill", "photo",
-        "arrow.turn.down.right",
+        "arrow.turn.down.right", "text.alignleft", "exclamationmark.triangle",
+        "bubble.left", "text.quote", "arrow.up.right",
     ]
 
     private static func symbol(_ name: String) -> UIImage {

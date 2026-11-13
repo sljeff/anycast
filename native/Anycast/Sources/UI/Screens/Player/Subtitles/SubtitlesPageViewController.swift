@@ -3,10 +3,12 @@ import AnycastKit
 
 /// Player page 2 (PlayerAI/Subtitles, 03 §2.10) in the Anycast 2.0
 /// transcript form (option A): a left-aligned header — the 44 pt episode
-/// cover beside "Transcript" over the episode title — then the transcript
+/// cover beside "Transcript" over the episode title, with ••• and Ask AI at
+/// its trailing side — then the transcript
 /// lines, ONE status capsule slot (following / back to now / jump undo /
 /// generation and translation states), and the shared scrubber + transport
-/// with the ••• menu and Ask AI flanking it, above the page selector.
+/// with speed and sleep flanking it (as on the main page), above the page
+/// selector.
 ///
 /// Row state is derived from the poll controllers plus async row fetches;
 /// polling cadence, K27 error policy and the K9 5-strike rule all live in
@@ -36,7 +38,9 @@ final class SubtitlesPageViewController: UIViewController {
     private let titleLabel = UILabel()
     private let contentHost = UIView()
     private let capsule = TranscriptStatusCapsuleView()
-    private lazy var transport = PlayerTransportView(context: context, transportGap: Spacing.gap)
+    private lazy var transport = PlayerTransportView(context: context)
+    /// Speed + sleep: the same buttons, menus and rendering as the main page.
+    private lazy var speedSleep = PlayerSpeedSleepControls(context: context)
     private let moreButton = AnycastIconButton(
         style: .tonal, icon: AppIcons.more, accessibilityLabel: "More transcript actions", glyphSize: 20
     )
@@ -46,12 +50,21 @@ final class SubtitlesPageViewController: UIViewController {
 
     // MARK: Observed state
 
+    /// Set when Read transcript / Ask AI opened this page for an episode
+    /// that is not the one playing. Playback is left alone until the user
+    /// taps play here.
+    private var pinnedTranscript: TranscriptBrowseTarget?
+    private var adoptPinned: (() async -> Bool)?
     private var loadedURL: String?
     private var rowPhase: TranscriptRowPhase = .fetching
     private var subtitleRow: SubtitleRow?
     private var translationRowPhase: TranslationRowPhase = .idle
     private var translationRow: TranslationRow?
     private var renderedState: TranscriptVisualState?
+    /// The signed-in account's transcript allowance, read while the page
+    /// offers to generate so the prompt can say how many are left.
+    private var allowance: TranscriptAllowance?
+    private var allowanceTask: Task<Void, Never>?
 
     // MARK: Ready-state views (kept alive across state swaps so scroll and
     // follow position survive)
@@ -63,6 +76,9 @@ final class SubtitlesPageViewController: UIViewController {
     private let stateLoop = ObservationLoop()
     private let progressLoop = ObservationLoop()
     private var languageObserver: NSObjectProtocol?
+    private var momentsObserver: NSObjectProtocol?
+    /// Where kept moments live; tests inject their own.
+    var momentStore: MomentStore = .shared
 
     #if DEBUG
     private var demoMode = false
@@ -79,6 +95,17 @@ final class SubtitlesPageViewController: UIViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     // MARK: - Lifecycle
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        speedSleep.pageWillAppear()
+        refreshAllowance()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        speedSleep.pageDidDisappear()
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -107,7 +134,7 @@ final class SubtitlesPageViewController: UIViewController {
         progressLoop.track(
             read: { [weak self] in _ = self?.context.playback.positionData },
             onChange: { [weak self] in
-                guard let self else { return }
+                guard let self, !self.isBrowsingOtherEpisode else { return }
                 self.lyricsView.setProgress(
                     positionMilliseconds: Int(self.context.playback.positionData.positionMilliseconds)
                 )
@@ -128,10 +155,31 @@ final class SubtitlesPageViewController: UIViewController {
             }
         }
 
+        // A moment kept or removed elsewhere (the Library) moves the marks.
+        momentsObserver = NotificationCenter.default.addObserver(
+            forName: MomentStore.didChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncKeptMarks() }
+        }
+
         #if DEBUG
         configureDemoIfRequested()
         #endif
         refreshState()
+    }
+
+    /// Shows `target`'s transcript without replacing the playing item.
+    /// `adopt` runs when the user taps play on this page and should make
+    /// `target` the current episode.
+    func pinTranscript(_ target: TranscriptBrowseTarget, adopt: @escaping () async -> Bool) {
+        pinnedTranscript = target
+        adoptPinned = adopt
+    }
+
+    private var isBrowsingOtherEpisode: Bool {
+        guard let pinnedTranscript else { return false }
+        let current = context.playback.currentEpisode?.enclosureUrl ?? ""
+        return pinnedTranscript.enclosureURL != current
     }
 
     deinit {
@@ -146,6 +194,9 @@ final class SubtitlesPageViewController: UIViewController {
             jumpUndo.clear()
             if let languageObserver {
                 NotificationCenter.default.removeObserver(languageObserver)
+            }
+            if let momentsObserver {
+                NotificationCenter.default.removeObserver(momentsObserver)
             }
         }
     }
@@ -173,8 +224,16 @@ final class SubtitlesPageViewController: UIViewController {
 
         let titles = UIStackView(arrangedSubviews: [headerTitleLabel, titleLabel])
         titles.axis = .vertical
-        let header = UIStackView(arrangedSubviews: [headerArtwork, titles])
+        // ••• and Ask AI sit at the header's trailing side; the transport
+        // row carries speed and sleep, exactly as on the main page.
+        buildHeaderActions()
+        let header = UIStackView(arrangedSubviews: [headerArtwork, titles, moreButton, askAIButton])
         header.axis = .horizontal
+        for button in [moreButton, askAIButton] {
+            button.setContentHuggingPriority(.required, for: .horizontal)
+            button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        }
+        titles.setContentHuggingPriority(.defaultLow, for: .horizontal)
         header.alignment = .center
         header.spacing = Spacing.gap
         header.translatesAutoresizingMaskIntoConstraints = false
@@ -192,17 +251,17 @@ final class SubtitlesPageViewController: UIViewController {
 
         transport.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(transport)
-        buildTransportAccessories()
+        speedSleep.install(in: transport)
 
         NSLayoutConstraint.activate([
-            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: PlayerLayout.column),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -PlayerLayout.column),
             header.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
             headerArtwork.widthAnchor.constraint(equalToConstant: Layout.headerArtwork),
             headerArtwork.heightAnchor.constraint(equalToConstant: Layout.headerArtwork),
 
-            contentHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            contentHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            contentHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: PlayerLayout.column),
+            contentHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -PlayerLayout.column),
             contentHost.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.gap),
 
             lyricsView.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
@@ -221,10 +280,10 @@ final class SubtitlesPageViewController: UIViewController {
         ])
     }
 
-    /// ••• (menu) left and Ask AI right of the transport: 44 pt round
-    /// buttons with a subtle player-text fill. Player colors only — the
-    /// player is always dark, so nothing adapts to the appearance.
-    private func buildTransportAccessories() {
+    /// ••• (menu) and Ask AI in the header: 44 pt round buttons with a
+    /// subtle player-text fill. Player colors only — the player is always
+    /// dark, so nothing adapts to the appearance.
+    private func buildHeaderActions() {
         for button in [moreButton, askAIButton] {
             button.configuration?.baseBackgroundColor = Theme.playerText.withAlphaComponent(0.08)
             button.configuration?.baseForegroundColor = Theme.playerText
@@ -236,7 +295,6 @@ final class SubtitlesPageViewController: UIViewController {
             },
         ])
         askAIButton.addAction(UIAction { [weak self] _ in self?.openChat() }, for: .touchUpInside)
-        transport.setAccessories(leading: moreButton, trailing: askAIButton)
     }
 
     // MARK: - State refresh (observation → row loads → render)
@@ -248,10 +306,29 @@ final class SubtitlesPageViewController: UIViewController {
             return
         }
         #endif
+        if let pinned = pinnedTranscript,
+           pinned.enclosureURL == (context.playback.currentEpisode?.enclosureUrl ?? "") {
+            pinnedTranscript = nil
+            adoptPinned = nil
+        }
+        transport.onPlay = isBrowsingOtherEpisode ? { [weak self] in
+            Task { await self?.adoptPinnedEpisode() }
+        } : nil
+
+        if let pinned = pinnedTranscript {
+            showPinnedHeader(pinned)
+            loadURL(pinned.enclosureURL)
+            return
+        }
+
         let episode = context.playback.currentEpisode
         updateHeader(episode: episode)
 
         let url = (episode?.enclosureUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        loadURL(url)
+    }
+
+    private func loadURL(_ url: String) {
         if url != loadedURL {
             loadedURL = url
             subtitleRow = nil
@@ -267,6 +344,32 @@ final class SubtitlesPageViewController: UIViewController {
             loadTranslationRow(url: url)
         }
         render()
+    }
+
+    private func adoptPinnedEpisode() async {
+        guard let adoptPinned else { return }
+        let adopted = await adoptPinned()
+        guard adopted else {
+            if let window = view.window {
+                ToastPresenter.shared.show("Couldn't open this transcript", in: window, duration: 3)
+            }
+            return
+        }
+        pinnedTranscript = nil
+        self.adoptPinned = nil
+        transport.onPlay = nil
+        refreshState()
+    }
+
+    private func showPinnedHeader(_ pinned: TranscriptBrowseTarget) {
+        headerArtwork.isHidden = false
+        titleLabel.isHidden = false
+        titleLabel.text = pinned.title
+        let imageURL = pinned.imageURL ?? ""
+        guard imageURL != headerArtworkURL else { return }
+        headerArtworkURL = imageURL
+        headerArtwork.kf.cancelDownloadTask()
+        headerArtwork.setArtwork(URL(string: imageURL), title: pinned.channelTitle, side: Layout.headerArtwork)
     }
 
     private func loadTranscriptRow(url: String) {
@@ -336,7 +439,7 @@ final class SubtitlesPageViewController: UIViewController {
         guard imageURL != headerArtworkURL else { return }
         headerArtworkURL = imageURL
         headerArtwork.kf.cancelDownloadTask()
-        headerArtwork.setArtwork(URL(string: imageURL), title: episode?.channelTitle)
+        headerArtwork.setArtwork(URL(string: imageURL), title: episode?.channelTitle, side: Layout.headerArtwork)
     }
 
     // MARK: - Rendering
@@ -410,7 +513,7 @@ final class SubtitlesPageViewController: UIViewController {
             return .init(id: "loading", leading: .spinner, message: "Loading transcript")
         case .loadFailed:
             return .init(
-                id: "loadFailed", leading: .icon(UIImage(systemName: "arrow.triangle.2.circlepath")),
+                id: "loadFailed", leading: .icon(AppIcons.retry),
                 message: "Couldn't load transcript",
                 action: ("Retry", { [weak self] in
                     guard let self, let url = self.loadedURL, !url.isEmpty else { return }
@@ -418,17 +521,20 @@ final class SubtitlesPageViewController: UIViewController {
                 })
             )
         case .prompt:
-            return .init(
-                id: "prompt", leading: .icon(UIImage(systemName: "sparkles")),
-                message: "AI transcript",
-                action: ("Generate", { [weak self] in self?.generateTranscript() })
+            return .prompt(
+                DetailTranscriptState.reduce(
+                    status: nil,
+                    signedIn: AuthAccountSnapshot.current(context: context).signedIn,
+                    allowance: allowance
+                ),
+                onAction: { [weak self] action in self?.promptTapped(action) }
             )
         case .processing:
             // The server reports no percentage, so just a spinner.
             return .init(id: "processing", leading: .spinner, message: "Generating transcript")
         case .failed:
             return .init(
-                id: "failed", leading: .icon(UIImage(systemName: "exclamationmark.triangle")),
+                id: "failed", leading: .icon(AppIcons.transcriptFailed),
                 message: "Couldn't transcribe",
                 action: ("Retry", { [weak self] in self?.generateTranscript() })
             )
@@ -505,62 +611,70 @@ final class SubtitlesPageViewController: UIViewController {
         Task { await context.playback.seek(Int64(milliseconds)) }
     }
 
-    /// `controller.add(url)` with the K27 user-trigger surface: the error
-    /// signal from the add itself becomes a toast (background polling is
-    /// silent; 401 routes to login inside the poller).
-    private func generateTranscript() {
-        guard loadedURL != nil else { return }
-        // Signed out: sign in first, then generate once the sheet reports
-        // success (the add would only bounce off a 401 otherwise).
-        guard AuthAccountSnapshot.current(context: context).signedIn else {
-            LoginSheetViewController.present(
-                from: topMostPresented(), context: context, source: .transcribe
-            ) { [weak self] in self?.startTranscriptGeneration() }
+    /// Reads the allowance (cache first) for the prompt copy. A failed read
+    /// leaves the neutral prompt; it is not retried until the next visit.
+    private func refreshAllowance() {
+        let account = AuthAccountSnapshot.current(context: context)
+        guard let uid = account.uid, account.signedIn else {
+            allowance = nil
+            updateCapsule()
             return
         }
-        startTranscriptGeneration()
+        if let cached = TranscriptAllowanceCache.shared.current(uid: uid) {
+            allowance = cached
+            updateCapsule()
+            return
+        }
+        guard allowanceTask == nil else { return }
+        allowanceTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let fresh = await TranscriptRequests.refresh(context: self.context)
+            self.allowanceTask = nil
+            guard !Task.isCancelled else { return }
+            if let fresh { self.allowance = fresh }
+            self.updateCapsule()
+        }
     }
 
-    private func startTranscriptGeneration() {
-        guard let url = loadedURL else { return }
-        Task { @MainActor in
-            let signal = await self.context.subtitles.add(url: url)
-            guard let signal, let window = self.view.window else { return }
-            switch signal {
-            case .errorMessage(let text):
-                // A 403 at the quota limit opens the paywall instead of a
-                // toast; any other 403 keeps the toast.
-                if await self.presentQuotaPaywallIfExhausted() { return }
-                ToastPresenter.shared.show(text, in: window, duration: 3)
-            case .errorBody(let status, let body):
-                ToastPresenter.shared.show("Error \(status): \(body)", in: window, duration: 3)
-            case .loginRequired:
-                break
+    private func promptTapped(_ action: DetailTranscriptAction?) {
+        switch action {
+        case .getPlus:
+            PaywallViewController.present(
+                from: topMostPresented(), context: context, variant: .quota(quotaEpisode() ?? Self.untitledEpisode)
+            ) { [weak self] in
+                TranscriptAllowanceCache.shared.invalidate()
+                self?.refreshAllowance()
             }
+        default:
+            generateTranscript()
         }
     }
 
-    /// Re-reads the account after a refused add: when it has no transcripts
-    /// left and the user is not Plus, presents the quota paywall (variant C)
-    /// for the current episode and returns true.
-    private func presentQuotaPaywallIfExhausted() async -> Bool {
-        var remaining: Int?
-        if let result = try? await context.api.getUser(), case .user(let user) = result {
-            remaining = user.remaining
-        }
-        let subscribed = remaining == 0 ? await context.purchases.isSubscribed() : false
-        guard PaywallModel.shouldPresentQuotaPaywall(refreshedRemaining: remaining, isSubscribed: subscribed),
-              let episode = context.playback.currentEpisode, view.window != nil else { return false }
-        let summary = PaywallModel.Episode(
+    private static let untitledEpisode = PaywallModel.Episode(
+        title: "", showName: "", durationMilliseconds: nil, artworkURL: nil
+    )
+
+    /// `controller.add(url)` with the K27 user-trigger surface. Login, the
+    /// quota paywall, and the toast live in `TranscriptRequests` so the
+    /// detail sheet and the playlist card use the same refusal.
+    private func generateTranscript() {
+        guard let url = loadedURL, !url.isEmpty else { return }
+        TranscriptRequests.generate(
+            enclosureURL: url,
+            context: context,
+            from: self,
+            episode: quotaEpisode() ?? Self.untitledEpisode
+        ) { [weak self] in self?.refreshAllowance() }
+    }
+
+    private func quotaEpisode() -> PaywallModel.Episode? {
+        guard let episode = context.playback.currentEpisode else { return nil }
+        return PaywallModel.Episode(
             title: episode.title ?? "",
             showName: episode.channelTitle ?? "",
             durationMilliseconds: episode.duration,
             artworkURL: episode.imageUrl.flatMap(URL.init(string:))
         )
-        PaywallViewController.present(
-            from: topMostPresented(), context: context, variant: .quota(summary)
-        )
-        return true
     }
 
     // MARK: - Lyrics
@@ -569,6 +683,18 @@ final class SubtitlesPageViewController: UIViewController {
         lyricsView.updateDocument(
             lines: currentLyricLines(),
             positionMilliseconds: Int(context.playback.positionData.positionMilliseconds)
+        )
+        syncKeptMarks()
+    }
+
+    /// Marks the lines of this transcript that are kept as moments.
+    private func syncKeptMarks() {
+        guard let url = loadedURL, !url.isEmpty else {
+            lyricsView.keptStarts = []
+            return
+        }
+        lyricsView.keptStarts = Set(
+            momentStore.all.filter { $0.enclosureURL == url }.map(\.startMilliseconds)
         )
     }
 
@@ -591,12 +717,13 @@ final class SubtitlesPageViewController: UIViewController {
         let episodeTitle = context.playback.currentEpisode?.title ?? ""
 
         return UIMenu(children: [
-            UIAction(title: "Ask AI about this", image: UIImage(systemName: "sparkles")) { [weak self] _ in
+            UIAction(title: "Ask AI about this", image: AppIcons.aiChat) { [weak self] _ in
                 self?.openChat(draftQuestion: "Can you explain this part of the episode? \"\(text)\"")
             },
             UIAction(title: "Play from here", image: AppIcons.play) { [weak self] _ in
                 self?.jumpToLine(index)
             },
+            keepMomentAction(for: index),
             UIAction(title: "Copy", image: AppIcons.copy) { [weak self] _ in
                 UIPasteboard.general.string = text
                 self?.showToast("Copied")
@@ -607,6 +734,61 @@ final class SubtitlesPageViewController: UIViewController {
                 self?.topMostPresented().present(activity, animated: true)
             },
         ])
+    }
+
+    // MARK: - Moments
+
+    /// The transcript being shown, as a moment records it: the pinned
+    /// episode when browsing another one, otherwise the playing episode.
+    private func momentSource() -> (
+        enclosureURL: String, rssFeedURL: String?, episodeTitle: String, showTitle: String, artworkURL: String?
+    )? {
+        guard let url = loadedURL, !url.isEmpty else { return nil }
+        if let pinned = pinnedTranscript, pinned.enclosureURL == url {
+            return (url, nil, pinned.title, pinned.channelTitle ?? "", pinned.imageURL)
+        }
+        if let episode = context.playback.currentEpisode, episode.enclosureUrl == url {
+            return (url, episode.rssFeedUrl, episode.title ?? "", episode.channelTitle ?? "", episode.imageUrl)
+        }
+        #if DEBUG
+        if demoMode { return (url, nil, "Demo episode", "Demo show", nil) }
+        #endif
+        return nil
+    }
+
+    /// "Keep moment" for a line, "Remove moment" when it is already kept.
+    private func keepMomentAction(for index: Int) -> UIAction {
+        let start = lyricsView.lines[index].startMilliseconds
+        let isKept = loadedURL.map { momentStore.contains(episode: $0, start: start) } ?? false
+        return UIAction(
+            title: isKept ? "Remove moment" : "Keep moment",
+            image: isKept ? AppIcons.remove : AppIcons.keepMoment,
+            attributes: isKept || momentSource() != nil ? [] : .disabled
+        ) { [weak self] _ in
+            self?.toggleMoment(at: index)
+        }
+    }
+
+    func toggleMoment(at index: Int) {
+        guard lyricsView.lines.indices.contains(index), let source = momentSource() else { return }
+        let line = lyricsView.lines[index]
+        Haptics.tap()
+        if momentStore.contains(episode: source.enclosureURL, start: line.startMilliseconds) {
+            momentStore.remove(episode: source.enclosureURL, start: line.startMilliseconds)
+            showToast("Moment removed")
+            return
+        }
+        let result = momentStore.add(Moment(
+            enclosureURL: source.enclosureURL,
+            rssFeedURL: source.rssFeedURL,
+            episodeTitle: source.episodeTitle,
+            showTitle: source.showTitle,
+            artworkURL: source.artworkURL,
+            startMilliseconds: line.startMilliseconds,
+            text: line.text.trimmingCharacters(in: .whitespacesAndNewlines),
+            translation: line.translation
+        ))
+        showToast(result == .failed ? "Couldn't keep this moment" : "Moment kept")
     }
 
     // MARK: - ••• menu
@@ -649,12 +831,27 @@ final class SubtitlesPageViewController: UIViewController {
     /// Opens the chat sheet. `draftQuestion` pre-fills the input (long-press
     /// "Ask AI about this"); the chat asks for the current line lazily so a
     /// quick-ask can quote what is playing.
-    private func openChat(draftQuestion: String? = nil) {
+    func openChat(draftQuestion: String? = nil) {
+        let pinned = isBrowsingOtherEpisode ? pinnedTranscript : nil
         let chat = ChatViewController(
             context: context,
+            episodeTitle: pinned?.title,
+            enclosureURL: pinned?.enclosureURL,
             draftQuestion: draftQuestion,
             currentLineProvider: { [weak self] in self?.lyricsView.activeLineText },
-            onJump: { [weak self] milliseconds in self?.jump(toMilliseconds: milliseconds) }
+            onJump: { [weak self] milliseconds in
+                guard let self else { return }
+                if self.isBrowsingOtherEpisode {
+                    Task { @MainActor in
+                        await self.adoptPinnedEpisode()
+                        if !self.isBrowsingOtherEpisode {
+                            self.jump(toMilliseconds: milliseconds)
+                        }
+                    }
+                } else {
+                    self.jump(toMilliseconds: milliseconds)
+                }
+            }
         )
         AppSheets.presentExpand(chat, from: topMostPresented())
     }
@@ -758,6 +955,9 @@ final class SubtitlesPageViewController: UIViewController {
 
     /// Lyric lines on screen (smoke-test probe).
     var demoLines: [LyricLine] { lyricsView.lines }
+
+    /// The lyrics list itself (visual-check probe).
+    var demoLyricsView: LyricsView { lyricsView }
 
     /// 60 four-second segments so the demo list scrolls well past a
     /// viewport (the first lines are fixed samples of the styles).

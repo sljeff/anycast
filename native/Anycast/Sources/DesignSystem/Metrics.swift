@@ -46,6 +46,37 @@ nonisolated enum Radius {
     static let modal = ThemeRegistry.current.shape.modal
     /// Capsules; clamp at draw time, this just exceeds any frame.
     static let pill: CGFloat = 999
+    /// The floating sheet's corner. Every corner on the detail sheet is
+    /// concentric with this: radius = sheetCorner − inset from the sheet edge.
+    static let sheetCorner: CGFloat = 54
+    /// The concentric rule never returns a radius smaller than this.
+    static let sheetCornerMinimum: CGFloat = 12
+    /// A control inset by `Spacing.sheetContent` inside `sheetCorner` (26).
+    static var sheetConcentric: CGFloat { concentric(insetFromSheetEdge: Spacing.sheetContent) }
+    /// Same value as `sheetCorner`. Kept so existing call sites stay named.
+    static var sheetDisplay: CGFloat { sheetCorner }
+
+    /// Inner radius for an element inset `inset` from the sheet edge.
+    /// Clamped so the corner stays visible and never exceeds the sheet.
+    static func concentric(insetFromSheetEdge inset: CGFloat) -> CGFloat {
+        min(max(sheetCorner - inset, sheetCornerMinimum), sheetCorner)
+    }
+
+    /// Height of the capsule whose radius is `sheetConcentric` (52).
+    /// Play, ••• and the transcript row share it at the default text size.
+    static var sheetCapsuleHeight: CGFloat { sheetConcentric * 2 }
+
+    /// Tallest capsule that stays concentric without crossing the sheet arc.
+    /// Its inset is `arcContentInset(sheetCorner)`.
+    static var maximumSheetCapsuleHeight: CGFloat {
+        concentric(insetFromSheetEdge: arcContentInset(sheetCorner)) * 2
+    }
+
+    /// How far content must sit from a corner of `radius` so it stays outside
+    /// the arc: radius × (1 − 1/√2).
+    static func arcContentInset(_ radius: CGFloat) -> CGFloat {
+        radius * (1 - 1 / CGFloat(2).squareRoot())
+    }
 }
 
 /// Anycast 2.0 motion durations and curves (`AnycastMotion`).

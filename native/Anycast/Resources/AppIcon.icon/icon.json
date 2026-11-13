@@ -1,0 +1,146 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "solid": "extended-srgb:0.94510,0.89412,0.79608,1.00000"
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "extended-srgb:0.12157,0.10196,0.08235,1.00000"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "name": "Character",
+      "layers": [
+        {
+          "name": "eyes",
+          "glass": true,
+          "image-name": "eyes.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "extended-srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.07059,0.05098,0.03137,1.00000"
+              }
+            }
+          ],
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "name": "body",
+          "glass": true,
+          "image-name": "body.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "extended-srgb:0.12941,0.12549,0.10980,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.94510,0.92157,0.86667,1.00000"
+              }
+            }
+          ],
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.4
+      }
+    },
+    {
+      "name": "Fin",
+      "layers": [
+        {
+          "name": "fin",
+          "glass": true,
+          "image-name": "fin.svg",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "extended-srgb:0.12941,0.12549,0.10980,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.94510,0.92157,0.86667,1.00000"
+              }
+            }
+          ],
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.4
+      }
+    },
+    {
+      "name": "Sky",
+      "layers": [
+        {
+          "name": "sky",
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "sky-light.png"
+            },
+            {
+              "appearance": "dark",
+              "value": "sky-dark.png"
+            }
+          ],
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

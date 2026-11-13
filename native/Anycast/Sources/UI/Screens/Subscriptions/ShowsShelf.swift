@@ -86,7 +86,7 @@ final class ShowsShelfView: UIView {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.pageH),
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            heightAnchor.constraint(equalToConstant: ShowsShelfLayout.itemSide),
+            heightAnchor.constraint(greaterThanOrEqualToConstant: ShowsShelfLayout.itemSide),
         ])
     }
 
@@ -149,7 +149,7 @@ private final class ShowShelfCoverButton: UIControl {
             shownKey = key
             coverView.kf.cancelDownloadTask()
             if let show {
-                coverView.setArtwork(show.imageUrl.flatMap(URL.init(string:)), title: show.title)
+                coverView.setArtwork(show.imageUrl.flatMap(URL.init(string:)), title: show.title, side: ShowsShelfLayout.itemSide)
                 accessibilityLabel = show.title
             } else {
                 coverView.image = nil

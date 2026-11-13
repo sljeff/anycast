@@ -18,8 +18,7 @@ class ReleasedDatabaseBaseline {
 }
 
 // Keep one independent fixture for every released schema users can still carry.
-// Build 26 introduced schema 4; every later published build through the current
-// 1.2.1 release still opens that same schema version.
+// Build 26 introduced schema 4. Schema 5 adds historyEpisode.lastPlayedAt.
 const releasedDatabaseBaselines = <ReleasedDatabaseBaseline>[
   ReleasedDatabaseBaseline(
     appVersions: 'early 1.0.0 releases before build 26',
