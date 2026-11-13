@@ -51,7 +51,7 @@ struct AccountPageModelTests {
     func identitySignedOut() {
         let content = AccountPageModel.identity(tier: .signedOut, email: "a@b.co", remaining: 3, plus: nil)
         #expect(content == AccountPageModel.IdentityContent(
-            avatar: .glyph, title: "Sign In & Sync",
+            avatar: .glyph, title: "Sign In",
             subtitle: "Get 10 free AI transcripts", trailing: .action("Sign In")
         ))
     }

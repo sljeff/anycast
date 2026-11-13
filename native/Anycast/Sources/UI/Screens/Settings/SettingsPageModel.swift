@@ -2,63 +2,59 @@ import Foundation
 import AnycastKit
 
 /// Pure model for the settings sheet (lib/pages/settings.dart, 03 §2.13):
-/// row/group structure, row copy and trailing values, tooltip copy, stepper
+/// row/group structure, row copy and trailing values, VoiceOver hints, stepper
 /// step math, option lists, and the deep links. The grouping, copy and
 /// in-row steppers follow the restrained 2.0 Settings direction adopted
-/// 2026-10-21 (the Dart scroll-wheel pickers are gone). UI-free so the
-/// fixtures in AnycastAppTests/Settings assert against data, not UIKit.
+/// 2026-10-21 (the Dart scroll-wheel pickers are gone), regrouped by task in
+/// the batch-1 redesign. UI-free so the fixtures in AnycastAppTests/Settings
+/// assert against data, not UIKit.
 nonisolated enum SettingsPageModel {
 
     // MARK: - Row identity (order = on-screen order)
 
     enum Row: Hashable {
         case account
-        /// Gold upgrade plate under the identity row (free tier only).
+        /// Anycast Plus offer, the second row of the identity plate (signed
+        /// out and free tiers only).
         case plusUpgrade
-        case cacheLimit
-        case enableTranslation
         case targetLanguage
-        case country
-        case autoRefreshInterval
         case maxFeedEpisodes
         case maxHistoryEpisodes
+        case cacheLimit
+        case country
         case importExport
-        case history
         case contactEmail
         case privacyPolicy
         case termsOfUse
     }
 
+    /// The text under a section's plate.
+    enum Footer {
+        /// "Keep on this iPhone": the standing note, or the held-limit notices.
+        case keep
+        /// The app version line.
+        case version
+    }
+
     struct Section {
         let header: String?
         let rows: [Row]
-        /// The trailing Privacy links render outside a group plate (a
-        /// centered column of plain links, not a grouped list).
-        let plainStyle: Bool
+        let footer: Footer?
     }
 
-    /// Group structure of the 2.0 Settings page. Target Language is always
-    /// present; it reads "Off" and is inert while translation is off. The
-    /// gold Upgrade plate follows the identity row for everyone who is not Plus.
+    /// Group structure of the Settings page. The Plus offer joins the
+    /// identity plate for everyone who is not Plus.
     static func sections(tier: AccountPageModel.Tier) -> [Section] {
-        var sections = [Section(header: nil, rows: [.account], plainStyle: false)]
-        if tier == .free || tier == .signedOut {
-            sections.append(Section(header: nil, rows: [.plusUpgrade], plainStyle: false))
-        }
-        sections += [
-            // Listening sits on the first screen: History is a secondary
-            // tool, found here, not in the header or the tab bar.
-            Section(header: "Listening", rows: [.history, .maxHistoryEpisodes], plainStyle: false),
-            Section(header: "Downloads & Storage", rows: [.cacheLimit], plainStyle: false),
-            Section(header: "Subtitles & Translation",
-                    rows: [.enableTranslation, .targetLanguage], plainStyle: false),
-            Section(header: "Content & Discovery",
-                    rows: [.country, .autoRefreshInterval, .maxFeedEpisodes, .importExport],
-                    plainStyle: false),
-            Section(header: "Help", rows: [.contactEmail], plainStyle: false),
-            Section(header: nil, rows: [.privacyPolicy, .termsOfUse], plainStyle: true),
+        let identity: [Row] = tier == .free || tier == .signedOut ? [.account, .plusUpgrade] : [.account]
+        return [
+            Section(header: nil, rows: identity, footer: nil),
+            Section(header: "Transcripts", rows: [.targetLanguage], footer: nil),
+            Section(header: "Keep on this iPhone",
+                    rows: [.maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit], footer: .keep),
+            Section(header: "Shows", rows: [.country, .importExport], footer: nil),
+            Section(header: "Help",
+                    rows: [.contactEmail, .privacyPolicy, .termsOfUse], footer: .version),
         ]
-        return sections
     }
 
     /// Whether translation is on: a target language is set (settings.dart:239
@@ -78,29 +74,25 @@ nonisolated enum SettingsPageModel {
         switch row {
         case .account: return "Account"
         case .plusUpgrade: return AccountPageModel.upgradePlateTitle
-        case .cacheLimit: return "Cache Limit"
-        case .enableTranslation: return "Subtitle Translation"
-        case .targetLanguage: return "Target Language"
-        case .country: return "Discovery Region"
-        case .autoRefreshInterval: return "Auto Refresh"
-        case .maxFeedEpisodes: return "Inbox Limit"
-        case .maxHistoryEpisodes: return "History Limit"
+        case .targetLanguage: return "Translate to"
+        case .maxFeedEpisodes: return "Inbox"
+        case .maxHistoryEpisodes: return "History"
+        case .cacheLimit: return "Played audio"
+        case .country: return "Charts from"
         case .importExport: return "Import & Export"
-        case .history: return "Listening History"
-        case .contactEmail: return "Contact Us"
+        case .contactEmail: return "Send Feedback"
         case .privacyPolicy: return "Privacy Policy"
-        case .termsOfUse: return "Terms of Use (EULA)"
+        case .termsOfUse: return "Terms of Use"
         }
     }
 
-    /// Optional one-line caption under the title.
-    static func subtitle(for row: Row) -> String? {
-        row == .enableTranslation ? "Translate generated text" : nil
+    /// Trailing action on the Plus row: plans for a visitor, upgrade for Free.
+    static func plusActionTitle(tier: AccountPageModel.Tier) -> String {
+        tier == .signedOut ? "See Plans" : AccountPageModel.upgradePlateAction
     }
 
-    /// Trailing value text; nil for rows that show none (switch, plain
-    /// chevron rows). Stepper rows show the stored value even when it is
-    /// off the choice list.
+    /// Trailing value text; nil for rows that show none. Stepper rows show
+    /// the stored value even when it is off the choice list.
     static func value(for row: Row, settings: AppSettings) -> String? {
         switch row {
         case .country:
@@ -108,36 +100,27 @@ nonisolated enum SettingsPageModel {
         case .targetLanguage:
             return showsTargetLanguage(targetLanguage: settings.targetLanguage)
                 ? languageName(forCode: settings.targetLanguage) : "Off"
-        case .autoRefreshInterval:
-            return autoRefreshDisplay(seconds: settings.autoRefreshInterval)
         case .maxFeedEpisodes:
-            return episodesDisplay(count: settings.maxFeedEpisodes)
+            return "Latest \(settings.maxFeedEpisodes)"
         case .maxHistoryEpisodes:
-            return episodesDisplay(count: settings.maxHistoryEpisodes)
+            return "Latest \(settings.maxHistoryEpisodes)"
         case .cacheLimit:
-            return episodesDisplay(count: settings.maxCacheCount)
-        case .contactEmail:
-            return "Email"
+            return "\(settings.maxCacheCount) episodes"
         default:
             return nil
         }
     }
 
-    /// Long-press info captions — the five Dart `Tooltip` messages verbatim
-    /// (settings.dart:150, 255, 302, 356, 405). Trigger/display adaptation
-    /// per 07 §2.7: long-press shows the caption ~2 s.
-    static func tooltip(for row: Row) -> String? {
+    /// VoiceOver hint read after the row name; the sighted page carries no
+    /// long-press captions.
+    static func accessibilityHint(for row: Row) -> String? {
         switch row {
         case .country:
-            return "Discover page will show episodes from this country."
+            return "Discover shows charts from this country."
         case .targetLanguage:
-            return "Translates the podcast transcript into the target language."
-        case .autoRefreshInterval:
-            return "Automatically fetch new episodes every X minutes."
-        case .maxFeedEpisodes:
-            return "Limits the number of episodes in the inbox. Auto deleted if exceeded."
-        case .maxHistoryEpisodes:
-            return "Limits the number of episodes in the history. Auto deleted if exceeded."
+            return "Translates transcripts into this language."
+        case .maxFeedEpisodes, .maxHistoryEpisodes:
+            return "Older episodes are removed automatically."
         default:
             return nil
         }
@@ -156,7 +139,6 @@ nonisolated enum SettingsPageModel {
     /// Choice list behind a stepper row; nil for rows that are not steppers.
     static func stepperChoices(for row: Row) -> [Int64]? {
         switch row {
-        case .autoRefreshInterval: return SettingsCodec.autoRefreshChoicesSeconds
         case .maxFeedEpisodes, .maxHistoryEpisodes: return SettingsCodec.maxEpisodesChoices
         case .cacheLimit: return cacheLimitChoices
         default: return nil
@@ -166,7 +148,6 @@ nonisolated enum SettingsPageModel {
     /// The stored value a stepper row steps from.
     static func stepperValue(for row: Row, settings: AppSettings) -> Int64? {
         switch row {
-        case .autoRefreshInterval: return settings.autoRefreshInterval
         case .maxFeedEpisodes: return settings.maxFeedEpisodes
         case .maxHistoryEpisodes: return settings.maxHistoryEpisodes
         case .cacheLimit: return settings.maxCacheCount
@@ -198,38 +179,35 @@ nonisolated enum SettingsPageModel {
         choiceIndex(of: value, in: choices) < choices.count - 1
     }
 
-    /// Trailing value on the Auto Refresh row: `interval ~/ 60` minutes.
-    static func autoRefreshDisplay(seconds: Int64) -> String {
-        "\(seconds / 60) min"
-    }
+    /// Standing note under "Keep on this iPhone".
+    static let keepNote = "Older ones are removed automatically."
 
-    static func episodesDisplay(count: Int64) -> String {
-        "\(count) episodes"
-    }
-
-    /// Trailing count on Listening History. Empty is "None" so it does not
-    /// read like the History Limit stepper ("100 episodes").
-    static func historyCountDisplay(count: Int) -> String {
-        switch count {
-        case ..<1: return "None"
-        case 1: return "1 episode"
-        default: return "\(count) episodes"
-        }
-    }
-
-    /// One line under the Listening group while a lowered History Limit is
-    /// waiting for Settings to close. Nil when nothing would be removed
-    /// (pending limit at or above the stored count).
-    static func historyRemovalNotice(pendingLimit: Int64, historyCount: Int) -> String? {
-        let removed = historyCount - Int(clamping: pendingLimit)
+    /// Line for a held Inbox or History limit that is lower than the number
+    /// of episodes stored. Nil when nothing would be removed.
+    static func removalNotice(for row: Row, pendingLimit: Int64, count: Int) -> String? {
+        let removed = count - Int(clamping: pendingLimit)
         guard removed > 0 else { return nil }
-        return removed == 1 ? "Oldest episode will be removed." : "Oldest \(removed) episodes will be removed."
+        let place = row == .maxFeedEpisodes ? "the Inbox" : "History"
+        return removed == 1
+            ? "Oldest episode leaves \(place) when you close Settings."
+            : "\(removed) oldest episodes leave \(place) when you close Settings."
     }
 
-    /// The History Limit stepper value while Settings is open. Steps are
-    /// held here and written once, when Settings closes, so stepping below
-    /// the stored count deletes nothing yet and can be stepped back.
-    struct HistoryLimitDraft: Equatable {
+    /// The "Keep on this iPhone" footer: the held-limit notices (Inbox
+    /// first, one per line) or, with none, the standing note.
+    static func keepFooter(pendingLimits: [Row: Int64], counts: [Row: Int]) -> String {
+        let notices = [Row.maxFeedEpisodes, .maxHistoryEpisodes].compactMap { row in
+            pendingLimits[row].flatMap { pending in
+                counts[row].flatMap { removalNotice(for: row, pendingLimit: pending, count: $0) }
+            }
+        }
+        return notices.isEmpty ? keepNote : notices.joined(separator: "\n")
+    }
+
+    /// An Inbox or History limit stepped in this sheet. Steps are held here
+    /// and written once, when Settings closes, so stepping below the stored
+    /// count removes nothing yet and can be stepped back.
+    struct LimitDraft: Equatable {
         /// The limit persisted in settings.
         let stored: Int64
         /// A held value that differs from `stored`; nil when there is none.
@@ -252,7 +230,6 @@ nonisolated enum SettingsPageModel {
     /// VoiceOver names for the minus/plus halves of each stepper row.
     static func stepperAccessibilityLabels(for row: Row) -> (decrease: String, increase: String)? {
         switch row {
-        case .autoRefreshInterval: return ("Shorter auto refresh interval", "Longer auto refresh interval")
         case .maxFeedEpisodes: return ("Lower inbox limit", "Raise inbox limit")
         case .maxHistoryEpisodes: return ("Lower history limit", "Raise history limit")
         case .cacheLimit: return ("Lower cache limit", "Raise cache limit")
@@ -288,24 +265,42 @@ nonisolated enum SettingsPageModel {
             ?? languages[0].name
     }
 
-    /// Language preselected when the translation switch turns on:
-    /// `Platform.localeName` split on "_" taking the first segment, default
-    /// "en" (settings.dart:221-228). iOS hands us hyphenated identifiers —
-    /// the G9 locale fixture split (first segment = language).
-    static func defaultTargetLanguage(localeIdentifier: String) -> String {
-        let normalized = localeIdentifier.replacingOccurrences(of: "-", with: "_")
-        let parts = normalized.split(separator: "_", omittingEmptySubsequences: false)
-        guard parts.count > 1 else { return "en" }
-        return String(parts[0])
-    }
+    /// Language sheet options: "Off" (the empty stored value) first.
+    static let languageOptions: [(name: String, code: String)] = [("Off", "")] + languages
 
     // MARK: - Deep links
 
     /// The mailto the shipped app actually opens (settings.dart:451-458) —
-    /// note the missing dot in the recipient, mirrored byte-for-byte.
+    /// note the missing dot in the recipient, mirrored byte-for-byte. The
+    /// composer takes its recipient from here.
     static let feedbackMailtoURL = URL(
         string: "mailto:kindjeffcom@gmail.com?subject=Anycast%20Feedback"
     )!
+
+    /// Recipient address of `feedbackMailtoURL`.
+    static var feedbackAddress: String {
+        URLComponents(url: feedbackMailtoURL, resolvingAgainstBaseURL: false)?.path ?? ""
+    }
+
+    static let feedbackSubject = "Anycast Feedback"
+
+    /// Feedback mail body: room to write, then a diagnostics block.
+    static func feedbackBody(appVersion: String, build: String, systemVersion: String,
+                             deviceModel: String) -> String {
+        """
+
+
+        ---
+        Anycast \(appVersion) (\(build))
+        iOS \(systemVersion)
+        \(deviceModel)
+        """
+    }
+
+    /// The version line under the Help plate.
+    static func versionLine(appVersion: String, build: String) -> String {
+        "Anycast \(appVersion) (\(build))"
+    }
 
     /// Privacy/EULA targets (widgets/privacy.dart:17-19, 33-38).
     static let privacyPolicyURL = URL(string: "https://privacy.anycast.website")!

@@ -99,7 +99,7 @@ nonisolated enum AccountPageModel {
         if tier == .signedOut {
             return IdentityContent(
                 avatar: .glyph,
-                title: "Sign In & Sync",
+                title: "Sign In",
                 subtitle: "Get \(PlusOffer.freePitch)",
                 trailing: .action("Sign In")
             )

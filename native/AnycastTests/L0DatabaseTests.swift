@@ -716,6 +716,21 @@ struct L0DatabaseTests {
         _ = try await AppDatabase.openAt(url)
     }
 
+    @Test("Feed count follows inserts and trim")
+    func feedCount() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("feed-count-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let database = try await AppDatabase.openAt(url, localeIdentifier: "en_US")
+        #expect(try await database.feedRepository().count() == 0)
+        try await database.feedRepository().insertMany((1...4).map {
+            FeedEpisodeRow(title: "e\($0)", enclosureUrl: "https://count.example/\($0).mp3", pubDate: Int64($0))
+        })
+        #expect(try await database.feedRepository().count() == 4)
+        try await database.feedRepository().trim(keeping: 2)
+        #expect(try await database.feedRepository().count() == 2)
+    }
+
     @Test("Subtitle insert gate (1.2.1+38 baseline): incomplete payloads are dropped, complete rows persist")
     func subtitleInsertGate() async throws {
         let directory = FileManager.default.temporaryDirectory

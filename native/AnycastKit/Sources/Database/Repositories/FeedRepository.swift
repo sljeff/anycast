@@ -15,6 +15,14 @@ public struct FeedRepository: Sendable {
         }
     }
 
+    /// Number of inbox rows. Read-only.
+    @concurrent
+    public func count() async throws -> Int {
+        try await database.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM feedEpisode") ?? 0
+        }
+    }
+
     /// The inbox rows of one show, newest first. Read-only: the Channel page
     /// shows these while its network fetch runs.
     @concurrent

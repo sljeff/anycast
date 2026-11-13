@@ -117,23 +117,24 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        // The Auto Refresh row is a stepper row: its text block carries the
-        // value, and the − | + halves are separate buttons.
+        // The Played audio row is a stepper row that writes immediately: its
+        // text block carries the value, and the − | + halves are separate
+        // buttons. (Inbox and History are held until Settings closes.)
         func intervalValue(_ row: XCUIElement) -> String? {
-            row.otherElements["Auto Refresh"].value as? String
+            row.otherElements["Played audio"].value as? String
         }
-        let shorter = "Shorter auto refresh interval"
-        let longer = "Longer auto refresh interval"
+        let shorter = "Lower cache limit"
+        let longer = "Raise cache limit"
 
         app.buttons["Settings"].tap()
-        let intervalRow = app.cells["settings-row-autoRefreshInterval"]
-        guard intervalRow.waitForExistence(timeout: 8) else {
-            XCTFail("settings sheet did not list the auto refresh row")
+        let limitRow = app.cells["settings-row-cacheLimit"]
+        guard limitRow.waitForExistence(timeout: 8) else {
+            XCTFail("settings sheet did not list the played audio row")
             return
         }
-        let before = intervalValue(intervalRow)
-        // Step up unless already at the longest interval.
-        let forward = intervalRow.buttons[longer].isEnabled ? longer : shorter
+        let before = intervalValue(limitRow)
+        // Step up unless already at the largest limit.
+        let forward = limitRow.buttons[longer].isEnabled ? longer : shorter
         let back = forward == longer ? shorter : longer
         // Restore the original interval no matter how the test exits — the
         // change is persisted to the simulator database and would otherwise
@@ -145,15 +146,15 @@ final class SmokeFlowsUITests: XCTestCase {
             app.launch()
             guard app.buttons["tab-0"].waitForExistence(timeout: 20) else { return }
             app.buttons["Settings"].tap()
-            let row = app.cells["settings-row-autoRefreshInterval"]
+            let row = app.cells["settings-row-cacheLimit"]
             guard row.waitForExistence(timeout: 8), intervalValue(row) != original else { return }
             row.buttons[back].tap()
         }
         defer { restoreOriginalInterval() }
 
-        intervalRow.buttons[forward].tap()
-        waitUntil(timeout: 5) { intervalValue(intervalRow) != before }
-        guard let target = intervalValue(intervalRow), target != before else {
+        limitRow.buttons[forward].tap()
+        waitUntil(timeout: 5) { intervalValue(limitRow) != before }
+        guard let target = intervalValue(limitRow), target != before else {
             XCTFail("settings row did not change from \(before ?? "nil")")
             return
         }
@@ -163,11 +164,11 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
         app.buttons["Settings"].tap()
-        let reopened = app.cells["settings-row-autoRefreshInterval"]
+        let reopened = app.cells["settings-row-cacheLimit"]
         XCTAssertTrue(reopened.waitForExistence(timeout: 8), "settings sheet did not reopen")
         XCTAssertEqual(
             intervalValue(reopened), target,
-            "auto refresh interval did not persist (was \(before ?? "nil"))"
+            "cache limit did not persist (was \(before ?? "nil"))"
         )
     }
 

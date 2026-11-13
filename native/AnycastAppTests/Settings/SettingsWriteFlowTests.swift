@@ -57,7 +57,7 @@ struct SettingsWriteFlowTests {
         )
 
         // Holding a lower limit (the draft) never touches the database.
-        var draft = SettingsPageModel.HistoryLimitDraft(stored: box.current.maxHistoryEpisodes)
+        var draft = SettingsPageModel.LimitDraft(stored: box.current.maxHistoryEpisodes)
         draft.step(.decrease, in: SettingsCodec.maxEpisodesChoices)
         #expect(try await database.historyRepository().count() == 5)
 
@@ -158,7 +158,7 @@ struct SettingsWriteFlowTests {
         let writer = SettingsStepWriter(coordinator: coordinator)
 
         let rows: [SettingsPageModel.Row] = [
-            .autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit,
+            .maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit,
         ]
         for row in rows {
             let choices = try #require(SettingsPageModel.stepperChoices(for: row))
@@ -177,7 +177,6 @@ struct SettingsWriteFlowTests {
         let reloaded = try await database.settingsRepository().load()
         #expect(SettingsPageModel.stepperValue(for: .cacheLimit, settings: reloaded)
             == SettingsPageModel.stepperValue(for: .cacheLimit, settings: box.current))
-        #expect(reloaded.autoRefreshInterval == box.current.autoRefreshInterval)
         #expect(reloaded.maxFeedEpisodes == box.current.maxFeedEpisodes)
         #expect(reloaded.maxHistoryEpisodes == box.current.maxHistoryEpisodes)
 
