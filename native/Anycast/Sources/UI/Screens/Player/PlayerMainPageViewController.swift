@@ -28,15 +28,9 @@ final class PlayerMainPageViewController: UIViewController {
     private let shareSpinner = UIActivityIndicatorView(style: .medium)
     private let titleBlock = PlayerTitleBlockView()
     private lazy var transport = PlayerTransportView(context: context, transportGap: Spacing.gap)
-    private let speedButton = AnycastIconButton(
-        style: .tonal, icon: nil, accessibilityLabel: "Playback speed", glyphSize: 20
-    )
-    private let sleepButton = AnycastIconButton(
-        style: .tonal, icon: AppIcons.sleepTimer, accessibilityLabel: "Sleep timer", glyphSize: 20
-    )
+    private lazy var speedSleep = PlayerSpeedSleepControls(context: context)
     private let chapterButton = UIButton(type: .system)
     private var chapters: [EpisodeChapter] = []
-    private var sleepTicker: Timer?
     private let retryRow = UIStackView()
     private var bottomStack = UIStackView()
 
@@ -63,11 +57,6 @@ final class PlayerMainPageViewController: UIViewController {
         static let contentTop: CGFloat = 36
     }
 
-    /// The speed menu: the stepper's 0.5–2 ×0.25 stops, with the rarely
-    /// used 0.5× set apart at the bottom.
-    private static let speedStops = PlayerSliderMath.stops(min: 0.5, max: 2.0, divisions: 6)
-    private static let sleepMinutes = [10, 20, 30, 45, 60]
-
     init(context: UIContext) {
         self.context = context
         super.init(nibName: nil, bundle: nil)
@@ -84,9 +73,6 @@ final class PlayerMainPageViewController: UIViewController {
         build()
         bind()
         render()
-        renderSpeed()
-        renderSleep()
-
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
@@ -98,30 +84,19 @@ final class PlayerMainPageViewController: UIViewController {
         chapterObservation.track(
             read: { [weak self] in
                 _ = self?.context.playback.positionData
-                _ = self?.context.playback.speed
             },
-            onChange: { [weak self] in
-                self?.renderChapter()
-                self?.renderSpeed()
-            }
+            onChange: { [weak self] in self?.renderChapter() }
         )
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        renderSleep()
-        // The sleep countdown lives in SleepTimerController; this only
-        // re-reads it so the button's minutes tick down.
-        guard sleepTicker == nil else { return }
-        sleepTicker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.renderSleep() }
-        }
+        speedSleep.pageWillAppear()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        sleepTicker?.invalidate()
-        sleepTicker = nil
+        speedSleep.pageDidDisappear()
     }
 
     // MARK: - Build
@@ -215,34 +190,10 @@ final class PlayerMainPageViewController: UIViewController {
         ])
     }
 
-    /// Speed left and sleep timer right of the transport, styled like the
-    /// transcript page's ••• and Ask AI; the current chapter under the
-    /// scrubber.
+    /// Speed left and sleep timer right of the transport (shared with the
+    /// transcript page); the current chapter under the scrubber.
     private func buildTransportAccessories() {
-        for button in [speedButton, sleepButton] {
-            button.configuration?.baseBackgroundColor = Theme.playerText.withAlphaComponent(0.08)
-            button.configuration?.baseForegroundColor = Theme.playerText
-            button.configuration?.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-                var outgoing = incoming
-                outgoing.font = TypographyV2.body.font().monospacedDigits()
-                return outgoing
-            }
-            button.configuration?.titleLineBreakMode = .byClipping
-            button.showsMenuAsPrimaryAction = true
-        }
-        speedButton.accessibilityIdentifier = "player-speed"
-        sleepButton.accessibilityIdentifier = "player-sleep"
-        speedButton.menu = UIMenu(children: [
-            UIDeferredMenuElement.uncached { [weak self] completion in
-                completion(self?.speedMenuElements() ?? [])
-            },
-        ])
-        sleepButton.menu = UIMenu(children: [
-            UIDeferredMenuElement.uncached { [weak self] completion in
-                completion(self?.sleepMenuElements() ?? [])
-            },
-        ])
-        transport.setAccessories(leading: speedButton, trailing: sleepButton)
+        speedSleep.install(in: transport)
 
         var chapterConfig = UIButton.Configuration.plain()
         chapterConfig.baseForegroundColor = Theme.playerSecondary
@@ -334,35 +285,6 @@ final class PlayerMainPageViewController: UIViewController {
         chapterButton.accessibilityHint = "Shows this episode's chapters and notes"
     }
 
-    private func renderSpeed() {
-        let index = PlayerSliderMath.nearestIndex(for: Double(context.playback.speed), in: Self.speedStops)
-        let text = PlayerSliderMath.speedText(Self.speedStops[index])
-        guard speedButton.configuration?.title != text else { return }
-        speedButton.configuration?.title = text
-        speedButton.accessibilityValue = text
-    }
-
-    /// Off: outline moon in player text. End of episode: filled moon in
-    /// primary. Counting down: the minutes replace the glyph (the button
-    /// is one slot). Player text, not `Theme.onSurface`: the player is
-    /// always dark, and onSurface follows the app appearance.
-    private func renderSleep() {
-        let timer = context.sleepTimer
-        let remaining = timer.remainingMilliseconds ?? 0
-        if remaining > 0 {
-            sleepButton.setIcon(nil)
-            sleepButton.configuration?.title = "\(timer.countdownMinutes)m"
-            sleepButton.configuration?.baseForegroundColor = Theme.primary
-            sleepButton.accessibilityValue = "\(timer.countdownMinutes) minutes left"
-        } else {
-            sleepButton.configuration?.title = nil
-            let engaged = timer.stopsAtEpisodeEnd
-            sleepButton.setIcon(engaged ? AppIcons.sleepTimerActive : AppIcons.sleepTimer)
-            sleepButton.configuration?.baseForegroundColor = engaged ? Theme.primary : Theme.playerText
-            sleepButton.accessibilityValue = engaged ? "End of episode" : "Off"
-        }
-    }
-
     /// The share action needs the shortlink inputs — an episode with both
     /// a feed URL and an enclosure URL. Everything else on the transport
     /// dims to 38% with no episode; share matches that affordance (the
@@ -370,74 +292,6 @@ final class PlayerMainPageViewController: UIViewController {
     static func shareAvailable(_ episode: PlaylistEpisodeRow?) -> Bool {
         guard let episode else { return false }
         return !(episode.rssFeedUrl ?? "").isEmpty && !(episode.enclosureUrl ?? "").isEmpty
-    }
-
-    // MARK: - Menus
-
-    private func speedMenuElements() -> [UIMenuElement] {
-        let current = PlayerSliderMath.nearestIndex(for: Double(context.playback.speed), in: Self.speedStops)
-        let actions = Self.speedStops.enumerated().map { index, stop in
-            UIAction(
-                title: PlayerSliderMath.speedText(stop),
-                state: index == current ? .on : .off
-            ) { [weak self] _ in
-                self?.context.playback.setSpeed(Float(stop))
-                self?.renderSpeed()
-            }
-        }
-        // Everyday speeds first; the slow 0.5× sits apart below them.
-        return [
-            UIMenu(title: "Playback speed", options: .displayInline, children: Array(actions.dropFirst())),
-            UIMenu(options: .displayInline, children: [actions[0]]),
-        ]
-    }
-
-    private func sleepMenuElements() -> [UIMenuElement] {
-        let timer = context.sleepTimer
-        let remaining = timer.remainingMilliseconds ?? 0
-        let counting = remaining > 0
-        let title = counting ? "Sleep timer · \(timer.countdownMinutes) min left" : "Sleep timer"
-
-        var timerItems: [UIMenuElement] = [
-            UIAction(title: "Off", state: !counting && !timer.stopsAtEpisodeEnd ? .on : .off) { [weak self] _ in
-                self?.context.sleepTimer.stop()
-                self?.renderSleep()
-            },
-        ]
-        for minutes in Self.sleepMinutes {
-            timerItems.append(UIAction(title: "\(minutes) minutes") { [weak self] _ in
-                self?.context.sleepTimer.setCountdown(minutes: minutes)
-                Haptics.timerSet()
-                self?.renderSleep()
-            })
-        }
-        let position = context.playback.positionData
-        let left = max(position.durationMilliseconds - position.positionMilliseconds, 0)
-        let endOfEpisode = UIAction(
-            title: "End of episode",
-            subtitle: left > 0 ? "\(Int((Double(left) / 60_000).rounded(.up))) min" : nil,
-            state: timer.stopsAtEpisodeEnd ? .on : .off
-        ) { [weak self] _ in
-            self?.context.sleepTimer.setStopAtEpisodeEnd()
-            Haptics.timerSet()
-            self?.renderSleep()
-        }
-        timerItems.append(endOfEpisode)
-
-        // Continuous play: what happens whenever an episode finishes.
-        let continuous = context.playback.continuousPlaying
-        let afterItems: [UIMenuElement] = [
-            UIAction(title: "Play next in playlist", state: continuous ? .on : .off) { [weak self] _ in
-                self?.context.playback.setContinuousPlaying(true)
-            },
-            UIAction(title: "Stop", state: continuous ? .off : .on) { [weak self] _ in
-                self?.context.playback.setContinuousPlaying(false)
-            },
-        ]
-        return [
-            UIMenu(title: title, options: .displayInline, children: timerItems),
-            UIMenu(title: "When an episode ends", options: .displayInline, children: afterItems),
-        ]
     }
 
     private func openEpisodePage() {

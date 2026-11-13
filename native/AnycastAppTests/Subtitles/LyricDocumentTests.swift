@@ -93,6 +93,8 @@ struct LyricDocumentTests {
         // End spacer of segment 1 sits between the two content lines.
         #expect(lines[1].text == "")
         #expect(lines[1].startMilliseconds == 2_500)
+        // It shares segment 2's stamp but must not repeat its translation.
+        #expect(lines[1].translation == nil)
         #expect(lines[2].text == "second")
         #expect(lines[2].translation == "第二")
     }
