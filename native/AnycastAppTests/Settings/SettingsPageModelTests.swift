@@ -16,8 +16,8 @@ struct SettingsPageModelTests {
     func sectionRowOrder() {
         let tail: [[SettingsPageModel.Row]] = [
             [.targetLanguage],
-            [.maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit],
-            [.country, .importExport],
+            [.maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit, .clearCache],
+            [.country, .importSubscriptions, .exportSubscriptions],
             [.contactEmail, .privacyPolicy, .termsOfUse],
         ]
         for (tier, identity) in [
@@ -28,7 +28,7 @@ struct SettingsPageModelTests {
             let sections = SettingsPageModel.sections(tier: tier)
             #expect(sections.map(\.rows) == [identity] + tail, "\(tier)")
             #expect(sections.map(\.header) == [nil, "Transcripts", "Keep on this iPhone", "Shows", "Help"])
-            #expect(sections.map(\.footer) == [nil, nil, .keep, nil, .version])
+            #expect(sections.map(\.footer) == [nil, nil, .keep, .shows, .version])
         }
         #expect(SettingsPageModel.identifier(for: .plusUpgrade) == "settings-row-plusUpgrade")
     }
@@ -63,7 +63,9 @@ struct SettingsPageModelTests {
             .maxHistoryEpisodes: "History",
             .cacheLimit: "Played audio",
             .country: "Charts from",
-            .importExport: "Import & Export",
+            .clearCache: "Clear played audio",
+            .importSubscriptions: "Import subscriptions",
+            .exportSubscriptions: "Export subscriptions",
             .contactEmail: "Send Feedback",
             .privacyPolicy: "Privacy Policy",
             .termsOfUse: "Terms of Use",
@@ -82,7 +84,7 @@ struct SettingsPageModelTests {
         settings.maxHistoryEpisodes = 100
         settings.maxCacheCount = 10
 
-        #expect(SettingsPageModel.value(for: .country, settings: settings) == "日本")
+        #expect(SettingsPageModel.value(for: .country, settings: settings) == Locale.current.localizedString(forRegionCode: "JP"))
         #expect(SettingsPageModel.value(for: .targetLanguage, settings: settings) == "中文")
         #expect(SettingsPageModel.value(for: .maxFeedEpisodes, settings: settings) == "Latest 200")
         #expect(SettingsPageModel.value(for: .maxHistoryEpisodes, settings: settings) == "Latest 100")
@@ -92,7 +94,8 @@ struct SettingsPageModelTests {
         #expect(SettingsPageModel.value(for: .targetLanguage, settings: settings) == "Off")
 
         for row: SettingsPageModel.Row in [
-            .account, .plusUpgrade, .importExport, .contactEmail, .privacyPolicy, .termsOfUse,
+            .account, .plusUpgrade, .importSubscriptions, .exportSubscriptions, .clearCache,
+            .contactEmail, .privacyPolicy, .termsOfUse,
         ] {
             #expect(SettingsPageModel.value(for: row, settings: settings) == nil)
         }
@@ -104,53 +107,58 @@ struct SettingsPageModelTests {
         #expect(SettingsPageModel.accessibilityHint(for: .maxHistoryEpisodes) == "Older episodes are removed automatically.")
         #expect(SettingsPageModel.accessibilityHint(for: .country) == "Discover shows charts from this country.")
         #expect(SettingsPageModel.accessibilityHint(for: .targetLanguage) == "Translates transcripts into this language.")
-        for row: SettingsPageModel.Row in [.account, .plusUpgrade, .cacheLimit, .importExport, .contactEmail] {
+        for row: SettingsPageModel.Row in [.account, .plusUpgrade, .cacheLimit, .importSubscriptions, .exportSubscriptions, .contactEmail] {
             #expect(SettingsPageModel.accessibilityHint(for: row) == nil)
         }
     }
 
-    // MARK: - Country list (49 whitelist, Dart compareTo display order)
+    // MARK: - Country list (49 whitelist, system language, locale-aware order)
 
-    @Test("Country options: 49 entries, full Dart-UTF16-sorted order")
-    func countryOrderFixture() {
-        let expected: [(name: String, code: String)] = [
-            ("Argentina", "AR"), ("Australia", "AU"), ("Bangladesh", "BD"),
-            ("België / Belgique", "BE"), ("Brasil", "BR"), ("Canada", "CA"),
-            ("Chile", "CL"), ("Colombia", "CO"), ("Danmark", "DK"),
-            ("Deutschland", "DE"), ("España", "ES"), ("France", "FR"),
-            ("India", "IN"), ("Indonesia", "ID"), ("Ireland", "IE"),
-            ("Israel", "IL"), ("Italia", "IT"), ("Magyarország", "HU"),
-            ("Malaysia", "MY"), ("México", "MX"), ("Nederland", "NL"),
-            ("New Zealand", "NZ"), ("Nigeria", "NG"), ("Norge", "NO"),
-            ("Pakistan", "PK"), ("Philippines", "PH"), ("Polska", "PL"),
-            ("Portugal", "PT"), ("România", "RO"), ("Saudi Arabia", "SA"),
-            ("Schweiz", "CH"), ("Singapore", "SG"), ("South Africa", "ZA"),
-            ("Suomi", "FI"), ("Sverige", "SE"), ("Türkiye", "TR"),
-            ("United Kingdom", "GB"), ("United States", "US"),
-            ("Việt Nam", "VN"), ("Österreich", "AT"), ("Česká republika", "CZ"),
-            ("Ελλάδα", "GR"), ("Россия", "RU"), ("Україна", "UA"),
-            ("مصر", "EG"), ("ประเทศไทย", "TH"), ("中国", "CN"),
-            ("日本", "JP"), ("대한민국", "KR"),
-        ]
-        // Tuple arrays are not Equatable; compare element by element.
-        #expect(SettingsPageModel.sortedCountries.count == 49)
-        #expect(SettingsPageModel.sortedCountries.count == expected.count)
-        for (index, option) in SettingsPageModel.sortedCountries.enumerated() {
-            #expect(option.name == expected[index].name)
-            #expect(option.code == expected[index].code)
+    @Test("Country options: 49 entries named and sorted for the locale; stored codes unchanged")
+    func countryOrder() {
+        for identifier in ["en_US", "de_DE", "ja_JP", "fr_FR"] {
+            let locale = Locale(identifier: identifier)
+            let countries = SettingsPageModel.sortedCountries(locale: locale)
+            #expect(countries.count == 49, "\(identifier)")
+            #expect(Set(countries.map(\.code)) == Set(SettingsCodec.countries.map(\.code)))
+            for pair in zip(countries, countries.dropFirst()) {
+                #expect(pair.0.name.compare(pair.1.name, locale: locale) != .orderedDescending,
+                        "\(identifier): \(pair.0.name) before \(pair.1.name)")
+            }
+            // Names come from the system language, not the whitelist's own.
+            for country in countries {
+                #expect(country.name == locale.localizedString(forRegionCode: country.code))
+            }
         }
+    }
 
-        // Same 49 codes as the codec whitelist (order is the only change).
-        #expect(Set(SettingsPageModel.sortedCountries.map(\.code))
-            == Set(SettingsCodec.countries.map(\.code)))
+    @Test("German: Österreich sorts with the O's, Ägypten with the A's")
+    func germanCountryOrder() {
+        let names = SettingsPageModel.sortedCountries(locale: Locale(identifier: "de_DE")).map(\.name)
+        let austria = names.firstIndex(of: "Österreich")!
+        #expect(austria > names.firstIndex(of: "Norwegen")!)
+        #expect(austria < names.firstIndex(of: "Pakistan")!)
+        #expect(names.firstIndex(of: "Ägypten")! < names.firstIndex(of: "Argentinien")!)
     }
 
     @Test("Country name lookup: exact code, case-insensitive, first-entry fallback")
     func countryNameLookup() {
-        #expect(SettingsPageModel.countryName(forCode: "US") == "United States")
-        #expect(SettingsPageModel.countryName(forCode: "jp") == "日本")
-        // country_code_picker falls back to elements[0] ("Argentina").
-        #expect(SettingsPageModel.countryName(forCode: "XX") == "Argentina")
+        let english = Locale(identifier: "en_US")
+        #expect(SettingsPageModel.countryName(forCode: "US", locale: english) == "United States")
+        #expect(SettingsPageModel.countryName(forCode: "jp", locale: english) == "Japan")
+        #expect(SettingsPageModel.countryName(forCode: "JP", locale: Locale(identifier: "ja_JP")) == "日本")
+        // An unknown code falls back to the first entry of the sorted list.
+        #expect(SettingsPageModel.countryName(forCode: "XX", locale: english)
+            == SettingsPageModel.sortedCountries(locale: english)[0].name)
+    }
+
+    @Test("Export and cache rows: values and copy")
+    func exportAndCacheValues() {
+        #expect(SettingsPageModel.exportValue(subscriptionCount: 0) == "No shows yet")
+        #expect(SettingsPageModel.exportValue(subscriptionCount: 3) == nil)
+        #expect(SettingsPageModel.cacheUsageValue(bytes: 0) == "None")
+        #expect(SettingsPageModel.cacheUsageValue(bytes: 5_000_000) == ByteCountFormatter.string(fromByteCount: 5_000_000, countStyle: .file))
+        #expect(SettingsPageModel.clearCacheMessage(bytes: 5_000_000).hasSuffix("The episode playing now stays."))
     }
 
     // MARK: - Language list (11 entries, declaration order)

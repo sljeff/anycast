@@ -68,7 +68,7 @@ nonisolated enum ShareHandoff {
 
 /// The `ShareHandoffPresenting` implementation (App/UIContext.swift):
 /// consumes the redirect URL, reads the App Group payload, parses the OPML
-/// and presents the ShareDialog. Long-lived like Dart's ShareController —
+/// and presents the import sheet. Long-lived like Dart's ShareController —
 /// `UIContext.shareHandoffPresenter` is weak, so registration retains the
 /// instance for the process lifetime (static, below).
 @MainActor
@@ -92,7 +92,7 @@ final class ShareHandoffCoordinator: ShareHandoffPresenting {
     }
 
     private let context: UIContext
-    private weak var currentDialog: ShareDialogViewController?
+    private weak var currentSheet: ImportSheetViewController?
 
     private init(context: UIContext) {
         self.context = context
@@ -108,9 +108,9 @@ final class ShareHandoffCoordinator: ShareHandoffPresenting {
     }
 
     private func beginHandoff(fixtureURL: URL?) {
-        // Dart stacked a dialog per event; a visible handoff dialog swallows
-        // repeats (the dedupe precedent from LoginPromptCoordinator).
-        guard currentDialog?.view.window == nil else { return }
+        // A visible handoff sheet swallows repeats (the dedupe precedent from
+        // LoginPromptCoordinator).
+        guard currentSheet?.view.window == nil else { return }
 
         var fileURL = fixtureURL
         if fixtureURL == nil {
@@ -123,42 +123,36 @@ final class ShareHandoffCoordinator: ShareHandoffPresenting {
             }
         }
 
-        guard let fileURL else {
-            // No payload at all: Dart still opened ShareDialog, which showed
-            // the empty state (states/share.dart:36-38 → widgets/share.dart:13).
-            Task { await presentWhenReady(entries: []) }
-            return
-        }
-
         Task { [fileURL] in
-            // File read + XML parse off the main actor.
-            let entries = await Task.detached(priority: .userInitiated) {
-                (try? OPMLParser.parse(fileURL: fileURL)) ?? []
-            }.value
-            await presentWhenReady(entries: entries)
+            // File read + XML parse off the main actor; no payload at all
+            // reads as a file with no feeds.
+            var entries: [OPMLParser.Entry] = []
+            if let fileURL { entries = await ImportFlow.parse(fileURL: fileURL) }
+            let plan = await PodcastImporter(database: context.database).plan(entries: entries)
+            await presentWhenReady(plan: plan, filename: fileURL?.lastPathComponent)
         }
     }
 
-    /// Cold-start parity: Dart delayed the dialog 2 s after launch
-    /// (states/share.dart:52-56); here the retry loop waits for the scene's
-    /// window instead, capped at the same 2 s.
-    private func presentWhenReady(entries: [OPMLParser.Entry], attempt: Int = 0) async {
+    /// Cold-start parity: the Dart app delayed the dialog 2 s after launch;
+    /// here the retry loop waits for the scene's window instead, capped at
+    /// the same 2 s.
+    private func presentWhenReady(plan: ImportPlan, filename: String?, attempt: Int = 0) async {
         if let presenter {
-            let dialog = ShareDialogViewController(context: context, entries: entries)
-            currentDialog = dialog
-            presenter.present(dialog, animated: true)
+            let sheet = ImportSheetViewController(context: context, plan: plan, filename: filename)
+            currentSheet = sheet
+            presenter.present(sheet, animated: true)
             return
         }
         guard attempt < 10 else {
             // No silent drop: after the 2 s presenter-retry cap the handoff
             // never reaches a presenter — leave an error-level trace.
             Self.logger.error(
-                "Share handoff dropped: no window presenter after \(attempt) retries (\(entries.count) parsed entries)"
+                "Share handoff dropped: no window presenter after \(attempt) retries (\(plan.entries.count) parsed entries)"
             )
             return
         }
         try? await Task.sleep(nanoseconds: 200_000_000)
-        await presentWhenReady(entries: entries, attempt: attempt + 1)
+        await presentWhenReady(plan: plan, filename: filename, attempt: attempt + 1)
     }
 
     /// The top-most presenter over the key window of a foreground-ACTIVE

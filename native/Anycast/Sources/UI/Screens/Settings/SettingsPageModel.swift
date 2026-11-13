@@ -21,8 +21,11 @@ nonisolated enum SettingsPageModel {
         case maxFeedEpisodes
         case maxHistoryEpisodes
         case cacheLimit
+        /// Space the played audio takes, and the action to clear it.
+        case clearCache
         case country
-        case importExport
+        case importSubscriptions
+        case exportSubscriptions
         case contactEmail
         case privacyPolicy
         case termsOfUse
@@ -32,6 +35,8 @@ nonisolated enum SettingsPageModel {
     enum Footer {
         /// "Keep on this iPhone": the standing note, or the held-limit notices.
         case keep
+        /// The note under "Shows": what Export covers.
+        case shows
         /// The app version line.
         case version
     }
@@ -50,8 +55,9 @@ nonisolated enum SettingsPageModel {
             Section(header: nil, rows: identity, footer: nil),
             Section(header: "Transcripts", rows: [.targetLanguage], footer: nil),
             Section(header: "Keep on this iPhone",
-                    rows: [.maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit], footer: .keep),
-            Section(header: "Shows", rows: [.country, .importExport], footer: nil),
+                    rows: [.maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit, .clearCache], footer: .keep),
+            Section(header: "Shows", rows: [.country, .importSubscriptions, .exportSubscriptions],
+                    footer: .shows),
             Section(header: "Help",
                     rows: [.contactEmail, .privacyPolicy, .termsOfUse], footer: .version),
         ]
@@ -79,7 +85,9 @@ nonisolated enum SettingsPageModel {
         case .maxHistoryEpisodes: return "History"
         case .cacheLimit: return "Played audio"
         case .country: return "Charts from"
-        case .importExport: return "Import & Export"
+        case .clearCache: return "Clear played audio"
+        case .importSubscriptions: return "Import subscriptions"
+        case .exportSubscriptions: return "Export subscriptions"
         case .contactEmail: return "Send Feedback"
         case .privacyPolicy: return "Privacy Policy"
         case .termsOfUse: return "Terms of Use"
@@ -109,6 +117,23 @@ nonisolated enum SettingsPageModel {
         default:
             return nil
         }
+    }
+
+    /// Trailing value of "Export subscriptions": a note instead when there
+    /// is nothing to export.
+    static func exportValue(subscriptionCount: Int) -> String? {
+        subscriptionCount == 0 ? ImportCopy.exportEmpty : nil
+    }
+
+    /// Trailing value of "Clear played audio": the space the files take.
+    static func cacheUsageValue(bytes: Int64) -> String {
+        bytes <= 0 ? "None" : ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    /// The confirmation before clearing played audio.
+    static func clearCacheMessage(bytes: Int64) -> String {
+        "Frees \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)). "
+            + "Episodes download again when you play them. The episode playing now stays."
     }
 
     /// VoiceOver hint read after the row name; the sighted page carries no
@@ -239,12 +264,20 @@ nonisolated enum SettingsPageModel {
 
     // MARK: - Country / language options
 
-    /// The 49-country whitelist sorted like the Dart build does
-    /// (settings.dart:91 — `String.compareTo`, UTF-16 code-unit order).
-    static let sortedCountries: [(name: String, code: String)] =
-        SettingsCodec.countries.sorted { a, b in
-            utf16Units(a.name).lexicographicallyPrecedes(utf16Units(b.name))
-        }
+    /// The 49-country whitelist, named in the system language and sorted
+    /// by that name with the locale's own collation, so "Österreich" sits
+    /// with the O's. The stored value is still the region code.
+    static func sortedCountries(locale: Locale = .current) -> [(name: String, code: String)] {
+        SettingsCodec.countries
+            .map { (name: displayName(forRegion: $0.code, fallback: $0.name, locale: locale), code: $0.code) }
+            .sorted { $0.name.compare($1.name, locale: locale) == .orderedAscending }
+    }
+
+    /// A region's name in the system language; the whitelist's own name
+    /// when the system has none.
+    static func displayName(forRegion code: String, fallback: String, locale: Locale = .current) -> String {
+        locale.localizedString(forRegionCode: code) ?? fallback
+    }
 
     /// Languages keep declaration order (the package does not sort;
     /// settings.dart targetLangList).
@@ -253,10 +286,10 @@ nonisolated enum SettingsPageModel {
     /// Display name for a code; unknown codes fall back to the first entry,
     /// matching the picker's `elements[0]` fallback (country_code_picker
     /// createState/firstWhere).
-    static func countryName(forCode code: String) -> String {
+    static func countryName(forCode code: String, locale: Locale = .current) -> String {
         let upper = code.uppercased()
-        return sortedCountries.first { $0.code.uppercased() == upper }?.name
-            ?? sortedCountries[0].name
+        let countries = sortedCountries(locale: locale)
+        return countries.first { $0.code.uppercased() == upper }?.name ?? countries[0].name
     }
 
     static func languageName(forCode code: String) -> String {
@@ -308,8 +341,4 @@ nonisolated enum SettingsPageModel {
         string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
     )!
 
-    /// Dart `String.compareTo` — UTF-16 code-unit lexicographic comparison.
-    private static func utf16Units(_ string: String) -> [UInt16] {
-        Array(string.utf16)
-    }
 }

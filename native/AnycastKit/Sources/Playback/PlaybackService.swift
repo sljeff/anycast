@@ -245,6 +245,15 @@ public final class PlaybackService {
         }
     }
 
+    /// After the audio cache was cleared: finished downloads no longer read
+    /// as downloaded on the cards. `keeping` stays as it is (the episode
+    /// still playing), and so do downloads that have not finished.
+    public func forgetCachedDownloads(keeping urls: Set<String>) {
+        for (url, state) in cacheStates where state >= 1 && !urls.contains(url) {
+            cacheStates.removeValue(forKey: url)
+        }
+    }
+
     /// Resume/pause entry (mini player, lock screen toggle, lyrics tap).
     public func play() async {
         if !engine.hasItem {

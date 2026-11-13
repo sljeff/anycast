@@ -206,7 +206,7 @@ struct ScreenBaselineCaptureTests {
             // private presentCountrySheet().
             let sheet = SettingsOptionSheetViewController(
                 title: SettingsPageModel.title(for: .country),
-                options: SettingsPageModel.sortedCountries.map { ($0.name, $0.code) },
+                options: SettingsPageModel.sortedCountries().map { ($0.name, $0.code) },
                 selectedCode: context.settingsBox.current.countryCode
             )
             sheet.present(from: settingsPage)
@@ -228,16 +228,20 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S19 Import/Export dialog and import instructions")
+    @Test("S19 Import sheet and import instructions")
     func captureImportExport() async throws {
         try await Self.withRoot { root in
             guard let context = await Self.liveContext() else {
                 Self.missingBaselineInput("live UIContext")
                 return
             }
-            ImportExportDialogViewController.present(from: root, context: context)
+            let plan = ImportPlan(
+                entries: (1...8).map { OPMLParser.Entry(title: "Show \($0)", xmlURL: "https://s\($0).example/f") },
+                alreadyFollowed: 2
+            )
+            root.present(ImportSheetViewController(context: context, plan: plan, filename: "Overcast.opml"), animated: false)
             try await Self.settle(1.2)
-            try await Self.capture("S19a-import-export")
+            try await Self.capture("S19a-import-sheet")
         }
         try await Self.withRoot { root in
             ImportInstructionsViewController.present(from: root)

@@ -318,6 +318,36 @@ public actor EpisodeCacheStore {
         await meta.delete(forURL: url)
     }
 
+    // MARK: - Settings: space used and clearing
+
+    /// Bytes the cached audio files take on disk (files the index points at
+    /// and that still exist).
+    public func cachedBytes() async -> Int64 {
+        var total: Int64 = 0
+        for row in await meta.allRows() {
+            guard let name = row.relativePath else { continue }
+            let path = directory.appendingPathComponent(name).path
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else { continue }
+            total += (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        }
+        return total
+    }
+
+    /// Deletes every cached audio file and its index row except those whose
+    /// URL is in `keeping` and any download still in flight. Cached audio is
+    /// reconstructible (the episode downloads again when played). Returns
+    /// how many entries were removed.
+    @discardableResult
+    public func clearCached(keeping urls: Set<String>) async -> Int {
+        var removed = 0
+        for row in await meta.allRows() {
+            if let url = row.url, urls.contains(url) || inFlight[url] != nil { continue }
+            await deleteRow(row)
+            removed += 1
+        }
+        return removed
+    }
+
     // MARK: - LRU cleanup (fork cache_store semantics)
 
     private func scheduleCleanup() {

@@ -23,7 +23,8 @@ struct SettingsPickerMappingTests {
         #expect(SettingsPageModel.stepperChoices(for: .cacheLimit) == [5, 10, 20, 50, 100])
         #expect(SettingsPageModel.cacheLimitChoices == [5, 10, 20, 50, 100])
         for row in [SettingsPageModel.Row.account, .country, .targetLanguage,
-                    .importExport, .contactEmail, .privacyPolicy, .termsOfUse] {
+                    .importSubscriptions, .exportSubscriptions, .clearCache, .contactEmail, .privacyPolicy,
+                    .termsOfUse] {
             #expect(SettingsPageModel.stepperChoices(for: row) == nil)
             #expect(SettingsPageModel.stepperAccessibilityLabels(for: row) == nil)
         }

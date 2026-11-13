@@ -189,8 +189,7 @@ final class SearchEntryViewController: UIViewController, UICollectionViewDelegat
 
     // MARK: - Layout
 
-    /// Pasting a feed address is not handled yet, so the line promises names only.
-    static let hintText = "Search shows and episodes by name."
+    static let hintText = "Search by name, or paste a feed address."
 
     /// Row and capsule minimum height.
     private static let rowHeight: CGFloat = 44

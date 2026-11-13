@@ -4,7 +4,7 @@ import Testing
 
 /// ImportInstructions content parity (lib/widgets/import_export.dart:251-333,
 /// 03 §2.15): the five ExpansionTile sections with byte-exact titles and
-/// step text — including the Chinese 小宇宙 copy.
+/// step text — all in English.
 @MainActor
 struct FeedsImportInstructionsTests {
 
@@ -15,7 +15,7 @@ struct FeedsImportInstructionsTests {
             "Castro",
             "Overcast",
             "Pocket Casts",
-            "小宇宙",
+            "Xiaoyuzhou",
             "Other Apps using OPML",
         ])
     }
@@ -46,14 +46,18 @@ struct FeedsImportInstructionsTests {
             + "5. Share to \"Anycast\"")
     }
 
-    @Test("小宇宙 steps verbatim (the Chinese-copy exception, 03 §8)")
+    @Test("Xiaoyuzhou steps are English like the rest, and every section ends by sharing to Anycast")
     func xiaoyuzhou() {
-        #expect(ImportInstructionsContent.sections[3].text == "1. 打开小宇宙 -> 订阅\n"
-            + "2. 点击右上角 \"我的订阅\"\n"
-            + "3. 点击右上角的分享按钮\n"
-            + "4. 选中所有想要导入的频道\n"
-            + "5. 点击 \"导出 OPML\"\n"
-            + "6. 分享到 \"Anycast\"")
+        #expect(ImportInstructionsContent.sections[3].text == "1. Open Xiaoyuzhou -> Subscriptions\n"
+            + "2. Tap \"My Subscriptions\" at the top right\n"
+            + "3. Tap the share button at the top right\n"
+            + "4. Select the shows you want to import\n"
+            + "5. Tap \"Export OPML\"\n"
+            + "6. Share to \"Anycast\"")
+        for section in ImportInstructionsContent.sections {
+            #expect(section.text.unicodeScalars.allSatisfy { $0.isASCII }, "\(section.title) is not English")
+            #expect(section.lines.last?.hasSuffix("Share to \"Anycast\"") == true)
+        }
     }
 
     @Test("Other Apps steps verbatim")

@@ -436,10 +436,16 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             self.renderList(allowsDiff: false)
         }
         emptyStateView.onImport = { [weak self] in
-            // Get.dialog(ImportExportBlock) — the T9 stub is the correct
-            // presentation target for now.
+            // The steps for each app (all end with sharing to Anycast), and
+            // a button for someone who already has the file.
             guard let self else { return }
-            ImportExportDialogViewController.present(from: self, context: self.context)
+            ImportInstructionsViewController.present(from: self) { [weak self] instructions in
+                guard let self else { return }
+                ImportFlow.chooseFile(from: instructions, context: self.context) { [weak instructions] in
+                    // Done closes the sheet and the instructions under it.
+                    instructions?.presentingViewController?.dismiss(animated: true)
+                }
+            }
         }
 
         historyFooterButton.addAction(
@@ -899,7 +905,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             // would trap). The array removal itself runs by URL so it stays
             // idempotent under interleaving.
             let plan = InboxTrimPlanner.plan(count: self.episodes.count, keeping: settings.maxFeedEpisodes)
-            if plan.removesAnything {
+            // An import adds episodes the person has not seen the result of
+            // yet: the Inbox waits until they tap Done.
+            if plan.removesAnything, !InboxTrimHold.isHeld {
                 let urls = self.episodes[plan.removedIndices].compactMap(\.enclosureUrl)
                 try? await self.context.database.feedRepository().removeByEnclosureUrls(urls)
                 let remaining = self.episodes.filter { !($0.enclosureUrl.map(urls.contains) ?? false) }

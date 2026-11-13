@@ -40,8 +40,12 @@ nonisolated enum OPMLWriter {
         lines.append("  <body>")
         for subscription in subscriptions {
             var attributes: [(name: String, value: String)] = []
-            if let text = subscription.description { attributes.append(("text", text)) }
-            if let title = subscription.title { attributes.append(("title", title)) }
+            // `text` is what other apps show as the name, so it carries the
+            // title (the shipped writer put the description there).
+            if let title = subscription.title {
+                attributes.append(("text", title))
+                attributes.append(("title", title))
+            }
             attributes.append(("type", "rss"))
             if let xmlURL = subscription.rssFeedUrl { attributes.append(("xmlUrl", xmlURL)) }
             let rendered = attributes

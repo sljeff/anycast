@@ -127,6 +127,11 @@ final class SettingsViewController: UIViewController {
     /// Inbox / History limits stepped in this sheet, held until Settings
     /// closes (a row is absent when its stepper shows the stored value).
     private var pendingLimits: [SettingsPageModel.Row: Int64] = [:]
+    /// Shows followed (Export has nothing to export at zero) and the bytes
+    /// the played audio takes (Clear has nothing to clear at zero); both
+    /// read when the sheet loads.
+    private var subscriptionCount = 0
+    private var cachedBytes: Int64 = 0
 
     init(context: UIContext) {
         self.context = context
@@ -235,11 +240,13 @@ final class SettingsViewController: UIViewController {
             SettingsCoordinator.countryCodeDidChange,
             SettingsCoordinator.targetLanguageDidChange,
             SettingsCoordinator.limitsDidChange,
+            ShowsShelfLayout.subscriptionsDidChange,
         ] {
             notificationObservers.append(center.addObserver(forName: name, object: nil, queue: .main) {
                 [weak self] _ in
                 guard let self, self.viewIfLoaded?.window != nil else { return }
                 self.refreshFromBox()
+                self.reloadShowsAndCache()
             })
         }
     }
@@ -340,6 +347,19 @@ final class SettingsViewController: UIViewController {
         self.dataSource = dataSource
         applySnapshot()
         reloadKeptCounts()
+        reloadShowsAndCache()
+    }
+
+    /// Followed shows and cached audio bytes: what Export and Clear can act on.
+    private func reloadShowsAndCache() {
+        Task { [weak self] in
+            guard let self else { return }
+            if let shows = try? await context.database.subscriptionRepository().listAll() {
+                subscriptionCount = shows.count
+            }
+            cachedBytes = await context.cacheStore.cachedBytes()
+            reconfigureVisible()
+        }
     }
 
     /// Inbox and History counts, read when the sheet loads (it is created
@@ -374,6 +394,7 @@ final class SettingsViewController: UIViewController {
         var config = footer.defaultContentConfiguration()
         switch sections[section].footer {
         case .keep: config.text = sectionStore.keepFooter
+        case .shows: config.text = ImportCopy.exportFooter
         case .version:
             config.text = SettingsPageModel.versionLine(appVersion: Self.bundleValue("CFBundleShortVersionString"),
                                                         build: Self.bundleValue("CFBundleVersion"))
@@ -467,15 +488,26 @@ final class SettingsViewController: UIViewController {
     // MARK: - Cell configuration
 
     private func configure(_ cell: SettingsRowCell, for row: SettingsPageModel.Row) {
-        let opensSomething: Set<SettingsPageModel.Row> = [.targetLanguage, .country, .importExport, .contactEmail]
+        let opensSomething: Set<SettingsPageModel.Row> = [
+            .targetLanguage, .country, .importSubscriptions, .exportSubscriptions, .contactEmail,
+        ]
         let opensExternally = row == .privacyPolicy || row == .termsOfUse
+        var value = SettingsPageModel.value(for: row, settings: settings)
+        switch row {
+        case .exportSubscriptions: value = SettingsPageModel.exportValue(subscriptionCount: subscriptionCount)
+        case .clearCache: value = SettingsPageModel.cacheUsageValue(bytes: cachedBytes)
+        default: break
+        }
+        let enabled = isEnabled(row)
         cell.configure(
             title: SettingsPageModel.title(for: row),
-            value: SettingsPageModel.value(for: row, settings: settings),
-            showsChevron: opensSomething.contains(row),
+            value: value,
+            showsChevron: opensSomething.contains(row) && enabled,
             opensExternally: opensExternally
         )
-        cell.accessibilityTraits = opensExternally ? .link : .button
+        // A row with nothing to act on reads as a note, not a button.
+        cell.titleLabel.textColor = enabled ? Theme.onSurface : Theme.onSurfaceVariant
+        cell.accessibilityTraits = !enabled ? .staticText : opensExternally ? .link : .button
         cell.accessibilityIdentifier = SettingsPageModel.identifier(for: row)
         cell.accessibilityHint = SettingsPageModel.accessibilityHint(for: row)
     }
@@ -637,8 +669,52 @@ final class SettingsViewController: UIViewController {
         controller.presentationController?.delegate = self
     }
 
-    private func presentImportExport() {
-        ImportExportDialogViewController.present(from: self, context: context)
+    /// Export and Clear have nothing to act on at zero.
+    private func isEnabled(_ row: SettingsPageModel.Row) -> Bool {
+        switch row {
+        case .exportSubscriptions: return subscriptionCount > 0
+        case .clearCache: return cachedBytes > 0
+        default: return true
+        }
+    }
+
+    private func presentImport() {
+        ImportFlow.chooseFile(from: self, context: context)
+    }
+
+    private func presentExport(from sourceView: UIView) {
+        SubscriptionExport.present(from: self, context: context, sourceView: sourceView) { [weak self] in
+            guard let window = self?.view.window else { return }
+            ToastPresenter.shared.show(ImportCopy.exportFailed, in: window, duration: 3)
+        }
+    }
+
+    /// Confirm, then remove the cached audio files. The episode playing now
+    /// (and any download still running) stays; everything else downloads
+    /// again when played.
+    private func confirmClearCache() {
+        let bytes = cachedBytes
+        let alert = UIAlertController(
+            title: "Clear played audio?",
+            message: SettingsPageModel.clearCacheMessage(bytes: bytes),
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Clear", style: .destructive) { [weak self] _ in
+            self?.clearCache()
+        })
+        present(alert, animated: true)
+    }
+
+    private func clearCache() {
+        let keeping = Set([context.playback.currentEpisode?.enclosureUrl].compactMap { $0 })
+        Task { [weak self] in
+            guard let self else { return }
+            await context.cacheStore.clearCached(keeping: keeping)
+            context.playback.forgetCachedDownloads(keeping: keeping)
+            cachedBytes = await context.cacheStore.cachedBytes()
+            reconfigureVisible()
+        }
     }
 
     /// Inbox / History steps are held, not written: lowering below the
@@ -659,7 +735,7 @@ final class SettingsViewController: UIViewController {
     private func presentCountrySheet() {
         let sheet = SettingsOptionSheetViewController(
             title: SettingsPageModel.title(for: .country),
-            options: SettingsPageModel.sortedCountries.map { ($0.name, $0.code) },
+            options: SettingsPageModel.sortedCountries().map { ($0.name, $0.code) },
             selectedCode: settings.countryCode
         )
         sheet.onSelect = { [weak self] code in
@@ -736,6 +812,7 @@ extension SettingsViewController: UICollectionViewDelegate {
     private func isInteractive(_ row: SettingsPageModel.Row) -> Bool {
         switch row {
         case .cacheLimit, .maxFeedEpisodes, .maxHistoryEpisodes: return false
+        case .exportSubscriptions, .clearCache: return isEnabled(row)
         default: return true
         }
     }
@@ -756,7 +833,10 @@ extension SettingsViewController: UICollectionViewDelegate {
         case .plusUpgrade: presentUpgrade()
         case .country: presentCountrySheet()
         case .targetLanguage: presentLanguageSheet()
-        case .importExport: presentImportExport()
+        case .importSubscriptions: presentImport()
+        case .exportSubscriptions:
+            presentExport(from: collectionView.cellForItem(at: indexPath) ?? collectionView)
+        case .clearCache: confirmClearCache()
         case .cacheLimit, .maxFeedEpisodes, .maxHistoryEpisodes: break
         case .contactEmail: openFeedbackMail()
         case .privacyPolicy: presentSafari(SettingsPageModel.privacyPolicyURL)

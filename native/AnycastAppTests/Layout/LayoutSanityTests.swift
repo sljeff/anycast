@@ -121,7 +121,14 @@ struct LayoutSanityTests {
         // and a login sheet pops over the live shell mid-run.
         let screens: [UIViewController] = [
             SettingsViewController(context: context),
-            ImportExportDialogViewController(context: context),
+            ImportSheetViewController(
+                context: context,
+                plan: ImportPlan(
+                    entries: (1...8).map { OPMLParser.Entry(title: "Show \($0)", xmlURL: "https://s\($0).example/f") },
+                    alreadyFollowed: 2
+                ),
+                filename: "Overcast.opml"
+            ),
             HistoryDialogViewController(context: context),
         ]
         for controller in screens {

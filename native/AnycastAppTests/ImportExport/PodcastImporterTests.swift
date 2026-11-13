@@ -1,37 +1,53 @@
 import Foundation
+import UIKit
 import Testing
 import AnycastKit
 @testable import Anycast
 
-/// PodcastImporter parity (lib/utils/rss_fetcher.dart:20-31 +
-/// import_export.dart / share.dart widget-side persistence): the `s = {}`
-/// dead filter verbatim, the idle → importing(progress) → finished state
-/// machine with TempResult batch semantics, partial-failure result text,
-/// and the real-SQLite re-import behavior the dead filter implies.
+/// The import: matching followed shows by feed address, one write at the
+/// end (so Cancel imports nothing), failures kept per show, and the copy of
+/// every stage of the sheet.
 @MainActor
+@Suite(.serialized)
 struct PodcastImporterTests {
 
     // MARK: - Fixtures
 
-    /// Scripted stand-in for RSSFetcher: one array per 8-URL batch (nil =
-    /// failed source, skipped), reporting the batch START index like
-    /// TempResult does.
-    private struct FakeFetcher: PodcastFetchProviding {
-        var batches: [[PodcastImportData?]]
+    /// Scripted stand-in for RSSFetcher: answers per address, in batches of
+    /// 8 like the real one, and reports each batch.
+    final class FakeFetcher: PodcastFetchProviding, @unchecked Sendable {
+        private let lock = NSLock()
+        private var feeds: [String: PodcastImportData]
+        private func locked<T>(_ body: () -> T) -> T { lock.withLock(body) }
+        /// How long the fetch takes; a cancelled caller wakes early.
+        var delay: UInt64 = 0
+        private(set) var requested: [[String]] = []
 
-        nonisolated func fetchPodcasts(
+        init(feeds: [PodcastImportData]) {
+            self.feeds = Dictionary(uniqueKeysWithValues: feeds.compactMap { feed in
+                feed.subscription.rssFeedUrl.map { ($0, feed) }
+            })
+        }
+
+        func serve(_ feed: PodcastImportData) {
+            locked { if let url = feed.subscription.rssFeedUrl { feeds[url] = feed } }
+        }
+
+        func fetchPodcasts(
             urls: [String],
             onlyFirstEpisode: Bool,
             onBatch: (@Sendable (Int, Int, [PodcastImportData?]) -> Void)?
         ) async -> [PodcastImportData] {
+            locked { requested.append(urls) }
+            if delay > 0 { try? await Task.sleep(nanoseconds: delay) }
             var collected: [PodcastImportData] = []
             var start = 0
-            for chunk in batches {
-                onBatch?(start, urls.count, chunk)
+            while start < urls.count {
+                let chunk = Array(urls[start..<min(start + 8, urls.count)])
+                let results = locked { chunk.map { feeds[$0] } }
+                onBatch?(start, urls.count, results)
+                collected.append(contentsOf: results.compactMap { $0 })
                 start += chunk.count
-                for case let podcast? in chunk {
-                    collected.append(podcast)
-                }
             }
             return collected
         }
@@ -39,7 +55,7 @@ struct PodcastImporterTests {
 
     private func makeDatabase() async throws -> (AppDatabase, URL) {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("t9-import-\(UUID().uuidString).sqlite")
+            .appendingPathComponent("import-\(UUID().uuidString).sqlite")
         let database = try await AppDatabase.openAt(url, localeIdentifier: "en_US")
         return (database, url)
     }
@@ -59,231 +75,337 @@ struct PodcastImporterTests {
         return PodcastImportData(subscription: subscription, feedEpisodes: episode.map { [$0] } ?? [])
     }
 
-    // MARK: - The dead filter (rss_fetcher.dart:24-28, preserved verbatim)
-
-    @Test("Dead filter: existing subscription URLs are NOT filtered out")
-    func deadFilterPassesExistingURLs() {
-        let existing = [SubscriptionRow(rssFeedUrl: "https://a.example/f", title: "A")]
-        let urls = ["https://a.example/f", "https://b.example/f"]
-        // `s = {};` — the set is discarded; nothing is ever excluded.
-        #expect(PodcastImporter.filterExisting(urls: urls, existingSubscriptions: existing) == urls)
-        #expect(PodcastImporter.filterExisting(urls: [], existingSubscriptions: existing) == [])
+    private func entry(_ title: String, _ url: String) -> OPMLParser.Entry {
+        OPMLParser.Entry(title: title, xmlURL: url)
     }
 
-    @Test("Re-import re-fetches and rewrites the row (INSERT OR REPLACE rotates the id)")
-    func reImportRewritesRow() async throws {
+    // MARK: - Plan: already followed, matched by feed address
+
+    @Test("A show already followed is skipped, matched by feed address")
+    func planSkipsFollowed() {
+        let plan = ImportPlan.make(
+            entries: [entry("A", "https://a.example/f"), entry("B", "https://b.example/f")],
+            followedURLs: ["https://a.example/f"]
+        )
+        #expect(plan.entries == [entry("B", "https://b.example/f")])
+        #expect(plan.alreadyFollowed == 1)
+        #expect(!plan.isAllFollowed)
+    }
+
+    @Test("Same feed written differently still counts as followed")
+    func planMatchesEquivalentAddresses() {
+        let plan = ImportPlan.make(
+            entries: [
+                entry("A", "HTTP://Feeds.Example.com/show/"),
+                entry("B", "https://b.example/f?x=1"),
+                entry("C", "https://c.example/f"),
+            ],
+            followedURLs: ["https://feeds.example.com/show", "https://b.example/f"]
+        )
+        // Trailing slash, host case and scheme do not matter; a different
+        // query string is a different feed.
+        #expect(plan.alreadyFollowed == 1)
+        #expect(plan.entries.map(\.title) == ["B", "C"])
+    }
+
+    @Test("The same address twice in one file counts once; all followed; empty file")
+    func planEdgeCases() {
+        let twice = ImportPlan.make(
+            entries: [entry("A", "https://a.example/f"), entry("A again", "https://a.example/f")],
+            followedURLs: []
+        )
+        #expect(twice.entries.count == 1)
+        #expect(twice.alreadyFollowed == 0)
+
+        let all = ImportPlan.make(entries: [entry("A", "https://a.example/f")], followedURLs: ["https://a.example/f"])
+        #expect(all.isAllFollowed)
+        #expect(!all.isEmptyFile)
+
+        let empty = ImportPlan.make(entries: [], followedURLs: ["https://a.example/f"])
+        #expect(empty.isEmptyFile)
+        #expect(!empty.isAllFollowed)
+    }
+
+    @Test("plan(entries:) reads the followed shows from the real database")
+    func planUsesDatabase() async throws {
+        let (database, databaseURL) = try await makeDatabase()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try await database.subscriptionRepository()
+            .addMany([SubscriptionRow(rssFeedUrl: "https://a.example/f", title: "A")])
+        let importer = PodcastImporter(database: database, fetcher: FakeFetcher(feeds: []))
+
+        let plan = await importer.plan(entries: [entry("A", "https://a.example/f"), entry("B", "https://b.example/f")])
+
+        #expect(plan.alreadyFollowed == 1)
+        #expect(plan.entries.map(\.title) == ["B"])
+    }
+
+    @Test("Only web addresses can be fetched")
+    func webAddresses() {
+        #expect(ImportPlan.isWebAddress("https://a.example/f"))
+        #expect(ImportPlan.isWebAddress("http://a.example"))
+        #expect(!ImportPlan.isWebAddress("ftp://a.example/f"))
+        #expect(!ImportPlan.isWebAddress("not a url"))
+        #expect(!ImportPlan.isWebAddress("https://"))
+    }
+
+    // MARK: - Run
+
+    @Test("Run writes the first episodes and the subscriptions once, and says what failed")
+    func runWritesAndReportsFailures() async throws {
+        let (database, databaseURL) = try await makeDatabase()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        let a = podcast(url: "https://a.example/f", title: "A", enclosure: "enc-a")
+        let c = podcast(url: "https://c.example/f", title: "C")
+        let importer = PodcastImporter(database: database, fetcher: FakeFetcher(feeds: [a, c]))
+
+        let outcome = await importer.run([
+            entry("A", "https://a.example/f"),
+            entry("Dead", "https://b.example/f"),
+            entry("C", "https://c.example/f"),
+            entry("Broken", "not a url"),
+        ])
+
+        #expect(outcome.imported.map(\.title) == ["A", "C"])
+        #expect(outcome.failures.map(\.entry.title).sorted() == ["Broken", "Dead"])
+        #expect(outcome.failures.first { $0.entry.title == "Dead" }?.reason == .unreachable)
+        #expect(outcome.failures.first { $0.entry.title == "Broken" }?.reason == .invalidAddress)
+        #expect(outcome.addedEpisodeCount == 1)
+        #expect(!outcome.writeFailed && !outcome.cancelled)
+        let stored = try await database.subscriptionRepository().listAll()
+        #expect(Set(stored.compactMap(\.rssFeedUrl)) == ["https://a.example/f", "https://c.example/f"])
+        #expect(try await database.feedRepository().count() == 1)
+    }
+
+    @Test("Progress reports how many have answered, row by row")
+    func runReportsProgress() async throws {
+        let (database, databaseURL) = try await makeDatabase()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        let urls = (0..<10).map { "https://u\($0).example/f" }
+        let importer = PodcastImporter(
+            database: database,
+            fetcher: FakeFetcher(feeds: [podcast(url: urls[0], title: "Zero"), podcast(url: urls[9], title: "Nine")])
+        )
+        var finished: [Int] = []
+        var answered: [Int: Bool] = [:]
+        _ = await importer.run(urls.map { entry($0, $0) }) { count, rows in
+            finished.append(count)
+            for row in rows { answered[row.index] = row.ok }
+        }
+        // The progress callbacks hop to the main actor; let them land.
+        try await Task.sleep(for: .milliseconds(100))
+
+        #expect(finished.sorted() == [8, 10])
+        #expect(answered.count == 10)
+        #expect(answered[0] == true && answered[9] == true && answered[5] == false)
+    }
+
+    @Test("Cancel before the write imports nothing")
+    func cancelWritesNothing() async throws {
+        let (database, databaseURL) = try await makeDatabase()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        let a = podcast(url: "https://a.example/f", title: "A", enclosure: "enc-a")
+        let fetcher = FakeFetcher(feeds: [a])
+        fetcher.delay = 5_000_000_000
+        let importer = PodcastImporter(database: database, fetcher: fetcher)
+
+        let task = Task { await importer.run([self.entry("A", "https://a.example/f")]) }
+        try await Task.sleep(for: .milliseconds(100))
+        task.cancel()
+        let outcome = await task.value
+
+        #expect(outcome.cancelled)
+        #expect(outcome.imported.isEmpty)
+        #expect(try await database.subscriptionRepository().listAll().isEmpty)
+        #expect(try await database.feedRepository().count() == 0)
+    }
+
+    // MARK: - The sheet: stages, retry of the failed only, Inbox hold
+
+    private func waitForStage(_ stage: ImportSheetViewController.Stage, in sheet: ImportSheetViewController) async {
+        for _ in 0..<100 where sheet.stage != stage {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    private func button(_ identifier: String, in view: UIView) -> UIButton? {
+        if let button = view as? UIButton, button.accessibilityIdentifier == identifier { return button }
+        for subview in view.subviews {
+            if let found = button(identifier, in: subview) { return found }
+        }
+        return nil
+    }
+
+    private func label(_ identifier: String, in view: UIView) -> UILabel? {
+        if let label = view as? UILabel, label.accessibilityIdentifier == identifier { return label }
+        for subview in view.subviews {
+            if let found = label(identifier, in: subview) { return found }
+        }
+        return nil
+    }
+
+    private func makeSheet(
+        database: AppDatabase,
+        fetcher: FakeFetcher,
+        entries: [OPMLParser.Entry],
+        alreadyFollowed: Int = 0,
+        inboxCount: Int = 0,
+        limit: Int = 100
+    ) -> ImportSheetViewController {
+        let sheet = ImportSheetViewController(
+            context: nil,
+            importer: PodcastImporter(database: database, fetcher: fetcher),
+            plan: ImportPlan(entries: entries, alreadyFollowed: alreadyFollowed),
+            filename: "Overcast.opml",
+            inboxLimit: { limit },
+            inboxCount: { inboxCount }
+        )
+        sheet.loadViewIfNeeded()
+        sheet.view.frame = CGRect(x: 0, y: 0, width: 402, height: 700)
+        sheet.view.layoutIfNeeded()
+        return sheet
+    }
+
+    @Test("Confirm stage copy, then a partial failure; Try again retries only the failed show")
+    func sheetStagesAndRetry() async throws {
         let (database, databaseURL) = try await makeDatabase()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
         let a = podcast(url: "https://a.example/f", title: "A", enclosure: "enc-a")
         let b = podcast(url: "https://b.example/f", title: "B", enclosure: "enc-b")
-
-        var importer = PodcastImporter(database: database, fetcher: FakeFetcher(batches: [[a, b]]))
-        await importer.importByURLs(["https://a.example/f", "https://b.example/f"], reportsProgress: true)
-
-        var rows = try await database.subscriptionRepository().listAll()
-        #expect(rows.count == 2)
-        let idBefore = rows.first { $0.title == "A" }?.id
-
-        // Same URL re-imported: the dead filter lets it through, the fresh
-        // row REPLACEs on rssFeedUrl/title and the rowid rotates (the shipped
-        // quirk the M1 note pins — this is why the filter stays broken).
-        importer = PodcastImporter(database: database, fetcher: FakeFetcher(batches: [[a]]))
-        await importer.importByURLs(["https://a.example/f"], reportsProgress: true)
-
-        rows = try await database.subscriptionRepository().listAll()
-        #expect(rows.count == 2)   // B untouched
-        let rewritten = rows.first { $0.title == "A" }
-        #expect(rewritten?.rssFeedUrl == "https://a.example/f")
-        #expect(rewritten?.id != idBefore)   // REPLACE → new rowid
-    }
-
-    @Test("Failed re-import leaves the stored row (and its id) untouched")
-    func failedReImportKeepsRow() async throws {
-        let (database, databaseURL) = try await makeDatabase()
-        defer { try? FileManager.default.removeItem(at: databaseURL) }
-        let a = podcast(url: "https://a.example/f", title: "A")
-
-        var importer = PodcastImporter(database: database, fetcher: FakeFetcher(batches: [[a]]))
-        await importer.importByURLs(["https://a.example/f"], reportsProgress: true)
-        var rows = try await database.subscriptionRepository().listAll()
-        let idBefore = rows.first?.id
-        #expect(rows.count == 1)
-
-        // The re-fetch fails (network error / unparsable feed → nil): the
-        // engine writes nothing, so ids do not change.
-        importer = PodcastImporter(database: database, fetcher: FakeFetcher(batches: [[nil]]))
-        await importer.importByURLs(["https://a.example/f"], reportsProgress: true)
-
-        rows = try await database.subscriptionRepository().listAll()
-        #expect(rows.count == 1)
-        #expect(rows.first?.id == idBefore)
-    }
-
-    // MARK: - State machine + progress (TempResult semantics)
-
-    @Test("OPML flow: idle → importing(0) → importing(batchStart/total) → finished")
-    func progressPhases() async throws {
-        let (database, databaseURL) = try await makeDatabase()
-        defer { try? FileManager.default.removeItem(at: databaseURL) }
-        let a = podcast(url: "https://a.example/f", title: "A")
-        let c = podcast(url: "https://c.example/f", title: "C")
-
-        let importer = PodcastImporter(
-            database: database,
-            fetcher: FakeFetcher(batches: [[a, nil, c, nil, nil, nil, nil, nil], [nil, nil]])
+        let fetcher = FakeFetcher(feeds: [a])
+        let sheet = makeSheet(
+            database: database, fetcher: fetcher,
+            entries: [entry("A", "https://a.example/f"), entry("B", "https://b.example/f")],
+            alreadyFollowed: 3, inboxCount: 105, limit: 100
         )
-        var phases: [PodcastImporter.Phase] = []
-        importer.onPhaseChange = { phases.append($0) }
 
-        await importer.importByURLs((0..<10).map { "https://u\($0).example/f" }, reportsProgress: true)
+        #expect(label("import-title", in: sheet.view)?.text == "Import 2 shows")
+        #expect(label("import-subtitle", in: sheet.view)?.text == "From Overcast.opml \u{00B7} 3 already followed")
+        let primary = try #require(button("import-primary", in: sheet.view))
+        #expect(primary.configuration?.title == "Import 2 shows")
 
-        // TempResult sends the batch START index: 0 for the first 8-URL
-        // batch, 8 for the second — so the ring lags one batch behind.
-        #expect(phases == [
-            .importing(progress: 0),
-            .importing(progress: 0.0),
-            .importing(progress: 0.8),
-            .finished(PodcastImporter.Result(
-                requestedURLCount: 10,
-                importedSubscriptions: [a.subscription, c.subscription]
-            )),
-        ])
-        #expect(importer.phase == phases.last)
+        primary.sendActions(for: .touchUpInside)
+        #expect(InboxTrimHold.isHeld, "the Inbox trim waits while an import runs")
+        await waitForStage(.result, in: sheet)
+
+        #expect(sheet.stage == .result)
+        #expect(label("import-title", in: sheet.view)?.text == "1 show imported")
+        #expect(label("import-subtitle", in: sheet.view)?.text == "1 couldn\u{2019}t be reached")
+        #expect(label("import-note", in: sheet.view)?.text ==
+            "Your Inbox keeps the latest 100 episodes, so 5 older ones will leave it. The shows stay in Library.")
+        #expect(InboxTrimHold.isHeld, "and keeps waiting until Done")
+        #expect(button("import-secondary", in: sheet.view)?.configuration?.title == "Try 1 again")
+
+        // B comes back online; only B is asked for again.
+        fetcher.serve(b)
+        button("import-secondary", in: sheet.view)?.sendActions(for: .touchUpInside)
+        await waitForStage(.result, in: sheet)
+        #expect(fetcher.requested.last == ["https://b.example/f"])
+        #expect(label("import-title", in: sheet.view)?.text == "2 shows imported")
+        #expect(button("import-secondary", in: sheet.view)?.isHidden == true)
+
+        var done = false
+        sheet.onDone = { done = true }
+        button("import-primary", in: sheet.view)?.sendActions(for: .touchUpInside)
+        #expect(done)
+        #expect(!InboxTrimHold.isHeld, "Done lets the Inbox trim again")
+        let stored = try await database.subscriptionRepository().listAll()
+        #expect(stored.count == 2)
     }
 
-    @Test("Manual-URL flow: indeterminate importing, no progress ticks")
-    func indeterminatePhases() async throws {
+    @Test("Every show failed: No shows imported, nothing written")
+    func sheetAllFailed() async throws {
         let (database, databaseURL) = try await makeDatabase()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
-        let a = podcast(url: "https://a.example/f", title: "A")
-
-        let importer = PodcastImporter(database: database, fetcher: FakeFetcher(batches: [[a]]))
-        var phases: [PodcastImporter.Phase] = []
-        importer.onPhaseChange = { phases.append($0) }
-
-        await importer.importByURLs(["https://a.example/f"], reportsProgress: false)
-
-        #expect(phases == [
-            .importing(progress: nil),
-            .finished(PodcastImporter.Result(
-                requestedURLCount: 1,
-                importedSubscriptions: [a.subscription]
-            )),
-        ])
-    }
-
-    @Test("Empty import (picker cancelled path / empty OPML): straight to finished")
-    func emptyImport() async throws {
-        let (database, databaseURL) = try await makeDatabase()
-        defer { try? FileManager.default.removeItem(at: databaseURL) }
-        let importer = PodcastImporter(database: database, fetcher: FakeFetcher(batches: []))
-        await importer.importByURLs([], reportsProgress: true)
-
-        guard case .finished(let result) = importer.phase else {
-            Issue.record("expected finished")
-            return
-        }
-        #expect(result.isEmpty)
-        #expect(ImportCopy.needsInvalidFeedAlert(result))
-    }
-
-    // MARK: - Persistence parity (import_export.dart:96-103)
-
-    @Test("First episodes of non-empty feeds land in the inbox table")
-    func persistsFirstEpisodes() async throws {
-        let (database, databaseURL) = try await makeDatabase()
-        defer { try? FileManager.default.removeItem(at: databaseURL) }
-        let withEpisodes = podcast(url: "https://a.example/f", title: "A", enclosure: "enc-a")
-        let withoutEpisodes = podcast(url: "https://b.example/f", title: "B")
-
-        let importer = PodcastImporter(database: database, fetcher: FakeFetcher(batches: [[withEpisodes, withoutEpisodes]]))
-        await importer.importByURLs(["https://a.example/f", "https://b.example/f"], reportsProgress: true)
-
-        let episodes = try await database.feedRepository().listAll()
-        #expect(episodes.map(\.enclosureUrl) == ["enc-a"])
-        let subscriptions = try await database.subscriptionRepository().listAll()
-        #expect(subscriptions.map(\.title) == ["A", "B"])
-    }
-
-    // MARK: - Result text parity
-
-    @Test("Batch flow text: joined titles, ', ' separator")
-    func batchText() {
-        #expect(ImportResultText.batchFlow(titles: ["A", "C"]) == "Import A, C successfully")
-    }
-
-    @Test("Batch flow text: all-failed import still toasts (Dart has no emptiness check)")
-    func batchTextEmpty() {
-        #expect(ImportResultText.batchFlow(titles: []) == "Import  successfully")
-    }
-
-    @Test("Result text: all failed never says successfully; partial counts both sides; a write failure says nothing was imported")
-    func resultText() {
-        func row(_ title: String) -> SubscriptionRow { SubscriptionRow(rssFeedUrl: "https://x/\(title)", title: title) }
-        let allFailed = PodcastImporter.Result(requestedURLCount: 3, importedSubscriptions: [])
-        #expect(ImportResultText.batchFlow(result: allFailed) == "No shows imported.")
-        let partial = PodcastImporter.Result(requestedURLCount: 3, importedSubscriptions: [row("A"), row("B")])
-        #expect(ImportResultText.batchFlow(result: partial) == "2 shows imported. 1 couldn\u{2019}t be reached.")
-        let one = PodcastImporter.Result(requestedURLCount: 4, importedSubscriptions: [row("A")])
-        #expect(ImportResultText.batchFlow(result: one) == "1 show imported. 3 couldn\u{2019}t be reached.")
-        let all = PodcastImporter.Result(requestedURLCount: 2, importedSubscriptions: [row("A"), row("B")])
-        #expect(ImportResultText.batchFlow(result: all) == "Import A, B successfully")
-        let writeFailed = PodcastImporter.Result(requestedURLCount: 2, importedSubscriptions: [], writeFailed: true)
-        #expect(ImportResultText.batchFlow(result: writeFailed) == "Couldn\u{2019}t save. Nothing was imported.")
-    }
-
-    @Test("Batch flow text: >50 UTF-16 code units truncate to 50 + '...'")
-    func batchTextTruncation() {
-        let titles = [String(repeating: "a", count: 30), String(repeating: "b", count: 30)]
-        // joined = 30 a's + ", " + 30 b's = 62 UTF-16 units → the first 50
-        // (= 30 a's + ", " + 18 b's) survive, then "...".
-        let joined = titles.joined(separator: ", ")
-        let truncated = String(decoding: Array(joined.utf16.prefix(50)), as: UTF16.self)
-        #expect(ImportResultText.batchFlow(titles: titles) == "Import \(truncated)... successfully")
-        // A short join stays whole.
-        #expect(
-            ImportResultText.batchFlow(titles: ["short", "list"])
-                == "Import short, list successfully"
+        let sheet = makeSheet(
+            database: database, fetcher: FakeFetcher(feeds: []),
+            entries: [entry("A", "https://a.example/f"), entry("B", "https://b.example/f")]
         )
+        button("import-primary", in: sheet.view)?.sendActions(for: .touchUpInside)
+        await waitForStage(.result, in: sheet)
+
+        #expect(label("import-title", in: sheet.view)?.text == "No shows imported")
+        #expect(label("import-subtitle", in: sheet.view)?.text == "2 couldn\u{2019}t be reached")
+        #expect(label("import-note", in: sheet.view)?.isHidden == true)
+        #expect(button("import-secondary", in: sheet.view)?.configuration?.title == "Try 2 again")
+        #expect(try await database.subscriptionRepository().listAll().isEmpty)
+        button("import-primary", in: sheet.view)?.sendActions(for: .touchUpInside)
+        #expect(!InboxTrimHold.isHeld)
     }
 
-    @Test("Manual flow text: single title, untruncated; nil title tolerated (K4)")
-    func manualText() {
-        #expect(ImportResultText.manualURLFlow(title: "Some Podcast") == "Import Some Podcast successfully")
-        #expect(ImportResultText.manualURLFlow(title: nil) == "Import  successfully")
-        let long = String(repeating: "x", count: 80)
-        #expect(ImportResultText.manualURLFlow(title: long) == "Import \(long) successfully")
-    }
-
-    @Test("Invalid-URL alert copy (import_export.dart:198-225)")
-    func invalidURLCopy() {
-        #expect(ImportCopy.invalidFeedURLTitle == "Error")
-        #expect(ImportCopy.invalidFeedURLMessage == "Invalid RSS Feed URL")
-        #expect(ImportCopy.okButton == "OK")
-        let empty = PodcastImporter.Result(requestedURLCount: 1, importedSubscriptions: [])
-        let filled = PodcastImporter.Result(
-            requestedURLCount: 1,
-            importedSubscriptions: [SubscriptionRow(rssFeedUrl: "u", title: "T")]
-        )
-        #expect(ImportCopy.needsInvalidFeedAlert(empty))
-        #expect(!ImportCopy.needsInvalidFeedAlert(filled))
-    }
-
-    @Test("Partial failure counts: requested vs imported vs failed")
-    func partialFailureCounts() async throws {
+    @Test("Cancel in the sheet returns to Confirm and writes nothing")
+    func sheetCancel() async throws {
         let (database, databaseURL) = try await makeDatabase()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
-        let a = podcast(url: "https://a.example/f", title: "A")
-        let c = podcast(url: "https://c.example/f", title: "C")
-        let importer = PodcastImporter(database: database, fetcher: FakeFetcher(batches: [[a, nil, c]]))
-        await importer.importByURLs(["a", "b", "c"], reportsProgress: false)
+        let a = podcast(url: "https://a.example/f", title: "A", enclosure: "enc-a")
+        let fetcher = FakeFetcher(feeds: [a])
+        fetcher.delay = 5_000_000_000
+        let sheet = makeSheet(database: database, fetcher: fetcher, entries: [entry("A", "https://a.example/f")])
 
-        guard case .finished(let result) = importer.phase else {
-            Issue.record("expected finished")
-            return
-        }
-        #expect(result.requestedURLCount == 3)
-        #expect(result.failedURLCount == 1)
-        #expect(result.titles == ["A", "C"])
+        button("import-primary", in: sheet.view)?.sendActions(for: .touchUpInside)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(sheet.stage == .progress)
+        button("import-cancel", in: sheet.view)?.sendActions(for: .touchUpInside)
+        await waitForStage(.confirm, in: sheet)
+
+        #expect(sheet.stage == .confirm)
+        #expect(!InboxTrimHold.isHeld, "a cancelled import does not hold the Inbox")
+        #expect(label("import-title", in: sheet.view)?.text == "Import 1 show")
+        #expect(try await database.subscriptionRepository().listAll().isEmpty)
+        #expect(try await database.feedRepository().count() == 0)
+    }
+
+    @Test("A file with no feeds, and a file whose shows are all followed")
+    func sheetEmptyAndAllFollowed() async throws {
+        let (database, databaseURL) = try await makeDatabase()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        let empty = makeSheet(database: database, fetcher: FakeFetcher(feeds: []), entries: [])
+        #expect(label("import-title", in: empty.view)?.text == "No podcast feeds in this file.")
+        #expect(button("import-primary", in: empty.view)?.configuration?.title == "Choose another file")
+        #expect(button("import-secondary", in: empty.view)?.isHidden == true)
+
+        let followed = makeSheet(database: database, fetcher: FakeFetcher(feeds: []), entries: [], alreadyFollowed: 52)
+        #expect(label("import-title", in: followed.view)?.text == "You already follow all 52.")
+        #expect(button("import-primary", in: followed.view)?.configuration?.title == "Done")
+    }
+
+    // MARK: - Copy
+
+    @Test("Copy of every stage")
+    func copy() {
+        #expect(ImportCopy.confirmTitle(count: 52) == "Import 52 shows")
+        #expect(ImportCopy.confirmTitle(count: 1) == "Import 1 show")
+        #expect(ImportCopy.confirmSubtitle(filename: "Overcast.opml", alreadyFollowed: 8)
+            == "From Overcast.opml \u{00B7} 8 already followed")
+        #expect(ImportCopy.confirmSubtitle(filename: "Overcast.opml", alreadyFollowed: 0) == "From Overcast.opml")
+        #expect(ImportCopy.confirmSubtitle(filename: nil, alreadyFollowed: 2) == "2 already followed")
+        #expect(ImportCopy.progressCount(finished: 23, total: 52) == "23 of 52")
+        #expect(ImportCopy.resultTitle(imported: 49) == "49 shows imported")
+        #expect(ImportCopy.resultTitle(imported: 1) == "1 show imported")
+        #expect(ImportCopy.resultTitle(imported: 0) == "No shows imported")
+        #expect(ImportCopy.failedSummary(count: 3) == "3 couldn\u{2019}t be reached")
+        #expect(ImportCopy.retryButton(count: 3) == "Try 3 again")
+        #expect(ImportCopy.writeFailedTitle == "Couldn\u{2019}t save. Nothing was imported.")
+        #expect(ImportCopy.allFollowedTitle(total: 52) == "You already follow all 52.")
+        #expect(ImportCopy.noFeedsTitle == "No podcast feeds in this file.")
+    }
+
+    @Test("Inbox-limit line: how many older episodes leave, omitted when none do")
+    func inboxLimitNote() {
+        #expect(ImportCopy.inboxLimitNote(inboxCount: 112, limit: 100)
+            == "Your Inbox keeps the latest 100 episodes, so 12 older ones will leave it. The shows stay in Library.")
+        #expect(ImportCopy.inboxLimitNote(inboxCount: 101, limit: 100)
+            == "Your Inbox keeps the latest 100 episodes, so 1 older one will leave it. The shows stay in Library.")
+        #expect(ImportCopy.inboxLimitNote(inboxCount: 100, limit: 100) == nil)
+        #expect(ImportCopy.inboxLimitNote(inboxCount: 12, limit: 100) == nil)
+    }
+
+    @Test("Export copy")
+    func exportCopy() {
+        #expect(ImportCopy.exportFileName == "Anycast Subscriptions.opml")
+        #expect(ImportCopy.exportFailed == "Couldn\u{2019}t create the file. Try again.")
+        #expect(ImportCopy.exportEmpty == "No shows yet")
+        #expect(ImportCopy.exportFooter
+            == "Export covers the shows you follow. Playlist, history and transcripts stay on this iPhone.")
     }
 }

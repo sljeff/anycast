@@ -675,7 +675,7 @@ final class QACrawlUITests: XCTestCase {
 
     private func settingsRowsVisible() -> Bool {
         ["settings-row-account", "settings-row-country",
-         "settings-row-importExport", "settings-row-cacheLimit"]
+         "settings-row-importSubscriptions", "settings-row-cacheLimit"]
             .contains { app.cells[$0].exists }
     }
 
@@ -1047,20 +1047,6 @@ final class QACrawlUITests: XCTestCase {
                        },
                        required: [],
                        probe: false, settle: 2),
-
-            Checkpoint(state: "import-export",
-                       action: { s in
-                           let close = s.app.buttons["Close"]
-                           if close.exists { s.tapElement(close) ; Thread.sleep(forTimeInterval: 0.5) }
-                           else { s.closeSheet() }
-                           guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-importExport",
-                                          title: "Import & Export") else { return false }
-                           return s.app.textFields["RSS Feed URL"].waitForExistence(timeout: 6)
-                               || s.app.buttons["Import help"].waitForExistence(timeout: 3)
-                       },
-                       required: [],
-                       probe: true, settle: 2),
 
             Checkpoint(state: "login",
                        action: { s in
