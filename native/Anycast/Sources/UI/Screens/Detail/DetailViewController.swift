@@ -95,6 +95,10 @@ final class DetailViewController: UIViewController {
             }
             return PlayLabel(title: "Play · \(TimeFormats.formatDuration(duration))", fraction: 0)
         }
+
+        /// The verb alone, for accessibility text sizes where the full title
+        /// no longer fits the capsule on one line.
+        var compactTitle: String { fraction > 0 ? "Resume" : "Play" }
     }
 
     var openChannel: ((ChannelReference) -> Void)?
@@ -440,6 +444,7 @@ final class DetailViewController: UIViewController {
         ScrollEdgeChrome.attachTopEdge(
             to: scrollView, in: view, height: Layout.inset, fadeColor: Theme.surface, restingGap: 0
         )
+        ScrollEdgeChrome.updateTopEffect(of: scrollView)
 
         // The last line of the notes scrolls to rest above the fade.
         scrollView.contentInset.bottom = Layout.fadeHeight
@@ -643,7 +648,7 @@ final class DetailViewController: UIViewController {
         artwork.layer.cornerRadius = Radius.concentric(insetFromSheetEdge: Layout.inset)
         artwork.layer.cornerCurve = .continuous
         artwork.backgroundColor = Theme.surfaceContainerHighest
-        artwork.setArtwork(episode.imageURL.flatMap(URL.init(string:)), title: episode.channelTitle)
+        artwork.setArtwork(episode.imageURL.flatMap(URL.init(string:)), title: episode.channelTitle, side: Layout.artworkLarge)
         artwork.isAccessibilityElement = true
         artwork.accessibilityLabel = "Episode artwork"
         artwork.translatesAutoresizingMaskIntoConstraints = false
@@ -675,7 +680,7 @@ final class DetailViewController: UIViewController {
         let meta = UILabel()
         meta.adjustsFontForContentSizeCategory = false
         meta.numberOfLines = 1
-        meta.text = metaLine
+        meta.text = metaText(playTimeInMeta: false)
 
         for label in [titleLabel, meta] as [UIView] {
             label.setContentHuggingPriority(.required, for: .vertical)
@@ -853,20 +858,19 @@ final class DetailViewController: UIViewController {
         )
     }
 
-    private var metaLine: String {
-        RelativeTimeFormatter.dateAndDuration(
-            pubDateMilliseconds: episode.pubDateMilliseconds,
-            durationMilliseconds: episode.durationMilliseconds,
-            now: now()
-        )
-    }
-
     /// Channel and date are one line at the default size, so they keep the
     /// font's natural line height. When they wrap, they use the meta line
     /// height: 20 pt at the default size, and at most 1.25× the point size
-    /// above that.
+    /// above that. Accessibility sizes append the play time (the Play
+    /// capsule shows its compact, verb-only title there).
     private func applyMetaLineHeight(wrapped: Bool) {
-        applyBlockText(metaLabel, text: metaLine, style: .meta, honorLineHeight: wrapped)
+        let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        applyBlockText(
+            metaLabel,
+            text: metaText(playTimeInMeta: accessibility && playLabel.fraction > 0),
+            style: .meta,
+            honorLineHeight: wrapped
+        )
     }
 
     private func applyBlockText(
@@ -1029,15 +1033,48 @@ final class DetailViewController: UIViewController {
         moreButton.setDiameter(chrome.height, glyphPointSize: glyph)
         transcriptRow.applyConcentricRadius(chrome.radius)
         artwork.layer.cornerRadius = Radius.concentric(insetFromSheetEdge: Layout.inset)
-        applyPlayButton(height: chrome.height)
+        let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        applyPlayTitle(accessibility: accessibility)
+        if accessibility {
+            fitPlayButton(height: chrome.height)
+        }
         updateScrollContentInsets()
     }
 
-    /// Sizes the Play label and icon. Accessibility sizes cap both at
-    /// `playLabelMaximumPointSize` and offer a long-press Large Content
-    /// Viewer for the full title. The vertical inset stays the 12 pt token
-    /// when the capsule has room, so the default 52 pt height is unchanged.
-    private func applyPlayButton(height: CGFloat) {
+    /// Accessibility sizes keep the capsule to the verb on one line. The
+    /// time moves to the meta line, and VoiceOver still reads the full label.
+    private func applyPlayTitle(accessibility: Bool) {
+        guard var configuration = playButton.configuration else { return }
+        let label = playLabel
+        configuration.title = accessibility ? label.compactTitle : label.title
+        configuration.titleLineBreakMode = .byTruncatingTail
+        playButton.configuration = configuration
+        applyMetaLineHeight(wrapped: accessibility)
+    }
+
+    private var playLabel: PlayLabel {
+        PlayLabel.make(
+            durationMilliseconds: episode.durationMilliseconds,
+            playedMilliseconds: episode.playedMilliseconds
+        )
+    }
+
+    private func metaText(playTimeInMeta: Bool) -> String {
+        let meta = RelativeTimeFormatter.dateAndDuration(
+            pubDateMilliseconds: episode.pubDateMilliseconds,
+            durationMilliseconds: episode.durationMilliseconds,
+            now: now()
+        )
+        guard playTimeInMeta, let duration = episode.durationMilliseconds else { return meta }
+        let left = PlaylistCardDisplay.timeLeft(
+            durationMilliseconds: duration, playedMilliseconds: episode.playedMilliseconds ?? 0
+        )
+        return "\(meta) · \(left)"
+    }
+
+    /// Keeps the Play label inside the capped capsule without changing the
+    /// default 12 pt inset when the 52 pt height already has room.
+    private func fitPlayButton(height: CGFloat) {
         guard var configuration = playButton.configuration else { return }
         let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
         let font = playLabelFont()
@@ -1084,10 +1121,7 @@ final class DetailViewController: UIViewController {
         actionRow.alignment = .fill
         actionRow.spacing = Spacing.md
 
-        let label = PlayLabel.make(
-            durationMilliseconds: episode.durationMilliseconds,
-            playedMilliseconds: episode.playedMilliseconds
-        )
+        let label = playLabel
         let play = AnycastButton.make(.primary, title: label.title, image: AppIcons.play)
         var configuration = play.configuration
         configuration?.background.customView = ProgressCapsuleBackground(fraction: label.fraction)
@@ -1221,7 +1255,7 @@ final class DetailViewController: UIViewController {
         if case .text(let plain) = HtmlText.displayPayload(for: html) {
             descriptionTextView.setDocument(
                 ShowNotesStore.shared.attributedFallback(
-                    plain: plain, style: ShowNotesStyle(), traits: traits
+                    plain: DisplayText.plainText(fromHTML: plain), style: ShowNotesStyle(), traits: traits
                 ),
                 imageLoader: KingfisherShowNotesImageLoader.shared
             )
@@ -1303,6 +1337,7 @@ final class DetailViewController: UIViewController {
 
 extension DetailViewController: UIScrollViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        ScrollEdgeChrome.updateTopEffect(of: scrollView)
         updateFoldTreatment()
     }
 }

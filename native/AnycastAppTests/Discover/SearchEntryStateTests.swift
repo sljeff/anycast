@@ -1,5 +1,6 @@
 import UIKit
 import Testing
+import AnycastKit
 @testable import Anycast
 
 /// The Search tab's entry state: which sections show for which data, that it
@@ -45,7 +46,7 @@ struct SearchEntryStateTests {
     @Test("Categories only: no recents section")
     func categoriesOnly() async {
         let entry = await makeEntry(recents: [], categories: .success(["News"]))
-        #expect(entry.sections == [.categoriesHeader, .categories])
+        #expect(entry.sections == [.hint, .categoriesHeader, .categories])
     }
 
     @Test("A failed category load hides the section silently")
@@ -55,10 +56,10 @@ struct SearchEntryStateTests {
         #expect(entry.sections == [.recentsHeader, .recents])
     }
 
-    @Test("Neither: the page is empty")
+    @Test("Neither: only the one-line hint")
     func neither() async {
         let entry = await makeEntry(recents: [], categories: .success([]))
-        #expect(entry.sections.isEmpty)
+        #expect(entry.sections == [.hint])
     }
 
     @Test("Choosing a recent or a category reports its text")
@@ -85,19 +86,31 @@ struct SearchEntryStateTests {
         #expect(!page.isShowingResults)
         #expect(!page.entryPage.view.isHidden)
 
+        let script = ScriptedSearch(channels: .success([ScriptedSearch.channel("Second")]))
+        page.setSearchTransport(
+            channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+            episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+        )
         page.entryPage.activate(.recent("second"))
         #expect(page.isShowingResults)
         #expect(page.entryPage.view.isHidden)
+        await Self.waitUntil { store.queries == ["second", "first"] }
         #expect(store.queries == ["second", "first"])
     }
 
-    @Test("Submitting a query records it")
+    @Test("Submitting a query records it once a segment returns a row")
     func searchRecordsQuery() async {
         guard let context = await Self.liveUIContext() else { return }
         let store = makeStore([])
+        let script = ScriptedSearch(channels: .success([ScriptedSearch.channel("Planet Money")]))
         let page = SearchPageViewController(context: context, recentStore: store, loadCategories: { [] })
+        page.setSearchTransport(
+            channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+            episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+        )
         page.loadViewIfNeeded()
         page.search("  Planet Money ")
+        await Self.waitUntil { store.queries == ["Planet Money"] }
         #expect(store.queries == ["Planet Money"])
     }
 
@@ -105,6 +118,10 @@ struct SearchEntryStateTests {
     func emptiedFieldReturnsToEntry() async {
         guard let context = await Self.liveUIContext() else { return }
         let page = SearchPageViewController(context: context, recentStore: makeStore([]), loadCategories: { [] })
+        page.setSearchTransport(
+            channels: { @Sendable (_: String) async throws -> [SubscriptionRow] in [] },
+            episodes: { @Sendable (_: String) async throws -> [APIClient.EpisodeWithChannel] in [] }
+        )
         page.loadViewIfNeeded()
         page.search("news")
         #expect(page.isShowingResults)
@@ -121,9 +138,15 @@ struct SearchEntryStateTests {
     func cancelReturnsToEntry() async {
         guard let context = await Self.liveUIContext() else { return }
         let store = makeStore([])
+        let script = ScriptedSearch(channels: .success([ScriptedSearch.channel("news")]))
         let page = SearchPageViewController(context: context, recentStore: store, loadCategories: { [] })
+        page.setSearchTransport(
+            channels: { @Sendable keyword in try await script.fetchChannels(keyword) },
+            episodes: { @Sendable keyword in try await script.fetchEpisodes(keyword) }
+        )
         page.loadViewIfNeeded()
         page.search("news")
+        await Self.waitUntil { store.queries == ["news"] }
         #expect(page.isShowingResults)
 
         // The system clears the bar's text only after this callback.

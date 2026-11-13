@@ -64,7 +64,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Player page distribution (1) + thumb height (2)
 
-    @Test("Player main page: square column-width cover, 28 pt rhythm, centered play")
+    @Test("Player main page: square cover centered above the title, centered play")
     func playerPageDistribution() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -111,22 +111,22 @@ struct UIFixRegressionTests {
         let bottomFrame = frameInPage(bottomStack)
         let playFrame = frameInPage(playPause)
 
-        // Square, at most the 24 pt content column's width, horizontally centered.
+        // Square, at most the 28 pt content column's width, horizontally centered.
         #expect(abs(coverFrame.width - coverFrame.height) < 1.5, "cover is not square: \(coverFrame)")
-        #expect(coverFrame.width <= page.bounds.width - 48 + 0.5, "cover exceeds the column: \(coverFrame.width)")
+        #expect(coverFrame.width <= page.bounds.width - 56 + 0.5, "cover exceeds the column: \(coverFrame.width)")
         #expect(abs(coverFrame.midX - page.bounds.midX) < 1, "cover is off center")
 
-        // One 28 pt VISIBLE rhythm (subtitle → track, labels → transport,
-        // transport → selector); the frames carry the hidden slack, so the
-        // frame gaps are at least 28 - 24 and exactly 28 - 13 (the page ends
-        // at the selector's top). The cover sits just under the grabber and
-        // the slack goes between the title and the scrubber, keeping the
-        // controls in the thumb zone.
-        let topGap = coverFrame.minY
+        // The artwork floats centered between the grabber clearance (20) and
+        // the title: equal air above and below. The title sits on the
+        // scrubber (frames overlap by 6, the scrubber hides ~20 of slack),
+        // and the page ends 15 above the selector.
+        let airAbove = coverFrame.minY - 20
+        let airBelow = titleFrame.minY - coverFrame.maxY
         let middleGap = bottomFrame.minY - titleFrame.maxY
         let bottomGap = page.bounds.maxY - bottomFrame.maxY
-        #expect(abs(topGap - 36) < 0.5, "cover should sit just under the grabber: \(topGap)")
-        #expect(middleGap >= 4 - 0.5, "title → scrubber frame gap is \(middleGap), expected at least 4")
+        #expect(abs(airAbove - airBelow) < 1.0, "cover is not centered above the title: \(airAbove) vs \(airBelow)")
+        #expect(airBelow >= 24 - 0.5, "cover crowds the title: \(airBelow)")
+        #expect(abs(middleGap + 6) < 0.5, "title → scrubber frame gap is \(middleGap), expected -6")
         #expect(abs(bottomGap - 15) < 1.0, "transport → selector frame gap is \(bottomGap), expected 15")
 
         // Play sits exactly on the page's center line.
@@ -383,7 +383,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Inbox native-first card interactions (6a)
 
-    @Test("Inbox card: tap opens Detail; context menu + more button carry the 3 actions")
+    @Test("Inbox row: tap opens Detail; context menu + VoiceOver actions carry the 3 actions")
     func inboxNativeCardInteractions() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -410,11 +410,6 @@ struct UIFixRegressionTests {
         // card as custom actions (09 §7a-C1).
         #expect(cell.menuActions.count == 3,
                 "menu actions not mirrored (count \(cell.menuActions.count))")
-
-        // The more button pulls the same menu down (批次1).
-        let moreTitles = cell.moreButton.menu?.children.compactMap { ($0 as? UIAction)?.title }
-        #expect(moreTitles == ["Play", "Add to playlist", "Remove from inbox"],
-                "more menu children \(moreTitles ?? [])")
 
         // The long-press menu itself: Play / Add to playlist / Remove from inbox.
         guard let menu = inbox.contextMenu(at: path) else {
@@ -642,7 +637,7 @@ struct UIFixRegressionTests {
         // Best-effort net for early exits; the happy path awaits its own
         // cleanup first (idempotent delete by URL).
         defer {
-            Task { try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: tallURL) }
+            Task { try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: tallURL) }
         }
 
         let list = PlaylistEpisodeListViewController(
@@ -772,7 +767,7 @@ struct UIFixRegressionTests {
 
         // Restore the fixture: the seeded tall row leaves the playlist it
         // was appended to (awaited, so later serialized tests read clean).
-        try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: tallURL)
+        try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: tallURL)
     }
 
     // MARK: - 9b. Off-screen collapse (scroll-back settling)
@@ -829,7 +824,7 @@ struct UIFixRegressionTests {
         defer {
             Task {
                 for url in fillerURLs {
-                    try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: url)
+                    try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: url)
                 }
             }
         }
@@ -906,7 +901,7 @@ struct UIFixRegressionTests {
 
         // Fixture restore (awaited; the defer Task above is the early-exit net).
         for url in fillerURLs {
-            try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: url)
+            try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: url)
         }
     }
 
@@ -1188,7 +1183,7 @@ struct UIFixRegressionTests {
 
         // Restore the fixture (the live container must not leak this add):
         // back out of the playlist, return the inbox row.
-        try? await context.database.playlistRepository().removeEpisodeCascade(byEnclosureURL: url)
+        try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: url)
         try? await context.database.feedRepository().insertMany([episodeRow])
     }
 
@@ -1222,15 +1217,16 @@ struct UIFixRegressionTests {
 
         allShows.sendActions(for: .touchUpInside)
         try await Self.settle(window, seconds: 1.5)
-        guard let sheet = Self.find(ShowsSheetViewController.self, in: window.rootViewController),
+        guard let sheet = Self.find(LibrarySheetViewController.self, in: window.rootViewController),
               let grid = Self.firstView(in: sheet.view, where: { $0 is UICollectionView })
                 as? UICollectionView else {
-            Issue.record("All shows did not open the Shows sheet"); return
+            Issue.record("All shows did not open the Library sheet"); return
         }
         #expect(sheet.sheetPresentationController?.prefersGrabberVisible == true)
-        grid.delegate?.collectionView?(grid, didSelectItemAt: IndexPath(item: 0, section: 0))
+        // Section 0 is the "Shows" title; the covers are section 1.
+        grid.delegate?.collectionView?(grid, didSelectItemAt: IndexPath(item: 0, section: 1))
         try await Self.settle(window, seconds: 2.0)
-        #expect(Self.find(ShowsSheetViewController.self, in: window.rootViewController) == nil,
+        #expect(Self.find(LibrarySheetViewController.self, in: window.rootViewController) == nil,
                 "the sheet did not dismiss after a show was picked")
         #expect(Self.find(ChannelViewController.self, in: window.rootViewController) != nil,
                 "a show picked in the sheet did not open its Channel")

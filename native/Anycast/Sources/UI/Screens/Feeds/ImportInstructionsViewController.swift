@@ -1,9 +1,8 @@
 import UIKit
 
 /// ImportInstructions content (lib/widgets/import_export.dart:251-333),
-/// extracted verbatim — five ExpansionTile sections; the XiaoYuzhou
-/// (小宇宙) entry is
-/// the one Chinese-copy exception (03 §8).
+/// five ExpansionTile sections, all in English (the Xiaoyuzhou section was
+/// the one Chinese-copy exception until the import redesign).
 enum ImportInstructionsContent {
 
     struct Section: Equatable {
@@ -41,13 +40,13 @@ enum ImportInstructionsContent {
                 + "5. Share to \"Anycast\""
         ),
         Section(
-            title: "小宇宙",
-            text: "1. 打开小宇宙 -> 订阅\n"
-                + "2. 点击右上角 \"我的订阅\"\n"
-                + "3. 点击右上角的分享按钮\n"
-                + "4. 选中所有想要导入的频道\n"
-                + "5. 点击 \"导出 OPML\"\n"
-                + "6. 分享到 \"Anycast\""
+            title: "Xiaoyuzhou",
+            text: "1. Open Xiaoyuzhou -> Subscriptions\n"
+                + "2. Tap \"My Subscriptions\" at the top right\n"
+                + "3. Tap the share button at the top right\n"
+                + "4. Select the shows you want to import\n"
+                + "5. Tap \"Export OPML\"\n"
+                + "6. Share to \"Anycast\""
         ),
         Section(
             title: "Other Apps using OPML",
@@ -76,12 +75,18 @@ final class ImportInstructionsViewController: UIViewController {
 
     private let collectionView: UICollectionView
     private let titleLabel = UILabel()
+    private var chooseFileButton: UIButton?
+    /// Set before presenting; adds the "Choose a file" button.
+    var onChooseFile: ((ImportInstructionsViewController) -> Void)?
     private var expandedSections: Set<Int> = []
 
     // MARK: - Present (showModalBottomSheet + DraggableScrollableSheet 0.7/0.6)
 
-    static func present(from presenter: UIViewController) {
+    /// With `onChooseFile`, a "Choose a file" button rests at the bottom: the
+    /// way in for someone who has the file already.
+    static func present(from presenter: UIViewController, onChooseFile: ((ImportInstructionsViewController) -> Void)? = nil) {
         let controller = ImportInstructionsViewController()
+        controller.onChooseFile = onChooseFile
         controller.modalPresentationStyle = .pageSheet
         let sheet = controller.sheetPresentationController
         // SDK 27 removed Detent.fraction; the custom resolver reproduces it
@@ -164,12 +169,35 @@ final class ImportInstructionsViewController: UIViewController {
             // out behind both; `viewDidLayoutSubviews` keeps the resting
             // layout of a list that started below the title.
             collectionView.topAnchor.constraint(equalTo: view.topAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
         ScrollEdgeChrome.attachTopBand(
             to: collectionView, in: view, below: titleLabel.bottomAnchor, restingGap: Self.titleGap
         )
-        ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view)
+        if onChooseFile != nil {
+            // The button rests in thumb reach; the list ends above it.
+            let button = AnycastButton.make(.primary, title: ImportCopy.chooseFile)
+            button.accessibilityIdentifier = "import-choose-file"
+            button.addAction(UIAction { [weak self] _ in
+                guard let self else { return }
+                self.onChooseFile?(self)
+            }, for: .touchUpInside)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(button)
+            let bottom = button.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Self.contentInset)
+            bottom.priority = .defaultHigh
+            NSLayoutConstraint.activate([
+                button.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.contentInset),
+                button.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Self.contentInset),
+                button.heightAnchor.constraint(equalToConstant: 52),
+                button.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
+                bottom,
+                collectionView.bottomAnchor.constraint(equalTo: button.topAnchor, constant: -Self.titleGap),
+            ])
+            chooseFileButton = button
+        } else {
+            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
+            ScrollEdgeChrome.attachBottomEdge(to: collectionView, in: view)
+        }
         view.bringSubviewToFront(titleLabel)
     }
 

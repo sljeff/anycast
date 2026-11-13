@@ -215,13 +215,151 @@ public enum HtmlText {
 
     public static func displayPayload(for html: String) -> DisplayPayload {
         if html.isEmpty { return .empty }
-        if html.dartTrimmed().hasPrefix("<") {
-            let sanitized = sanitizeHtml(html).dartTrimmed()
+        let repaired = repairEmbeddedMarkup(html)
+        if repaired.dartTrimmed().hasPrefix("<") {
+            let sanitized = sanitizeHtml(repaired).dartTrimmed()
             if sanitized.isEmpty {
-                return .text(htmlToText(html))
+                return .text(htmlToText(repaired))
             }
             return .html(sanitized)
         }
-        return .text(html)
+        return .text(repaired)
+    }
+
+    // MARK: - Embedded markup repair
+
+    /// Tags that count as markup on their own, without a closing tag.
+    private static let standaloneTags: Set<String> = ["br", "hr", "wbr"]
+
+    /// Presentational tags the sanitizer would delete with their text; the
+    /// repair drops the tag and keeps the text.
+    private static let unwrappedTags: Set<String> = ["font", "u", "center"]
+
+    private static let embeddedTagExpression: NSRegularExpression = {
+        let opening = "(?:<|&(?:amp;)*(?:lt|#0*60|#[xX]0*3[cC]);)"
+        let closing = "(?:>|&(?:amp;)*(?:gt|#0*62|#[xX]0*3[eE]);)"
+        let escapedQuote = "&(?:amp;)*(?:quot|apos|#0*3[49]|#[xX]0*2[27]);"
+        let value = "(?:\"[^\"<]{0,4096}\"|'[^'<]{0,4096}'"
+            + "|\(escapedQuote).{0,4096}?\(escapedQuote)"
+            + "|(?:(?!\(closing))[^\\s\"'<>]){1,4096})"
+        let attribute = "[a-zA-Z_:][-\\w:.]*\\s*=\\s*\(value)"
+        return try! NSRegularExpression(
+            pattern: "\(opening)(/?)([a-zA-Z][a-zA-Z0-9]*)"
+                + "((?:\\s+\(attribute)(?:\\s*\(attribute))*)?)\\s*(/?)\(closing)"
+        )
+    }()
+
+    private struct EmbeddedTag {
+        let range: Range<String.Index>
+        let name: String
+        let attributes: String
+        let isClosing: Bool
+        let selfCloses: Bool
+        var isEscaped: Bool
+    }
+
+    /// Feeds put real HTML inside fields that open as plain prose (NPR:
+    /// `Light is the answer.<br/><br/>For <em>years</em>`), or escape it
+    /// (`&lt;em&gt;`). The display routing only recognizes a leading `<`, so
+    /// that markup would reach the reader verbatim.
+    ///
+    /// Returns display-ready source. A field that already opens with `<` only
+    /// has its escaped tags restored. A field that opens as prose and holds a
+    /// real tag becomes a `<body>` document: every other `<` is escaped, so the
+    /// parser cannot swallow prose (`x<y`), and its line breaks become `<br>`.
+    /// Anything else comes back unchanged.
+    ///
+    /// A real tag has a name the sanitizer knows, plus one of: a standalone
+    /// name (`br`), `name=value` attributes, or a matching closing tag.
+    /// `<event>`, `<3` and a lone `<em>` therefore stay literal. Display only:
+    /// ingest stays on `htmlToText` (G5 parity).
+    public static func repairEmbeddedMarkup(_ text: String) -> String {
+        let isDocument = text.dartTrimmed().hasPrefix("<")
+        if isDocument ? !text.contains("&") : !(text.contains("<") || text.contains("&")) {
+            return text
+        }
+        let tags = realEmbeddedTags(in: text)
+        guard !tags.isEmpty else { return text }
+
+        var output = ""
+        var cursor = text.startIndex
+        if isDocument {
+            for tag in tags where tag.isEscaped {
+                output += text[cursor..<tag.range.lowerBound]
+                output += markup(for: tag)
+                cursor = tag.range.upperBound
+            }
+            output += text[cursor...]
+            return output
+        }
+        for tag in tags {
+            output += escapedProse(text[cursor..<tag.range.lowerBound])
+            output += markup(for: tag)
+            cursor = tag.range.upperBound
+        }
+        output += escapedProse(text[cursor...])
+        return "<body>\(output)</body>"
+    }
+
+    private static func realEmbeddedTags(in text: String) -> [EmbeddedTag] {
+        let fullRange = NSRange(text.startIndex..., in: text)
+        let candidates: [EmbeddedTag] = embeddedTagExpression.matches(in: text, range: fullRange).compactMap { match in
+            guard let range = Range(match.range, in: text),
+                  let closing = Range(match.range(at: 1), in: text),
+                  let name = Range(match.range(at: 2), in: text),
+                  let attributes = Range(match.range(at: 3), in: text),
+                  let selfClosing = Range(match.range(at: 4), in: text)
+            else { return nil }
+            let lowered = text[name].lowercased()
+            guard allowedElements.contains(lowered) || unwrappedTags.contains(lowered) else { return nil }
+            return EmbeddedTag(
+                range: range,
+                name: lowered,
+                attributes: String(text[attributes]),
+                isClosing: !closing.isEmpty,
+                selfCloses: !selfClosing.isEmpty,
+                isEscaped: text[range].hasPrefix("&")
+            )
+        }
+
+        var isReal = [Bool](repeating: false, count: candidates.count)
+        var unclosed: [String: [Int]] = [:]
+        for (index, tag) in candidates.enumerated() {
+            if tag.isClosing {
+                if let opener = unclosed[tag.name]?.popLast() {
+                    isReal[opener] = true
+                    isReal[index] = true
+                }
+            } else if standaloneTags.contains(tag.name) {
+                isReal[index] = true
+            } else {
+                if !tag.attributes.isEmpty { isReal[index] = true }
+                unclosed[tag.name, default: []].append(index)
+            }
+        }
+        return zip(candidates, isReal).filter(\.1).map(\.0)
+    }
+
+    private static func markup(for tag: EmbeddedTag) -> String {
+        if unwrappedTags.contains(tag.name) { return "" }
+        var attributes = tag.attributes
+        if tag.isEscaped {
+            attributes = attributes
+                .replacingOccurrences(
+                    of: "&(?:amp;)*(?:quot|#0*34|#[xX]0*22);", with: "\"", options: .regularExpression
+                )
+                .replacingOccurrences(
+                    of: "&(?:amp;)*(?:apos|#0*39|#[xX]0*27);", with: "'", options: .regularExpression
+                )
+        }
+        return "<\(tag.isClosing ? "/" : "")\(tag.name)\(attributes)\(tag.selfCloses ? "/" : "")>"
+    }
+
+    private static func escapedProse(_ prose: Substring) -> String {
+        prose
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: "\r\n", with: "<br>")
+            .replacingOccurrences(of: "\r", with: "<br>")
+            .replacingOccurrences(of: "\n", with: "<br>")
     }
 }

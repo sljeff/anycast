@@ -129,9 +129,12 @@ nonisolated enum AppIcons {
     static let delete = symbol("trash")
     /// Forward disclosure. Mirrors in right-to-left layouts.
     static let disclosure = symbol("chevron.forward")
+    /// Trailing mark on rows that open a web page.
+    static let externalLink = symbol("arrow.up.right")
     static let retry = symbol("arrow.clockwise")
-    /// Transcript failure. Outline, shared by the playlist strip and the
-    /// transcript page (not `exclamationmark.bubble.fill`).
+    /// Transcript failure. Outline, shared by the playlist strip, the
+    /// transcript page, and the detail transcript row when generation
+    /// failed and Retry is offered (not `exclamationmark.bubble.fill`).
     static let transcriptFailed = symbol("exclamationmark.triangle")
     static let check = symbol("checkmark")
     static let person = symbol("person")
@@ -154,10 +157,10 @@ nonisolated enum AppIcons {
     static let elbowIndent = symbol("arrow.turn.down.right")
     /// Detail transcript row / menu: lines once a transcript exists.
     static let transcriptLines = symbol("text.alignleft")
-    /// Detail transcript row: generation failed, offer Retry.
-    static let transcriptFailed = symbol("exclamationmark.triangle")
     /// Detail ••• "Ask AI" — a bubble, not the player-page brand mark.
     static let chatBubble = symbol("bubble.left")
+    /// Transcript line menu: keep the sentence as a moment.
+    static let keepMoment = symbol("text.quote")
 
     /// Brand SVGs (template imagesets; tint with tintColor). Ask AI is
     /// `aiChat`; generating or opening a transcript is `aiTranscript`.
@@ -179,7 +182,7 @@ nonisolated enum AppIcons {
         "doc.on.doc", "safari.fill", "safari", "arrow.up.doc", "apple.logo",
         "envelope", "plus.circle", "exclamationmark.bubble.fill", "photo",
         "arrow.turn.down.right", "text.alignleft", "exclamationmark.triangle",
-        "bubble.left",
+        "bubble.left", "text.quote", "arrow.up.right",
     ]
 
     private static func symbol(_ name: String) -> UIImage {

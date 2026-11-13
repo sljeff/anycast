@@ -45,6 +45,11 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyState = EmptyStateView()
     private let emptyExploreButton = UIButton(type: .system)
+    /// Weak "Listening history" link under the empty state; shown only when
+    /// History has rows.
+    private let emptyHistoryLink = HistoryLinkButton(accessibilityIdentifier: "playlist-listening-history")
+    /// Element kind of the trailing "history ›" capsule after the last card.
+    private static let historyTailKind = "playlist-history-tail"
     private var emptyTopConstraint: NSLayoutConstraint?
     private var spinnerCenterConstraint: NSLayoutConstraint?
 
@@ -167,22 +172,18 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         spinnerCenterConstraint?.constant = topChromeInset / 2
     }
 
-    /// AnycastEmptyState (playlists.dart:71-84): "All caught up? Explore new
-    /// shows!" with the Explore button jumping to the Discover tab.
+    /// "Nothing queued." The queue is filled from the Inbox, so the action
+    /// goes there; with an empty Inbox it offers "Find a show" instead.
     private func buildEmptyState() {
         emptyState.isHidden = true
         emptyState.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyState)
 
-        emptyExploreButton.configuration = AnycastButton.configuration(.primary, title: "Explore", image: AppIcons.explore)
         emptyExploreButton.addPressFeedback(scale: Motion.pressScaleSubtle)
-        emptyExploreButton.addTarget(self, action: #selector(exploreTapped), for: .touchUpInside)
-        emptyState.configure(EmptyStateView.Content(
-            icon: UIImage(systemName: "music.note.list"),
-            title: "All caught up?",
-            message: "Explore new shows!",
-            actions: [emptyExploreButton]
-        ))
+        emptyExploreButton.addTarget(self, action: #selector(emptyActionTapped), for: .touchUpInside)
+        configureEmptyState(inboxIsEmpty: false)
+        emptyHistoryLink.addAction(UIAction { [weak self] _ in self?.presentHistory() }, for: .touchUpInside)
+        emptyHistoryLink.install(in: view)
 
         let top = emptyState.topAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.topAnchor, constant: topChromeInset
@@ -196,14 +197,43 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         ])
     }
 
-    @objc private func exploreTapped() {
-        // Jump to the Discover tab (playlists.dart: onItemTapped(2)),
-        // closing this list first when it is presented as a sheet.
+    private var emptyActionFindsShow = false
+
+    private func configureEmptyState(inboxIsEmpty: Bool) {
+        emptyActionFindsShow = inboxIsEmpty
+        emptyExploreButton.configuration = AnycastButton.configuration(
+            .primary, title: inboxIsEmpty ? "Find a show" : "Go to Inbox"
+        )
+        emptyState.configure(EmptyStateView.Content(
+            title: "Nothing queued.",
+            message: "Add episodes from the Inbox to play next.",
+            actions: [emptyExploreButton]
+        ))
+    }
+
+    /// Re-reads whether the Inbox has anything, to pick the action.
+    private func refreshEmptyAction() {
+        let repository = context.database.feedRepository()
+        Task { [weak self] in
+            let count = (try? await repository.count()) ?? 1
+            guard let self, self.emptyState.isHidden == false else { return }
+            self.configureEmptyState(inboxIsEmpty: count == 0)
+        }
+    }
+
+    private func presentHistory() {
+        HistoryDialogViewController.present(from: self, context: context)
+    }
+
+    @objc private func emptyActionTapped() {
+        // Inbox (tab 0) or Search (tab 3), closing this list first when it
+        // is presented as a sheet.
         let tabs = context.tabs
+        let index = emptyActionFindsShow ? 3 : 0
         if presentingViewController != nil {
-            dismiss(animated: true) { tabs.select(2) }
+            dismiss(animated: true) { tabs.select(index) }
         } else {
-            tabs.select(2)
+            tabs.select(index)
         }
     }
 
@@ -224,6 +254,17 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             let section = NSCollectionLayoutSection(group: group)
             section.interGroupSpacing = EpisodeCardCell.spacing
             section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 64, trailing: 0)
+            // The "history ›" capsule closes the list, like the Inbox tail.
+            // A boundary item, not a second section: the reorder gesture and
+            // the expand animator keep a one-section index space.
+            let tail = NSCollectionLayoutBoundarySupplementaryItem(
+                layoutSize: NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1), heightDimension: .estimated(IconMetrics.minimumHit)
+                ),
+                elementKind: Self.historyTailKind,
+                alignment: .bottom
+            )
+            section.boundarySupplementaryItems = [tail]
             return section
         }
     }
@@ -232,6 +273,11 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
 
     private func configureDataSource() {
         collectionView.setCollectionViewLayout(makeLayout(), animated: false)
+        collectionView.register(
+            HistoryTailCell.self,
+            forSupplementaryViewOfKind: Self.historyTailKind,
+            withReuseIdentifier: HistoryTailCell.reuseIdentifier
+        )
         let binder = self.binder!
         dataSource = UICollectionViewDiffableDataSource<Int, String>(
             collectionView: collectionView
@@ -247,6 +293,13 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             }
             binder.configure(cell: cell, episode: episode, at: indexPath, in: collectionView)
             return cell
+        }
+        dataSource.supplementaryViewProvider = { [weak self] collectionView, kind, indexPath in
+            let view = collectionView.dequeueReusableSupplementaryView(
+                ofKind: kind, withReuseIdentifier: HistoryTailCell.reuseIdentifier, for: indexPath
+            )
+            (view as? HistoryTailCell)?.onOpenHistory = { [weak self] in self?.presentHistory() }
+            return view
         }
         // Route a: drag-driven reorder commits through the diffable
         // reorderingHandlers (never `moveItemAt`). The legacy interactive
@@ -288,6 +341,8 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         spinner.isHidden = !isLoading
         if isLoading { spinner.startAnimating() } else { spinner.stopAnimating() }
         emptyState.isHidden = isLoading || !episodes.isEmpty
+        if !emptyState.isHidden { refreshEmptyAction() }
+        emptyHistoryLink.refresh(pageIsEmpty: !isLoading && episodes.isEmpty, database: context.database)
         collectionView.isHidden = isLoading || episodes.isEmpty
     }
 
@@ -401,7 +456,7 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         // DB read here is the resync.
         let playback = context.playback
         queueObservation.track(
-            read: { _ = playback.queue.map(\.enclosureUrl) },
+            read: { _ = playback.queueEnclosureURLs },
             onChange: { [weak self] in
                 Task { await self?.reloadEpisodes() }
             }

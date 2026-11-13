@@ -11,20 +11,20 @@ import AnycastKit
 struct SettingsPickerMappingTests {
 
     private let stepperRows: [SettingsPageModel.Row] = [
-        .autoRefreshInterval, .maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit,
+        .maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit,
     ]
 
     // MARK: - Choice lists
 
     @Test("Choice lists per stepper row; non-stepper rows have none")
     func choiceLists() {
-        #expect(SettingsPageModel.stepperChoices(for: .autoRefreshInterval) == [60, 180, 300, 600, 1800])
         #expect(SettingsPageModel.stepperChoices(for: .maxFeedEpisodes) == [50, 100, 200, 300])
         #expect(SettingsPageModel.stepperChoices(for: .maxHistoryEpisodes) == [50, 100, 200, 300])
         #expect(SettingsPageModel.stepperChoices(for: .cacheLimit) == [5, 10, 20, 50, 100])
         #expect(SettingsPageModel.cacheLimitChoices == [5, 10, 20, 50, 100])
-        for row in [SettingsPageModel.Row.account, .country, .enableTranslation, .targetLanguage,
-                    .importExport, .history, .contactEmail, .privacyPolicy, .termsOfUse] {
+        for row in [SettingsPageModel.Row.account, .country, .targetLanguage,
+                    .importSubscriptions, .exportSubscriptions, .clearCache, .contactEmail, .privacyPolicy,
+                    .termsOfUse] {
             #expect(SettingsPageModel.stepperChoices(for: row) == nil)
             #expect(SettingsPageModel.stepperAccessibilityLabels(for: row) == nil)
         }
@@ -33,20 +33,14 @@ struct SettingsPickerMappingTests {
     @Test("Each stepper row reads its own stored value and has accessibility labels")
     func stepperValueSource() {
         var settings = AppSettings.defaults(localeIdentifier: "en_US")
-        settings.autoRefreshInterval = 600
         settings.maxFeedEpisodes = 200
         settings.maxHistoryEpisodes = 300
         settings.maxCacheCount = 50
-        #expect(SettingsPageModel.stepperValue(for: .autoRefreshInterval, settings: settings) == 600)
         #expect(SettingsPageModel.stepperValue(for: .maxFeedEpisodes, settings: settings) == 200)
         #expect(SettingsPageModel.stepperValue(for: .maxHistoryEpisodes, settings: settings) == 300)
         #expect(SettingsPageModel.stepperValue(for: .cacheLimit, settings: settings) == 50)
         #expect(SettingsPageModel.stepperValue(for: .account, settings: settings) == nil)
 
-        #expect(SettingsPageModel.stepperAccessibilityLabels(for: .autoRefreshInterval)?.decrease
-            == "Shorter auto refresh interval")
-        #expect(SettingsPageModel.stepperAccessibilityLabels(for: .autoRefreshInterval)?.increase
-            == "Longer auto refresh interval")
         #expect(SettingsPageModel.stepperAccessibilityLabels(for: .maxFeedEpisodes)?.decrease
             == "Lower inbox limit")
         #expect(SettingsPageModel.stepperAccessibilityLabels(for: .maxHistoryEpisodes)?.increase
@@ -68,10 +62,6 @@ struct SettingsPickerMappingTests {
         #expect(SettingsPageModel.choiceIndex(of: 150, in: episodes) == 1, "tie goes to the lower choice")
         #expect(SettingsPageModel.choiceIndex(of: 0, in: episodes) == 0)
         #expect(SettingsPageModel.choiceIndex(of: 9_999, in: episodes) == 3)
-
-        let seconds = SettingsCodec.autoRefreshChoicesSeconds
-        #expect(SettingsPageModel.choiceIndex(of: 90, in: seconds) == 0)
-        #expect(SettingsPageModel.choiceIndex(of: 700, in: seconds) == 3)
     }
 
     @Test("Steps move to the neighbouring choice and clamp at the ends")
@@ -120,15 +110,5 @@ struct SettingsPickerMappingTests {
             }
             #expect(choices.contains(value), "\(row) default \(value) is a choice")
         }
-    }
-
-    // MARK: - Display
-
-    @Test("Row display strings")
-    func display() {
-        #expect(SettingsPageModel.autoRefreshDisplay(seconds: 300) == "5 min")
-        #expect(SettingsPageModel.autoRefreshDisplay(seconds: 60) == "1 min")
-        #expect(SettingsPageModel.autoRefreshDisplay(seconds: 1800) == "30 min")
-        #expect(SettingsPageModel.episodesDisplay(count: 100) == "100 episodes")
     }
 }

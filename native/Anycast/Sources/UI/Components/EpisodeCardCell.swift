@@ -226,7 +226,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         if url != renderedCoverURL {
             renderedCoverURL = url
             coverView.kf.cancelDownloadTask()
-            coverView.setArtwork(url, title: content.channelTitle)
+            coverView.setArtwork(url, title: content.channelTitle, side: Self.coverSide)
         }
 
         showsProgress = content.showsProgress
@@ -570,13 +570,13 @@ final class EpisodeCardCell: UICollectionViewCell {
             cardContainer.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
             cardContainer.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
 
-            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.gap),
+            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.pageH),
             coverView.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.gap),
             coverView.widthAnchor.constraint(equalToConstant: Self.coverSide),
             coverView.heightAnchor.constraint(equalToConstant: Self.coverSide),
 
             textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
-            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.gap),
+            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.pageH),
             textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.gap),
             textColumn.bottomAnchor.constraint(lessThanOrEqualTo: cardContainer.bottomAnchor, constant: -Spacing.gap),
             metaRow.widthAnchor.constraint(lessThanOrEqualTo: textColumn.widthAnchor),

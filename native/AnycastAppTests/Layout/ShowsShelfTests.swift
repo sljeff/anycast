@@ -205,28 +205,4 @@ struct ShowsShelfTests {
         )
         #expect(capped == 800, "capped at the large detent")
     }
-
-    @Test("The sheet titles Shows with the count and lists every show in three columns")
-    func sheetContent() {
-        let shows = (1...7).map { show("S\($0)") }
-        let sheet = ShowsSheetViewController(shows: shows)
-        sheet.view.frame = CGRect(x: 0, y: 0, width: 390, height: 600)
-        sheet.view.layoutIfNeeded()
-
-        let label = sheet.view.subviews.compactMap { $0 as? UILabel }
-            .first { $0.accessibilityIdentifier == "shows-sheet-title" }
-        #expect(label?.attributedText?.string == "Shows · 7")
-
-        let grid = sheet.view.subviews.compactMap { $0 as? UICollectionView }.first
-        #expect(grid?.numberOfItems(inSection: 0) == 7)
-        grid?.layoutIfNeeded()
-        let frames = (0..<4).compactMap { grid?.layoutAttributesForItem(at: IndexPath(item: $0, section: 0))?.frame }
-        #expect(frames.count == 4)
-        if frames.count == 4 {
-            #expect(frames[0].minY == frames[2].minY, "three to a row")
-            #expect(frames[3].minY > frames[0].minY, "fourth wraps to the next row")
-            #expect(frames[1].minX - frames[0].maxX == 12, "12 pt column gap")
-            #expect(abs(frames[3].minY - frames[0].maxY - 20) < 0.5, "20 pt row gap (got \(frames[3].minY - frames[0].maxY))")
-        }
-    }
 }

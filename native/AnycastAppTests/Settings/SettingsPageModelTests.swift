@@ -5,46 +5,38 @@ import AnycastKit
 
 /// Settings page model (05 §6.1 S16 / 03 §2.13, restrained 2.0 Settings
 /// direction 2026-10-21): group/row structure, row copy and trailing values,
-/// tooltip fixtures, option lists, locale derivation, and the deep links —
+/// VoiceOver hints, option lists, locale derivation, and the deep links —
 /// asserted against data so the fixtures are independent of the live UI.
 @MainActor
 struct SettingsPageModelTests {
 
     // MARK: - Group / row order
 
-    @Test("Sections and rows follow the 2.0 Settings grouping")
+    @Test("Sections and rows follow the task grouping, per tier")
     func sectionRowOrder() {
-        let sections = SettingsPageModel.sections(tier: .signedOut)
-        #expect(sections.map(\.header) == [
-            nil, "Downloads & Storage", "Subtitles & Translation",
-            "Content & Discovery", "Help", nil,
-        ])
-        #expect(sections.map(\.rows) == [
-            [.account],
-            [.cacheLimit],
-            [.enableTranslation, .targetLanguage],
-            [.country, .autoRefreshInterval, .maxFeedEpisodes,
-             .maxHistoryEpisodes, .importExport, .history],
-            [.contactEmail],
-            [.privacyPolicy, .termsOfUse],
-        ])
-        // Only the trailing privacy links render outside a group plate.
-        #expect(sections.map(\.plainStyle) == [false, false, false, false, false, true])
-    }
-
-    @Test("The gold Upgrade plate follows the identity row for free users only")
-    func upgradePlateIsTierDependent() {
-        let free = SettingsPageModel.sections(tier: .free)
-        #expect(free.map(\.rows).prefix(3) == [[.account], [.plusUpgrade], [.cacheLimit]])
-        #expect(free.count == SettingsPageModel.sections(tier: .signedOut).count + 1)
-        #expect(free[1].header == nil)
-        #expect(free[1].plainStyle == false)
-
-        for tier in [AccountPageModel.Tier.signedOut, .plus] {
-            let rows = SettingsPageModel.sections(tier: tier).flatMap(\.rows)
-            #expect(!rows.contains(.plusUpgrade))
+        let tail: [[SettingsPageModel.Row]] = [
+            [.targetLanguage],
+            [.maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit, .clearCache],
+            [.country, .importSubscriptions, .exportSubscriptions],
+            [.contactEmail, .privacyPolicy, .termsOfUse],
+        ]
+        for (tier, identity) in [
+            (AccountPageModel.Tier.signedOut, [SettingsPageModel.Row.account, .plusUpgrade]),
+            (.free, [.account, .plusUpgrade]),
+            (.plus, [.account]),
+        ] {
+            let sections = SettingsPageModel.sections(tier: tier)
+            #expect(sections.map(\.rows) == [identity] + tail, "\(tier)")
+            #expect(sections.map(\.header) == [nil, "Transcripts", "Keep on this iPhone", "Shows", "Help"])
+            #expect(sections.map(\.footer) == [nil, nil, .keep, .shows, .version])
         }
         #expect(SettingsPageModel.identifier(for: .plusUpgrade) == "settings-row-plusUpgrade")
+    }
+
+    @Test("Plus row action: See Plans signed out, Upgrade for Free")
+    func plusAction() {
+        #expect(SettingsPageModel.plusActionTitle(tier: .signedOut) == "See Plans")
+        #expect(SettingsPageModel.plusActionTitle(tier: .free) == "Upgrade")
     }
 
     @Test("Translation is on while a target language is set (settings.dart:239)")
@@ -53,136 +45,120 @@ struct SettingsPageModelTests {
         #expect(SettingsPageModel.showsTargetLanguage(targetLanguage: "ja") == true)
     }
 
-    @Test("Row identifiers stay stable for existing rows")
+    @Test("Row identifiers stay stable for surviving rows")
     func rowIdentifiers() {
         #expect(SettingsPageModel.identifier(for: .account) == "settings-row-account")
         #expect(SettingsPageModel.identifier(for: .country) == "settings-row-country")
-        #expect(SettingsPageModel.identifier(for: .enableTranslation) == "settings-row-enableTranslation")
-        #expect(SettingsPageModel.identifier(for: .autoRefreshInterval) == "settings-row-autoRefreshInterval")
+        #expect(SettingsPageModel.identifier(for: .targetLanguage) == "settings-row-targetLanguage")
         #expect(SettingsPageModel.identifier(for: .cacheLimit) == "settings-row-cacheLimit")
     }
 
-    @Test("Row titles and the switch subtitle")
+    @Test("Row titles")
     func rowLabels() {
         let expected: [SettingsPageModel.Row: String] = [
             .account: "Account",
             .plusUpgrade: "Anycast Plus",
-            .cacheLimit: "Cache Limit",
-            .enableTranslation: "Subtitle Translation",
-            .targetLanguage: "Target Language",
-            .country: "Discovery Region",
-            .autoRefreshInterval: "Auto Refresh",
-            .maxFeedEpisodes: "Inbox Limit",
-            .maxHistoryEpisodes: "History Limit",
-            .importExport: "Import & Export",
-            .history: "Listening History",
-            .contactEmail: "Contact Us",
+            .targetLanguage: "Translate to",
+            .maxFeedEpisodes: "Inbox",
+            .maxHistoryEpisodes: "History",
+            .cacheLimit: "Played audio",
+            .country: "Charts from",
+            .clearCache: "Clear played audio",
+            .importSubscriptions: "Import subscriptions",
+            .exportSubscriptions: "Export subscriptions",
+            .contactEmail: "Send Feedback",
             .privacyPolicy: "Privacy Policy",
-            .termsOfUse: "Terms of Use (EULA)",
+            .termsOfUse: "Terms of Use",
         ]
         for (row, title) in expected {
             #expect(SettingsPageModel.title(for: row) == title)
         }
-        #expect(SettingsPageModel.subtitle(for: .enableTranslation) == "Translate generated text")
-        for row in expected.keys where row != .enableTranslation {
-            #expect(SettingsPageModel.subtitle(for: row) == nil)
-        }
     }
 
-    @Test("Trailing values: stored value, 'Off' while translation is off, 'Email' on Contact Us")
+    @Test("Trailing values: stored value, 'Off' while translation is off, none on link rows")
     func trailingValues() {
         var settings = AppSettings.defaults(localeIdentifier: "en_US")
         settings.countryCode = "JP"
         settings.targetLanguage = "zh"
-        settings.autoRefreshInterval = 300
         settings.maxFeedEpisodes = 200
-        settings.maxHistoryEpisodes = 50
-        settings.maxCacheCount = 20
+        settings.maxHistoryEpisodes = 100
+        settings.maxCacheCount = 10
 
-        #expect(SettingsPageModel.value(for: .country, settings: settings) == "日本")
+        #expect(SettingsPageModel.value(for: .country, settings: settings) == Locale.current.localizedString(forRegionCode: "JP"))
         #expect(SettingsPageModel.value(for: .targetLanguage, settings: settings) == "中文")
-        #expect(SettingsPageModel.value(for: .autoRefreshInterval, settings: settings) == "5 min")
-        #expect(SettingsPageModel.value(for: .maxFeedEpisodes, settings: settings) == "200 episodes")
-        #expect(SettingsPageModel.value(for: .maxHistoryEpisodes, settings: settings) == "50 episodes")
-        #expect(SettingsPageModel.value(for: .cacheLimit, settings: settings) == "20 episodes")
-        #expect(SettingsPageModel.value(for: .contactEmail, settings: settings) == "Email")
+        #expect(SettingsPageModel.value(for: .maxFeedEpisodes, settings: settings) == "Latest 200")
+        #expect(SettingsPageModel.value(for: .maxHistoryEpisodes, settings: settings) == "Latest 100")
+        #expect(SettingsPageModel.value(for: .cacheLimit, settings: settings) == "10 episodes")
 
         settings.targetLanguage = ""
         #expect(SettingsPageModel.value(for: .targetLanguage, settings: settings) == "Off")
 
         for row: SettingsPageModel.Row in [
-            .account, .plusUpgrade, .enableTranslation, .importExport, .history, .privacyPolicy, .termsOfUse,
+            .account, .plusUpgrade, .importSubscriptions, .exportSubscriptions, .clearCache,
+            .contactEmail, .privacyPolicy, .termsOfUse,
         ] {
             #expect(SettingsPageModel.value(for: row, settings: settings) == nil)
         }
     }
 
-    // MARK: - Tooltip copy fixtures (settings.dart:150/255/302/356/405)
-
-    @Test("Info tooltips: exact Dart copy on the five rows, none elsewhere")
-    func tooltipFixtures() {
-        #expect(SettingsPageModel.tooltip(for: .country)
-            == "Discover page will show episodes from this country.")
-        #expect(SettingsPageModel.tooltip(for: .targetLanguage)
-            == "Translates the podcast transcript into the target language.")
-        #expect(SettingsPageModel.tooltip(for: .autoRefreshInterval)
-            == "Automatically fetch new episodes every X minutes.")
-        #expect(SettingsPageModel.tooltip(for: .maxFeedEpisodes)
-            == "Limits the number of episodes in the inbox. Auto deleted if exceeded.")
-        #expect(SettingsPageModel.tooltip(for: .maxHistoryEpisodes)
-            == "Limits the number of episodes in the history. Auto deleted if exceeded.")
-
-        let withoutTooltip: [SettingsPageModel.Row] = [
-            .account, .plusUpgrade, .cacheLimit, .enableTranslation, .importExport, .history,
-            .contactEmail, .privacyPolicy, .termsOfUse,
-        ]
-        for row in withoutTooltip {
-            #expect(SettingsPageModel.tooltip(for: row) == nil)
+    @Test("VoiceOver hints on the five rows that had captions, none elsewhere")
+    func accessibilityHints() {
+        #expect(SettingsPageModel.accessibilityHint(for: .maxFeedEpisodes) == "Older episodes are removed automatically.")
+        #expect(SettingsPageModel.accessibilityHint(for: .maxHistoryEpisodes) == "Older episodes are removed automatically.")
+        #expect(SettingsPageModel.accessibilityHint(for: .country) == "Discover shows charts from this country.")
+        #expect(SettingsPageModel.accessibilityHint(for: .targetLanguage) == "Translates transcripts into this language.")
+        for row: SettingsPageModel.Row in [.account, .plusUpgrade, .cacheLimit, .importSubscriptions, .exportSubscriptions, .contactEmail] {
+            #expect(SettingsPageModel.accessibilityHint(for: row) == nil)
         }
     }
 
-    // MARK: - Country list (49 whitelist, Dart compareTo display order)
+    // MARK: - Country list (49 whitelist, system language, locale-aware order)
 
-    @Test("Country options: 49 entries, full Dart-UTF16-sorted order")
-    func countryOrderFixture() {
-        let expected: [(name: String, code: String)] = [
-            ("Argentina", "AR"), ("Australia", "AU"), ("Bangladesh", "BD"),
-            ("België / Belgique", "BE"), ("Brasil", "BR"), ("Canada", "CA"),
-            ("Chile", "CL"), ("Colombia", "CO"), ("Danmark", "DK"),
-            ("Deutschland", "DE"), ("España", "ES"), ("France", "FR"),
-            ("India", "IN"), ("Indonesia", "ID"), ("Ireland", "IE"),
-            ("Israel", "IL"), ("Italia", "IT"), ("Magyarország", "HU"),
-            ("Malaysia", "MY"), ("México", "MX"), ("Nederland", "NL"),
-            ("New Zealand", "NZ"), ("Nigeria", "NG"), ("Norge", "NO"),
-            ("Pakistan", "PK"), ("Philippines", "PH"), ("Polska", "PL"),
-            ("Portugal", "PT"), ("România", "RO"), ("Saudi Arabia", "SA"),
-            ("Schweiz", "CH"), ("Singapore", "SG"), ("South Africa", "ZA"),
-            ("Suomi", "FI"), ("Sverige", "SE"), ("Türkiye", "TR"),
-            ("United Kingdom", "GB"), ("United States", "US"),
-            ("Việt Nam", "VN"), ("Österreich", "AT"), ("Česká republika", "CZ"),
-            ("Ελλάδα", "GR"), ("Россия", "RU"), ("Україна", "UA"),
-            ("مصر", "EG"), ("ประเทศไทย", "TH"), ("中国", "CN"),
-            ("日本", "JP"), ("대한민국", "KR"),
-        ]
-        // Tuple arrays are not Equatable; compare element by element.
-        #expect(SettingsPageModel.sortedCountries.count == 49)
-        #expect(SettingsPageModel.sortedCountries.count == expected.count)
-        for (index, option) in SettingsPageModel.sortedCountries.enumerated() {
-            #expect(option.name == expected[index].name)
-            #expect(option.code == expected[index].code)
+    @Test("Country options: 49 entries named and sorted for the locale; stored codes unchanged")
+    func countryOrder() {
+        for identifier in ["en_US", "de_DE", "ja_JP", "fr_FR"] {
+            let locale = Locale(identifier: identifier)
+            let countries = SettingsPageModel.sortedCountries(locale: locale)
+            #expect(countries.count == 49, "\(identifier)")
+            #expect(Set(countries.map(\.code)) == Set(SettingsCodec.countries.map(\.code)))
+            for pair in zip(countries, countries.dropFirst()) {
+                #expect(pair.0.name.compare(pair.1.name, locale: locale) != .orderedDescending,
+                        "\(identifier): \(pair.0.name) before \(pair.1.name)")
+            }
+            // Names come from the system language, not the whitelist's own.
+            for country in countries {
+                #expect(country.name == locale.localizedString(forRegionCode: country.code))
+            }
         }
+    }
 
-        // Same 49 codes as the codec whitelist (order is the only change).
-        #expect(Set(SettingsPageModel.sortedCountries.map(\.code))
-            == Set(SettingsCodec.countries.map(\.code)))
+    @Test("German: Österreich sorts with the O's, Ägypten with the A's")
+    func germanCountryOrder() {
+        let names = SettingsPageModel.sortedCountries(locale: Locale(identifier: "de_DE")).map(\.name)
+        let austria = names.firstIndex(of: "Österreich")!
+        #expect(austria > names.firstIndex(of: "Norwegen")!)
+        #expect(austria < names.firstIndex(of: "Pakistan")!)
+        #expect(names.firstIndex(of: "Ägypten")! < names.firstIndex(of: "Argentinien")!)
     }
 
     @Test("Country name lookup: exact code, case-insensitive, first-entry fallback")
     func countryNameLookup() {
-        #expect(SettingsPageModel.countryName(forCode: "US") == "United States")
-        #expect(SettingsPageModel.countryName(forCode: "jp") == "日本")
-        // country_code_picker falls back to elements[0] ("Argentina").
-        #expect(SettingsPageModel.countryName(forCode: "XX") == "Argentina")
+        let english = Locale(identifier: "en_US")
+        #expect(SettingsPageModel.countryName(forCode: "US", locale: english) == "United States")
+        #expect(SettingsPageModel.countryName(forCode: "jp", locale: english) == "Japan")
+        #expect(SettingsPageModel.countryName(forCode: "JP", locale: Locale(identifier: "ja_JP")) == "日本")
+        // An unknown code falls back to the first entry of the sorted list.
+        #expect(SettingsPageModel.countryName(forCode: "XX", locale: english)
+            == SettingsPageModel.sortedCountries(locale: english)[0].name)
+    }
+
+    @Test("Export and cache rows: values and copy")
+    func exportAndCacheValues() {
+        #expect(SettingsPageModel.exportValue(subscriptionCount: 0) == "No shows yet")
+        #expect(SettingsPageModel.exportValue(subscriptionCount: 3) == nil)
+        #expect(SettingsPageModel.cacheUsageValue(bytes: 0) == "None")
+        #expect(SettingsPageModel.cacheUsageValue(bytes: 5_000_000) == ByteCountFormatter.string(fromByteCount: 5_000_000, countStyle: .file))
+        #expect(SettingsPageModel.clearCacheMessage(bytes: 5_000_000).hasSuffix("The episode playing now stays."))
     }
 
     // MARK: - Language list (11 entries, declaration order)
@@ -197,14 +173,76 @@ struct SettingsPageModelTests {
         #expect(SettingsPageModel.languageName(forCode: "xx") == "English")
     }
 
-    @Test("Switch-on default language follows the G9 locale split")
-    func defaultLanguageDerivation() {
-        #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "zh_Hans_CN") == "zh")
-        #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "zh-Hans-CN") == "zh")
-        #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "en_US") == "en")
-        #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "en-US") == "en")
-        #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "en") == "en")
-        #expect(SettingsPageModel.defaultTargetLanguage(localeIdentifier: "pt_BR") == "pt")
+    @Test("Language sheet lists Off (the empty stored value) first")
+    func languageOptions() {
+        #expect(SettingsPageModel.languageOptions.first?.name == "Off")
+        #expect(SettingsPageModel.languageOptions.first?.code == "")
+        #expect(SettingsPageModel.languageOptions.dropFirst().map(\.code) == SettingsPageModel.languages.map(\.code))
+    }
+
+    // MARK: - Inbox / History limits (held until Settings closes)
+
+    @Test("Removal notice: singular, plural, and hidden at or above the count")
+    func removalNotice() {
+        let feed = SettingsPageModel.Row.maxFeedEpisodes
+        let history = SettingsPageModel.Row.maxHistoryEpisodes
+        #expect(SettingsPageModel.removalNotice(for: history, pendingLimit: 100, count: 311)
+            == "211 oldest episodes leave History when you close Settings.")
+        #expect(SettingsPageModel.removalNotice(for: history, pendingLimit: 100, count: 101)
+            == "Oldest episode leaves History when you close Settings.")
+        #expect(SettingsPageModel.removalNotice(for: feed, pendingLimit: 50, count: 120)
+            == "70 oldest episodes leave the Inbox when you close Settings.")
+        #expect(SettingsPageModel.removalNotice(for: feed, pendingLimit: 50, count: 51)
+            == "Oldest episode leaves the Inbox when you close Settings.")
+        #expect(SettingsPageModel.removalNotice(for: feed, pendingLimit: 100, count: 100) == nil)
+        #expect(SettingsPageModel.removalNotice(for: history, pendingLimit: 300, count: 100) == nil)
+        #expect(SettingsPageModel.removalNotice(for: history, pendingLimit: 100, count: 0) == nil)
+    }
+
+    @Test("Keep footer: standing note, one notice, or both with the Inbox first")
+    func keepFooter() {
+        let feed = SettingsPageModel.Row.maxFeedEpisodes
+        let history = SettingsPageModel.Row.maxHistoryEpisodes
+        let counts = [feed: 120, history: 101]
+        #expect(SettingsPageModel.keepFooter(pendingLimits: [:], counts: counts) == "Older ones are removed automatically.")
+        #expect(SettingsPageModel.keepFooter(pendingLimits: [feed: 100], counts: counts)
+            == "20 oldest episodes leave the Inbox when you close Settings.")
+        #expect(SettingsPageModel.keepFooter(pendingLimits: [history: 100], counts: counts)
+            == "Oldest episode leaves History when you close Settings.")
+        #expect(SettingsPageModel.keepFooter(pendingLimits: [history: 100, feed: 100], counts: counts)
+            == "20 oldest episodes leave the Inbox when you close Settings.\nOldest episode leaves History when you close Settings.")
+        // A raised limit, or an unread count, has nothing to announce.
+        #expect(SettingsPageModel.keepFooter(pendingLimits: [feed: 300], counts: counts)
+            == "Older ones are removed automatically.")
+        #expect(SettingsPageModel.keepFooter(pendingLimits: [feed: 50], counts: [:])
+            == "Older ones are removed automatically.")
+    }
+
+    @Test("Limit draft holds steps, steps back to cancel, and clamps")
+    func limitDraft() throws {
+        let choices = try #require(SettingsPageModel.stepperChoices(for: .maxHistoryEpisodes))
+        let stored = choices[choices.count / 2]
+        var draft = SettingsPageModel.LimitDraft(stored: stored)
+        #expect(draft.shown == stored)
+        #expect(draft.pending == nil)
+
+        draft.step(.decrease, in: choices)
+        let lower = choices[choices.count / 2 - 1]
+        #expect(draft.shown == lower)
+        #expect(draft.pending == lower)
+        #expect(draft.stored == stored, "stepping never changes the stored value")
+
+        draft.step(.increase, in: choices)
+        #expect(draft.shown == stored)
+        #expect(draft.pending == nil, "stepping back to the stored value drops the held change")
+
+        draft.step(.increase, in: choices)
+        #expect(draft.pending == choices[choices.count / 2 + 1], "raising is held too")
+
+        var floor = SettingsPageModel.LimitDraft(stored: choices[0])
+        floor.step(.decrease, in: choices)
+        #expect(floor.pending == nil, "no step below the smallest choice")
+        #expect(SettingsPageModel.LimitDraft(stored: stored, pending: stored).pending == nil)
     }
 
     // MARK: - Deep links
@@ -213,8 +251,20 @@ struct SettingsPageModelTests {
     func deepLinks() {
         #expect(SettingsPageModel.feedbackMailtoURL.absoluteString
             == "mailto:kindjeffcom@gmail.com?subject=Anycast%20Feedback")
+        #expect(SettingsPageModel.feedbackAddress == "kindjeffcom@gmail.com")
+        #expect(SettingsPageModel.feedbackSubject == "Anycast Feedback")
         #expect(SettingsPageModel.privacyPolicyURL.absoluteString == "https://privacy.anycast.website")
         #expect(SettingsPageModel.termsOfUseURL.absoluteString
             == "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
+    }
+
+    @Test("Feedback body ends with the diagnostics block; version line")
+    func feedbackBody() {
+        let body = SettingsPageModel.feedbackBody(
+            appVersion: "1.4.0", build: "57", systemVersion: "27.0", deviceModel: "iPhone17,1"
+        )
+        #expect(body.hasPrefix("\n\n---\n"))
+        #expect(body.hasSuffix("---\nAnycast 1.4.0 (57)\niOS 27.0\niPhone17,1"))
+        #expect(SettingsPageModel.versionLine(appVersion: "1.4.0", build: "57") == "Anycast 1.4.0 (57)")
     }
 }

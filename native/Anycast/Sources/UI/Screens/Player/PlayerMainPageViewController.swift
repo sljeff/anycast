@@ -27,46 +27,33 @@ final class PlayerMainPageViewController: UIViewController {
     )
     private let shareSpinner = UIActivityIndicatorView(style: .medium)
     private let titleBlock = PlayerTitleBlockView()
-    private lazy var transport = PlayerTransportView(context: context, transportGap: Spacing.gap)
-    private let speedButton = AnycastIconButton(
-        style: .tonal, icon: nil, accessibilityLabel: "Playback speed", glyphSize: 20
-    )
-    private let sleepButton = AnycastIconButton(
-        style: .tonal, icon: AppIcons.sleepTimer, accessibilityLabel: "Sleep timer", glyphSize: 20
-    )
+    private lazy var transport = PlayerTransportView(context: context)
+    private lazy var speedSleep = PlayerSpeedSleepControls(context: context)
     private let chapterButton = UIButton(type: .system)
     private var chapters: [EpisodeChapter] = []
-    private var sleepTicker: Timer?
     private let retryRow = UIStackView()
     private var bottomStack = UIStackView()
 
     private enum Layout {
         /// The page's one content column: the artwork, title row, scrubber
         /// and transport all share these side insets.
-        static let columnInset = Spacing.pageHeader
+        static let columnInset = PlayerLayout.column
         /// Frame-to-ink slack at the share button's trailing side (the
         /// 20 pt `square.and.arrow.up` is ~22.5 pt of ink centered in the
         /// 44 pt hit target, measured), hung outside the column so the
         /// glyph's ink, not the frame, meets the column's trailing edge.
         static let shareInkInset: CGFloat = 10.75
-        /// The one vertical rhythm, measured between VISIBLE edges: subtitle
-        /// → scrubber track, time labels → transport glyphs and transport
-        /// glyphs → page selector.
-        static let rhythm: CGFloat = 28
-        /// Frame-to-ink slack hidden inside each block (measured on device),
-        /// subtracted so the rhythm is the gap the eye sees: the scrubber
-        /// track and the show-name text sit well inside their frames, the
-        /// time-label band and the 72 pt transport slot pad the skip glyphs.
-        static let titleToScrubber = rhythm - 24
+        /// Title block → scrubber frame. The title belongs to the scrubber
+        /// ("what is playing, and where in it"), so the two sit close; the
+        /// scrubber frame hides ~20 pt of slack above its track.
+        static let titleToScrubber: CGFloat = -6
+        /// Least air between the artwork and the title block.
+        static let coverToTitle: CGFloat = Spacing.pageHeader
         static let transportToSelector = PlayerTransportView.Layout.toSelector
-        /// Clears the sheet's system grabber (as on This episode).
-        static let contentTop: CGFloat = 36
+        /// Clears the sheet's system grabber; the artwork is centered in
+        /// what is left between here and the title.
+        static let contentTop: CGFloat = 20
     }
-
-    /// The speed menu: the stepper's 0.5–2 ×0.25 stops, with the rarely
-    /// used 0.5× set apart at the bottom.
-    private static let speedStops = PlayerSliderMath.stops(min: 0.5, max: 2.0, divisions: 6)
-    private static let sleepMinutes = [10, 20, 30, 45, 60]
 
     init(context: UIContext) {
         self.context = context
@@ -84,13 +71,10 @@ final class PlayerMainPageViewController: UIViewController {
         build()
         bind()
         render()
-        renderSpeed()
-        renderSleep()
-
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
                 _ = self.context.playback.playbackError
             },
             onChange: { [weak self] in self?.render() }
@@ -98,30 +82,19 @@ final class PlayerMainPageViewController: UIViewController {
         chapterObservation.track(
             read: { [weak self] in
                 _ = self?.context.playback.positionData
-                _ = self?.context.playback.speed
             },
-            onChange: { [weak self] in
-                self?.renderChapter()
-                self?.renderSpeed()
-            }
+            onChange: { [weak self] in self?.renderChapter() }
         )
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        renderSleep()
-        // The sleep countdown lives in SleepTimerController; this only
-        // re-reads it so the button's minutes tick down.
-        guard sleepTicker == nil else { return }
-        sleepTicker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.renderSleep() }
-        }
+        speedSleep.pageWillAppear()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        sleepTicker?.invalidate()
-        sleepTicker = nil
+        speedSleep.pageDidDisappear()
     }
 
     // MARK: - Build
@@ -184,12 +157,26 @@ final class PlayerMainPageViewController: UIViewController {
         // the artwork gives way first, not the title or the controls.
         let coverWidth = coverFrame.widthAnchor.constraint(equalTo: column.widthAnchor)
         coverWidth.priority = UILayoutPriority(700)
+        let aboveCover = UILayoutGuide()
+        let belowCover = UILayoutGuide()
+        view.addLayoutGuide(aboveCover)
+        view.addLayoutGuide(belowCover)
+        let balanced = aboveCover.heightAnchor.constraint(equalTo: belowCover.heightAnchor)
+        balanced.priority = UILayoutPriority(750)
 
         NSLayoutConstraint.activate([
             column.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.columnInset),
             column.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.columnInset),
 
-            coverFrame.topAnchor.constraint(equalTo: view.topAnchor, constant: Layout.contentTop),
+            // The artwork floats centered between the grabber and the
+            // title: equal air above and below, so the page has one clear
+            // subject and no hole between the title and the controls.
+            aboveCover.topAnchor.constraint(equalTo: view.topAnchor, constant: Layout.contentTop),
+            aboveCover.bottomAnchor.constraint(equalTo: coverFrame.topAnchor),
+            belowCover.topAnchor.constraint(equalTo: coverFrame.bottomAnchor),
+            belowCover.bottomAnchor.constraint(equalTo: titleRow.topAnchor),
+            belowCover.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.coverToTitle),
+            balanced,
 
             coverFrame.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             coverWidth,
@@ -200,12 +187,12 @@ final class PlayerMainPageViewController: UIViewController {
             coverView.leadingAnchor.constraint(equalTo: coverFrame.leadingAnchor),
             coverView.trailingAnchor.constraint(equalTo: coverFrame.trailingAnchor),
 
-            titleRow.topAnchor.constraint(equalTo: coverFrame.bottomAnchor, constant: Spacing.pageHeader),
             titleRow.leadingAnchor.constraint(equalTo: column.leadingAnchor),
             titleRow.trailingAnchor.constraint(equalTo: column.trailingAnchor, constant: Layout.shareInkInset),
 
-            // The slack: the controls stay down by the selector.
-            bottomStack.topAnchor.constraint(greaterThanOrEqualTo: titleRow.bottomAnchor, constant: Layout.titleToScrubber),
+            // The title sits on the scrubber; the controls stay down by the
+            // selector, in the thumb zone.
+            bottomStack.topAnchor.constraint(equalTo: titleRow.bottomAnchor, constant: Layout.titleToScrubber),
             bottomStack.leadingAnchor.constraint(equalTo: column.leadingAnchor),
             bottomStack.trailingAnchor.constraint(equalTo: column.trailingAnchor),
             bottomStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.transportToSelector),
@@ -215,34 +202,10 @@ final class PlayerMainPageViewController: UIViewController {
         ])
     }
 
-    /// Speed left and sleep timer right of the transport, styled like the
-    /// transcript page's ••• and Ask AI; the current chapter under the
-    /// scrubber.
+    /// Speed left and sleep timer right of the transport (shared with the
+    /// transcript page); the current chapter under the scrubber.
     private func buildTransportAccessories() {
-        for button in [speedButton, sleepButton] {
-            button.configuration?.baseBackgroundColor = Theme.playerText.withAlphaComponent(0.08)
-            button.configuration?.baseForegroundColor = Theme.playerText
-            button.configuration?.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-                var outgoing = incoming
-                outgoing.font = TypographyV2.body.font().monospacedDigits()
-                return outgoing
-            }
-            button.configuration?.titleLineBreakMode = .byClipping
-            button.showsMenuAsPrimaryAction = true
-        }
-        speedButton.accessibilityIdentifier = "player-speed"
-        sleepButton.accessibilityIdentifier = "player-sleep"
-        speedButton.menu = UIMenu(children: [
-            UIDeferredMenuElement.uncached { [weak self] completion in
-                completion(self?.speedMenuElements() ?? [])
-            },
-        ])
-        sleepButton.menu = UIMenu(children: [
-            UIDeferredMenuElement.uncached { [weak self] completion in
-                completion(self?.sleepMenuElements() ?? [])
-            },
-        ])
-        transport.setAccessories(leading: speedButton, trailing: sleepButton)
+        speedSleep.install(in: transport)
 
         var chapterConfig = UIButton.Configuration.plain()
         chapterConfig.baseForegroundColor = Theme.playerSecondary
@@ -293,7 +256,7 @@ final class PlayerMainPageViewController: UIViewController {
         if coverURL != renderedCoverURL || coverURL == nil {
             renderedCoverURL = coverURL
             coverView.kf.cancelDownloadTask()
-            coverView.setArtwork(coverURL, title: episode?.channelTitle)
+            coverView.setArtwork(coverURL, title: episode?.channelTitle, side: ArtworkSizing.large)
         }
 
         titleBlock.update(
@@ -334,35 +297,6 @@ final class PlayerMainPageViewController: UIViewController {
         chapterButton.accessibilityHint = "Shows this episode's chapters and notes"
     }
 
-    private func renderSpeed() {
-        let index = PlayerSliderMath.nearestIndex(for: Double(context.playback.speed), in: Self.speedStops)
-        let text = PlayerSliderMath.speedText(Self.speedStops[index])
-        guard speedButton.configuration?.title != text else { return }
-        speedButton.configuration?.title = text
-        speedButton.accessibilityValue = text
-    }
-
-    /// Off: outline moon in player text. End of episode: filled moon in
-    /// primary. Counting down: the minutes replace the glyph (the button
-    /// is one slot). Player text, not `Theme.onSurface`: the player is
-    /// always dark, and onSurface follows the app appearance.
-    private func renderSleep() {
-        let timer = context.sleepTimer
-        let remaining = timer.remainingMilliseconds ?? 0
-        if remaining > 0 {
-            sleepButton.setIcon(nil)
-            sleepButton.configuration?.title = "\(timer.countdownMinutes)m"
-            sleepButton.configuration?.baseForegroundColor = Theme.primary
-            sleepButton.accessibilityValue = "\(timer.countdownMinutes) minutes left"
-        } else {
-            sleepButton.configuration?.title = nil
-            let engaged = timer.stopsAtEpisodeEnd
-            sleepButton.setIcon(engaged ? AppIcons.sleepTimerActive : AppIcons.sleepTimer)
-            sleepButton.configuration?.baseForegroundColor = engaged ? Theme.primary : Theme.playerText
-            sleepButton.accessibilityValue = engaged ? "End of episode" : "Off"
-        }
-    }
-
     /// The share action needs the shortlink inputs — an episode with both
     /// a feed URL and an enclosure URL. Everything else on the transport
     /// dims to 38% with no episode; share matches that affordance (the
@@ -370,74 +304,6 @@ final class PlayerMainPageViewController: UIViewController {
     static func shareAvailable(_ episode: PlaylistEpisodeRow?) -> Bool {
         guard let episode else { return false }
         return !(episode.rssFeedUrl ?? "").isEmpty && !(episode.enclosureUrl ?? "").isEmpty
-    }
-
-    // MARK: - Menus
-
-    private func speedMenuElements() -> [UIMenuElement] {
-        let current = PlayerSliderMath.nearestIndex(for: Double(context.playback.speed), in: Self.speedStops)
-        let actions = Self.speedStops.enumerated().map { index, stop in
-            UIAction(
-                title: PlayerSliderMath.speedText(stop),
-                state: index == current ? .on : .off
-            ) { [weak self] _ in
-                self?.context.playback.setSpeed(Float(stop))
-                self?.renderSpeed()
-            }
-        }
-        // Everyday speeds first; the slow 0.5× sits apart below them.
-        return [
-            UIMenu(title: "Playback speed", options: .displayInline, children: Array(actions.dropFirst())),
-            UIMenu(options: .displayInline, children: [actions[0]]),
-        ]
-    }
-
-    private func sleepMenuElements() -> [UIMenuElement] {
-        let timer = context.sleepTimer
-        let remaining = timer.remainingMilliseconds ?? 0
-        let counting = remaining > 0
-        let title = counting ? "Sleep timer · \(timer.countdownMinutes) min left" : "Sleep timer"
-
-        var timerItems: [UIMenuElement] = [
-            UIAction(title: "Off", state: !counting && !timer.stopsAtEpisodeEnd ? .on : .off) { [weak self] _ in
-                self?.context.sleepTimer.stop()
-                self?.renderSleep()
-            },
-        ]
-        for minutes in Self.sleepMinutes {
-            timerItems.append(UIAction(title: "\(minutes) minutes") { [weak self] _ in
-                self?.context.sleepTimer.setCountdown(minutes: minutes)
-                Haptics.timerSet()
-                self?.renderSleep()
-            })
-        }
-        let position = context.playback.positionData
-        let left = max(position.durationMilliseconds - position.positionMilliseconds, 0)
-        let endOfEpisode = UIAction(
-            title: "End of episode",
-            subtitle: left > 0 ? "\(Int((Double(left) / 60_000).rounded(.up))) min" : nil,
-            state: timer.stopsAtEpisodeEnd ? .on : .off
-        ) { [weak self] _ in
-            self?.context.sleepTimer.setStopAtEpisodeEnd()
-            Haptics.timerSet()
-            self?.renderSleep()
-        }
-        timerItems.append(endOfEpisode)
-
-        // Continuous play: what happens whenever an episode finishes.
-        let continuous = context.playback.continuousPlaying
-        let afterItems: [UIMenuElement] = [
-            UIAction(title: "Play next in playlist", state: continuous ? .on : .off) { [weak self] _ in
-                self?.context.playback.setContinuousPlaying(true)
-            },
-            UIAction(title: "Stop", state: continuous ? .off : .on) { [weak self] _ in
-                self?.context.playback.setContinuousPlaying(false)
-            },
-        ]
-        return [
-            UIMenu(title: title, options: .displayInline, children: timerItems),
-            UIMenu(title: "When an episode ends", options: .displayInline, children: afterItems),
-        ]
     }
 
     private func openEpisodePage() {

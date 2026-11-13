@@ -102,11 +102,11 @@ enum TranscriptRequests {
         let subscribed = await context.purchases.isSubscribed()
         // The account may have changed while the entitlement read was in flight.
         guard AuthAccountSnapshot.current(context: context).uid == uid else { return nil }
-        guard let result = try? await context.api.getUser(), case .user(let user) = result else {
+        guard let remaining = await AccountRemaining.fetch(context: context) else {
             return nil
         }
         guard AuthAccountSnapshot.current(context: context).uid == uid else { return nil }
-        let allowance = TranscriptAllowance(remaining: user.remaining, isSubscribed: subscribed)
+        let allowance = TranscriptAllowance(remaining: remaining, isSubscribed: subscribed)
         cache.store(allowance, uid: uid)
         return allowance
     }

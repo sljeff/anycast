@@ -66,6 +66,6 @@ final class ShowCoverCell: UICollectionViewCell {
     func configure(title: String, imageURL: String?) {
         titleLabel.text = title
         accessibilityLabel = title
-        coverView.setArtwork(imageURL.flatMap(URL.init(string:)), title: title)
+        coverView.setArtwork(imageURL.flatMap(URL.init(string:)), title: title, side: 120)
     }
 }
