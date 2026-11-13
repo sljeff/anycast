@@ -87,7 +87,7 @@ nonisolated struct LoginSheetModel: Equatable, Sendable {
 
     static func title(for source: LoginSource) -> String {
         switch source {
-        case .settings: "Sign In & Sync"
+        case .settings: "Sign In"
         case .paywall: "Sign in to continue"
         case .transcribe: "Sign in to transcribe"
         case .reauth: "Sign in again"
@@ -96,7 +96,7 @@ nonisolated struct LoginSheetModel: Equatable, Sendable {
 
     static func subtitle(for source: LoginSource) -> String {
         switch source {
-        case .settings, .transcribe: "Get 10 free AI transcripts"
+        case .settings, .transcribe: "Get \(PlusOffer.freePitch)"
         case .paywall: "Plus stays with your account"
         case .reauth: "Session expired. Nothing is lost."
         }

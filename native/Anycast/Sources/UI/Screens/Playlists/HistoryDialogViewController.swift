@@ -96,8 +96,8 @@ enum HistoryPresentation {
 /// deferred for a 5 s Undo window and the DB is only written when it ends
 /// (or the sheet disappears / the app backgrounds), so Undo is a plain
 /// re-read. VoiceOver and Switch Control skip the hold for an inline
-/// Cancel / Clear confirm. The empty state is the shared `EmptyStateView`
-/// with an Explore button that closes the sheet and opens Discover.
+/// Cancel / Clear confirm. The empty state is the shared `EmptyStateView`:
+/// one sentence, no button.
 @MainActor
 final class HistoryDialogViewController: UIViewController {
 
@@ -131,7 +131,6 @@ final class HistoryDialogViewController: UIViewController {
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyView = EmptyStateView()
-    private let exploreButton = UIButton(type: .system)
     private let bottomFade = ScrollEdgeFade(edge: .bottom, color: Theme.background)
     private let footerStack = UIStackView()
     private let holdButton = HoldToConfirmButton(
@@ -212,13 +211,6 @@ final class HistoryDialogViewController: UIViewController {
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
-
-        // Same primary Explore capsule as the Playlist empty state.
-        exploreButton.configuration = AnycastButton.configuration(.primary, title: "Explore", image: AppIcons.explore)
-        exploreButton.addPressFeedback(scale: Motion.pressScaleSubtle)
-        exploreButton.accessibilityLabel = "Explore"
-        exploreButton.accessibilityIdentifier = "history-explore"
-        exploreButton.addAction(UIAction { [weak self] _ in self?.exploreTapped() }, for: .touchUpInside)
 
         emptyView.isHidden = true
         emptyView.translatesAutoresizingMaskIntoConstraints = false
@@ -473,20 +465,15 @@ final class HistoryDialogViewController: UIViewController {
     }
 
     /// "History cleared" while a clear is pending or has committed in this
-    /// presentation; otherwise the shared empty block with Explore.
+    /// presentation; otherwise the shared empty block.
     private func renderEmptyState() {
         if didClear {
             emptyView.configure(.init(
-                icon: AppIcons.check,
                 title: "History cleared",
                 message: "Episodes you play show up here."
             ))
         } else {
-            emptyView.configure(.init(
-                icon: UIImage(systemName: "clock.arrow.circlepath"),
-                title: "Play an episode and it shows up here.",
-                actions: [exploreButton]
-            ))
+            emptyView.configure(.init(title: "Episodes you play show up here."))
         }
     }
 
@@ -611,14 +598,6 @@ final class HistoryDialogViewController: UIViewController {
     @objc private func undoTapped() {
         Task { await undoPendingClear() }
     }
-
-    private func exploreTapped() {
-        // Same destination as the Inbox empty state's Explore: Discover.
-        let tabs = context.tabs
-        dismiss(animated: true) {
-            tabs.select(2)
-        }
-    }
 }
 
 // MARK: - Row tap → Detail
@@ -632,96 +611,13 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
     }
 
     private func presentDetail(_ episode: HistoryEpisodeRow) {
-        let detailEpisode = DetailViewController.Episode(
-            title: episode.title ?? "",
-            channelTitle: episode.channelTitle ?? "",
-            pubDateMilliseconds: episode.pubDate,
-            durationMilliseconds: episode.duration,
-            imageURL: episode.imageUrl,
-            rssFeedURL: episode.rssFeedUrl ?? "",
-            enclosureURL: episode.enclosureUrl ?? "",
-            descriptionHTML: episode.description ?? ""
+        HistoryEpisodeActions.presentDetail(
+            episode, from: self, context: context,
+            // `playByEpisode` awaits the history write before it returns,
+            // so the replayed row is on top at reload.
+            didPlay: { [weak self] in await self?.reload() },
+            remove: { [weak self] url in self?.deleteEpisode(url: url) }
         )
-        DetailViewController.present(
-            from: self,
-            episode: detailEpisode,
-            actions: [
-                EpisodeCardAction(
-                    icon: AppIcons.play,
-                    accessibilityLabel: "Play"
-                ) { [weak self] in
-                    // `playByEpisode` awaits the history write before it
-                    // returns, so the replayed row is on top at reload.
-                    Task { [weak self] in
-                        await self?.playFromHistory(episode)
-                        await self?.reload()
-                    }
-                },
-                EpisodeCardAction(
-                    icon: AppIcons.remove,
-                    accessibilityLabel: "Remove"
-                ) { [weak self] in
-                    guard let url = episode.enclosureUrl else { return }
-                    self?.deleteEpisode(url: url)
-                },
-            ],
-            htmlRenderer: HTMLContentRenderer(),
-            shortenURL: { [weak self] url in
-                await self?.context.api.getShortURL(for: url) ?? url
-            },
-            transcript: DetailTranscriptCoordinator(
-                context: context,
-                episode: detailEpisode,
-                prepareEpisode: { [weak self] in
-                    guard let self else { return nil }
-                    return await self.prepareTranscriptEpisode(episode)
-                }
-            )
-        )
-    }
-
-    /// Same insert as play, without starting audio.
-    private func prepareTranscriptEpisode(_ episode: HistoryEpisodeRow) async -> PlaylistEpisodeRow? {
-        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return nil }
-        let playlistId = ChannelPlaylistLogic.defaultPlaylistID
-        var row = PlaylistEpisodeRow(
-            title: episode.title,
-            description: episode.description,
-            duration: episode.duration,
-            enclosureUrl: episode.enclosureUrl,
-            pubDate: episode.pubDate,
-            imageUrl: episode.imageUrl,
-            channelTitle: episode.channelTitle,
-            rssFeedUrl: episode.rssFeedUrl,
-            playlistId: playlistId
-        )
-        let repository = context.database.playlistRepository()
-        try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: 0)
-        if let stored = try? await repository.episode(byEnclosureURL: enclosureURL) {
-            row = stored
-        }
-        return row
-    }
-
-    private func playFromHistory(_ episode: HistoryEpisodeRow) async {
-        let playlistId = ChannelPlaylistLogic.defaultPlaylistID
-        var row = PlaylistEpisodeRow(
-            title: episode.title,
-            description: episode.description,
-            duration: episode.duration,
-            enclosureUrl: episode.enclosureUrl,
-            pubDate: episode.pubDate,
-            imageUrl: episode.imageUrl,
-            channelTitle: episode.channelTitle,
-            rssFeedUrl: episode.rssFeedUrl,
-            playlistId: playlistId
-        )
-        let repository = context.database.playlistRepository()
-        try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: 0)
-        if let stored = try? await repository.episode(byEnclosureURL: episode.enclosureUrl ?? "") {
-            row = stored
-        }
-        await context.playback.playByEpisode(row)
     }
 }
 
@@ -734,7 +630,24 @@ final class HistoryRowCell: UICollectionViewListCell {
 
     static let coverSize: CGFloat = 44
     /// Where the text column (and the row separator) starts.
-    static let textColumnLeading = Spacing.sheetContent + coverSize + Spacing.gap
+    static let textColumnLeading = textColumnLeading(inset: Spacing.sheetContent)
+
+    /// Where the text column starts when the row's content is inset
+    /// `inset` from the cell edge.
+    static func textColumnLeading(inset: CGFloat) -> CGFloat {
+        inset + coverSize + Spacing.gap
+    }
+
+    /// Cover and text sit this far inside the cell. The History sheet's
+    /// rows run edge to edge (28); the Library's sit on a plate (16).
+    var horizontalInset: CGFloat = Spacing.sheetContent {
+        didSet {
+            coverLeading?.constant = horizontalInset
+            textTrailing?.constant = -horizontalInset
+        }
+    }
+    private var coverLeading: NSLayoutConstraint?
+    private var textTrailing: NSLayoutConstraint?
 
     var onDelete: (() -> Void)?
     var onTap: (() -> Void)?
@@ -790,14 +703,22 @@ final class HistoryRowCell: UICollectionViewListCell {
         textColumn.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(textColumn)
 
+        let coverLeading = coverView.leadingAnchor.constraint(
+            equalTo: contentView.leadingAnchor, constant: horizontalInset
+        )
+        let textTrailing = textColumn.trailingAnchor.constraint(
+            equalTo: contentView.trailingAnchor, constant: -horizontalInset
+        )
+        self.coverLeading = coverLeading
+        self.textTrailing = textTrailing
         NSLayoutConstraint.activate([
-            coverView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.sheetContent),
+            coverLeading,
+            textTrailing,
             coverView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             coverView.widthAnchor.constraint(equalToConstant: Self.coverSize),
             coverView.heightAnchor.constraint(equalToConstant: Self.coverSize),
 
             textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
-            textColumn.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.sheetContent),
             textColumn.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.row),
             textColumn.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
@@ -814,7 +735,7 @@ final class HistoryRowCell: UICollectionViewListCell {
 
     func configure(_ episode: HistoryEpisodeRow, now: Date = Date()) {
         let url = episode.imageUrl.flatMap(URL.init(string:))
-        coverView.setArtwork(url, title: episode.channelTitle)
+        coverView.setArtwork(url, title: episode.channelTitle, side: Self.coverSize)
         titleLabel.text = episode.title ?? ""
         let subtitle = HistoryPresentation.subtitle(
             channel: episode.channelTitle, lastPlayedAt: episode.lastPlayedAt, now: now

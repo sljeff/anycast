@@ -621,7 +621,7 @@ final class DetailViewController: UIViewController {
         artwork.layer.cornerRadius = Radius.concentric(insetFromSheetEdge: Layout.inset)
         artwork.layer.cornerCurve = .continuous
         artwork.backgroundColor = Theme.surfaceContainerHighest
-        artwork.setArtwork(episode.imageURL.flatMap(URL.init(string:)), title: episode.channelTitle)
+        artwork.setArtwork(episode.imageURL.flatMap(URL.init(string:)), title: episode.channelTitle, side: Layout.artworkLarge)
         artwork.isAccessibilityElement = true
         artwork.accessibilityLabel = "Episode artwork"
         artwork.translatesAutoresizingMaskIntoConstraints = false
@@ -1150,7 +1150,7 @@ final class DetailViewController: UIViewController {
         if case .text(let plain) = HtmlText.displayPayload(for: html) {
             descriptionTextView.setDocument(
                 ShowNotesStore.shared.attributedFallback(
-                    plain: plain, style: ShowNotesStyle(), traits: traits
+                    plain: DisplayText.plainText(fromHTML: plain), style: ShowNotesStyle(), traits: traits
                 ),
                 imageLoader: KingfisherShowNotesImageLoader.shared
             )

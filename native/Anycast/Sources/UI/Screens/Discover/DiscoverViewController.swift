@@ -20,7 +20,7 @@ final class DiscoverViewController: UIViewController {
     private var didAttachStripEdge = false
     private var pagingContainer: DiscoverPagingContainer?
     private let bodySpinner = UIActivityIndicatorView(style: .large)
-    private let networkErrorLabel = UILabel()
+    private let failedState = EmptyStateView()
 
     private let observation = ObservationLoop()
     /// Block-API observer token — touched only on the main thread
@@ -112,26 +112,25 @@ final class DiscoverViewController: UIViewController {
         bodySpinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(bodySpinner)
 
-        // Centered white "Network Error" for a failed/empty category list
-        // (discover.dart:73-78 applied at page level).
-        networkErrorLabel.text = "Network Error"
-        networkErrorLabel.textColor = Theme.onSurfaceVariant
-        networkErrorLabel.font = TypographyV2.emphasis.font()
-        networkErrorLabel.adjustsFontForContentSizeCategory = true
-        networkErrorLabel.textAlignment = .center
-        networkErrorLabel.isHidden = true
-        networkErrorLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(networkErrorLabel)
+        // A failed (or empty) category list: one sentence and Retry.
+        let retry = AnycastButton.make(
+            .secondary, title: "Retry", image: UIImage(systemName: "arrow.clockwise")
+        )
+        retry.accessibilityIdentifier = "discover-load-retry"
+        retry.addAction(UIAction { [weak self] _ in self?.viewModel.loadCategories() }, for: .touchUpInside)
+        failedState.configure(.init(title: "Couldn’t load Discover.", actions: [retry]))
+        failedState.isHidden = true
+        failedState.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(failedState)
 
         NSLayoutConstraint.activate([
             bodySpinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             bodySpinner.centerYAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -160
             ),
-            networkErrorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            networkErrorLabel.centerYAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -160
-            ),
+            failedState.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            failedState.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            failedState.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
     }
 
@@ -221,13 +220,13 @@ final class DiscoverViewController: UIViewController {
         switch viewModel.categoriesPhase {
         case .loading:
             bodySpinner.startAnimating()
-            networkErrorLabel.isHidden = true
+            failedState.isHidden = true
         case .networkError:
             bodySpinner.stopAnimating()
-            networkErrorLabel.isHidden = false
+            failedState.isHidden = false
         case .loaded(let names):
             bodySpinner.stopAnimating()
-            networkErrorLabel.isHidden = true
+            failedState.isHidden = true
             if categoryStrip == nil {
                 buildTabsAndPages(names: names)
             }

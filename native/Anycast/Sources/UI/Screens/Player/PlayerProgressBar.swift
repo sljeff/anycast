@@ -120,6 +120,10 @@ final class PlayerProgressBarView: UIControl {
     private var disabledStatusMessage: String?
     private let positionLabel = UILabel()
     private let remainingLabel = UILabel()
+    /// The state message (`Loading…` / `Nothing playing` / `Duration
+    /// unavailable`) in the time labels' band while they are hidden, so
+    /// showing it never moves the bar or the controls.
+    private let statusLabel = UILabel()
     /// The time bubble shown above the track while held.
     private let timeBubble = UIView()
     private let timeBubbleLabel = UILabel()
@@ -172,6 +176,20 @@ final class PlayerProgressBarView: UIControl {
             addSubview(label)
         }
 
+        statusLabel.font = TypographyV2.meta.font()
+        statusLabel.textColor = Theme.playerSecondary
+        statusLabel.textAlignment = .center
+        statusLabel.adjustsFontForContentSizeCategory = true
+        // One line, as the times it replaces: at the accessibility sizes it
+        // shrinks rather than wrapping into the footer below.
+        statusLabel.numberOfLines = 1
+        statusLabel.adjustsFontSizeToFitWidth = true
+        statusLabel.minimumScaleFactor = 0.6
+        statusLabel.isAccessibilityElement = false
+        statusLabel.isHidden = true
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(statusLabel)
+
         timeBubbleLabel.font = TypographyV2.emphasis.font().monospacedDigits()
         timeBubbleLabel.adjustsFontForContentSizeCategory = true
         timeBubbleLabel.textColor = Theme.playerBackground
@@ -193,6 +211,10 @@ final class PlayerProgressBarView: UIControl {
             positionLabel.topAnchor.constraint(equalTo: barContainer.centerYAnchor, constant: Spacing.md),
             remainingLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
             remainingLabel.topAnchor.constraint(equalTo: barContainer.centerYAnchor, constant: Spacing.md),
+            statusLabel.topAnchor.constraint(equalTo: barContainer.centerYAnchor, constant: Spacing.md),
+            statusLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            statusLabel.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
+            statusLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
 
             timeBubbleLabel.topAnchor.constraint(equalTo: timeBubble.topAnchor, constant: Spacing.sm),
             timeBubbleLabel.bottomAnchor.constraint(equalTo: timeBubble.bottomAnchor, constant: -Spacing.sm),
@@ -247,16 +269,19 @@ final class PlayerProgressBarView: UIControl {
         render()
     }
 
-    /// Dart IgnorePointer + 0.48 opacity when the visual state disallows
-    /// seeking; time labels hidden (timeLabelLocation .none). The
+    /// Dart IgnorePointer + 0.48 opacity on the track when the visual state
+    /// disallows seeking; time labels hidden (timeLabelLocation .none) and
+    /// the status message shown in their place at full strength. The
     /// adjustable trait goes with it — VoiceOver must not announce a
     /// control it can adjust when seeking is blocked; the status message
     /// (`Loading…` / `Nothing playing`) becomes the value instead.
     func setAllowsSeek(_ allows: Bool, statusMessage: String? = nil) {
         isEnabled = allows
-        alpha = allows ? 1 : 0.48
+        barContainer.alpha = allows ? 1 : 0.48
         positionLabel.isHidden = !allows
         remainingLabel.isHidden = !allows
+        statusLabel.text = statusMessage
+        statusLabel.isHidden = allows || statusMessage == nil
         accessibilityTraits = allows ? [.adjustable] : []
         disabledStatusMessage = statusMessage
         accessibilityValue = allows

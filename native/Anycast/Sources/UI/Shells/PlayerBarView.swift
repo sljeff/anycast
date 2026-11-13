@@ -242,7 +242,7 @@ final class PlayerBarView: UIView {
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.playback.currentEpisode
+                _ = self.playback.currentEpisodeContent
                 _ = self.playback.isPlaying
                 _ = self.playback.isLoading
             },
@@ -259,7 +259,7 @@ final class PlayerBarView: UIView {
         if coverURL != renderedCoverURL {
             renderedCoverURL = coverURL
             coverView.kf.cancelDownloadTask()
-            coverView.setArtwork(coverURL, title: episode?.channelTitle)
+            coverView.setArtwork(coverURL, title: episode?.channelTitle, side: 36)
         }
 
         playPauseControl.update(

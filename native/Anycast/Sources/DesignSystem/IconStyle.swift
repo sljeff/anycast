@@ -16,7 +16,7 @@ nonisolated struct IconStyle: Sendable {
     /// Secondary actions in a button group (player pager, toolbars).
     static let groupAction = IconStyle(pointSize: 20, weight: .regular)
     /// Player skip back / forward.
-    static let playerTransport = IconStyle(pointSize: 36, weight: .regular)
+    static let playerTransport = IconStyle(pointSize: 30, weight: .regular)
     /// Player play / pause.
     static let playerPrimary = IconStyle(pointSize: 56, weight: .regular)
 }

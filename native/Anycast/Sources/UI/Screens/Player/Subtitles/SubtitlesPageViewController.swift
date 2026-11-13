@@ -38,7 +38,7 @@ final class SubtitlesPageViewController: UIViewController {
     private let titleLabel = UILabel()
     private let contentHost = UIView()
     private let capsule = TranscriptStatusCapsuleView()
-    private lazy var transport = PlayerTransportView(context: context, transportGap: Spacing.gap)
+    private lazy var transport = PlayerTransportView(context: context)
     /// Speed + sleep: the same buttons, menus and rendering as the main page.
     private lazy var speedSleep = PlayerSpeedSleepControls(context: context)
     private let moreButton = AnycastIconButton(
@@ -61,6 +61,10 @@ final class SubtitlesPageViewController: UIViewController {
     private var translationRowPhase: TranslationRowPhase = .idle
     private var translationRow: TranslationRow?
     private var renderedState: TranscriptVisualState?
+    /// The signed-in account's transcript allowance, read while the page
+    /// offers to generate so the prompt can say how many are left.
+    private var allowance: TranscriptAllowance?
+    private var allowanceTask: Task<Void, Never>?
 
     // MARK: Ready-state views (kept alive across state swaps so scroll and
     // follow position survive)
@@ -72,6 +76,9 @@ final class SubtitlesPageViewController: UIViewController {
     private let stateLoop = ObservationLoop()
     private let progressLoop = ObservationLoop()
     private var languageObserver: NSObjectProtocol?
+    private var momentsObserver: NSObjectProtocol?
+    /// Where kept moments live; tests inject their own.
+    var momentStore: MomentStore = .shared
 
     #if DEBUG
     private var demoMode = false
@@ -92,6 +99,7 @@ final class SubtitlesPageViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         speedSleep.pageWillAppear()
+        refreshAllowance()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -147,6 +155,13 @@ final class SubtitlesPageViewController: UIViewController {
             }
         }
 
+        // A moment kept or removed elsewhere (the Library) moves the marks.
+        momentsObserver = NotificationCenter.default.addObserver(
+            forName: MomentStore.didChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncKeptMarks() }
+        }
+
         #if DEBUG
         configureDemoIfRequested()
         #endif
@@ -179,6 +194,9 @@ final class SubtitlesPageViewController: UIViewController {
             jumpUndo.clear()
             if let languageObserver {
                 NotificationCenter.default.removeObserver(languageObserver)
+            }
+            if let momentsObserver {
+                NotificationCenter.default.removeObserver(momentsObserver)
             }
         }
     }
@@ -236,14 +254,14 @@ final class SubtitlesPageViewController: UIViewController {
         speedSleep.install(in: transport)
 
         NSLayoutConstraint.activate([
-            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: PlayerLayout.column),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -PlayerLayout.column),
             header.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
             headerArtwork.widthAnchor.constraint(equalToConstant: Layout.headerArtwork),
             headerArtwork.heightAnchor.constraint(equalToConstant: Layout.headerArtwork),
 
-            contentHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.pageHeader),
-            contentHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageHeader),
+            contentHost.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: PlayerLayout.column),
+            contentHost.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -PlayerLayout.column),
             contentHost.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.gap),
 
             lyricsView.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor),
@@ -351,7 +369,7 @@ final class SubtitlesPageViewController: UIViewController {
         guard imageURL != headerArtworkURL else { return }
         headerArtworkURL = imageURL
         headerArtwork.kf.cancelDownloadTask()
-        headerArtwork.setArtwork(URL(string: imageURL), title: pinned.channelTitle)
+        headerArtwork.setArtwork(URL(string: imageURL), title: pinned.channelTitle, side: Layout.headerArtwork)
     }
 
     private func loadTranscriptRow(url: String) {
@@ -421,7 +439,7 @@ final class SubtitlesPageViewController: UIViewController {
         guard imageURL != headerArtworkURL else { return }
         headerArtworkURL = imageURL
         headerArtwork.kf.cancelDownloadTask()
-        headerArtwork.setArtwork(URL(string: imageURL), title: episode?.channelTitle)
+        headerArtwork.setArtwork(URL(string: imageURL), title: episode?.channelTitle, side: Layout.headerArtwork)
     }
 
     // MARK: - Rendering
@@ -503,10 +521,13 @@ final class SubtitlesPageViewController: UIViewController {
                 })
             )
         case .prompt:
-            return .init(
-                id: "prompt", leading: .icon(AppIcons.aiTranscript),
-                message: "AI transcript",
-                action: ("Generate", { [weak self] in self?.generateTranscript() })
+            return .prompt(
+                DetailTranscriptState.reduce(
+                    status: nil,
+                    signedIn: AuthAccountSnapshot.current(context: context).signedIn,
+                    allowance: allowance
+                ),
+                onAction: { [weak self] action in self?.promptTapped(action) }
             )
         case .processing:
             // The server reports no percentage, so just a spinner.
@@ -590,6 +611,49 @@ final class SubtitlesPageViewController: UIViewController {
         Task { await context.playback.seek(Int64(milliseconds)) }
     }
 
+    /// Reads the allowance (cache first) for the prompt copy. A failed read
+    /// leaves the neutral prompt; it is not retried until the next visit.
+    private func refreshAllowance() {
+        let account = AuthAccountSnapshot.current(context: context)
+        guard let uid = account.uid, account.signedIn else {
+            allowance = nil
+            updateCapsule()
+            return
+        }
+        if let cached = TranscriptAllowanceCache.shared.current(uid: uid) {
+            allowance = cached
+            updateCapsule()
+            return
+        }
+        guard allowanceTask == nil else { return }
+        allowanceTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let fresh = await TranscriptRequests.refresh(context: self.context)
+            self.allowanceTask = nil
+            guard !Task.isCancelled else { return }
+            if let fresh { self.allowance = fresh }
+            self.updateCapsule()
+        }
+    }
+
+    private func promptTapped(_ action: DetailTranscriptAction?) {
+        switch action {
+        case .getPlus:
+            PaywallViewController.present(
+                from: topMostPresented(), context: context, variant: .quota(quotaEpisode() ?? Self.untitledEpisode)
+            ) { [weak self] in
+                TranscriptAllowanceCache.shared.invalidate()
+                self?.refreshAllowance()
+            }
+        default:
+            generateTranscript()
+        }
+    }
+
+    private static let untitledEpisode = PaywallModel.Episode(
+        title: "", showName: "", durationMilliseconds: nil, artworkURL: nil
+    )
+
     /// `controller.add(url)` with the K27 user-trigger surface. Login, the
     /// quota paywall, and the toast live in `TranscriptRequests` so the
     /// detail sheet and the playlist card use the same refusal.
@@ -599,10 +663,8 @@ final class SubtitlesPageViewController: UIViewController {
             enclosureURL: url,
             context: context,
             from: self,
-            episode: quotaEpisode() ?? PaywallModel.Episode(
-                title: "", showName: "", durationMilliseconds: nil, artworkURL: nil
-            )
-        )
+            episode: quotaEpisode() ?? Self.untitledEpisode
+        ) { [weak self] in self?.refreshAllowance() }
     }
 
     private func quotaEpisode() -> PaywallModel.Episode? {
@@ -621,6 +683,18 @@ final class SubtitlesPageViewController: UIViewController {
         lyricsView.updateDocument(
             lines: currentLyricLines(),
             positionMilliseconds: Int(context.playback.positionData.positionMilliseconds)
+        )
+        syncKeptMarks()
+    }
+
+    /// Marks the lines of this transcript that are kept as moments.
+    private func syncKeptMarks() {
+        guard let url = loadedURL, !url.isEmpty else {
+            lyricsView.keptStarts = []
+            return
+        }
+        lyricsView.keptStarts = Set(
+            momentStore.all.filter { $0.enclosureURL == url }.map(\.startMilliseconds)
         )
     }
 
@@ -649,6 +723,7 @@ final class SubtitlesPageViewController: UIViewController {
             UIAction(title: "Play from here", image: AppIcons.play) { [weak self] _ in
                 self?.jumpToLine(index)
             },
+            keepMomentAction(for: index),
             UIAction(title: "Copy", image: AppIcons.copy) { [weak self] _ in
                 UIPasteboard.general.string = text
                 self?.showToast("Copied")
@@ -659,6 +734,61 @@ final class SubtitlesPageViewController: UIViewController {
                 self?.topMostPresented().present(activity, animated: true)
             },
         ])
+    }
+
+    // MARK: - Moments
+
+    /// The transcript being shown, as a moment records it: the pinned
+    /// episode when browsing another one, otherwise the playing episode.
+    private func momentSource() -> (
+        enclosureURL: String, rssFeedURL: String?, episodeTitle: String, showTitle: String, artworkURL: String?
+    )? {
+        guard let url = loadedURL, !url.isEmpty else { return nil }
+        if let pinned = pinnedTranscript, pinned.enclosureURL == url {
+            return (url, nil, pinned.title, pinned.channelTitle ?? "", pinned.imageURL)
+        }
+        if let episode = context.playback.currentEpisode, episode.enclosureUrl == url {
+            return (url, episode.rssFeedUrl, episode.title ?? "", episode.channelTitle ?? "", episode.imageUrl)
+        }
+        #if DEBUG
+        if demoMode { return (url, nil, "Demo episode", "Demo show", nil) }
+        #endif
+        return nil
+    }
+
+    /// "Keep moment" for a line, "Remove moment" when it is already kept.
+    private func keepMomentAction(for index: Int) -> UIAction {
+        let start = lyricsView.lines[index].startMilliseconds
+        let isKept = loadedURL.map { momentStore.contains(episode: $0, start: start) } ?? false
+        return UIAction(
+            title: isKept ? "Remove moment" : "Keep moment",
+            image: isKept ? AppIcons.remove : AppIcons.keepMoment,
+            attributes: isKept || momentSource() != nil ? [] : .disabled
+        ) { [weak self] _ in
+            self?.toggleMoment(at: index)
+        }
+    }
+
+    func toggleMoment(at index: Int) {
+        guard lyricsView.lines.indices.contains(index), let source = momentSource() else { return }
+        let line = lyricsView.lines[index]
+        Haptics.tap()
+        if momentStore.contains(episode: source.enclosureURL, start: line.startMilliseconds) {
+            momentStore.remove(episode: source.enclosureURL, start: line.startMilliseconds)
+            showToast("Moment removed")
+            return
+        }
+        let result = momentStore.add(Moment(
+            enclosureURL: source.enclosureURL,
+            rssFeedURL: source.rssFeedURL,
+            episodeTitle: source.episodeTitle,
+            showTitle: source.showTitle,
+            artworkURL: source.artworkURL,
+            startMilliseconds: line.startMilliseconds,
+            text: line.text.trimmingCharacters(in: .whitespacesAndNewlines),
+            translation: line.translation
+        ))
+        showToast(result == .failed ? "Couldn't keep this moment" : "Moment kept")
     }
 
     // MARK: - ••• menu
@@ -825,6 +955,9 @@ final class SubtitlesPageViewController: UIViewController {
 
     /// Lyric lines on screen (smoke-test probe).
     var demoLines: [LyricLine] { lyricsView.lines }
+
+    /// The lyrics list itself (visual-check probe).
+    var demoLyricsView: LyricsView { lyricsView }
 
     /// 60 four-second segments so the demo list scrolls well past a
     /// viewport (the first lines are fixed samples of the styles).

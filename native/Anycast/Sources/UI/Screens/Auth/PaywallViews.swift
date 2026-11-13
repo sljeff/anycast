@@ -153,7 +153,7 @@ final class PaywallCardView: UIView {
         artwork.backgroundColor = Theme.playerWarm
         artwork.isAccessibilityElement = false
         artwork.translatesAutoresizingMaskIntoConstraints = false
-        artwork.setArtwork(episode.artworkURL, title: episode.showName)
+        artwork.setArtwork(episode.artworkURL, title: episode.showName, side: 56)
 
         let title = Self.label(episode.title, font: TypographyV2.emphasis.font(), color: Theme.playerText)
         let meta = Self.label(episode.metaLine, font: TypographyV2.meta.font(), color: Theme.playerSecondary)
@@ -573,6 +573,7 @@ final class PaywallPlansStatusView: UIView {
         column.axis = .vertical
         column.alignment = .center
         column.spacing = Spacing.md
+        isAccessibilityElement = false
         column.translatesAutoresizingMaskIntoConstraints = false
         addSubview(column)
         NSLayoutConstraint.activate([
@@ -589,7 +590,8 @@ final class PaywallPlansStatusView: UIView {
 
     func setLoading(_ loading: Bool) {
         spinner.isHidden = !loading
-        messageLabel.isHidden = loading
+        messageLabel.text = loading ? PaywallModel.loadingMessage : PaywallModel.unavailableMessage
+        messageLabel.isHidden = false
         retryButton.isHidden = loading
         if loading { spinner.startAnimating() } else { spinner.stopAnimating() }
     }

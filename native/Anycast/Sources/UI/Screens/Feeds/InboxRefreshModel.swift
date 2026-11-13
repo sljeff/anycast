@@ -30,6 +30,88 @@ enum InboxRefreshTrigger: Equatable {
     }
 }
 
+extension InboxRefreshTrigger {
+
+    /// Only a user-initiated trigger shows the refresh control and reveals
+    /// it. Every automatic trigger (and the subscription-change path) runs
+    /// silently: the list a reader is looking at never moves.
+    var revealsRefreshControl: Bool {
+        switch self {
+        case .pull, .tabRetapAtTop: return true
+        case .firstAppear, .delayedAuto, .periodicAuto: return false
+        }
+    }
+}
+
+/// The header status line, pure. The line is always one line of the same
+/// font (never nil), so the header's height never changes with the state.
+enum InboxHeaderStatus {
+
+    /// A silent refresh in flight reads "Updating…"; a finished one that
+    /// added `newCount` rows reads "N new · updated {relative}"; everything
+    /// else is "updated {relative} · {n} unlistened".
+    static func text(
+        isUpdating: Bool,
+        newCount: Int,
+        lastRefresh: Date?,
+        episodeCount: Int,
+        now: Date = Date()
+    ) -> String {
+        if isUpdating { return "Updating…" }
+        let relative: String
+        if let lastRefresh {
+            let milliseconds = Int64(lastRefresh.timeIntervalSince1970 * 1000)
+            relative = RelativeTimeFormatter.format(milliseconds, now: now)
+        } else {
+            relative = "—"
+        }
+        let visibleNew = min(newCount, episodeCount)
+        if visibleNew > 0 { return "\(visibleNew) new · updated \(relative)" }
+        return "updated \(relative) · \(episodeCount) unlistened"
+    }
+
+    /// Rows in `current` whose enclosure URL was not in `known`.
+    static func newRowCount(known: Set<String>, current: [FeedEpisodeRow]) -> Int {
+        current.reduce(0) { count, row in
+            guard let url = row.enclosureUrl, !known.contains(url) else { return count }
+            return count + 1
+        }
+    }
+}
+
+/// How the inbox card list moves from one render to the next, pure. A list
+/// whose rows only appeared or left (everything else in the same order) is
+/// applied as inserts and removes so unchanged cards stay put; anything else
+/// falls back to a plain `reloadData`.
+nonisolated enum InboxListDiff {
+
+    enum Plan: Equatable {
+        /// Same rows in the same order: nothing to apply.
+        case unchanged
+        /// Rebuild the whole list.
+        case reload
+        /// Indices in the OLD list to remove and in the NEW list to insert.
+        case batch(removes: [Int], inserts: [Int])
+    }
+
+    static func plan(old: [String?], new: [String?], sectionsUnchanged: Bool) -> Plan {
+        guard sectionsUnchanged, !old.isEmpty, !new.isEmpty else { return .reload }
+        let oldURLs = old.compactMap { $0 }
+        let newURLs = new.compactMap { $0 }
+        // A nil URL has no identity, a duplicate has an ambiguous one.
+        guard oldURLs.count == old.count, newURLs.count == new.count,
+              Set(oldURLs).count == oldURLs.count, Set(newURLs).count == newURLs.count
+        else { return .reload }
+        if oldURLs == newURLs { return .unchanged }
+        let oldSet = Set(oldURLs), newSet = Set(newURLs)
+        // Rows that stayed must keep their relative order, else a row moved.
+        guard oldURLs.filter(newSet.contains) == newURLs.filter(oldSet.contains) else { return .reload }
+        let removes = oldURLs.indices.filter { !newSet.contains(oldURLs[$0]) }
+        let inserts = newURLs.indices.filter { !oldSet.contains(newURLs[$0]) }
+        return .batch(removes: removes, inserts: inserts)
+    }
+}
+
 /// `lastRefresh` bookkeeping for the inbox (states/feed_episode.dart).
 /// `autoFetch` skips when the last refresh is under a minute old;
 /// `fetchNewEpisodes` stamps `lastRefresh = DateTime.now()` at its start —

@@ -32,6 +32,8 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     private let recentStore: RecentSearchStore
     /// Recent searches and categories, shown while no results are.
     let entryPage: SearchEntryViewController
+    /// One row for a pasted feed address, shown instead of the results.
+    let feedAddressPage: SearchFeedAddressViewController
     private var entryFade: ScrollEdgeFade?
     private let tabStrip: ChipTabBarView
     private var didAttachStripEdge = false
@@ -65,9 +67,11 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     init(
         context: UIContext,
         recentStore: RecentSearchStore = RecentSearchStore(),
-        loadCategories: (() async throws -> [String])? = nil
+        loadCategories: (() async throws -> [String])? = nil,
+        feedAddressPage: SearchFeedAddressViewController? = nil
     ) {
         self.context = context
+        self.feedAddressPage = feedAddressPage ?? SearchFeedAddressViewController(context: context)
         self.recentStore = recentStore
         let api = context.api
         self.fetchChannels = { try await api.searchChannels(keyword: $0) }
@@ -129,6 +133,7 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         clearEntryTop()
+        feedAddressPage.topInset = entryTopChrome.frame.maxY
         relayFloatingSearchField()
     }
 
@@ -173,8 +178,22 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
     /// Whether the results (strip and pages) replace the entry state.
     private(set) var isShowingResults = false
+    /// Whether a pasted feed address replaces both.
+    private(set) var isShowingFeedAddress = false
+
+    /// A pasted web address is read as a feed instead of searched.
+    private func showFeedAddress(_ address: String) {
+        setResultsVisible(false)
+        isShowingFeedAddress = true
+        entryPage.view.isHidden = true
+        entryFade?.isHidden = true
+        feedAddressPage.view.isHidden = false
+        feedAddressPage.load(address: address)
+    }
 
     private func setResultsVisible(_ visible: Bool) {
+        isShowingFeedAddress = false
+        feedAddressPage.view.isHidden = true
         isShowingResults = visible
         entryPage.view.isHidden = visible
         entryFade?.isHidden = visible
@@ -205,6 +224,11 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
         searchController.searchBar.text = query
         searchField.resignFirstResponder()
         searchController.searchBar.resignFirstResponder()
+        // A web address is not a search: read that feed (and leave Recent alone).
+        if let address = FeedAddress.parse(query) {
+            showFeedAddress(address)
+            return
+        }
 
         viewModel = SearchPageViewModel(
             searchText: query,
@@ -248,7 +272,8 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
     /// Emptying the field brings the entry state back.
     private func queryDidChange(_ text: String) {
-        guard isShowingResults, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard isShowingResults || isShowingFeedAddress,
+              text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         setResultsVisible(false)
     }
 
@@ -499,6 +524,17 @@ final class SearchPageViewController: UIViewController, UISearchBarDelegate {
             entryPage.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             entryPage.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             entryPage.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        addChild(feedAddressPage)
+        feedAddressPage.view.translatesAutoresizingMaskIntoConstraints = false
+        feedAddressPage.view.isHidden = true
+        view.insertSubview(feedAddressPage.view, aboveSubview: entryPage.view)
+        feedAddressPage.didMove(toParent: self)
+        NSLayoutConstraint.activate([
+            feedAddressPage.view.topAnchor.constraint(equalTo: view.topAnchor),
+            feedAddressPage.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            feedAddressPage.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            feedAddressPage.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
         let fade = ScrollEdgeChrome.attach(
             chrome: entryTopChrome, to: entryPage.collectionView, edge: .top, in: view,
@@ -803,10 +839,10 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         playbackObservation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
                 _ = self.context.playback.isPlaying
                 _ = self.context.playback.isLoading
-                _ = self.context.playback.queue.map(\.enclosureUrl)
+                _ = self.context.playback.queueEnclosureURLs
             },
             onChange: { [weak self] in
                 guard let self else { return }

@@ -18,22 +18,18 @@ struct SettingsRowCellTests {
         ).height
     }
 
-    @Test("Plain rows are at least 56 tall; a subtitle grows the row")
+    @Test("Plain rows are at least 56 tall")
     func minimumHeight() {
         let cell = SettingsRowCell(frame: .zero)
         cell.configure(title: "Account", showsChevron: true)
         #expect(fittingHeight(cell) >= 56)
-
-        let withSubtitle = SettingsSwitchListCell(frame: .zero)
-        withSubtitle.configure(title: "Subtitle Translation", subtitle: "Translate generated text")
-        #expect(fittingHeight(withSubtitle) >= 56)
     }
 
     @Test("Stepper rows stay 56 tall and mirror the range flags onto the halves")
     func stepperRow() {
         let cell = SettingsStepperRowCell(frame: .zero)
         cell.configure(
-            title: "Cache Limit", value: "5 episodes",
+            title: "Played audio", value: "5 episodes",
             labels: (decrease: "Lower cache limit", increase: "Raise cache limit"),
             canDecrease: false, canIncrease: true
         )
@@ -44,7 +40,7 @@ struct SettingsRowCellTests {
         #expect(cell.isAccessibilityElement == false)
 
         cell.configure(
-            title: "Cache Limit", value: "100 episodes",
+            title: "Played audio", value: "100 episodes",
             labels: (decrease: "Lower cache limit", increase: "Raise cache limit"),
             canDecrease: true, canIncrease: false
         )
@@ -56,7 +52,7 @@ struct SettingsRowCellTests {
     func stepperTaps() {
         let cell = SettingsStepperRowCell(frame: .zero)
         cell.configure(
-            title: "Inbox Limit", value: "100 episodes",
+            title: "Inbox", value: "100 episodes",
             labels: (decrease: "Lower inbox limit", increase: "Raise inbox limit"),
             canDecrease: true, canIncrease: true
         )

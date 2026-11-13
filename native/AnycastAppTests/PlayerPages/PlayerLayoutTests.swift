@@ -26,7 +26,8 @@ struct PlayerLayoutTests {
         bar.frame = CGRect(x: 0, y: 0, width: 320, height: 60)
         bar.layoutIfNeeded()
         let labels = bar.subviews.compactMap { $0 as? UILabel }
-        #expect(labels.count == 2)
+        // Elapsed + remaining, and the state message that takes their place.
+        #expect(labels.count == 3)
         for label in labels {
             #expect(label.frame.minY >= 24, "label must sit below the bar")
             #expect(label.frame.maxY <= 60, "label must stay inside the control")

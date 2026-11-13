@@ -3,60 +3,42 @@ import Testing
 import AnycastKit
 @testable import Anycast
 
-/// Hosted visual check for the T9 dialogs (05 §6.1 S19): presents the real
-/// ImportExport dialog and the ShareDialog (list + empty states) over the
-/// live shell and captures window PNGs into tmp for offline inspection.
-/// Skips silently when the startup DAG has no context yet (unseeded
-/// simulator), mirroring ChannelVisualSmokeTests.
+/// Hosted visual check for the import sheet (05 §6.1 S19): presents the
+/// real sheet over the live shell and captures window PNGs into tmp for
+/// offline inspection. Skips silently when the startup DAG has no context
+/// yet (unseeded simulator), mirroring ChannelVisualSmokeTests.
 @MainActor
 struct ImportExportVisualSmokeTests {
 
-    @Test("ImportExport dialog + ShareDialog states capture")
-    func dialogScreenshots() async throws {
+    @Test("Import sheet: confirm list, no-feeds and all-followed states capture")
+    func sheetScreenshots() async throws {
         guard let context = await Self.liveUIContext() else { return }
         guard let presenter = Self.rootPresenter() else { return }
 
-        let dialog = ImportExportDialogViewController(context: context)
-        presenter.present(dialog, animated: false)
-        try await Task.sleep(for: .milliseconds(800))
-        await Self.captureWindow(name: "t9-import-export-dialog")
-        // The dialog chrome must expose both affordances, not just render.
-        #expect(Self.findButton(titled: "Import", in: dialog.view) != nil, "Import button missing")
-        #expect(Self.findButton(titled: "Export", in: dialog.view) != nil, "Export button missing")
-
-        dialog.dismiss(animated: false)
-        try await Task.sleep(for: .milliseconds(400))
-
-        let share = ShareDialogViewController(
-            context: context,
-            entries: [
-                OPMLParser.Entry(title: "Channel One", xmlURL: "https://one.example/f"),
-                OPMLParser.Entry(title: "Channel Two", xmlURL: "https://two.example/f"),
-                OPMLParser.Entry(title: "A Rather Long Channel Title That Truncates", xmlURL: "https://three.example/f"),
-            ]
+        let entries = [
+            OPMLParser.Entry(title: "Channel One", xmlURL: "https://one.example/f"),
+            OPMLParser.Entry(title: "Channel Two", xmlURL: "https://two.example/f"),
+            OPMLParser.Entry(title: "A Rather Long Channel Title That Truncates", xmlURL: "https://three.example/f"),
+        ]
+        let sheet = ImportSheetViewController(
+            context: context, plan: ImportPlan(entries: entries, alreadyFollowed: 2), filename: "Overcast.opml"
         )
-        presenter.present(share, animated: false)
+        presenter.present(sheet, animated: false)
         try await Task.sleep(for: .milliseconds(800))
-        await Self.captureWindow(name: "t9-share-dialog-list")
-        let table = Self.firstTableView(in: share.view)
-        #expect(table != nil, "share dialog table missing")
-        if let table {
-            #expect(table.numberOfRows(inSection: 0) == 3, "share list dropped entries")
-        }
-
-        share.dismiss(animated: false)
+        await Self.captureWindow(name: "b2-import-sheet-confirm")
+        #expect(Self.findButton(titled: "Import 3 shows", in: sheet.view) != nil, "primary button missing")
+        let table = Self.firstTableView(in: sheet.view)
+        #expect(table?.numberOfRows(inSection: 0) == 3, "the list dropped entries")
+        sheet.dismiss(animated: false)
         try await Task.sleep(for: .milliseconds(400))
 
-        let empty = ShareDialogViewController(context: context, entries: [])
+        let empty = ImportSheetViewController(
+            context: context, plan: ImportPlan(entries: [], alreadyFollowed: 0), filename: "notes.txt"
+        )
         presenter.present(empty, animated: false)
         try await Task.sleep(for: .milliseconds(800))
-        await Self.captureWindow(name: "t9-share-dialog-empty")
-        // Zero entries legitimately builds no table at all — absence is the
-        // expected empty state, not a missing view.
-        if let emptyTable = Self.firstTableView(in: empty.view) {
-            #expect(emptyTable.numberOfRows(inSection: 0) == 0, "empty share dialog listed rows")
-        }
-
+        await Self.captureWindow(name: "b2-import-sheet-empty")
+        #expect(Self.findButton(titled: "Choose another file", in: empty.view) != nil)
         empty.dismiss(animated: false)
         try await Task.sleep(for: .milliseconds(400))
     }

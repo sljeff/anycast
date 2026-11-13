@@ -129,6 +129,8 @@ nonisolated enum AppIcons {
     static let delete = symbol("trash")
     /// Forward disclosure. Mirrors in right-to-left layouts.
     static let disclosure = symbol("chevron.forward")
+    /// Trailing mark on rows that open a web page.
+    static let externalLink = symbol("arrow.up.right")
     static let retry = symbol("arrow.clockwise")
     /// Transcript failure. Outline, shared by the playlist strip, the
     /// transcript page, and the detail transcript row when generation
@@ -157,6 +159,8 @@ nonisolated enum AppIcons {
     static let transcriptLines = symbol("text.alignleft")
     /// Detail ••• "Ask AI" — a bubble, not the player-page brand mark.
     static let chatBubble = symbol("bubble.left")
+    /// Transcript line menu: keep the sentence as a moment.
+    static let keepMoment = symbol("text.quote")
 
     /// Brand SVGs (template imagesets; tint with tintColor). Ask AI is
     /// `aiChat`; generating or opening a transcript is `aiTranscript`.
@@ -178,7 +182,7 @@ nonisolated enum AppIcons {
         "doc.on.doc", "safari.fill", "safari", "arrow.up.doc", "apple.logo",
         "envelope", "plus.circle", "exclamationmark.bubble.fill", "photo",
         "arrow.turn.down.right", "text.alignleft", "exclamationmark.triangle",
-        "bubble.left",
+        "bubble.left", "text.quote", "arrow.up.right",
     ]
 
     private static func symbol(_ name: String) -> UIImage {

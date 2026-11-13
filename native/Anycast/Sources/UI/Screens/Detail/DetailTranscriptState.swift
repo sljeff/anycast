@@ -68,6 +68,8 @@ nonisolated struct DetailTranscriptContent: Equatable, Sendable {
         case available
         case plus
         case exhausted
+        /// Plus, nothing left until the monthly pool refills.
+        case plusExhausted
         case generating
         case ready
         case failed
@@ -97,6 +99,9 @@ nonisolated struct DetailTranscriptContent: Equatable, Sendable {
     /// "Get Plus" under Increase Contrast: onSurface + underline.
     var trailingUpgradesContrast: Bool
     var menu: [DetailTranscriptMenuItem]
+    /// The player's transcript-page capsule says the same thing in one line
+    /// (message, then `actionTitle` as its trailing word).
+    var promptMessage: String = "AI transcript"
 
     /// VoiceOver custom actions for targets that are not the row's own
     /// double-tap (Ask AI on a ready transcript).
@@ -147,35 +152,40 @@ nonisolated enum DetailTranscriptState {
     // MARK: - States
 
     private static func signedOut(policy: DetailTranscriptPolicy) -> DetailTranscriptContent {
-        accountRow(
+        var content = accountRow(
             kind: .signedOut,
-            value: nil,
-            actionTitle: "Generate",
+            value: "\(PlusOffer.freeTotal) free",
+            actionTitle: "Sign In",
             action: .generate,
-            accessibilityLabel: "AI transcript",
+            accessibilityLabel: "AI transcript, \(PlusOffer.freeTotal) free with an account",
             accessibilityHint: "Double-tap to sign in and generate",
-            menuSubtitle: nil,
+            menuSubtitle: "Sign in for \(PlusOffer.freeTotal) free",
             policy: policy
         )
+        content.promptMessage = PlusOffer.freePitch
+        return content
     }
 
     private static func available(left: Int, policy: DetailTranscriptPolicy) -> DetailTranscriptContent {
-        accountRow(
+        var content = accountRow(
             kind: .available,
-            value: "\(left) left",
+            value: "\(left) of \(PlusOffer.freeTotal) left",
             actionTitle: "Generate",
             action: .generate,
-            accessibilityLabel: "AI transcript, \(left) free left",
+            accessibilityLabel: "AI transcript, \(left) of \(PlusOffer.freeTotal) free left",
             accessibilityHint: "Double-tap to generate",
-            menuSubtitle: "\(left) free left",
+            menuSubtitle: "\(left) of \(PlusOffer.freeTotal) free left",
             policy: policy
         )
+        content.promptMessage = "\(left) of \(PlusOffer.freeTotal) free transcripts left"
+        return content
     }
 
     private static func plus(_ remaining: Int, policy: DetailTranscriptPolicy) -> DetailTranscriptContent {
         let left = clamp(remaining, subscribed: true)
+        if left == 0 { return plusExhausted() }
         let showsCount = left <= policy.plusCountVisibilityMaximum
-        return accountRow(
+        var content = accountRow(
             kind: .plus,
             value: showsCount ? "\(left) left this month" : nil,
             actionTitle: "Generate",
@@ -186,6 +196,27 @@ nonisolated enum DetailTranscriptState {
             accessibilityHint: "Double-tap to generate",
             menuSubtitle: showsCount ? "\(left) left this month" : nil,
             policy: policy
+        )
+        if showsCount { content.promptMessage = "\(left) transcripts left this month" }
+        return content
+    }
+
+    /// A member out of transcripts is not sold Plus again and is not handed
+    /// a Generate that the server would refuse: the row just says so.
+    private static func plusExhausted() -> DetailTranscriptContent {
+        DetailTranscriptContent(
+            kind: .plusExhausted,
+            title: "AI transcript",
+            value: "None left this month",
+            actionTitle: nil,
+            rowAction: nil,
+            trailingAction: nil,
+            accessibilityLabel: "AI transcript, none left this month",
+            accessibilityHint: "",
+            symbol: .sparkle,
+            trailingUpgradesContrast: false,
+            menu: [],
+            promptMessage: "No transcripts left this month"
         )
     }
 
@@ -201,6 +232,7 @@ nonisolated enum DetailTranscriptState {
             policy: policy
         )
         content.trailingUpgradesContrast = true
+        content.promptMessage = "No free transcripts left"
         content.menu = menu(
             primary: DetailTranscriptMenuItem(title: "Get Plus", subtitle: nil, action: .getPlus),
             policy: policy

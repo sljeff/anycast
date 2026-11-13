@@ -675,8 +675,7 @@ final class QACrawlUITests: XCTestCase {
 
     private func settingsRowsVisible() -> Bool {
         ["settings-row-account", "settings-row-country",
-         "settings-row-importExport", "settings-row-history",
-         "settings-row-autoRefreshInterval"]
+         "settings-row-importSubscriptions", "settings-row-cacheLimit"]
             .contains { app.cells[$0].exists }
     }
 
@@ -700,11 +699,10 @@ final class QACrawlUITests: XCTestCase {
     private func ensureDetailOpen() -> Bool {
         if app.buttons["More episode actions"].exists { return true }
         closeSheet()
-        // v2 inbox cards are located by their `more` menu button; the whole
-        // card opens Detail (09 §10 批次1).
-        let card = app.collectionViews.cells
-            .containing(.button, identifier: "inbox-card-more")
-            .firstMatch
+        // Inbox rows are located by their row identifier; the whole
+        // row opens Detail (09 §10 批次1).
+        let card = app.collectionViews.descendants(matching: .any)
+            .matching(identifier: "inbox-episode-row").firstMatch
         guard card.waitForExistence(timeout: 4) else { return false }
         tapElement(card)
         return app.buttons["More episode actions"].waitForExistence(timeout: 6)
@@ -794,9 +792,8 @@ final class QACrawlUITests: XCTestCase {
                            // The v2 card surfaces its actions through the
                            // long-press context menu (09 §7a-C1) — the v1
                            // strip and its offset-tap target are retired.
-                           let card = s.app.collectionViews.cells
-                               .containing(.button, identifier: "inbox-card-more")
-                               .firstMatch
+                           let card = s.app.collectionViews.descendants(matching: .any)
+                               .matching(identifier: "inbox-episode-row").firstMatch
                            guard card.waitForExistence(timeout: 5) else {
                                s.markSkipped("inbox-expanded", "inbox cards", "needs db_smoke")
                                return false
@@ -812,11 +809,11 @@ final class QACrawlUITests: XCTestCase {
                            // Cell subtrees merge into the cell's accessibility
                            // element, so the description identifier is not
                            // queryable — instead try cards (located by the
-                           // `more` button) until a Detail sheet renders a
+                           // row identifier) until a Detail sheet renders a
                            // real show-notes body (up to 3 visible cards).
                            // The sheet grabber tap closes.
-                           let cards = s.app.collectionViews.cells
-                               .containing(.button, identifier: "inbox-card-more")
+                           let cards = s.app.collectionViews.descendants(matching: .any)
+                               .matching(identifier: "inbox-episode-row")
                            guard cards.count > 0 else {
                                s.markSkipped("detail", "inbox cards", "needs db_smoke")
                                return false
@@ -1010,7 +1007,7 @@ final class QACrawlUITests: XCTestCase {
                            guard s.tap(s.app.buttons["Settings"].firstMatch, "settings gear") else {
                                return false
                            }
-                           return s.app.cells["settings-row-autoRefreshInterval"]
+                           return s.app.cells["settings-row-cacheLimit"]
                                .waitForExistence(timeout: 8)
                                || s.app.staticTexts["Account"].waitForExistence(timeout: 4)
                        },
@@ -1020,16 +1017,16 @@ final class QACrawlUITests: XCTestCase {
             Checkpoint(state: "settings-stepper",
                        action: { s in
                            guard s.ensureSettingsOpen() else { return false }
-                           let row = s.app.cells["settings-row-autoRefreshInterval"]
+                           let row = s.app.cells["settings-row-cacheLimit"]
                            guard row.waitForExistence(timeout: 6) else { return false }
-                           let longer = row.buttons["Longer auto refresh interval"]
-                           let shorter = row.buttons["Shorter auto refresh interval"]
+                           let longer = row.buttons["Raise cache limit"]
+                           let shorter = row.buttons["Lower cache limit"]
                            // Step once and back, so the crawl leaves the stored
-                           // interval as it found it.
+                           // limit as it found it.
                            let (step, undo) = longer.isEnabled ? (longer, shorter) : (shorter, longer)
-                           guard step.exists, s.tap(step, "auto refresh stepper") else { return false }
+                           guard step.exists, s.tap(step, "cache limit stepper") else { return false }
                            Thread.sleep(forTimeInterval: 0.5)
-                           return s.tap(undo, "auto refresh stepper back")
+                           return s.tap(undo, "cache limit stepper back")
                        },
                        required: [],
                        probe: false, settle: 2),
@@ -1040,7 +1037,7 @@ final class QACrawlUITests: XCTestCase {
                            if close.exists { s.tapElement(close) ; Thread.sleep(forTimeInterval: 0.5) }
                            else { s.closeSheet() }
                            guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-country", title: "Discovery Region") else {
+                                 s.tapRow(identifier: "settings-row-country", title: "Charts from") else {
                                return false
                            }
                            return s.waitUntil(timeout: 6) {
@@ -1051,36 +1048,6 @@ final class QACrawlUITests: XCTestCase {
                        required: [],
                        probe: false, settle: 2),
 
-            Checkpoint(state: "import-export",
-                       action: { s in
-                           let close = s.app.buttons["Close"]
-                           if close.exists { s.tapElement(close) ; Thread.sleep(forTimeInterval: 0.5) }
-                           else { s.closeSheet() }
-                           guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-importExport",
-                                          title: "Import & Export") else { return false }
-                           return s.app.textFields["RSS Feed URL"].waitForExistence(timeout: 6)
-                               || s.app.buttons["Import help"].waitForExistence(timeout: 3)
-                       },
-                       required: [],
-                       probe: true, settle: 2),
-
-            Checkpoint(state: "history",
-                       action: { s in
-                           s.closeSheet()
-                           guard s.ensureSettingsOpen(),
-                                 s.tapRow(identifier: "settings-row-history", title: "Listening History") else {
-                               return false
-                           }
-                           return s.waitUntil(timeout: 6) {
-                               s.app.buttons["Hold to Clear History"].exists
-                                   || s.app.staticTexts["Play an episode and it shows up here."].exists
-                                   || s.app.buttons["history-explore"].exists
-                           }
-                       },
-                       required: [],
-                       probe: true, settle: 2),
-
             Checkpoint(state: "login",
                        action: { s in
                            s.closeSheet()
@@ -1088,7 +1055,7 @@ final class QACrawlUITests: XCTestCase {
                                  s.tapRow(identifier: "settings-row-account", title: "Account") else {
                                return false
                            }
-                           // Signed out: the login sheet ("Sign In & Sync" with
+                           // Signed out: the login sheet ("Sign In" with
                            // "Continue with Apple"); signed in: the Membership page.
                            return s.waitUntil(timeout: 10) {
                                s.app.buttons["login-apple"].exists

@@ -75,7 +75,7 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S3 Shows sheet (the shelf's All shows)")
+    @Test("S3 Library sheet (the shelf's All shows)")
     func captureShows() async throws {
         try await Self.withRoot { root in
             guard let context = await Self.liveContext() else {
@@ -88,8 +88,8 @@ struct ScreenBaselineCaptureTests {
                 Self.missingBaselineInput("seeded subscriptions (S3)")
                 return
             }
-            ShowsSheetViewController.present(
-                from: root, shows: ShowsShelfLayout.ordered(subscriptions), onSelect: { _ in }
+            LibrarySheetViewController.present(
+                from: root, context: context, shows: ShowsShelfLayout.ordered(subscriptions), onSelect: { _ in }
             )
             try await Self.settle(1.5)
             try await Self.capture("S3-shows-sheet")
@@ -189,36 +189,6 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S16c Settings with the translation switch flipped on (visual only)")
-    func captureSettingsSwitchOn() async throws {
-        try await Self.withRoot { root in
-            guard let context = await Self.liveContext() else {
-                Self.missingBaselineInput("live UIContext")
-                return
-            }
-            AppSheets.presentExpand(SettingsViewController(context: context), from: root)
-            try await Self.settle(1.5)
-            func switchCell(in view: UIView) -> SettingsSwitchListCell? {
-                if let cell = view as? SettingsSwitchListCell { return cell }
-                for subview in view.subviews {
-                    if let match = switchCell(in: subview) { return match }
-                }
-                return nil
-            }
-            guard let window = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow),
-                let cell = switchCell(in: window)
-            else {
-                Self.missingBaselineInput("the translation switch row (S16c)")
-                return
-            }
-            // `setOn` does not fire onSwitchChanged: the stored setting stays untouched.
-            cell.setOn(true, animated: false)
-            try await Self.settle(0.5)
-            try await Self.capture("S16c-settings-switch-on")
-        }
-    }
-
     @Test("S16b Country picker sheet over Settings")
     func captureCountryPicker() async throws {
         try await Self.withRoot { root in
@@ -236,7 +206,7 @@ struct ScreenBaselineCaptureTests {
             // private presentCountrySheet().
             let sheet = SettingsOptionSheetViewController(
                 title: SettingsPageModel.title(for: .country),
-                options: SettingsPageModel.sortedCountries.map { ($0.name, $0.code) },
+                options: SettingsPageModel.sortedCountries().map { ($0.name, $0.code) },
                 selectedCode: context.settingsBox.current.countryCode
             )
             sheet.present(from: settingsPage)
@@ -258,16 +228,20 @@ struct ScreenBaselineCaptureTests {
         }
     }
 
-    @Test("S19 Import/Export dialog and import instructions")
+    @Test("S19 Import sheet and import instructions")
     func captureImportExport() async throws {
         try await Self.withRoot { root in
             guard let context = await Self.liveContext() else {
                 Self.missingBaselineInput("live UIContext")
                 return
             }
-            ImportExportDialogViewController.present(from: root, context: context)
+            let plan = ImportPlan(
+                entries: (1...8).map { OPMLParser.Entry(title: "Show \($0)", xmlURL: "https://s\($0).example/f") },
+                alreadyFollowed: 2
+            )
+            root.present(ImportSheetViewController(context: context, plan: plan, filename: "Overcast.opml"), animated: false)
             try await Self.settle(1.2)
-            try await Self.capture("S19a-import-export")
+            try await Self.capture("S19a-import-sheet")
         }
         try await Self.withRoot { root in
             ImportInstructionsViewController.present(from: root)

@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 @testable import AnycastKit
 
@@ -441,6 +442,35 @@ struct PollingRhythmTests {
         // A language switch resets the map (Dart setTargetLanguage).
         controller.resetForLanguageChange()
         #expect(controller.statuses.isEmpty)
+    }
+
+    @Test("a retrying translation stays processing without re-notifying observers each round")
+    func translationRetryIsQuiet() async throws {
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
+        let url = "https://x.example/ep1.mp3"
+        try await seedSubtitle(database: database, url: url, language: "en")
+
+        let controller = TranslationPollController(
+            api: makeAPI(),
+            translations: database.translationRepository(),
+            subtitles: database.subtitleRepository(),
+            targetLanguage: { "zh" },
+            subtitleStatuses: { [url: "succeeded"] },
+            timerFactory: ManualPollTimerFactory()
+        )
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 200, body: #"{"translation":null}"#)
+        }
+        await controller.refresh()
+        #expect(controller.statuses[url] == "processing")
+
+        final class Flag: @unchecked Sendable { var fired = false }
+        let flag = Flag()
+        withObservationTracking { _ = controller.statuses } onChange: { flag.fired = true }
+        await controller.refresh()
+        #expect(controller.statuses[url] == "processing")
+        #expect(!flag.fired, "an unchanged status must not re-render the cards and transcript page")
     }
 
     @Test("translation success persists the row with the encoded payload")

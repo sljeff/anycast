@@ -196,7 +196,6 @@ final class SearchSegmentStatusView: UIView {
             actionButton.accessibilityLabel = presentation.actionAccessibilityLabel
         }
         emptyState.configure(EmptyStateView.Content(
-            icon: nil,
             title: presentation.title,
             message: nil,
             actions: presentation.actionTitle == nil ? [] : [actionButton],

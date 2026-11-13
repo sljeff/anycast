@@ -46,7 +46,7 @@ struct SearchEntryStateTests {
     @Test("Categories only: no recents section")
     func categoriesOnly() async {
         let entry = await makeEntry(recents: [], categories: .success(["News"]))
-        #expect(entry.sections == [.categoriesHeader, .categories])
+        #expect(entry.sections == [.hint, .categoriesHeader, .categories])
     }
 
     @Test("A failed category load hides the section silently")
@@ -56,10 +56,10 @@ struct SearchEntryStateTests {
         #expect(entry.sections == [.recentsHeader, .recents])
     }
 
-    @Test("Neither: the page is empty")
+    @Test("Neither: only the one-line hint")
     func neither() async {
         let entry = await makeEntry(recents: [], categories: .success([]))
-        #expect(entry.sections.isEmpty)
+        #expect(entry.sections == [.hint])
     }
 
     @Test("Choosing a recent or a category reports its text")

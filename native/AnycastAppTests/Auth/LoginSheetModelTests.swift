@@ -12,7 +12,7 @@ struct LoginSheetModelTests {
     @Test("Copy per source: title and subtitle")
     func copyPerSource() {
         let expected: [(LoginSource, String, String)] = [
-            (.settings, "Sign In & Sync", "Get 10 free AI transcripts"),
+            (.settings, "Sign In", "Get 10 free AI transcripts"),
             (.paywall, "Sign in to continue", "Plus stays with your account"),
             (.transcribe, "Sign in to transcribe", "Get 10 free AI transcripts"),
             (.reauth, "Sign in again", "Session expired. Nothing is lost."),
@@ -54,7 +54,7 @@ struct LoginSheetModelTests {
         #expect(!model.showsOtherWaysLink)
         #expect(model.showsAlternatives)
         #expect(!model.showsEmailForm)
-        #expect(model.title == "Sign In & Sync")
+        #expect(model.title == "Sign In")
     }
 
     @Test("Email stage and back via Other ways")

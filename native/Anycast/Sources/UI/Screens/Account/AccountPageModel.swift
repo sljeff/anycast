@@ -21,6 +21,7 @@ nonisolated enum AccountPageModel {
     /// AI transcripts included per period.
     static let freeTotal = 10
     static let plusTotal = 50
+    // The offer copy (PlusOffer) derives from these two numbers.
 
     // MARK: - Plus entitlement snapshot
 
@@ -98,8 +99,8 @@ nonisolated enum AccountPageModel {
         if tier == .signedOut {
             return IdentityContent(
                 avatar: .glyph,
-                title: "Sign In & Sync",
-                subtitle: "Get 10 free AI transcripts",
+                title: "Sign In",
+                subtitle: "Get \(PlusOffer.freePitch)",
                 trailing: .action("Sign In")
             )
         }
@@ -112,7 +113,10 @@ nonisolated enum AccountPageModel {
         if tier == .plus {
             subtitle = plusIdentitySubtitle(plus, timeZone: timeZone)
         } else if let remaining {
-            subtitle = "Free · \(clamp(remaining, to: freeTotal)) of \(freeTotal) transcripts left"
+            let left = clamp(remaining, to: freeTotal)
+            subtitle = left == 0
+                ? "Free · No transcripts left"
+                : "Free · \(left) of \(freeTotal) transcripts left"
         } else {
             subtitle = "Free"
         }
@@ -128,9 +132,15 @@ nonisolated enum AccountPageModel {
     }
 
     /// The gold row under the identity row, shown to free users only.
-    static let upgradePlateTitle = "Anycast Plus"
-    static let upgradePlateSubtitle = "Bilingual subtitles and more"
+    static let upgradePlateTitle = PlusOffer.name
+    static let upgradePlateSubtitle = PlusOffer.transcriptsLine
     static let upgradePlateAction = "Upgrade"
+
+    /// The plate's line for this account: the offer, or the plain fact that
+    /// the free transcripts are gone.
+    static func upgradePlateSubtitle(tier: Tier, remaining: Int?) -> String {
+        PlusOffer.plateSubtitle(remaining: remaining, signedIn: tier != .signedOut)
+    }
 
     // MARK: - Membership status plate
 
@@ -156,14 +166,15 @@ nonisolated enum AccountPageModel {
     static func plate(
         isSubscribed: Bool,
         plus: PlusStatus?,
+        remaining: Int? = nil,
         timeZone: TimeZone = .current
     ) -> PlateContent {
-        let title = "Anycast Plus"
+        let title = PlusOffer.name
         guard let plus else {
             return isSubscribed
                 ? PlateContent(title: title, meta: "Plus", issue: nil,
                                actionTitle: "Manage", action: .manage, billingNote: nil)
-                : free(title)
+                : free(title, remaining: remaining)
         }
         let date = plus.expirationDate.map { formatDate($0, timeZone: timeZone) }
         guard plus.isActive else {
@@ -193,9 +204,9 @@ nonisolated enum AccountPageModel {
         )
     }
 
-    private static func free(_ title: String) -> PlateContent {
+    private static func free(_ title: String, remaining: Int?) -> PlateContent {
         PlateContent(
-            title: title, meta: "Bilingual subtitles and more", issue: nil,
+            title: title, meta: PlusOffer.plateSubtitle(remaining: remaining, signedIn: true), issue: nil,
             actionTitle: "Upgrade", action: .upgrade, billingNote: nil
         )
     }

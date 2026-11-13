@@ -53,10 +53,10 @@ final class ChannelEpisodeListBinder {
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
                 _ = self.context.playback.isPlaying
                 _ = self.context.playback.isLoading
-                _ = self.context.playback.queue.map(\.enclosureUrl)
+                _ = self.context.playback.queueEnclosureURLs
             },
             onChange: { [weak self] in self?.refreshPlaylistMembership() }
         )
