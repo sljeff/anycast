@@ -45,6 +45,11 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyState = EmptyStateView()
     private let emptyExploreButton = UIButton(type: .system)
+    /// Weak "Listening history" link under the empty state; shown only when
+    /// History has rows.
+    private let emptyHistoryLink = HistoryLinkButton(accessibilityIdentifier: "playlist-listening-history")
+    /// Element kind of the trailing "history ›" capsule after the last card.
+    private static let historyTailKind = "playlist-history-tail"
     private var emptyTopConstraint: NSLayoutConstraint?
     private var spinnerCenterConstraint: NSLayoutConstraint?
 
@@ -183,6 +188,8 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             message: "Explore new shows!",
             actions: [emptyExploreButton]
         ))
+        emptyHistoryLink.addAction(UIAction { [weak self] _ in self?.presentHistory() }, for: .touchUpInside)
+        emptyHistoryLink.install(in: view)
 
         let top = emptyState.topAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.topAnchor, constant: topChromeInset
@@ -194,6 +201,10 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             top,
             emptyState.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
         ])
+    }
+
+    private func presentHistory() {
+        HistoryDialogViewController.present(from: self, context: context)
     }
 
     @objc private func exploreTapped() {
@@ -224,6 +235,17 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             let section = NSCollectionLayoutSection(group: group)
             section.interGroupSpacing = EpisodeCardCell.spacing
             section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 64, trailing: 0)
+            // The "history ›" capsule closes the list, like the Inbox tail.
+            // A boundary item, not a second section: the reorder gesture and
+            // the expand animator keep a one-section index space.
+            let tail = NSCollectionLayoutBoundarySupplementaryItem(
+                layoutSize: NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1), heightDimension: .estimated(IconMetrics.minimumHit)
+                ),
+                elementKind: Self.historyTailKind,
+                alignment: .bottom
+            )
+            section.boundarySupplementaryItems = [tail]
             return section
         }
     }
@@ -232,6 +254,11 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
 
     private func configureDataSource() {
         collectionView.setCollectionViewLayout(makeLayout(), animated: false)
+        collectionView.register(
+            HistoryTailCell.self,
+            forSupplementaryViewOfKind: Self.historyTailKind,
+            withReuseIdentifier: HistoryTailCell.reuseIdentifier
+        )
         let binder = self.binder!
         dataSource = UICollectionViewDiffableDataSource<Int, String>(
             collectionView: collectionView
@@ -247,6 +274,13 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             }
             binder.configure(cell: cell, episode: episode, at: indexPath, in: collectionView)
             return cell
+        }
+        dataSource.supplementaryViewProvider = { [weak self] collectionView, kind, indexPath in
+            let view = collectionView.dequeueReusableSupplementaryView(
+                ofKind: kind, withReuseIdentifier: HistoryTailCell.reuseIdentifier, for: indexPath
+            )
+            (view as? HistoryTailCell)?.onOpenHistory = { [weak self] in self?.presentHistory() }
+            return view
         }
         // Route a: drag-driven reorder commits through the diffable
         // reorderingHandlers (never `moveItemAt`). The legacy interactive
@@ -288,6 +322,7 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         spinner.isHidden = !isLoading
         if isLoading { spinner.startAnimating() } else { spinner.stopAnimating() }
         emptyState.isHidden = isLoading || !episodes.isEmpty
+        emptyHistoryLink.refresh(pageIsEmpty: !isLoading && episodes.isEmpty, database: context.database)
         collectionView.isHidden = isLoading || episodes.isEmpty
     }
 

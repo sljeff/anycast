@@ -588,8 +588,9 @@ public final class DatabasePlaybackStore: PlaybackStore {
     }
 
     public func insertHistory(episode: PlaylistEpisodeRow) async throws {
+        // History keeps its own primary key. Copying playlistEpisode.id
+        // let a later queue row REPLACE an unrelated history row.
         let row = HistoryEpisodeRow(
-            id: episode.id,
             title: episode.title,
             description: episode.description,
             duration: episode.duration,

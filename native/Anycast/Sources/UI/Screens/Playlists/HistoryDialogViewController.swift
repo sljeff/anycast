@@ -2,18 +2,102 @@ import UIKit
 import Kingfisher
 import AnycastKit
 
-/// History (playlists.dart:240-421 `HistoryBlock`, opened from Settings and
-/// the Inbox tail) as a system page sheet in the Anycast 2.0 list language
-/// (09 §7a-C4: the Get.dialog card becomes a sheet): a centred "History"
-/// title and flat rows — 44 pt cover, one-line title, show name — that swipe
-/// to delete; tap opens Detail. Clear All lives at the bottom as a
-/// hold-to-confirm button (the Dart source cleared without asking): the clear
-/// is deferred for a 5 s Undo window and the DB is only written when it ends
+/// Calendar bucket for the History sheet. Display only — the stored order
+/// is `lastPlayedAt`.
+enum HistoryDaySection: Int, Hashable, CaseIterable {
+    case today
+    case yesterday
+    case earlier
+
+    var title: String {
+        switch self {
+        case .today: return "Today"
+        case .yesterday: return "Yesterday"
+        case .earlier: return "Earlier"
+        }
+    }
+}
+
+enum HistoryDayGrouping {
+
+    static func section(
+        for lastPlayedAt: Int64?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> HistoryDaySection {
+        guard let lastPlayedAt else { return .earlier }
+        let date = Date(timeIntervalSince1970: TimeInterval(lastPlayedAt) / 1000)
+        // Compare against the injected clock. `isDateInToday` / `isDateInYesterday`
+        // always use the wall clock, so a caller-supplied `now` would be ignored.
+        if calendar.isDate(date, inSameDayAs: now) { return .today }
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfToday),
+              calendar.isDate(date, inSameDayAs: startOfYesterday) else {
+            return .earlier
+        }
+        return .yesterday
+    }
+
+    /// Non-empty buckets in Today / Yesterday / Earlier order. `episodes`
+    /// is already newest-first; that order is kept inside each bucket.
+    static func grouped(
+        _ episodes: [HistoryEpisodeRow],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [(section: HistoryDaySection, rows: [HistoryEpisodeRow])] {
+        var buckets: [HistoryDaySection: [HistoryEpisodeRow]] = [:]
+        for episode in episodes {
+            let section = section(for: episode.lastPlayedAt, now: now, calendar: calendar)
+            buckets[section, default: []].append(episode)
+        }
+        return HistoryDaySection.allCases.compactMap { section in
+            guard let rows = buckets[section], !rows.isEmpty else { return nil }
+            return (section, rows)
+        }
+    }
+}
+
+enum HistoryPresentation {
+
+    /// "2h ago · Night Kitchen". The time comes first so one-line truncation
+    /// eats only the show name. A row with no stored play time (upgraded
+    /// from schema 4) shows just the show name; either side is dropped when
+    /// it is missing.
+    static func subtitle(channel: String?, lastPlayedAt: Int64?, now: Date = Date()) -> String {
+        var parts: [String] = []
+        if let lastPlayedAt {
+            parts.append(RelativeTimeFormatter.format(lastPlayedAt, now: now))
+        }
+        if let channel, !channel.isEmpty { parts.append(channel) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// VoiceOver: "Title, Show, 2h ago". The time is spoken only when known.
+    static func accessibilityLabel(
+        title: String?, channel: String?, lastPlayedAt: Int64?, now: Date = Date()
+    ) -> String {
+        var parts: [String] = []
+        if let title, !title.isEmpty { parts.append(title) }
+        if let channel, !channel.isEmpty { parts.append(channel) }
+        if let lastPlayedAt {
+            parts.append(RelativeTimeFormatter.format(lastPlayedAt, now: now))
+        }
+        return parts.joined(separator: ", ")
+    }
+}
+
+/// History, opened from Settings (after that sheet dismisses) and from the
+/// Inbox / Playlist tail or empty-state link. One `AppSheets` page sheet at
+/// medium and large: a left-aligned "History" title (like Settings and
+/// Shows) and day-grouped rows (44 pt cover, one-line title, "2h ago · Show"
+/// meta). Day headers scroll with the list; they never pin. Tap opens
+/// Detail; a Play from Detail reloads the list. Swipe deletes one row.
+/// Clear All lives at the bottom as a hold-to-confirm button: the clear is
+/// deferred for a 5 s Undo window and the DB is only written when it ends
 /// (or the sheet disappears / the app backgrounds), so Undo is a plain
 /// re-read. VoiceOver and Switch Control skip the hold for an inline
-/// Cancel / Clear confirm. Empty state is the shared empty block; loading a
-/// spinner. Settings presents this controller BY NAME via
-/// `HistoryDialogViewController(context:)`.
+/// Cancel / Clear confirm. The empty state is the shared `EmptyStateView`
+/// with an Explore button that closes the sheet and opens Discover.
 @MainActor
 final class HistoryDialogViewController: UIViewController {
 
@@ -34,17 +118,20 @@ final class HistoryDialogViewController: UIViewController {
     private var didClear = false
 
     private var pendingURLs: [String] = []
+    /// When the pending clear began: plays from then on survive its commit.
+    private var pendingClearStartedAt: Int64 = 0
     private var commitTask: Task<Void, Never>?
     /// Block-API observer token — touched only on the main thread;
     /// `nonisolated(unsafe)` because deinit is nonisolated.
     private nonisolated(unsafe) var backgroundObserver: NSObjectProtocol?
 
-    private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
+    private var dataSource: UICollectionViewDiffableDataSource<HistoryDaySection, String>!
 
     private let titleLabel = UILabel()
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyView = EmptyStateView()
+    private let exploreButton = UIButton(type: .system)
     private let bottomFade = ScrollEdgeFade(edge: .bottom, color: Theme.background)
     private let footerStack = UIStackView()
     private let holdButton = HoldToConfirmButton(
@@ -56,12 +143,7 @@ final class HistoryDialogViewController: UIViewController {
 
     static func present(from presenter: UIViewController, context: UIContext) {
         let controller = HistoryDialogViewController(context: context)
-        controller.modalPresentationStyle = .pageSheet
-        if let sheet = controller.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
-            sheet.prefersGrabberVisible = true
-        }
-        presenter.present(controller, animated: true)
+        AppSheets.presentExpand(controller, from: presenter, detents: [.medium(), .large()])
     }
 
     init(context: UIContext, database: AppDatabase? = nil, undoWindow: Duration = .seconds(5)) {
@@ -119,9 +201,8 @@ final class HistoryDialogViewController: UIViewController {
 
     private func buildSheet() {
         titleLabel.text = "History"
-        titleLabel.font = TypographyV2.emphasis.font()
+        titleLabel.font = TypographyV2.headlineMedium.font()
         titleLabel.textColor = Theme.onSurface
-        titleLabel.textAlignment = .center
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.accessibilityTraits = .header
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -131,6 +212,13 @@ final class HistoryDialogViewController: UIViewController {
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
+
+        // Same primary Explore capsule as the Playlist empty state.
+        exploreButton.configuration = AnycastButton.configuration(.primary, title: "Explore", image: AppIcons.explore)
+        exploreButton.addPressFeedback(scale: Motion.pressScaleSubtle)
+        exploreButton.accessibilityLabel = "Explore"
+        exploreButton.accessibilityIdentifier = "history-explore"
+        exploreButton.addAction(UIAction { [weak self] _ in self?.exploreTapped() }, for: .touchUpInside)
 
         emptyView.isHidden = true
         emptyView.translatesAutoresizingMaskIntoConstraints = false
@@ -149,7 +237,7 @@ final class HistoryDialogViewController: UIViewController {
         footerBottom.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.pageHeader),
+            titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.sheetContent),
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.sheetContent),
             titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.sheetContent),
 
@@ -196,7 +284,7 @@ final class HistoryDialogViewController: UIViewController {
     }
 
     /// The pinned footer: one stack holding the three mutually exclusive
-    /// controls (hold / undo / confirm); `render` shows exactly one.
+    /// controls (hold / undo / confirm); `renderStates` shows exactly one.
     private func buildFooter() {
         holdButton.onConfirm = { [weak self] in self?.beginPendingClear() }
         holdButton.onConfirmRequested = { [weak self] in
@@ -219,6 +307,7 @@ final class HistoryDialogViewController: UIViewController {
         }
         undoButton.configuration = undoConfiguration
         undoButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        undoButton.accessibilityIdentifier = "history-undo"
         undoButton.addTarget(self, action: #selector(undoTapped), for: .touchUpInside)
 
         // Assistive-tech path: an inline confirm instead of the hold gesture.
@@ -264,7 +353,29 @@ final class HistoryDialogViewController: UIViewController {
             HistoryRowCell.self, forCellWithReuseIdentifier: HistoryRowCell.reuseIdentifier
         )
         collectionView.delegate = self
-        dataSource = UICollectionViewDiffableDataSource<Int, String>(
+
+        let headerRegistration = UICollectionView.SupplementaryRegistration<UICollectionViewListCell>(
+            elementKind: UICollectionView.elementKindSectionHeader
+        ) { [weak self] header, _, indexPath in
+            let title = self?.dataSource.sectionIdentifier(for: indexPath.section)?.title ?? ""
+            var config = header.defaultContentConfiguration()
+            config.text = title
+            config.textProperties.font = TypographyV2.meta.font()
+            config.textProperties.color = Theme.onSurfaceVariant
+            config.textProperties.numberOfLines = 0
+            config.textProperties.adjustsFontForContentSizeCategory = true
+            config.directionalLayoutMargins = NSDirectionalEdgeInsets(
+                top: Spacing.gap,
+                leading: Spacing.sheetContent,
+                bottom: Spacing.xs,
+                trailing: Spacing.sheetContent
+            )
+            header.contentConfiguration = config
+            header.backgroundConfiguration = .clear()
+            header.accessibilityTraits = .header
+        }
+
+        dataSource = UICollectionViewDiffableDataSource<HistoryDaySection, String>(
             collectionView: collectionView
         ) { [weak self] collectionView, indexPath, enclosureURL in
             guard let self,
@@ -276,25 +387,33 @@ final class HistoryDialogViewController: UIViewController {
             }
             cell.configure(episode)
             cell.onDelete = { [weak self] in
-                self?.delete(url: enclosureURL)
+                self?.deleteEpisode(url: enclosureURL)
             }
             cell.onTap = { [weak self] in
                 self?.presentDetail(episode)
             }
             return cell
         }
+        dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
+            collectionView.dequeueConfiguredReusableSupplementary(using: headerRegistration, for: indexPath)
+        }
     }
 
-    /// A plain list section: rows swipe to delete, hairlines only between
-    /// rows, starting at the text column.
+    /// A plain list: rows swipe to delete, hairlines only between rows,
+    /// starting at the text column. Day headers are display-only and scroll
+    /// with the rows: the plain list style pins them, so each section's
+    /// header is unpinned here.
     private func makeLayout() -> UICollectionViewCompositionalLayout {
         var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
         configuration.showsSeparators = true
         configuration.backgroundColor = .clear
+        configuration.headerMode = .supplementary
+        configuration.headerTopPadding = Spacing.sm
         configuration.itemSeparatorHandler = { [weak self] indexPath, sectionSeparator in
             var separator = sectionSeparator
             separator.topSeparatorVisibility = .hidden
-            let isLast = indexPath.item >= (self?.episodes.count ?? 0) - 1
+            let count = self?.itemCount(inSectionAt: indexPath.section) ?? 0
+            let isLast = indexPath.item >= count - 1
             separator.bottomSeparatorVisibility = isLast ? .hidden : .visible
             separator.bottomSeparatorInsets = NSDirectionalEdgeInsets(
                 top: 0,
@@ -308,19 +427,37 @@ final class HistoryDialogViewController: UIViewController {
         configuration.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
             guard let self, let url = self.dataSource.itemIdentifier(for: indexPath) else { return nil }
             let delete = UIContextualAction(style: .destructive, title: "Delete") { [weak self] _, _, completion in
-                self?.delete(url: url)
+                self?.deleteEpisode(url: url)
                 completion(true)
             }
             delete.image = AppIcons.delete
             return UISwipeActionsConfiguration(actions: [delete])
         }
-        return UICollectionViewCompositionalLayout.list(using: configuration)
+        return UICollectionViewCompositionalLayout { _, environment in
+            let section = NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: environment)
+            for supplementary in section.boundarySupplementaryItems {
+                supplementary.pinToVisibleBounds = false
+            }
+            return section
+        }
+    }
+
+    private func itemCount(inSectionAt index: Int) -> Int {
+        guard let dataSource, let section = dataSource.sectionIdentifier(for: index) else { return 0 }
+        return dataSource.snapshot().numberOfItems(inSection: section)
     }
 
     private func applySnapshot() {
-        var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
-        snapshot.appendSections([0])
-        snapshot.appendItems(episodes.compactMap(\.enclosureUrl))
+        var snapshot = NSDiffableDataSourceSnapshot<HistoryDaySection, String>()
+        for group in HistoryDayGrouping.grouped(episodes) {
+            let identifiers = group.rows.compactMap(\.enclosureUrl)
+            guard !identifiers.isEmpty else { continue }
+            snapshot.appendSections([group.section])
+            snapshot.appendItems(identifiers, toSection: group.section)
+        }
+        // Rows are keyed by enclosure URL; a replay keeps the key but changes
+        // the play time, so existing cells must be reconfigured, not reused.
+        snapshot.reconfigureItems(snapshot.itemIdentifiers)
         dataSource.apply(snapshot, animatingDifferences: false)
         renderStates()
     }
@@ -336,13 +473,21 @@ final class HistoryDialogViewController: UIViewController {
     }
 
     /// "History cleared" while a clear is pending or has committed in this
-    /// presentation; otherwise the plain "No history" block.
+    /// presentation; otherwise the shared empty block with Explore.
     private func renderEmptyState() {
-        emptyView.configure(.init(
-            icon: didClear ? AppIcons.check : UIImage(systemName: "clock.arrow.circlepath"),
-            title: didClear ? "History cleared" : "No history",
-            message: "Episodes you play show up here."
-        ))
+        if didClear {
+            emptyView.configure(.init(
+                icon: AppIcons.check,
+                title: "History cleared",
+                message: "Episodes you play show up here."
+            ))
+        } else {
+            emptyView.configure(.init(
+                icon: UIImage(systemName: "clock.arrow.circlepath"),
+                title: "Play an episode and it shows up here.",
+                actions: [exploreButton]
+            ))
+        }
     }
 
     // MARK: - Footer
@@ -382,15 +527,18 @@ final class HistoryDialogViewController: UIViewController {
         view.setNeedsLayout()
     }
 
-    // MARK: - Data (HistoryRepository — "latest" is ORDER BY id DESC, K12)
+    // MARK: - Data
 
+    /// Re-reads the list. A pending clear owns the (empty) list until it
+    /// is undone or committed.
     private func reload() async {
+        guard !hasPendingClear else { return }
         episodes = (try? await database.historyRepository().listAll()) ?? []
         isLoading = false
         applySnapshot()
     }
 
-    private func delete(url: String) {
+    func deleteEpisode(url: String) {
         episodes.removeAll { $0.enclosureUrl == url }
         applySnapshot()
         Task { [weak self] in
@@ -411,6 +559,7 @@ final class HistoryDialogViewController: UIViewController {
     func beginPendingClear() {
         guard !hasPendingClear, !episodes.isEmpty else { return }
         pendingURLs = episodes.compactMap(\.enclosureUrl)
+        pendingClearStartedAt = Int64(Date().timeIntervalSince1970 * 1000)
         hasPendingClear = true
         didClear = true
         episodes = []
@@ -440,6 +589,7 @@ final class HistoryDialogViewController: UIViewController {
     func commitPendingClear() {
         guard hasPendingClear else { return }
         let urls = pendingURLs
+        let startedAt = pendingClearStartedAt
         pendingURLs = []
         hasPendingClear = false
         commitTask?.cancel()
@@ -448,7 +598,7 @@ final class HistoryDialogViewController: UIViewController {
         let repository = database.historyRepository()
         Task { [weak self] in
             do {
-                try await repository.deleteMany(urls)
+                try await repository.deleteMany(urls, notPlayedSince: startedAt)
             } catch {
                 self?.didClear = false
                 await self?.reload()
@@ -461,9 +611,17 @@ final class HistoryDialogViewController: UIViewController {
     @objc private func undoTapped() {
         Task { await undoPendingClear() }
     }
+
+    private func exploreTapped() {
+        // Same destination as the Inbox empty state's Explore: Discover.
+        let tabs = context.tabs
+        dismiss(animated: true) {
+            tabs.select(2)
+        }
+    }
 }
 
-// MARK: - Row tap → Detail (playlists.dart:260-288)
+// MARK: - Row tap → Detail
 
 extension HistoryDialogViewController: UICollectionViewDelegate {
 
@@ -492,16 +650,19 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
                     icon: AppIcons.play,
                     accessibilityLabel: "Play"
                 ) { [weak self] in
-                    // toFeedEpisode → addToTop(1, ep) → playByEpisode
-                    // (playlists.dart:270-279).
-                    Task { await self?.playFromHistory(episode) }
+                    // `playByEpisode` awaits the history write before it
+                    // returns, so the replayed row is on top at reload.
+                    Task { [weak self] in
+                        await self?.playFromHistory(episode)
+                        await self?.reload()
+                    }
                 },
                 EpisodeCardAction(
                     icon: AppIcons.remove,
                     accessibilityLabel: "Remove"
                 ) { [weak self] in
                     guard let url = episode.enclosureUrl else { return }
-                    self?.delete(url: url)
+                    self?.deleteEpisode(url: url)
                 },
             ],
             htmlRenderer: HTMLContentRenderer(),
@@ -564,14 +725,14 @@ extension HistoryDialogViewController: UICollectionViewDelegate {
     }
 }
 
-// MARK: - Row cell (playlists.dart:248-355)
+// MARK: - Row cell
 
-/// One history row: 44 pt rounded cover, one-line title, show name.
+/// One history row: 44 pt rounded cover, one-line title, "2h ago · Show" meta.
 final class HistoryRowCell: UICollectionViewListCell {
 
     static let reuseIdentifier = "HistoryRowCell"
 
-    private static let coverSize: CGFloat = 44
+    static let coverSize: CGFloat = 44
     /// Where the text column (and the row separator) starts.
     static let textColumnLeading = Spacing.sheetContent + coverSize + Spacing.gap
 
@@ -610,15 +771,18 @@ final class HistoryRowCell: UICollectionViewListCell {
 
         titleLabel.font = TypographyV2.emphasis.font()
         titleLabel.textColor = Theme.onSurface
-        titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.adjustsFontForContentSizeCategory = true
 
         channelLabel.font = TypographyV2.meta.font()
         channelLabel.textColor = Theme.onSurfaceVariant
-        channelLabel.numberOfLines = 1
         channelLabel.lineBreakMode = .byTruncatingTail
         channelLabel.adjustsFontForContentSizeCategory = true
+
+        applyLineLimit()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (cell: HistoryRowCell, _) in
+            cell.applyLineLimit()
+        }
 
         let textColumn = UIStackView(arrangedSubviews: [titleLabel, channelLabel])
         textColumn.axis = .vertical
@@ -640,14 +804,29 @@ final class HistoryRowCell: UICollectionViewListCell {
         ])
     }
 
-    func configure(_ episode: HistoryEpisodeRow) {
+    /// One line each by default. At accessibility text sizes a single line
+    /// leaves only a word or two, so the text wraps instead.
+    private func applyLineLimit() {
+        let lines = traitCollection.preferredContentSizeCategory.isAccessibilityCategory ? 0 : 1
+        titleLabel.numberOfLines = lines
+        channelLabel.numberOfLines = lines
+    }
+
+    func configure(_ episode: HistoryEpisodeRow, now: Date = Date()) {
         let url = episode.imageUrl.flatMap(URL.init(string:))
         coverView.setArtwork(url, title: episode.channelTitle)
         titleLabel.text = episode.title ?? ""
-        channelLabel.text = episode.channelTitle ?? ""
+        let subtitle = HistoryPresentation.subtitle(
+            channel: episode.channelTitle, lastPlayedAt: episode.lastPlayedAt, now: now
+        )
+        channelLabel.text = subtitle
+        channelLabel.isHidden = subtitle.isEmpty
         isAccessibilityElement = true
         accessibilityTraits = [.button]
-        accessibilityLabel = "\(episode.title ?? ""), \(episode.channelTitle ?? "")"
+        accessibilityLabel = HistoryPresentation.accessibilityLabel(
+            title: episode.title, channel: episode.channelTitle,
+            lastPlayedAt: episode.lastPlayedAt, now: now
+        )
         // Swipe-to-delete has a VoiceOver twin.
         accessibilityCustomActions = [
             UIAccessibilityCustomAction(name: "Delete") { [weak self] _ in
@@ -658,7 +837,6 @@ final class HistoryRowCell: UICollectionViewListCell {
     }
 
     override func accessibilityActivate() -> Bool {
-        // Row tap opens the Detail sheet (playlists.dart:260-288).
         onTap?()
         return true
     }

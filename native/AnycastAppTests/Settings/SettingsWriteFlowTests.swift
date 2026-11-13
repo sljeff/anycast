@@ -41,6 +41,53 @@ struct SettingsWriteFlowTests {
         #expect(reloaded.countryCode == "JP")
     }
 
+    @Test("History Limit commit persists the limit, then trims History to it")
+    func historyLimitCommitTrims() async throws {
+        let (coordinator, box, database, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        for index in 1...5 {
+            try await database.historyRepository().insert(HistoryEpisodeRow(
+                title: "Episode \(index)",
+                enclosureUrl: "https://example.test/limit-\(index).mp3",
+                lastPlayedAt: Int64(index) * 1_000
+            ))
+        }
+        let commit = SettingsHistoryLimitCommit(
+            coordinator: coordinator, settingsBox: box, history: database.historyRepository()
+        )
+
+        // Holding a lower limit (the draft) never touches the database.
+        var draft = SettingsPageModel.HistoryLimitDraft(stored: box.current.maxHistoryEpisodes)
+        draft.step(.decrease, in: SettingsCodec.maxEpisodesChoices)
+        #expect(try await database.historyRepository().count() == 5)
+
+        let remaining = await commit.run(3)
+        #expect(remaining == 3)
+        #expect(box.current.maxHistoryEpisodes == 3)
+        let stored = try await database.settingsRepository().load()
+        #expect(stored.maxHistoryEpisodes == 3)
+        let kept = try await database.historyRepository().listAll()
+        #expect(kept.map(\.enclosureUrl) == [
+            "https://example.test/limit-5.mp3",
+            "https://example.test/limit-4.mp3",
+            "https://example.test/limit-3.mp3",
+        ], "the oldest plays go first")
+    }
+
+    @Test("History Limit commit above the count removes nothing")
+    func historyLimitCommitAboveCount() async throws {
+        let (coordinator, box, database, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try await database.historyRepository().insert(HistoryEpisodeRow(
+            title: "One", enclosureUrl: "https://example.test/one.mp3", lastPlayedAt: 1
+        ))
+        let commit = SettingsHistoryLimitCommit(
+            coordinator: coordinator, settingsBox: box, history: database.historyRepository()
+        )
+        #expect(await commit.run(300) == 1)
+        #expect(box.current.maxHistoryEpisodes == 300)
+    }
+
     @Test("Language change: persists '' or a code and posts the payload")
     func languageChangeNotification() async throws {
         let (coordinator, box, _, databaseURL) = try await makeCoordinator()

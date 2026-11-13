@@ -12,7 +12,7 @@ import 'table_creator.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
-const int databaseSchemaVersion = 4;
+const int databaseSchemaVersion = 5;
 
 List<TableCreator> tableCreators = [
   feedEpisodeTableCreator,
@@ -30,6 +30,13 @@ const Map<int, List<String>> migrations = {
   // 3 -> 4
   4: <String>[
     'ALTER TABLE settings ADD COLUMN continuousPlaying INTEGER DEFAULT 1',
+  ],
+  // 4 -> 5. lastPlayedAt is the history sort key. Rows that predate the
+  // column keep NULL (their real play time is unknown). SQLite sorts NULL
+  // last under DESC, so they stay below every newly played row, in the old
+  // id-DESC order via the tie-break.
+  5: <String>[
+    'ALTER TABLE historyEpisode ADD COLUMN lastPlayedAt INTEGER',
   ],
 };
 
