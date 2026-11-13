@@ -69,11 +69,11 @@ struct RelativeTimeFormatterTests {
         let nowMs: Int64 = 1_800_000_000_000
         let now = Date(timeIntervalSince1970: TimeInterval(nowMs) / 1000)
         func secondsAgo(_ s: Int) -> Int64 { nowMs - Int64(s) * 1000 }
-        // "<45s → just now"; "45s–90s → 1m ago"; "5m"; "45-90m → ~1h".
+        // "<45s → just now"; "45s–90s → 1m ago"; "5m"; "45-90m → 1h".
         #expect(RelativeTimeFormatter.format(secondsAgo(10), now: now) == "just now")
         #expect(RelativeTimeFormatter.format(secondsAgo(60), now: now) == "1m ago")
         #expect(RelativeTimeFormatter.format(secondsAgo(5 * 60), now: now) == "5m ago")
-        #expect(RelativeTimeFormatter.format(secondsAgo(47 * 60), now: now) == "~1h ago")
+        #expect(RelativeTimeFormatter.format(secondsAgo(47 * 60), now: now) == "1h ago")
         #expect(RelativeTimeFormatter.format(secondsAgo(5 * 3600), now: now) == "5h ago")
     }
 

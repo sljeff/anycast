@@ -26,6 +26,93 @@ enum DiscoverPageReducer {
     }
 }
 
+/// What one category page shows while its list loads (P1.4 loading rule):
+/// content stays on screen through a refresh and through a failed one; a
+/// skeleton appears only when there is nothing to show AND the wait has
+/// lasted past `LoadingDelay.threshold`.
+enum ContentLoadDisplay: Equatable {
+    /// The rows, with nothing else.
+    case content
+    /// The rows, plus the one-line "Couldn't update" with Retry.
+    case contentWithRetry
+    /// No rows yet and the wait is past the threshold: static skeleton rows.
+    case skeleton
+    /// No rows yet, inside the threshold: nothing at all (no spinner).
+    case blank
+    /// No rows and no fetch in flight (failed or empty): the empty state.
+    case emptyError
+}
+
+enum ContentLoadReducer {
+    static func display(
+        hasContent: Bool, isFetching: Bool, updateFailed: Bool, skeletonDue: Bool
+    ) -> ContentLoadDisplay {
+        if hasContent { return updateFailed ? .contentWithRetry : .content }
+        if isFetching { return skeletonDue ? .skeleton : .blank }
+        return .emptyError
+    }
+}
+
+/// The last successful channel list per category and country, kept as JSON
+/// in the Caches directory. Reconstructible cache only (the OS may delete
+/// it; nothing depends on it, and it never touches the database).
+nonisolated struct DiscoverChannelCache: Sendable {
+
+    struct Entry: Codable, Equatable, Sendable {
+        var rssFeedUrl: String?
+        var title: String?
+        var description: String?
+        var imageUrl: String?
+        var author: String?
+    }
+
+    let directory: URL
+
+    init(directory: URL) { self.directory = directory }
+
+    static let shared = DiscoverChannelCache(
+        directory: (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory)
+            .appendingPathComponent("DiscoverChannels", isDirectory: true)
+    )
+
+    private func fileURL(categoryID: String, country: String) -> URL {
+        let safe = "\(categoryID)_\(country)".map { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" ? $0 : "_" }
+        return directory.appendingPathComponent(String(safe) + ".json")
+    }
+
+    func load(categoryID: String, country: String) -> [SubscriptionRow]? {
+        guard let data = try? Data(contentsOf: fileURL(categoryID: categoryID, country: country)),
+              let entries = try? JSONDecoder().decode([Entry].self, from: data)
+        else { return nil }
+        return entries.map {
+            SubscriptionRow(
+                rssFeedUrl: $0.rssFeedUrl, title: $0.title, description: $0.description,
+                imageUrl: $0.imageUrl, author: $0.author
+            )
+        }
+    }
+
+    func save(_ channels: [SubscriptionRow], categoryID: String, country: String) {
+        let entries = channels.map {
+            Entry(rssFeedUrl: $0.rssFeedUrl, title: $0.title, description: $0.description,
+                  imageUrl: $0.imageUrl, author: $0.author)
+        }
+        guard let data = try? JSONEncoder().encode(entries) else { return }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? data.write(to: fileURL(categoryID: categoryID, country: country), options: .atomic)
+    }
+
+    /// Whether a fetched list differs from what is shown, on the fields the
+    /// rows display.
+    static func differs(_ lhs: [SubscriptionRow], _ rhs: [SubscriptionRow]) -> Bool {
+        func key(_ row: SubscriptionRow) -> [String?] {
+            [row.rssFeedUrl, row.title, row.description, row.imageUrl, row.author]
+        }
+        return lhs.map(key) != rhs.map(key)
+    }
+}
+
 /// Display phase of the whole-page category fetch (discover.dart:38-46).
 /// A failed OR empty category list renders the same centered error label.
 enum DiscoverCategoriesPhase: Equatable {
@@ -47,8 +134,9 @@ enum DiscoverCategoriesReducer {
 }
 
 /// Search tab list phase (discover.dart:169-204 / 204-293): loading spinner;
-/// empty results → "No results"; a failed fetch → the error label instead
-/// of the Dart eternal spinner (K4 fix).
+/// empty results; a failed fetch instead of the Dart eternal spinner (K4
+/// fix). The sentence drawn for the empty and failed phases lives in
+/// `SearchResultState` — this value only says which phase it is.
 enum SearchListPhase: Equatable {
     case loading
     case noResults
@@ -143,14 +231,29 @@ final class DiscoverCategoryPageModel {
     private(set) var hasLoaded = false
     private(set) var isLoading = true
     private(set) var failed = false
+    /// A fetch is in flight (with or without rows on screen).
+    private(set) var isFetching = true
+    /// The refresh failed while rows from the cache or an earlier fetch stay
+    /// on screen ("Couldn't update" + Retry).
+    private(set) var updateFailed = false
     private(set) var channels: [SubscriptionRow] = []
 
     private var generation = 0
+    private var lastCountry: String?
     private let api: APIClient
+    private let cache: DiscoverChannelCache
 
-    init(categoryID: String, api: APIClient) {
+    init(categoryID: String, api: APIClient, cache: DiscoverChannelCache = .shared) {
         self.categoryID = categoryID
         self.api = api
+        self.cache = cache
+    }
+
+    func display(skeletonDue: Bool) -> ContentLoadDisplay {
+        ContentLoadReducer.display(
+            hasContent: !channels.isEmpty, isFetching: isFetching,
+            updateFailed: updateFailed, skeletonDue: skeletonDue
+        )
     }
 
     var phase: DiscoverPagePhase {
@@ -171,10 +274,21 @@ final class DiscoverCategoryPageModel {
         hasLoaded = true
         generation += 1
         let generation = generation
-        isLoading = true
         failed = false
+        updateFailed = false
+        isFetching = true
+        // Another country's rows are not this page's content.
+        if let lastCountry, lastCountry != country { channels = [] }
+        lastCountry = country
+        // Rows from the last successful fetch show at once while the
+        // network answers; with none, the page loads as before.
+        if channels.isEmpty, let cached = cache.load(categoryID: categoryID, country: country), !cached.isEmpty {
+            channels = cached
+        }
+        isLoading = channels.isEmpty
         let api = self.api
         let categoryID = self.categoryID
+        let cache = self.cache
         Task { [weak self] in
             var fetched: [SubscriptionRow]?
             do {
@@ -186,13 +300,22 @@ final class DiscoverCategoryPageModel {
             if let channels = fetched {
                 // data:null → [] is a valid empty answer (02 §1.2) → the
                 // "Network Error" empty state (discover.dart:72-78).
-                self.channels = channels
+                // Replaced only if it changed, so a quiet refresh moves nothing.
+                if DiscoverChannelCache.differs(self.channels, channels) {
+                    self.channels = channels
+                }
+                if !channels.isEmpty {
+                    cache.save(channels, categoryID: categoryID, country: country)
+                }
                 self.failed = false
-            } else {
-                self.channels = []
+            } else if self.channels.isEmpty {
                 self.failed = true
+            } else {
+                // Content stays; the page says so in one line.
+                self.updateFailed = true
             }
             self.isLoading = false
+            self.isFetching = false
         }
     }
 }
@@ -292,8 +415,10 @@ final class DiscoverViewModel {
 }
 
 /// The global SearchPage state (discover.dart:113-306): the two tab
-/// searches, each (re)started by its tab's first display or revisit (the
-/// TabBarView children carry no KeepAliveWrapper, 03 §2.6/§3.5).
+/// searches. Submitting a query fetches only the segment that is showing.
+/// A segment that has already loaded in this search — including a settled
+/// zero-result answer — is shown again with no new request (option A). A
+/// segment whose fetch failed is not loaded, so visiting it requests again.
 @MainActor
 @Observable
 final class SearchPageViewModel {
@@ -306,6 +431,12 @@ final class SearchPageViewModel {
     private(set) var channelsFailed = false
     private(set) var episodesLoading = true
     private(set) var episodesFailed = false
+    /// True once this search's channels request completed without error,
+    /// including zero rows. A failure leaves it false.
+    private(set) var channelsLoaded = false
+    /// True once this search's episodes request completed without error,
+    /// including zero rows. A failure leaves it false.
+    private(set) var episodesLoaded = false
 
     /// Monotonic per list: a newer search of the same list supersedes any
     /// in-flight one — an older response must never clobber it (same ruling
@@ -313,11 +444,25 @@ final class SearchPageViewModel {
     private var channelsGeneration = 0
     private var episodesGeneration = 0
 
-    private let api: APIClient
+    private let fetchChannels: @Sendable (String) async throws -> [SubscriptionRow]
+    private let fetchEpisodes: @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
 
-    init(searchText: String, api: APIClient) {
+    init(
+        searchText: String,
+        fetchChannels: @escaping @Sendable (String) async throws -> [SubscriptionRow],
+        fetchEpisodes: @escaping @Sendable (String) async throws -> [APIClient.EpisodeWithChannel]
+    ) {
         self.searchText = searchText
-        self.api = api
+        self.fetchChannels = fetchChannels
+        self.fetchEpisodes = fetchEpisodes
+    }
+
+    convenience init(searchText: String, api: APIClient) {
+        self.init(
+            searchText: searchText,
+            fetchChannels: { try await api.searchChannels(keyword: $0) },
+            fetchEpisodes: { try await api.searchEpisodes(keyword: $0) }
+        )
     }
 
     var channelsPhase: SearchListPhase {
@@ -332,18 +477,29 @@ final class SearchPageViewModel {
         )
     }
 
-    /// searchChannels + searchEpisodes in parallel (discover.dart:170 / 205).
+    /// Fetches both segments. The search page does not call this on submit;
+    /// it activates only the segment that is showing.
     func search() {
         searchChannels()
         searchEpisodes()
     }
 
-    /// The SearchPage TabBarView children carry NO KeepAliveWrapper — each
-    /// (re)visit rebuilds that tab's FutureBuilder and re-runs its future
-    /// (discover.dart:167-293). The sheet opens on Channels, so the channels
-    /// search is the launch fetch; the episodes search runs on first (and
-    /// every later) visit of the Episodes tab.
+    /// Starts the segment's fetch the first time it is shown. A segment that
+    /// already loaded in this search is left as it is: no spinner, no
+    /// request. A failed segment loads again.
     func activate(tab index: Int) {
+        if index == 1 {
+            guard !episodesLoaded else { return }
+            searchEpisodes()
+        } else {
+            guard !channelsLoaded else { return }
+            searchChannels()
+        }
+    }
+
+    /// Re-fetches one segment and returns it to the loading spinner. Does
+    /// not touch the other segment or Recent.
+    func retry(tab index: Int) {
         if index == 1 {
             searchEpisodes()
         } else {
@@ -354,14 +510,15 @@ final class SearchPageViewModel {
     private func searchChannels() {
         channelsLoading = true
         channelsFailed = false
+        channelsLoaded = false
         channelsGeneration += 1
         let generation = channelsGeneration
-        let api = self.api
+        let fetch = fetchChannels
         let keyword = searchText
         Task { [weak self] in
             var fetched: [SubscriptionRow]?
             do {
-                fetched = try await api.searchChannels(keyword: keyword)
+                fetched = try await fetch(keyword)
             } catch {
                 fetched = nil
             }
@@ -369,9 +526,11 @@ final class SearchPageViewModel {
             if let channels = fetched {
                 self.channels = channels
                 self.channelsFailed = false
+                self.channelsLoaded = true
             } else {
                 self.channels = []
                 self.channelsFailed = true
+                self.channelsLoaded = false
             }
             self.channelsLoading = false
         }
@@ -380,14 +539,15 @@ final class SearchPageViewModel {
     private func searchEpisodes() {
         episodesLoading = true
         episodesFailed = false
+        episodesLoaded = false
         episodesGeneration += 1
         let generation = episodesGeneration
-        let api = self.api
+        let fetch = fetchEpisodes
         let keyword = searchText
         Task { [weak self] in
             var fetched: [APIClient.EpisodeWithChannel]?
             do {
-                fetched = try await api.searchEpisodes(keyword: keyword)
+                fetched = try await fetch(keyword)
             } catch {
                 fetched = nil
             }
@@ -397,9 +557,11 @@ final class SearchPageViewModel {
             if let episodes = fetched {
                 self.episodes = episodes
                 self.episodesFailed = false
+                self.episodesLoaded = true
             } else {
                 self.episodes = []
                 self.episodesFailed = true
+                self.episodesLoaded = false
             }
             self.episodesLoading = false
         }

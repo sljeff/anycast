@@ -173,6 +173,12 @@ public struct APIClient: Sendable {
     public struct EpisodeWithChannel: Sendable, Equatable {
         public var episode: FeedEpisodeRow
         public var channel: SubscriptionRow
+
+        /// The memberwise initializer is internal; tests build rows directly.
+        public init(episode: FeedEpisodeRow, channel: SubscriptionRow) {
+            self.episode = episode
+            self.channel = channel
+        }
     }
 
     /// GET /api/search/episodes?keyword=<text>&limit=20.

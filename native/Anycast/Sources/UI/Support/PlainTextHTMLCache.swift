@@ -52,9 +52,9 @@ actor PlainTextHTMLCache {
 /// as markup — every other `<` is escaped before the string reaches the
 /// entity decoder, so the decoder cannot swallow prose. A naive re-parse
 /// drops everything a tag-like span would consume (`x<y values` → `x`);
-/// other partial markup (`<b>`) stays literal because nothing short of a
-/// real parser can distinguish it from angle-bracketed prose, and the
-/// show-notes pipeline owns that job.
+/// other partial markup (`<b>`) stays literal here because
+/// `HtmlText.repairEmbeddedMarkup` has already claimed every real tag before
+/// `plainText(fromHTML:)` calls this.
 nonisolated enum DisplayText {
 
     static func clean(_ text: String) -> String {
@@ -74,12 +74,13 @@ nonisolated enum DisplayText {
     /// the way HTML does; plain input keeps its own line breaks. Runs of
     /// blank lines collapse to one.
     static func plainText(fromHTML html: String) -> String {
-        let isMarkup = html.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<")
+        let repaired = HtmlText.repairEmbeddedMarkup(html)
+        let isMarkup = repaired.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("<")
         // U+2028 / U+2029 mark line / paragraph boundaries through the parse:
         // htmlToText concatenates text nodes, so the tags alone leave no trace.
         // Plain input skips the `<br>` mark because `clean` already turns a
         // stray `<br>` into "\n".
-        var marked = html
+        var marked = repaired
         if isMarkup {
             marked = marked.replacingOccurrences(
                 of: "<br\\s*/?>", with: "$0\u{2028}", options: [.regularExpression, .caseInsensitive]

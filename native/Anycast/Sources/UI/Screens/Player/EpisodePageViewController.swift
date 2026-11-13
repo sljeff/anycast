@@ -43,6 +43,10 @@ final class EpisodePageViewController: UIViewController {
     /// player's backdrop is a gradient no fade colour could match.
     private let scrollHost = UIView()
     private let fadeMask = CAGradientLayer()
+    /// The lower half every player page shares (scrubber, transport, speed
+    /// and sleep), so switching pages never moves the controls.
+    private lazy var transport = PlayerTransportView(context: context)
+    private lazy var speedSleep = PlayerSpeedSleepControls(context: context)
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
     private let chaptersPlate = UIStackView()
@@ -82,7 +86,7 @@ final class EpisodePageViewController: UIViewController {
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
                 _ = self.context.playback.positionData
             },
             onChange: { [weak self] in
@@ -92,10 +96,20 @@ final class EpisodePageViewController: UIViewController {
         )
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        speedSleep.pageWillAppear()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        speedSleep.pageDidDisappear()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // The last line can scroll clear of the Undo capsule.
-        let bottom = Layout.capsuleBottom + TranscriptStatusCapsuleView.height
+        // The last line rests clear of the bottom fade.
+        let bottom = Layout.bottomFade
         if scrollView.contentInset.bottom != bottom {
             scrollView.contentInset.bottom = bottom
         }
@@ -192,8 +206,11 @@ final class EpisodePageViewController: UIViewController {
         view.addSubview(scrollHost)
         view.addSubview(header)
         view.addSubview(capsule)
+        transport.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(transport)
+        speedSleep.install(in: transport)
 
-        let column = Spacing.pageHeader
+        let column = PlayerLayout.column
         NSLayoutConstraint.activate([
             header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: column),
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -column),
@@ -203,7 +220,10 @@ final class EpisodePageViewController: UIViewController {
 
             // Content fades out just under the header.
             scrollHost.topAnchor.constraint(equalTo: header.bottomAnchor),
-            scrollHost.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollHost.bottomAnchor.constraint(equalTo: transport.topAnchor),
+            transport.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: column),
+            transport.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -column),
+            transport.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -PlayerTransportView.Layout.toSelector),
             scrollHost.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollHost.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: scrollHost.topAnchor),
@@ -221,7 +241,7 @@ final class EpisodePageViewController: UIViewController {
 
             capsule.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: column),
             capsule.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -column),
-            capsule.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.capsuleBottom),
+            capsule.bottomAnchor.constraint(equalTo: transport.topAnchor, constant: -Spacing.md),
         ])
     }
 
@@ -247,7 +267,7 @@ final class EpisodePageViewController: UIViewController {
         if imageURL != headerArtworkURL {
             headerArtworkURL = imageURL
             headerArtwork.kf.cancelDownloadTask()
-            headerArtwork.setArtwork(URL(string: imageURL), title: episode?.channelTitle)
+            headerArtwork.setArtwork(URL(string: imageURL), title: episode?.channelTitle, side: Layout.headerArtwork)
         }
 
         chapters = EpisodeChapters.chapters(description: episode?.description, cacheKey: episode?.enclosureUrl)
@@ -282,7 +302,7 @@ final class EpisodePageViewController: UIViewController {
         // collapses all whitespace.
         if case .text(let plain) = payload {
             setNotes(ShowNotesStore.shared.attributedFallback(
-                plain: plain, style: ShowNotesStyle(), traits: traits
+                plain: DisplayText.plainText(fromHTML: plain), style: ShowNotesStyle(), traits: traits
             ))
             return
         }

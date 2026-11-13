@@ -3,7 +3,7 @@ import AnycastKit
 
 /// One Discover category page (discover.dart:56-103): the per-category
 /// `listChannelsByCategoryId` PodcastCard list with a loading spinner and
-/// the centered "Network Error" state. No pull-to-refresh (03 §3.3).
+/// the centered empty / failed state. No pull-to-refresh (03 §3.3).
 @MainActor
 final class DiscoverCategoryPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
 
@@ -11,8 +11,13 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
     private let model: DiscoverCategoryPageModel
 
     private let collectionView: UICollectionView
-    private let spinner = UIActivityIndicatorView(style: .large)
-    private let errorLabel = UILabel()
+    /// Genuinely empty ("No shows here for …") or failed ("Couldn’t load Discover." + Retry).
+    private let errorState = EmptyStateView()
+    /// "Couldn't update" + Retry, shown over kept content after a failed refresh.
+    private let retryBar = UIStackView()
+    private let skeletonDelay = LoadingDelay()
+    private var showsSkeleton = false
+    static let skeletonRowCount = 7
     private let observation = ObservationLoop()
     private var lastChannelSignature: [String?] = []
 
@@ -33,8 +38,22 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
 
     var edgeScrollView: UIScrollView { collectionView }
     var topChromeInset: CGFloat = 0 {
-        didSet { collectionView.contentInset.top = topChromeInset }
+        didSet { applyTopInset() }
     }
+    private var retryBarShown = false
+    private static let retryBarHeight: CGFloat = 40
+
+    private func applyTopInset(followsTop: Bool = false) {
+        let wasAtTop = collectionView.contentOffset.y <= -collectionView.adjustedContentInset.top + 0.5
+        collectionView.contentInset.top = topChromeInset + (retryBarShown ? Self.retryBarHeight : 0)
+        retryBarTop?.constant = topChromeInset
+        // A list resting at its top follows the new inset (the rows slide
+        // down under the "Couldn't update" line instead of sitting behind it).
+        if followsTop, wasAtTop {
+            collectionView.contentOffset.y = -collectionView.adjustedContentInset.top
+        }
+    }
+    private var retryBarTop: NSLayoutConstraint?
 
     // MARK: - Lifecycle
 
@@ -47,6 +66,8 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
             read: { [weak self] in
                 guard let self else { return }
                 _ = self.model.isLoading
+                _ = self.model.isFetching
+                _ = self.model.updateFailed
                 _ = self.model.failed
                 _ = self.model.channels
             },
@@ -71,20 +92,11 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         )
         view.addSubview(collectionView)
 
-        spinner.color = Theme.primary
-        spinner.hidesWhenStopped = true
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(spinner)
+        buildRetryBar()
 
-        // Centered white "Network Error" (discover.dart:73-78).
-        errorLabel.text = "Network Error"
-        errorLabel.textColor = Theme.onSurfaceVariant
-        errorLabel.font = TypographyV2.emphasis.font()
-        errorLabel.adjustsFontForContentSizeCategory = true
-        errorLabel.textAlignment = .center
-        errorLabel.isHidden = true
-        errorLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(errorLabel)
+        errorState.isHidden = true
+        errorState.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(errorState)
 
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -92,34 +104,109 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
             collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-
-            errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            errorLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            errorState.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            errorState.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            errorState.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
+    }
+
+    private func buildRetryBar() {
+        let label = UILabel()
+        label.text = "Couldn’t update"
+        label.font = TypographyV2.meta.font()
+        label.textColor = Theme.onSurfaceVariant
+        label.adjustsFontForContentSizeCategory = true
+        var configuration = UIButton.Configuration.plain()
+        configuration.title = "Retry"
+        configuration.baseForegroundColor = Theme.onSurface
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.emphasis.font()
+            return outgoing
+        }
+        let retry = UIButton(configuration: configuration)
+        retry.tintColor = Theme.onSurface
+        retry.accessibilityIdentifier = "discover-retry"
+        retry.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            self.model.load(country: self.context.settingsBox.current.countryCode)
+        }, for: .touchUpInside)
+        retryBar.axis = .horizontal
+        retryBar.alignment = .center
+        retryBar.spacing = Spacing.sm
+        retryBar.isLayoutMarginsRelativeArrangement = true
+        retryBar.layoutMargins = UIEdgeInsets(top: 0, left: Spacing.pageH, bottom: 0, right: Spacing.xs)
+        retryBar.addArrangedSubview(label)
+        retryBar.addArrangedSubview(retry)
+        retryBar.accessibilityIdentifier = "discover-update-failed"
+        retryBar.isHidden = true
+        retryBar.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(retryBar)
+        let top = retryBar.topAnchor.constraint(equalTo: view.topAnchor, constant: topChromeInset)
+        retryBarTop = top
+        NSLayoutConstraint.activate([
+            top,
+            retryBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            retryBar.heightAnchor.constraint(equalToConstant: Self.retryBarHeight),
+        ])
+    }
+
+    /// A failed load and a genuinely empty category read differently; only
+    /// the failure offers Retry.
+    private func configureErrorState() {
+        if model.failed {
+            let retry = AnycastButton.make(
+                .secondary, title: "Retry", image: UIImage(systemName: "arrow.clockwise")
+            )
+            retry.accessibilityIdentifier = "discover-load-retry"
+            retry.addAction(UIAction { [weak self] _ in
+                guard let self else { return }
+                self.model.load(country: self.context.settingsBox.current.countryCode)
+            }, for: .touchUpInside)
+            errorState.configure(.init(title: "Couldn’t load Discover.", actions: [retry]))
+        } else {
+            let code = context.settingsBox.current.countryCode
+            let region = Locale.current.localizedString(forRegionCode: code) ?? code
+            errorState.configure(.init(title: "No shows here for \(region)."))
+        }
     }
 
     // MARK: - Rendering (plain no-animation rebuild, 08 §7.2)
 
     private func render() {
-        switch model.phase {
-        case .loading:
-            spinner.startAnimating()
-            errorLabel.isHidden = true
-        case .networkError:
-            spinner.stopAnimating()
-            errorLabel.isHidden = false
-        case .loaded:
-            spinner.stopAnimating()
-            errorLabel.isHidden = true
+        // The skeleton clock runs only while there is nothing to show and a
+        // fetch is in flight.
+        let waitingEmpty = model.isFetching && model.channels.isEmpty
+        if waitingEmpty {
+            skeletonDelay.start { [weak self] in self?.render() }
+        } else {
+            skeletonDelay.cancel()
+        }
+        let display = model.display(skeletonDue: skeletonDelay.isDue)
+
+        errorState.isHidden = display != .emptyError
+        if display == .emptyError { configureErrorState() }
+        let shouldShowRetry = display == .contentWithRetry
+        if shouldShowRetry != retryBarShown {
+            retryBarShown = shouldShowRetry
+            retryBar.isHidden = !shouldShowRetry
+            applyTopInset(followsTop: true)
         }
 
+        let skeleton = display == .skeleton
         let signature = model.channels.map(\.rssFeedUrl)
-        if signature != lastChannelSignature {
+        if signature != lastChannelSignature || skeleton != showsSkeleton {
             lastChannelSignature = signature
+            let startsSkeleton = skeleton && !showsSkeleton
+            showsSkeleton = skeleton
             UIView.performWithoutAnimation {
                 collectionView.reloadData()
+            }
+            if startsSkeleton, !Motion.reduceMotion {
+                collectionView.alpha = 0
+                UIView.animate(withDuration: Motion.quick) { self.collectionView.alpha = 1 }
+            } else {
+                collectionView.alpha = 1
             }
         }
     }
@@ -129,7 +216,7 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
     func collectionView(
         _ collectionView: UICollectionView, numberOfItemsInSection section: Int
     ) -> Int {
-        model.channels.count
+        showsSkeleton ? Self.skeletonRowCount : model.channels.count
     }
 
     func collectionView(
@@ -138,6 +225,11 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: PodcastCardCell.reuseIdentifier, for: indexPath
         ) as! PodcastCardCell
+        if showsSkeleton {
+            cell.setPosition(isFirst: indexPath.item == 0, isLast: indexPath.item == Self.skeletonRowCount - 1)
+            cell.configureSkeleton()
+            return cell
+        }
         if model.channels.indices.contains(indexPath.item) {
             let channel = model.channels[indexPath.item]
             cell.setPosition(

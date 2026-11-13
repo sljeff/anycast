@@ -157,7 +157,8 @@ targets:
               - ShareMedia-$(PRODUCT_BUNDLE_IDENTIFIER)
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: Background
         AppGroupId: $(CUSTOM_GROUP_ID)
         UIAppFonts:
           - Comfortaa-Regular.ttf

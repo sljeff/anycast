@@ -79,6 +79,13 @@ final class HoldToConfirmButton: UIButton {
         layer.cornerCurve = .continuous
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(greaterThanOrEqualToConstant: Self.minimumHeight).isActive = true
+        // A wrapped title at large text sizes must grow the capsule, not clip.
+        if let titleLabel {
+            titleLabel.numberOfLines = 0
+            heightAnchor.constraint(
+                greaterThanOrEqualTo: titleLabel.heightAnchor, constant: Spacing.gap * 2
+            ).isActive = true
+        }
 
         fillView.isUserInteractionEnabled = false
         fillView.backgroundColor = UIColor { traits in

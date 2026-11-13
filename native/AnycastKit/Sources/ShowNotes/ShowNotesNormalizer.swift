@@ -48,7 +48,7 @@ public struct ShowNotesNormalizer {
         guard !html.isEmpty, html.utf8.count <= maximumInputBytes else {
             return ShowNotesDocument(blocks: [])
         }
-        guard let document = try? SwiftSoup.parse(html),
+        guard let document = try? SwiftSoup.parse(HtmlText.repairEmbeddedMarkup(html)),
               let body = document.body()
         else { return ShowNotesDocument(blocks: []) }
 

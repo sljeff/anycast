@@ -312,7 +312,7 @@ final class MembershipViewController: UIViewController {
     // MARK: - Rendering
 
     private func render() {
-        let plate = AccountPageModel.plate(isSubscribed: isSubscribed, plus: plus)
+        let plate = AccountPageModel.plate(isSubscribed: isSubscribed, plus: plus, remaining: remaining)
         plateAction = plate.action
         statusRow.titleLabel.text = plate.title
         if let issue = plate.issue {
@@ -364,11 +364,23 @@ final class MembershipViewController: UIViewController {
             self.isSubscribed = isSubscribed
             self.plus = plus
             self.account = AuthAccountSnapshot.current(context: context)
+            if self.remaining == nil,
+               let uid = self.account.uid,
+               let cached = TranscriptAllowanceCache.shared.current(uid: uid),
+               cached.isSubscribed == isSubscribed {
+                self.remaining = cached.remaining
+            }
             self.render()
 
-            if let result = try? await context.api.getUser(), case .user(let user) = result {
+            if let fresh = await AccountRemaining.fetch(context: context) {
                 guard !Task.isCancelled else { return }
-                self.remaining = user.remaining
+                self.remaining = fresh
+                if let uid = self.account.uid {
+                    TranscriptAllowanceCache.shared.store(
+                        TranscriptAllowance(remaining: fresh, isSubscribed: isSubscribed),
+                        uid: uid
+                    )
+                }
                 self.render()
             }
         }

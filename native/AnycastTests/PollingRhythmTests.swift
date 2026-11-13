@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 @testable import AnycastKit
 
@@ -167,21 +168,32 @@ struct PollingRhythmTests {
         #expect(stored?.language == "en")
         #expect((stored?.segments ?? []).count == 2)
 
-        // failed → local record removed, UI frees back to Generate.
+        // failed → local record removed. The in-memory status stays
+        // "failed" for this run so the UI can offer Retry; a relaunch
+        // reseeds from the database and returns to Generate.
         L2ContractTests.ReplayProtocol.reset { _ in
             .response(status: 200, body: #"{"status":"failed"}"#)
         }
         await controller.add(url: url)
-        #expect(controller.statuses[url] == nil)
+        #expect(controller.statuses[url] == "failed")
         #expect(try await database.subtitleRepository().get(byEnclosureURL: url) == nil)
 
         // User-triggered 403 quota → the server's error text returns for
-        // the dialog (K27: user-initiated failures stay visible).
+        // the dialog (K27: user-initiated failures stay visible), and the
+        // optimistic processing flag rolls back to whatever it was.
         L2ContractTests.ReplayProtocol.reset { _ in
             .response(status: 403, body: #"{"error":"Monthly transcription quota exhausted","code":1}"#)
         }
         let quota = await controller.add(url: url)
         #expect(quota == .errorMessage("Monthly transcription quota exhausted"))
+        #expect(controller.statuses[url] == "failed",
+                "a refused add restores the status from before the optimistic processing flag")
+
+        let fresh = "https://x.example/ep-quota.mp3"
+        let freshQuota = await controller.add(url: fresh)
+        #expect(freshQuota == .errorMessage("Monthly transcription quota exhausted"))
+        #expect(controller.statuses[fresh] == nil,
+                "a refused add on a never-started episode does not stick on Generating")
     }
 
     @Test("succeeded without a persistable row stays processing (no permanent spinner)")
@@ -526,6 +538,35 @@ struct PollingRhythmTests {
         // A language switch resets the map (Dart setTargetLanguage).
         controller.resetForLanguageChange()
         #expect(controller.statuses.isEmpty)
+    }
+
+    @Test("a retrying translation stays processing without re-notifying observers each round")
+    func translationRetryIsQuiet() async throws {
+        let (database, databaseDirectory) = try await makeDatabase()
+        defer { SandboxCleanup.remove(databaseDirectory, closing: [database.queue]) }
+        let url = "https://x.example/ep1.mp3"
+        try await seedSubtitle(database: database, url: url, language: "en")
+
+        let controller = TranslationPollController(
+            api: makeAPI(),
+            translations: database.translationRepository(),
+            subtitles: database.subtitleRepository(),
+            targetLanguage: { "zh" },
+            subtitleStatuses: { [url: "succeeded"] },
+            timerFactory: ManualPollTimerFactory()
+        )
+        L2ContractTests.ReplayProtocol.reset { _ in
+            .response(status: 200, body: #"{"translation":null}"#)
+        }
+        await controller.refresh()
+        #expect(controller.statuses[url] == "processing")
+
+        final class Flag: @unchecked Sendable { var fired = false }
+        let flag = Flag()
+        withObservationTracking { _ = controller.statuses } onChange: { flag.fired = true }
+        await controller.refresh()
+        #expect(controller.statuses[url] == "processing")
+        #expect(!flag.fired, "an unchanged status must not re-render the cards and transcript page")
     }
 
     @Test("translation success persists the row with the encoded payload")

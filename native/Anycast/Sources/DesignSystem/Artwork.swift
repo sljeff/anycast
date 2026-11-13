@@ -43,17 +43,52 @@ enum ArtworkPlaceholder {
     }
 }
 
+/// How list covers are decoded and cached. Views never decode full-size art
+/// for a 36 pt slot: every cover is downsampled to one of a few buckets, so
+/// one cover costs at most three cache entries instead of one per view size.
+/// Views and prefetchers build their options here, because the cache key
+/// carries the processor: a mismatch makes a prefetch silently useless.
+enum ArtworkSizing {
+
+    /// Pixel-side buckets, in points: small rows (36 / 44 / 56 / 64), medium
+    /// tiles (88 / 120 / 160) and everything larger (player, large headers).
+    static let small: CGFloat = 64
+    static let medium: CGFloat = 160
+    static let large: CGFloat = 400
+
+    static func bucket(for side: CGFloat) -> CGFloat {
+        if side <= small { return small }
+        if side <= medium { return medium }
+        return large
+    }
+
+    /// The options that decide the cache key and the decode: shared by
+    /// `setArtwork` and `ImagePrefetcher`.
+    @MainActor
+    static func processingOptions(side: CGFloat) -> KingfisherOptionsInfo {
+        let bucketSide = bucket(for: side)
+        return [
+            .processor(DownsamplingImageProcessor(size: CGSize(width: bucketSide, height: bucketSide))),
+            .scaleFactor(UIScreen.main.scale),
+            .cacheOriginalImage,
+            .loadDiskFileSynchronously,
+        ]
+    }
+}
+
 extension UIImageView {
     /// Loads a cover with the shared placeholder shown while loading and on
-    /// failure (no spinners or generic glyphs).
+    /// failure (no spinners or generic glyphs). `side` is the view's point
+    /// size (the largest it reaches); the image is decoded at its bucket.
     @MainActor
-    func setArtwork(_ url: URL?, title: String?) {
+    func setArtwork(_ url: URL?, title: String?, side: CGFloat) {
         applyArtworkHairline()
         let placeholder = ArtworkPlaceholder.image(for: title)
         kf.setImage(
             with: url,
             placeholder: placeholder,
-            options: [.transition(.none), .onFailureImage(placeholder)]
+            options: ArtworkSizing.processingOptions(side: side)
+                + [.transition(.none), .onFailureImage(placeholder)]
         )
     }
 

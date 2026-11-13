@@ -218,3 +218,22 @@ final class TranscriptStatusCapsuleView: UIView {
         return outgoing
     }
 }
+
+extension TranscriptStatusCapsuleView.Content {
+
+    /// The "no transcript yet" prompt for an account state: what the account
+    /// can do now ("7 of 10 free transcripts left" + Generate, "No free
+    /// transcripts left" + Get Plus, "10 free AI transcripts" + Sign In).
+    /// The id carries the copy, so a changed count replaces the capsule.
+    static func prompt(
+        _ row: DetailTranscriptContent,
+        onAction: @escaping (DetailTranscriptAction?) -> Void
+    ) -> Self {
+        .init(
+            id: "prompt-\(row.promptMessage)-\(row.actionTitle ?? "")",
+            leading: .icon(AppIcons.aiTranscript),
+            message: row.promptMessage,
+            action: row.actionTitle.map { title in (title, { onAction(row.rowAction) }) }
+        )
+    }
+}

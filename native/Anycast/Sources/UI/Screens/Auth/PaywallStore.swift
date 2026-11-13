@@ -105,7 +105,9 @@ struct PaywallStore {
         do {
             let result = try await Purchases.shared.purchase(package: package)
             if result.userCancelled { return .cancelled }
-            return result.customerInfo.entitlements.active.isEmpty ? .pending : .purchased
+            let purchased = !result.customerInfo.entitlements.active.isEmpty
+            if purchased { TranscriptAllowanceCache.shared.invalidate() }
+            return purchased ? .purchased : .pending
         } catch let error as ErrorCode where error == .purchaseCancelledError {
             return .cancelled
         }
@@ -117,7 +119,9 @@ struct PaywallStore {
         guard purchases.configured else { return false }
         do {
             let info = try await Purchases.shared.restorePurchases()
-            return !info.entitlements.active.isEmpty
+            let restored = !info.entitlements.active.isEmpty
+            if restored { TranscriptAllowanceCache.shared.invalidate() }
+            return restored
         } catch {
             return false
         }
@@ -136,6 +140,9 @@ struct PaywallStore {
     /// Settings identity row; nil when RevenueCat is not configured, the
     /// fetch fails, or the account never had Plus.
     func plusStatus() async -> AccountPageModel.PlusStatus? {
+        #if DEBUG
+        if let state = PlusDebug.state { return state.plusStatus }
+        #endif
         guard purchases.configured else { return nil }
         guard let info = try? await Purchases.shared.customerInfo(),
               let plus = info.entitlements.all["plus"] else { return nil }
@@ -158,6 +165,9 @@ struct PaywallStore {
 enum AuthAccountSnapshot {
 
     static func current(context: UIContext) -> LoginPageModel.AccountSnapshot {
+        #if DEBUG
+        if let state = PlusDebug.state { return state.snapshot }
+        #endif
         guard context.auth.isFirebaseConfigured else {
             return LoginPageModel.AccountSnapshot(
                 uid: context.auth.currentUID, email: nil, providerID: nil

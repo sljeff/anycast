@@ -1,9 +1,9 @@
 import UIKit
 import AnycastKit
 
-/// The player's scrubber + transport block (state message, progress bar,
-/// replay 10 / play-pause / forward 30), shared by the main page and the
-/// transcript page so play/pause is one component everywhere. It owns its
+/// The player's scrubber + transport block (progress bar with its state
+/// message, replay 10 / play-pause / forward 30), shared by the main page
+/// and the transcript page so play/pause is one component everywhere. It owns its
 /// own playback observation (episode, position, playing, loading) and the
 /// loading/disabled gating; hosts only place it and, optionally, pin
 /// accessory buttons to the ends of the transport row.
@@ -12,9 +12,8 @@ final class PlayerTransportView: UIView {
     enum Layout {
         /// The transport's touch slots (UI kit `playerControls` container).
         static let transportSlot: CGFloat = 72
-        /// Gap between the play slot and the skip slots (glyph centers
-        /// ~100 pt apart, as in the UI kit).
-        static let transportGap = Spacing.sectionGap
+        /// The round accessory buttons at the row ends (speed, sleep).
+        static let accessorySlot = AnycastIconButton.standardDiameter
         /// The one vertical rhythm, measured between VISIBLE edges (see the
         /// main page): time labels → transport glyphs.
         static let rhythm: CGFloat = 28
@@ -35,7 +34,6 @@ final class PlayerTransportView: UIView {
     private let context: UIContext
     private let observation = ObservationLoop()
 
-    private let stateMessageLabel = UILabel()
     private let progressBar = PlayerProgressBarView()
     private let replayButton = AnycastIconButton(
         style: .plain, icon: AppIcons.replay10, accessibilityLabel: "Seek back 10 seconds",
@@ -55,13 +53,13 @@ final class PlayerTransportView: UIView {
     private let stack = UIStackView()
     private var scrubberFooter: UIView?
 
-    /// Play-to-skip slot gap; pages with row-end accessories pass a tighter
-    /// one so the skip glyphs clear the 44 pt accessory buttons.
-    private let transportGap: CGFloat
+    /// When set, the play button runs this instead of toggling the current
+    /// item. The transcript page uses it to adopt a browsed episode without
+    /// the button pausing whatever is already playing.
+    var onPlay: (() -> Void)?
 
-    init(context: UIContext, transportGap: CGFloat = Layout.transportGap) {
+    init(context: UIContext) {
         self.context = context
-        self.transportGap = transportGap
         super.init(frame: .zero)
         build()
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (self: Self, _) in
@@ -76,7 +74,7 @@ final class PlayerTransportView: UIView {
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
                 _ = self.context.playback.positionData
                 _ = self.context.playback.isPlaying
                 _ = self.context.playback.isLoading
@@ -127,23 +125,13 @@ final class PlayerTransportView: UIView {
     // MARK: - Build
 
     private func build() {
-        stateMessageLabel.font = TypographyV2.meta.font()
-        stateMessageLabel.textColor = Theme.playerSecondary
-        stateMessageLabel.textAlignment = .center
-        stateMessageLabel.adjustsFontForContentSizeCategory = true
-        // Two lines at the accessibility text sizes — the message must
-        // not truncate at AX5.
-        stateMessageLabel.numberOfLines = 2
-        stateMessageLabel.isHidden = true
-
         progressBar.setContentCompressionResistancePriority(UILayoutPriority(800), for: .vertical)
         buildControls()
 
         stack.axis = .vertical
-        for view in [stateMessageLabel, progressBar, controlsRow] {
+        for view in [progressBar, controlsRow] {
             stack.addArrangedSubview(view)
         }
-        stack.setCustomSpacing(Spacing.xs, after: stateMessageLabel)
         updateScrubberSpacing()
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
@@ -201,6 +189,10 @@ final class PlayerTransportView: UIView {
         playPauseButton.addAction(
             UIAction { [weak self] _ in
                 guard let self else { return }
+                if let onPlay = self.onPlay {
+                    onPlay()
+                    return
+                }
                 Task { await self.context.playback.togglePlay() }
             },
             for: .touchUpInside
@@ -210,6 +202,10 @@ final class PlayerTransportView: UIView {
             button.translatesAutoresizingMaskIntoConstraints = false
             controlsRow.addSubview(button)
         }
+        let leadingSpan = UILayoutGuide()
+        let trailingSpan = UILayoutGuide()
+        controlsRow.addLayoutGuide(leadingSpan)
+        controlsRow.addLayoutGuide(trailingSpan)
         let playWidth = playPauseButton.widthAnchor.constraint(equalToConstant: Layout.transportSlot)
         let playHeight = playPauseButton.heightAnchor.constraint(equalToConstant: Layout.transportSlot)
         let glyphWidth = playPauseIcon.widthAnchor.constraint(equalToConstant: IconStyle.playerPrimary.pointSize)
@@ -227,12 +223,16 @@ final class PlayerTransportView: UIView {
             // to stretch the control past its slot (R2).
             glyphWidth, glyphHeight,
 
+            // Five controls on equal centers: each skip sits midway between
+            // the play button and the row-end accessory slot.
+            leadingSpan.leadingAnchor.constraint(equalTo: controlsRow.leadingAnchor, constant: Layout.accessorySlot / 2),
+            leadingSpan.trailingAnchor.constraint(equalTo: playPauseButton.centerXAnchor),
+            trailingSpan.leadingAnchor.constraint(equalTo: playPauseButton.centerXAnchor),
+            trailingSpan.trailingAnchor.constraint(equalTo: controlsRow.trailingAnchor, constant: -Layout.accessorySlot / 2),
             replayButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            replayButton.trailingAnchor.constraint(equalTo: playPauseButton.leadingAnchor, constant: -transportGap),
-            replayButton.leadingAnchor.constraint(greaterThanOrEqualTo: controlsRow.leadingAnchor),
+            replayButton.centerXAnchor.constraint(equalTo: leadingSpan.centerXAnchor),
             forwardButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            forwardButton.leadingAnchor.constraint(equalTo: playPauseButton.trailingAnchor, constant: transportGap),
-            forwardButton.trailingAnchor.constraint(lessThanOrEqualTo: controlsRow.trailingAnchor),
+            forwardButton.centerXAnchor.constraint(equalTo: trailingSpan.centerXAnchor),
         ])
         applyTransportMetrics()
     }
@@ -253,46 +253,64 @@ final class PlayerTransportView: UIView {
 
     // MARK: - Rendering (ObservationLoop-driven)
 
-    private func render() {
-        let episode = context.playback.currentEpisode
-        let position = context.playback.positionData
+    /// Everything the controls show besides the position. Position ticks
+    /// arrive twice a second; only the scrubber moves with them, so the
+    /// buttons, glyph and accessibility are re-applied only when this
+    /// changes.
+    private struct ControlState: Equatable {
+        var visual: PlayerProgressVisualState
+        var controlsEnabled: Bool
+        var enclosureURL: String?
+        var isPlaying: Bool
+        var isLoading: Bool
+    }
 
-        let state = PlayerProgressVisualState.resolve(
-            hasEpisode: (episode?.enclosureUrl?.isEmpty == false),
-            isLoading: context.playback.isLoading,
-            durationMilliseconds: position.durationMilliseconds
-        )
-        if let message = state.message {
-            stateMessageLabel.text = message
-            stateMessageLabel.isHidden = false
-        } else {
-            stateMessageLabel.isHidden = true
-        }
-        progressBar.setAllowsSeek(state.allowsSeek, statusMessage: state.message)
+    private var renderedControlState: ControlState?
+
+    private func render() {
+        let playback = context.playback
+        let episode = playback.currentEpisode
+        let position = playback.positionData
+
         progressBar.update(
             positionMilliseconds: position.positionMilliseconds,
             bufferedMilliseconds: position.bufferedMilliseconds,
             durationMilliseconds: position.durationMilliseconds
         )
 
-        // Dart gates every control on loading + having an episode
-        // (Controls, player.dart:1310-1313); disabled tints to 38%.
-        let controlsEnabled = !context.playback.isLoading
-            && episode?.enclosureUrl?.isEmpty == false
-        replayButton.isEnabled = controlsEnabled
-        forwardButton.isEnabled = controlsEnabled
-        playPauseButton.isEnabled = controlsEnabled
-        let alpha: CGFloat = controlsEnabled ? 1 : 0.38
+        let hasEpisode = episode?.enclosureUrl?.isEmpty == false
+        let state = ControlState(
+            visual: PlayerProgressVisualState.resolve(
+                hasEpisode: hasEpisode,
+                isLoading: playback.isLoading,
+                durationMilliseconds: position.durationMilliseconds
+            ),
+            // Dart gates every control on loading + having an episode
+            // (Controls, player.dart:1310-1313); disabled tints to 38%.
+            controlsEnabled: !playback.isLoading && hasEpisode,
+            enclosureURL: episode?.enclosureUrl,
+            isPlaying: playback.isPlaying,
+            isLoading: playback.isLoading
+        )
+        guard state != renderedControlState else { return }
+        renderedControlState = state
+
+        progressBar.setAllowsSeek(state.visual.allowsSeek, statusMessage: state.visual.message)
+
+        replayButton.isEnabled = state.controlsEnabled
+        forwardButton.isEnabled = state.controlsEnabled
+        playPauseButton.isEnabled = state.controlsEnabled
+        let alpha: CGFloat = state.controlsEnabled ? 1 : 0.38
         replayButton.alpha = alpha
         forwardButton.alpha = alpha
         playPauseButton.alpha = alpha
 
         playPauseIcon.update(
             snapshot: .init(
-                enclosureURL: episode?.enclosureUrl,
-                currentEnclosureURL: episode?.enclosureUrl,
-                isPlaying: context.playback.isPlaying,
-                isLoading: context.playback.isLoading
+                enclosureURL: state.enclosureURL,
+                currentEnclosureURL: state.enclosureURL,
+                isPlaying: state.isPlaying,
+                isLoading: state.isLoading
             ),
             tint: Theme.playerText
         )

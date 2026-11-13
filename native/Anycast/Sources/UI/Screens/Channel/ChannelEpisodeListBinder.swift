@@ -53,10 +53,10 @@ final class ChannelEpisodeListBinder {
         observation.track(
             read: { [weak self] in
                 guard let self else { return }
-                _ = self.context.playback.currentEpisode
+                _ = self.context.playback.currentEpisodeContent
                 _ = self.context.playback.isPlaying
                 _ = self.context.playback.isLoading
-                _ = self.context.playback.queue.map(\.enclosureUrl)
+                _ = self.context.playback.queueEnclosureURLs
             },
             onChange: { [weak self] in self?.refreshPlaylistMembership() }
         )
@@ -322,7 +322,15 @@ final class ChannelEpisodeListBinder {
             },
             shortenURL: { [weak self] url in
                 await self?.context.api.getShortURL(for: url) ?? url
-            }
+            },
+            transcript: DetailTranscriptCoordinator(
+                context: context,
+                episode: detailEpisode,
+                prepareEpisode: { [weak self] in
+                    guard let self else { return nil }
+                    return await self.addToTop(episode)
+                }
+            )
         )
     }
 

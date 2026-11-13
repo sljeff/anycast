@@ -82,6 +82,19 @@ final class AnycastIconButton: UIButton {
         }
     }
 
+    /// Set by the detail sheet so ••• matches Play instead of the shared
+    /// Dynamic Type diameter. `applyMetrics` keeps this size.
+    private var explicitDiameter: CGFloat?
+    private var explicitGlyphPointSize: CGFloat?
+
+    /// Resizes the circle. The detail sheet uses this so ••• matches Play
+    /// as the capsule grows, and stays a circle of that height.
+    func setDiameter(_ diameter: CGFloat, glyphPointSize: CGFloat) {
+        explicitDiameter = diameter
+        explicitGlyphPointSize = glyphPointSize
+        applyMetrics()
+    }
+
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
@@ -95,7 +108,7 @@ final class AnycastIconButton: UIButton {
     }
 
     private func applyMetrics() {
-        let glyph = IconMetrics.scaledUp(
+        let glyph = explicitGlyphPointSize ?? IconMetrics.scaledUp(
             designGlyphSize,
             style: metricsStyle,
             compatibleWith: traitCollection
@@ -109,7 +122,11 @@ final class AnycastIconButton: UIButton {
             configuration.image = image
             self.configuration = configuration
         }
-        let side = IconMetrics.diameter(designDiameter, style: metricsStyle, compatibleWith: traitCollection)
+        let side = explicitDiameter ?? IconMetrics.diameter(
+            designDiameter,
+            style: metricsStyle,
+            compatibleWith: traitCollection
+        )
         widthConstraint?.constant = side
         heightConstraint?.constant = side
         largeContentImage = image

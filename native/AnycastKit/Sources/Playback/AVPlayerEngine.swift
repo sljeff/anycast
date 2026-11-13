@@ -37,31 +37,39 @@ public final class AVPlayerEngine: PlaybackEngine {
         }
         self.timeObserver = observer
 
-        // Playing/loading state: AVPlayer.timeControlStatus covers playing
-        // (.playing) and buffering (.waitingToPlayAtSpecifiedRate); item
-        // status not-yet-ready is the "loading" leg of just_audio's
+        // Playing/buffering state: AVPlayer.timeControlStatus gives the play
+        // intent (anything but .paused, as just_audio's `playing` stays true
+        // while buffering) and buffering (.waitingToPlayAtSpecifiedRate);
+        // item status not-yet-ready is the "loading" leg of just_audio's
         // ProcessingState.loading.
         rateObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] player, _ in
             Task { @MainActor in
                 guard let self else { return }
-                self.events?(.playingChanged(player.timeControlStatus == .playing))
-                self.events?(.loadingChanged(player.timeControlStatus == .waitingToPlayAtSpecifiedRate))
+                let status = player.timeControlStatus
+                self.events?(.playingChanged(status != .paused))
+                self.events?(.bufferingChanged(status == .waitingToPlayAtSpecifiedRate))
             }
         }
 
         let center = NotificationCenter.default
+        // `object: nil` observes every AVPlayerItem in the process; only the
+        // engine's own current item may complete or fail the queue head.
         endToken = center.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification,
-                                      object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in
-                self?.events?(.completed)
+                                      object: nil, queue: .main) { [weak self] note in
+            let sender = (note.object as? AVPlayerItem).map(ObjectIdentifier.init)
+            MainActor.assumeIsolated {
+                guard let self, self.isCurrentItem(sender) else { return }
+                self.events?(.completed)
             }
         }
         failureToken = center.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime,
                                           object: nil, queue: .main) { [weak self] note in
+            let sender = (note.object as? AVPlayerItem).map(ObjectIdentifier.init)
             let reason = (note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)
             let message = reason?.localizedDescription ?? "playback failed"
-            Task { @MainActor in
-                self?.events?(.failed(message))
+            MainActor.assumeIsolated {
+                guard let self, self.isCurrentItem(sender) else { return }
+                self.events?(.failed(message))
             }
         }
     }
@@ -80,6 +88,13 @@ public final class AVPlayerEngine: PlaybackEngine {
     }
 
     public var hasItem: Bool { player.currentItem != nil }
+    /// Test seam: the item completion/failure notifications are matched against.
+    var currentItemForTesting: AVPlayerItem? { player.currentItem }
+
+    private func isCurrentItem(_ sender: ObjectIdentifier?) -> Bool {
+        guard let sender, let current = player.currentItem else { return false }
+        return sender == ObjectIdentifier(current)
+    }
     public var rate: Float { player.rate }
     public var desiredSpeedValue: Float { desiredSpeed }
 

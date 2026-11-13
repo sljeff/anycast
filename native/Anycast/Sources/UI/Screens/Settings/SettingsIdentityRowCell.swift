@@ -1,14 +1,10 @@
 import UIKit
 
 /// The Settings account rows (Membership B "SettingsAccount"): the identity
-/// row (44 pt avatar, title, subtitle, trailing action text or chevron) on
-/// the surface plate, and the gold Upgrade plate (title, subtitle, action
-/// text) under it. Fill-only press feedback, like `SettingsRowCell`.
+/// row (44 pt avatar, title, subtitle, trailing action text or chevron) and
+/// the Plus offer row (title, subtitle, gold action text) under it, both on
+/// the surface plate. Fill-only press feedback, like `SettingsRowCell`.
 final class SettingsIdentityRowCell: UICollectionViewListCell {
-
-    enum PlateStyle {
-        case surface, gold
-    }
 
     static let avatarSize: CGFloat = 44
 
@@ -25,9 +21,6 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
     }()
     private var avatarSideConstraints: [NSLayoutConstraint] = []
     private let rowStack = UIStackView()
-    private var topConstraint: NSLayoutConstraint?
-    private var bottomConstraint: NSLayoutConstraint?
-    private var plateStyle = PlateStyle.surface
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -96,8 +89,6 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
 
         let top = rowStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12)
         let bottom = rowStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
-        topConstraint = top
-        bottomConstraint = bottom
         let minimumHeight = contentView.heightAnchor.constraint(
             greaterThanOrEqualToConstant: SettingsRowCell.minimumHeight
         )
@@ -115,9 +106,8 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
         automaticallyUpdatesBackgroundConfiguration = false
         configurationUpdateHandler = { [unowned self] _, state in
             var background = UIBackgroundConfiguration.clear()
-            let base = self.plateStyle == .gold ? AccountStyle.goldPlate : Theme.surface
             background.backgroundColor = (state.isHighlighted || state.isSelected)
-                ? AccountStyle.pressed(base) : base
+                ? AccountStyle.pressed(Theme.surface) : Theme.surface
             self.backgroundConfiguration = background
         }
     }
@@ -125,20 +115,18 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        avatarView.layer.cornerRadius = avatarView.bounds.height / 2
-    }
-
     /// Avatar disc tracks title2 with the glyph, from the 44 pt design size.
     private func applyAvatarMetrics() {
         let side = IconMetrics.scaledUp(Self.avatarSize, textStyle: .title2, compatibleWith: traitCollection)
         for constraint in avatarSideConstraints { constraint.constant = side }
+        // From the constraint, not the bounds: the disc sits inside a stack
+        // that has not laid out yet when the cell's own layout pass runs.
+        avatarView.layer.cornerRadius = side / 2
     }
 
     /// Identity row on the surface plate.
     func configure(identity: AccountPageModel.IdentityContent) {
-        apply(style: .surface, title: identity.title, subtitle: identity.subtitle)
+        apply(title: identity.title, subtitle: identity.subtitle)
         avatarView.isHidden = false
         switch identity.avatar {
         case .glyph:
@@ -161,24 +149,17 @@ final class SettingsIdentityRowCell: UICollectionViewListCell {
         accessibilityValue = identity.subtitle
     }
 
-    /// The gold Upgrade plate: no avatar, 24 pt padding all round.
-    func configureUpgradePlate() {
-        apply(
-            style: .gold, title: AccountPageModel.upgradePlateTitle,
-            subtitle: AccountPageModel.upgradePlateSubtitle
-        )
+    /// The Plus offer row: no avatar, the gold action text trailing.
+    func configureUpgrade(subtitle: String, action: String) {
+        apply(title: AccountPageModel.upgradePlateTitle, subtitle: subtitle)
         avatarView.isHidden = true
-        actionLabel.text = AccountPageModel.upgradePlateAction
+        actionLabel.text = action
         actionLabel.isHidden = false
         chevronView.isHidden = true
-        accessibilityValue = AccountPageModel.upgradePlateSubtitle
+        accessibilityValue = subtitle
     }
 
-    private func apply(style: PlateStyle, title: String, subtitle: String) {
-        plateStyle = style
-        let padding = style == .gold ? AccountStyle.goldPadding : 12
-        topConstraint?.constant = padding
-        bottomConstraint?.constant = -padding
+    private func apply(title: String, subtitle: String) {
         titleLabel.text = title
         subtitleLabel.text = subtitle
         subtitleLabel.isHidden = subtitle.isEmpty

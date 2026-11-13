@@ -1,4 +1,5 @@
 import Testing
+import UIKit
 @testable import Anycast
 
 /// Progress-bar clock strings (the audio_video_progress_bar
@@ -53,5 +54,29 @@ struct PlayerProgressBarTests {
     @Test("a11y summary composes position and duration")
     func accessibilityValue() {
         #expect(PlayerProgressClock.accessibilityValue(positionMilliseconds: 65_000, durationMilliseconds: 3_600_000) == "1:05 of 1:00:00")
+    }
+
+    @MainActor
+    @Test("the state message takes the time labels' band: same size, track dimmed, message not")
+    func statusMessageKeepsLayout() {
+        let bar = PlayerProgressBarView()
+        bar.frame = CGRect(x: 0, y: 0, width: 320, height: 60)
+        bar.update(positionMilliseconds: 5_000, bufferedMilliseconds: 10_000, durationMilliseconds: 60_000)
+        let fitting = CGSize(width: 320, height: UIView.layoutFittingCompressedSize.height)
+        let resting = bar.systemLayoutSizeFitting(fitting, withHorizontalFittingPriority: .required,
+                                                   verticalFittingPriority: .fittingSizeLevel)
+
+        bar.setAllowsSeek(false, statusMessage: "Loading…")
+        bar.layoutIfNeeded()
+        let loading = bar.systemLayoutSizeFitting(fitting, withHorizontalFittingPriority: .required,
+                                                   verticalFittingPriority: .fittingSizeLevel)
+        #expect(loading == resting, "showing the message must not resize the scrubber")
+        #expect(bar.alpha == 1, "the message stays at full strength")
+        let labels = bar.subviews.compactMap { $0 as? UILabel }
+        let visible = labels.filter { !$0.isHidden }
+        #expect(visible.map(\.text) == ["Loading…"], "only the message shows; the times hide")
+
+        bar.setAllowsSeek(true)
+        #expect(bar.subviews.compactMap { $0 as? UILabel }.filter { !$0.isHidden && $0.text == "Loading…" }.isEmpty)
     }
 }

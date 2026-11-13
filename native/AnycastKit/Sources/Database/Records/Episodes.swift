@@ -50,7 +50,7 @@ public struct FeedEpisodeRow: EpisodeFields, Equatable {
     }
 }
 
-// MARK: - historyEpisode (identical shape; "latest" = ORDER BY id DESC)
+// MARK: - historyEpisode ("latest" = ORDER BY lastPlayedAt DESC)
 
 public struct HistoryEpisodeRow: EpisodeFields, Equatable {
     public static let databaseTableName = "historyEpisode"
@@ -63,10 +63,15 @@ public struct HistoryEpisodeRow: EpisodeFields, Equatable {
     public var imageUrl: String?
     public var channelTitle: String?
     public var rssFeedUrl: String?
+    /// Unix milliseconds of the latest play. The history sort key. Nil for
+    /// rows that predate the column (upgraded from schema 4).
+    /// Independent of `id` (which is no longer a playlist rowid).
+    public var lastPlayedAt: Int64?
 
     public init(id: Int64? = nil, title: String? = nil, description: String? = nil,
                 duration: Int64? = nil, enclosureUrl: String? = nil, pubDate: Int64? = nil,
-                imageUrl: String? = nil, channelTitle: String? = nil, rssFeedUrl: String? = nil) {
+                imageUrl: String? = nil, channelTitle: String? = nil, rssFeedUrl: String? = nil,
+                lastPlayedAt: Int64? = nil) {
         self.id = id
         self.title = title
         self.description = description
@@ -76,6 +81,7 @@ public struct HistoryEpisodeRow: EpisodeFields, Equatable {
         self.imageUrl = imageUrl
         self.channelTitle = channelTitle
         self.rssFeedUrl = rssFeedUrl
+        self.lastPlayedAt = lastPlayedAt
     }
 }
 

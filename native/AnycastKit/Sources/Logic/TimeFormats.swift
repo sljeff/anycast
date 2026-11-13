@@ -49,19 +49,19 @@ public enum TimeAgo {
         } else if minutes < 45 {
             result = "\(roundHalfAwayFromZero(minutes))m"
         } else if minutes < 90 {
-            result = "~1h"                                   // aboutAnHour
+            result = "1h"                                   // aboutAnHour
         } else if hours < 24 {
             result = "\(roundHalfAwayFromZero(hours))h"
         } else if hours < 48 {
-            result = "~1d"                                   // aDay
+            result = "1d"                                   // aDay
         } else if days < 30 {
             result = "\(roundHalfAwayFromZero(days))d"
         } else if days < 60 {
-            result = "~1mo"                                  // aboutAMonth
+            result = "1mo"                                  // aboutAMonth
         } else if days < 365 {
             result = "\(roundHalfAwayFromZero(months))mo"
         } else if years < 2 {
-            result = "~1y"                                   // aboutAYear
+            result = "1y"                                   // aboutAYear
         } else {
             result = "\(roundHalfAwayFromZero(years))y"
         }
