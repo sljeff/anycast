@@ -3,7 +3,7 @@ import AnycastKit
 
 /// One Discover category page (discover.dart:56-103): the per-category
 /// `listChannelsByCategoryId` PodcastCard list with a loading spinner and
-/// the centered "Network Error" state. No pull-to-refresh (03 §3.3).
+/// the centered empty / failed state. No pull-to-refresh (03 §3.3).
 @MainActor
 final class DiscoverCategoryPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
 
@@ -11,7 +11,8 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
     private let model: DiscoverCategoryPageModel
 
     private let collectionView: UICollectionView
-    private let errorLabel = UILabel()
+    /// Genuinely empty ("No shows here for …") or failed ("Couldn’t load Discover." + Retry).
+    private let errorState = EmptyStateView()
     /// "Couldn't update" + Retry, shown over kept content after a failed refresh.
     private let retryBar = UIStackView()
     private let skeletonDelay = LoadingDelay()
@@ -93,15 +94,9 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
 
         buildRetryBar()
 
-        // Centered white "Network Error" (discover.dart:73-78).
-        errorLabel.text = "Network Error"
-        errorLabel.textColor = Theme.onSurfaceVariant
-        errorLabel.font = TypographyV2.emphasis.font()
-        errorLabel.adjustsFontForContentSizeCategory = true
-        errorLabel.textAlignment = .center
-        errorLabel.isHidden = true
-        errorLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(errorLabel)
+        errorState.isHidden = true
+        errorState.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(errorState)
 
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -109,8 +104,9 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
             collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            errorLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            errorState.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            errorState.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            errorState.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
     }
 
@@ -155,6 +151,26 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         ])
     }
 
+    /// A failed load and a genuinely empty category read differently; only
+    /// the failure offers Retry.
+    private func configureErrorState() {
+        if model.failed {
+            let retry = AnycastButton.make(
+                .secondary, title: "Retry", image: UIImage(systemName: "arrow.clockwise")
+            )
+            retry.accessibilityIdentifier = "discover-load-retry"
+            retry.addAction(UIAction { [weak self] _ in
+                guard let self else { return }
+                self.model.load(country: self.context.settingsBox.current.countryCode)
+            }, for: .touchUpInside)
+            errorState.configure(.init(title: "Couldn’t load Discover.", actions: [retry]))
+        } else {
+            let code = context.settingsBox.current.countryCode
+            let region = Locale.current.localizedString(forRegionCode: code) ?? code
+            errorState.configure(.init(title: "No shows here for \(region)."))
+        }
+    }
+
     // MARK: - Rendering (plain no-animation rebuild, 08 §7.2)
 
     private func render() {
@@ -168,7 +184,8 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         }
         let display = model.display(skeletonDue: skeletonDelay.isDue)
 
-        errorLabel.isHidden = display != .emptyError
+        errorState.isHidden = display != .emptyError
+        if display == .emptyError { configureErrorState() }
         let shouldShowRetry = display == .contentWithRetry
         if shouldShowRetry != retryBarShown {
             retryBarShown = shouldShowRetry

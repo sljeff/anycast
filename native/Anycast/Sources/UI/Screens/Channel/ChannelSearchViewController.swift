@@ -152,10 +152,12 @@ final class ChannelSearchViewController: UIViewController {
         )
         view.addSubview(searchField)
 
-        noResultsLabel.text = "No results"
-        noResultsLabel.font = TypographyV2.emphasis.font()
+        noResultsLabel.text = Self.noResultsText(for: query)
+        noResultsLabel.font = TypographyV2.meta.font()
         noResultsLabel.adjustsFontForContentSizeCategory = true
-        noResultsLabel.textColor = Theme.onSurface
+        noResultsLabel.textColor = Theme.onSurfaceVariant
+        noResultsLabel.textAlignment = .center
+        noResultsLabel.numberOfLines = 0
         noResultsLabel.isHidden = true
         noResultsLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(noResultsLabel)
@@ -202,6 +204,8 @@ final class ChannelSearchViewController: UIViewController {
             ),
 
             noResultsLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            noResultsLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: Spacing.pageH),
+            noResultsLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -Spacing.pageH),
             noResultsCenterY,
         ])
 
@@ -278,8 +282,15 @@ final class ChannelSearchViewController: UIViewController {
             }
             refreshVisibleCards()
         }
+        noResultsLabel.text = Self.noResultsText(for: query)
         noResultsLabel.isHidden = !filtered.isEmpty
         renderPlayerBar()
+    }
+
+    /// "No episodes for “x”" (curly quotes); no query, no quote.
+    static func noResultsText(for query: String) -> String {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "No episodes." : "No episodes for \u{201C}\(trimmed)\u{201D}"
     }
 
     private func renderPlayerBar() {

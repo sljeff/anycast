@@ -1,15 +1,12 @@
 import UIKit
 
-/// The single empty / error / loading block (Anycast 2.0 UI kit
-/// `AnycastContentUnavailable`): a 64 pt tinted disc with a glyph or a
-/// spinner, a title, a message, and optional actions, centered in the
-/// layout margins (it yields to them when taller). Host it as a collection
+/// The single empty / error block: up to two sentences in Body size and the
+/// secondary colour (no icon, no title weight), and optional actions,
+/// centered in the layout margins (it yields to them when taller). Host it as a collection
 /// background (feed `alignBackgroundViewMargins()`) or pin it to a page.
 class EmptyStateView: UIView {
 
     struct Content {
-        var icon: UIImage?
-        var showsSpinner = false
         var title: String?
         var message: String?
         /// Buttons (or rows of buttons), stacked under the message.
@@ -21,9 +18,6 @@ class EmptyStateView: UIView {
         var titleIsHeader = false
     }
 
-    private let disc = UIView()
-    private let iconView = UIImageView()
-    private let spinner = UIActivityIndicatorView(style: .medium)
     private let titleLabel = UILabel()
     private let messageLabel = UILabel()
     private let actionColumn = UIStackView()
@@ -37,33 +31,11 @@ class EmptyStateView: UIView {
     /// The sentence before a too-wide token is given character breaks.
     private var plainTitle: String?
 
-    private static let discSize: CGFloat = 64
-    private static let glyphSize: CGFloat = 28
-    private var discConstraints: [NSLayoutConstraint] = []
-
     init() {
         super.init(frame: .zero)
 
-        disc.backgroundColor = AnycastColor.sandAlpha3
-        disc.layer.cornerRadius = Self.discSize / 2
-        disc.layer.cornerCurve = .continuous
-        disc.translatesAutoresizingMaskIntoConstraints = false
-
-        iconView.tintColor = Theme.primary
-        iconView.contentMode = .center
-        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (view: EmptyStateView, _) in
-            view.applyDiscMetrics()
-        }
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        disc.addSubview(iconView)
-
-        spinner.color = Theme.primary
-        spinner.hidesWhenStopped = true
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        disc.addSubview(spinner)
-
-        titleLabel.font = TypographyV2.emphasis.font()
-        titleLabel.textColor = Theme.onSurface
+        titleLabel.font = TypographyV2.meta.font()
+        titleLabel.textColor = Theme.onSurfaceVariant
         messageLabel.font = TypographyV2.meta.font()
         messageLabel.textColor = Theme.onSurfaceVariant
         for label in [titleLabel, messageLabel] {
@@ -76,11 +48,10 @@ class EmptyStateView: UIView {
         actionColumn.alignment = .center
         actionColumn.spacing = Spacing.md
 
-        column = UIStackView(arrangedSubviews: [disc, titleLabel, messageLabel, actionColumn])
+        column = UIStackView(arrangedSubviews: [titleLabel, messageLabel, actionColumn])
         column.axis = .vertical
         column.alignment = .center
         column.spacing = Spacing.md
-        column.setCustomSpacing(Spacing.cardInner, after: disc)
         column.setCustomSpacing(Spacing.pageHeader, after: messageLabel)
         column.translatesAutoresizingMaskIntoConstraints = false
         addSubview(column)
@@ -92,16 +63,7 @@ class EmptyStateView: UIView {
         widthCap = column.widthAnchor.constraint(lessThanOrEqualToConstant: 320)
         widthFill = column.widthAnchor.constraint(equalTo: layoutMarginsGuide.widthAnchor)
         widthFill.isActive = false
-        let discWidth = disc.widthAnchor.constraint(equalToConstant: Self.discSize)
-        let discHeight = disc.heightAnchor.constraint(equalToConstant: Self.discSize)
-        discConstraints = [discWidth, discHeight]
         NSLayoutConstraint.activate([
-            discWidth, discHeight,
-            iconView.centerXAnchor.constraint(equalTo: disc.centerXAnchor),
-            iconView.centerYAnchor.constraint(equalTo: disc.centerYAnchor),
-            spinner.centerXAnchor.constraint(equalTo: disc.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: disc.centerYAnchor),
-
             column.leadingAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.leadingAnchor),
             column.trailingAnchor.constraint(lessThanOrEqualTo: layoutMarginsGuide.trailingAnchor),
             column.topAnchor.constraint(greaterThanOrEqualTo: layoutMarginsGuide.topAnchor),
@@ -110,27 +72,33 @@ class EmptyStateView: UIView {
             column.centerXAnchor.constraint(equalTo: centerXAnchor),
             centersContent,
         ])
-        applyDiscMetrics()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    /// Decorative disc. Design size at the default content size; grows with title1.
-    private func applyDiscMetrics() {
-        let side = IconMetrics.scaledUp(Self.discSize, style: TypographyV2.displaySmall, compatibleWith: traitCollection)
-        for constraint in discConstraints { constraint.constant = side }
-        disc.layer.cornerRadius = side / 2
-        iconView.preferredSymbolConfiguration = IconMetrics.symbolConfiguration(
-            pointSize: Self.glyphSize, weight: .medium, style: TypographyV2.displaySmall, compatibleWith: traitCollection
-        )
+    /// The quiet text link under (or instead of) the primary action: Body
+    /// size, secondary colour, underlined, with a minimum hit height.
+    static func linkButton(title: String) -> UIButton {
+        var configuration = UIButton.Configuration.plain()
+        configuration.title = title
+        configuration.baseForegroundColor = Theme.onSurfaceVariant
+        configuration.titleLineBreakMode = .byWordWrapping
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.meta.font()
+            outgoing.foregroundColor = Theme.onSurfaceVariant
+            outgoing.underlineStyle = .single
+            return outgoing
+        }
+        let button = UIButton(configuration: configuration)
+        button.titleLabel?.adjustsFontForContentSizeCategory = true
+        button.titleLabel?.textAlignment = .center
+        button.heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit).isActive = true
+        return button
     }
 
     func configure(_ content: Content) {
-        iconView.image = content.icon
-        iconView.isHidden = content.showsSpinner || content.icon == nil
-        disc.isHidden = !content.showsSpinner && content.icon == nil
-        if content.showsSpinner { spinner.startAnimating() } else { spinner.stopAnimating() }
         plainTitle = content.title
         titleLabel.text = content.title
         titleLabel.isHidden = content.title == nil
@@ -146,7 +114,7 @@ class EmptyStateView: UIView {
         // message-to-action gap already uses. A message keeps the 8 pt title
         // gap, so Playlist and History do not move.
         let titleGap = (content.message == nil && !content.actions.isEmpty)
-            ? Spacing.pageHeader : Spacing.md
+            ? Spacing.pageHeader : Spacing.xs
         column.setCustomSpacing(titleGap, after: titleLabel)
     }
 
@@ -212,7 +180,7 @@ class EmptyStateView: UIView {
         // then clipped with no ellipsis.
         var height: CGFloat = 0
         var previous: UIView?
-        for row in [disc, titleLabel, messageLabel, actionColumn] where !row.isHidden {
+        for row in [titleLabel, messageLabel, actionColumn] where !row.isHidden {
             if let previous {
                 let custom = column.customSpacing(after: previous)
                 height += custom == UIStackView.spacingUseDefault ? column.spacing : custom
@@ -223,8 +191,8 @@ class EmptyStateView: UIView {
         return ceil(height + margins.top + margins.bottom)
     }
 
-    /// Labels measure their wrapped text with `sizeThatFits`. The disc and
-    /// the button row do not: `UIView.sizeThatFits` returns the current
+    /// Labels measure their wrapped text with `sizeThatFits`. The button row
+    /// does not: `UIView.sizeThatFits` returns the current
     /// bounds, which are still zero the first time this runs.
     private func rowHeight(_ row: UIView, columnWidth: CGFloat, textLimit: CGSize) -> CGFloat {
         if row === titleLabel || row === messageLabel {

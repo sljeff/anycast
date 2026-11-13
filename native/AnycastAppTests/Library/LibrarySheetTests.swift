@@ -208,7 +208,7 @@ struct LibrarySheetTests {
         }
     }
 
-    @Test("Library: no moments means no Moments section; no history means no Recently played")
+    @Test("Library: no moments keeps the Moments header with a hint; no history means no Recently played")
     func hidesEmptySections() async throws {
         guard let fixture = try await Self.makeFixture(moments: false, history: 0) else { return }
         defer { fixture.cleanUp() }
@@ -219,12 +219,13 @@ struct LibrarySheetTests {
         try await Self.present(sheet, in: fixture)
         let texts = Self.texts(in: sheet.view)
         #expect(texts.contains("Shows"))
-        #expect(!texts.contains("Moments"))
+        #expect(texts.contains("Moments"))
+        #expect(texts.contains("Hold a transcript line to keep it here."))
         #expect(!texts.contains("Recently played"))
         #expect(!texts.contains("All history"))
     }
 
-    @Test("Library: deleting a moment removes its row and the section when the last goes")
+    @Test("Library: deleting a moment removes its row; the last one leaves the header and the hint")
     func deletingMoments() async throws {
         guard let fixture = try await Self.makeFixture(history: 0) else { return }
         defer { fixture.cleanUp() }
@@ -250,7 +251,8 @@ struct LibrarySheetTests {
         last.onDelete?()
         try await Task.sleep(for: .milliseconds(300))
         #expect(sheet.moments.isEmpty)
-        #expect(!Self.texts(in: sheet.view).contains("Moments"))
+        #expect(Self.texts(in: sheet.view).contains("Moments"))
+        #expect(Self.texts(in: sheet.view).contains("Hold a transcript line to keep it here."))
     }
 
     // MARK: - Transcript

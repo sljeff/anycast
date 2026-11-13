@@ -96,8 +96,8 @@ enum HistoryPresentation {
 /// deferred for a 5 s Undo window and the DB is only written when it ends
 /// (or the sheet disappears / the app backgrounds), so Undo is a plain
 /// re-read. VoiceOver and Switch Control skip the hold for an inline
-/// Cancel / Clear confirm. The empty state is the shared `EmptyStateView`
-/// with an Explore button that closes the sheet and opens Discover.
+/// Cancel / Clear confirm. The empty state is the shared `EmptyStateView`:
+/// one sentence, no button.
 @MainActor
 final class HistoryDialogViewController: UIViewController {
 
@@ -131,7 +131,6 @@ final class HistoryDialogViewController: UIViewController {
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyView = EmptyStateView()
-    private let exploreButton = UIButton(type: .system)
     private let bottomFade = ScrollEdgeFade(edge: .bottom, color: Theme.background)
     private let footerStack = UIStackView()
     private let holdButton = HoldToConfirmButton(
@@ -212,13 +211,6 @@ final class HistoryDialogViewController: UIViewController {
         spinner.hidesWhenStopped = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
-
-        // Same primary Explore capsule as the Playlist empty state.
-        exploreButton.configuration = AnycastButton.configuration(.primary, title: "Explore", image: AppIcons.explore)
-        exploreButton.addPressFeedback(scale: Motion.pressScaleSubtle)
-        exploreButton.accessibilityLabel = "Explore"
-        exploreButton.accessibilityIdentifier = "history-explore"
-        exploreButton.addAction(UIAction { [weak self] _ in self?.exploreTapped() }, for: .touchUpInside)
 
         emptyView.isHidden = true
         emptyView.translatesAutoresizingMaskIntoConstraints = false
@@ -473,20 +465,15 @@ final class HistoryDialogViewController: UIViewController {
     }
 
     /// "History cleared" while a clear is pending or has committed in this
-    /// presentation; otherwise the shared empty block with Explore.
+    /// presentation; otherwise the shared empty block.
     private func renderEmptyState() {
         if didClear {
             emptyView.configure(.init(
-                icon: AppIcons.check,
                 title: "History cleared",
                 message: "Episodes you play show up here."
             ))
         } else {
-            emptyView.configure(.init(
-                icon: UIImage(systemName: "clock.arrow.circlepath"),
-                title: "Play an episode and it shows up here.",
-                actions: [exploreButton]
-            ))
+            emptyView.configure(.init(title: "Episodes you play show up here."))
         }
     }
 
@@ -610,14 +597,6 @@ final class HistoryDialogViewController: UIViewController {
 
     @objc private func undoTapped() {
         Task { await undoPendingClear() }
-    }
-
-    private func exploreTapped() {
-        // Same destination as the Inbox empty state's Explore: Discover.
-        let tabs = context.tabs
-        dismiss(animated: true) {
-            tabs.select(2)
-        }
     }
 }
 

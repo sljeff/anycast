@@ -16,6 +16,8 @@ final class ShareDialogViewController: DialogBaseViewController {
     private let titleLabel = UILabel()
     private var actionRow: UIView?
     private var progressOverlay: ImportProgressOverlayController?
+    /// One import per dialog: set when a run ends, so Import cannot run twice.
+    private var didFinishImport = false
 
     /// Stub-era entry point (kept: the coordinator constructs by name).
     convenience init(context: UIContext) {
@@ -191,7 +193,7 @@ final class ShareDialogViewController: DialogBaseViewController {
     // MARK: - Import (share.dart:77-105)
 
     private func startImport() {
-        guard !isBusy else { return }
+        guard !isBusy, !didFinishImport else { return }
         isBusy = true
 
         let overlay = ImportProgressOverlayController.shareStyle()
@@ -209,17 +211,24 @@ final class ShareDialogViewController: DialogBaseViewController {
             )
             self.isBusy = false
 
-            var titles: [String] = []
-            if case .finished(let result) = self.importer.phase {
-                titles = result.titles
+            let result: PodcastImporter.Result
+            if case .finished(let finished) = self.importer.phase {
+                result = finished
+            } else {
+                result = PodcastImporter.Result(
+                    requestedURLCount: self.entries.count, importedSubscriptions: []
+                )
             }
-            // Get.back() x2, progress reset, then the truncated-titles
-            // snackbar — same batch text as the OPML flow. Dismissing self
-            // cascades to the progress overlay above it.
+            // Get.back() x2, progress reset, then the result snackbar — same
+            // batch text as the OPML flow. `dismiss` on a controller that
+            // presents another only dismisses the presented one (it left
+            // this dialog on screen with Import tappable again), so ask the
+            // presenter to dismiss this dialog and the overlay above it.
+            self.didFinishImport = true
             let window = self.view.window
-            let text = ImportResultText.batchFlow(titles: titles)
+            let text = ImportResultText.batchFlow(result: result)
             self.progressOverlay = nil
-            self.dismiss(animated: true)
+            (self.presentingViewController ?? self).dismiss(animated: true)
             try? await Task.sleep(nanoseconds: 150_000_000)
             if let window {
                 ToastPresenter.shared.show(text, in: window, duration: 3.0)
@@ -283,7 +292,10 @@ final class ShareEntryCell: UITableViewCell {
             card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
             titleLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: card.trailingAnchor, constant: -16),
-            titleLabel.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+            // Pinned top and bottom, so the row's height comes from the
+            // label; centred only, the card collapsed and rows overlapped.
+            titleLabel.topAnchor.constraint(equalTo: card.topAnchor),
+            titleLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor),
             titleLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
         ])
     }

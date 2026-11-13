@@ -114,7 +114,7 @@ struct HistoryClearUndoTests {
         #expect(await fixture.historyCount() == 0)
     }
 
-    @Test("an empty history shows the shared empty state with a primary Explore button and no header Clear All")
+    @Test("an empty history shows one sentence, no button and no header Clear All")
     func emptyState() async throws {
         guard let context = await Self.liveUIContext() else { return }
         let url = FileManager.default.temporaryDirectory
@@ -126,10 +126,10 @@ struct HistoryClearUndoTests {
         controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 600)
         let shown = await Self.waitUntil {
             controller.view.layoutIfNeeded()
-            return Self.visibleLabelTexts(in: controller.view).contains("Play an episode and it shows up here.")
+            return Self.visibleLabelTexts(in: controller.view).contains("Episodes you play show up here.")
         }
         #expect(shown)
-        #expect(Self.visibleButtonTitles(in: controller.view).contains("Explore"))
+        #expect(!Self.visibleButtonTitles(in: controller.view).contains("Explore"))
         #expect(!Self.visibleButtonTitles(in: controller.view).contains("Clear All"))
         #expect(!Self.visibleButtonTitles(in: controller.view).contains("Hold to Clear History"))
         #expect(controller.footerState == .hidden)

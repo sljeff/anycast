@@ -78,7 +78,7 @@ final class LibrarySheetViewController: UIViewController {
     static let recentLimit = 5
 
     nonisolated enum Section: Hashable, Sendable {
-        case showsTitle, shows, momentsTitle, moments, recentTitle, recent
+        case showsTitle, shows, momentsTitle, moments, recentTitle, recent, empty
     }
 
     nonisolated enum Item: Hashable, Sendable {
@@ -87,6 +87,10 @@ final class LibrarySheetViewController: UIViewController {
         case moment(UUID)
         case recent(String)
         case allHistory
+        /// How to get a first Moment; the only row while Moments is empty.
+        case momentsHint
+        /// A plain sentence when there is nothing at all.
+        case note(String)
     }
 
     /// Called after the sheet dismissed itself, with the tapped show.
@@ -312,10 +316,17 @@ final class LibrarySheetViewController: UIViewController {
             snapshot.appendItems([.title("Shows")], toSection: .showsTitle)
             snapshot.appendItems(shows.indices.map(Item.show), toSection: .shows)
         }
-        if !moments.isEmpty {
+        if shows.isEmpty && moments.isEmpty && recent.isEmpty {
+            snapshot.appendSections([.empty])
+            snapshot.appendItems([.note("Shows you follow appear here.")], toSection: .empty)
+        } else {
+            // Moments keeps its header while empty: the hint is the only
+            // place that says the feature exists.
             snapshot.appendSections([.momentsTitle, .moments])
             snapshot.appendItems([.title("Moments")], toSection: .momentsTitle)
-            snapshot.appendItems(moments.map { Item.moment($0.id) }, toSection: .moments)
+            snapshot.appendItems(
+                moments.isEmpty ? [.momentsHint] : moments.map { Item.moment($0.id) }, toSection: .moments
+            )
         }
         if !recent.isEmpty {
             snapshot.appendSections([.recentTitle, .recent])
@@ -361,6 +372,22 @@ final class LibrarySheetViewController: UIViewController {
         let allHistoryCell = UICollectionView.CellRegistration<LibraryLinkCell, Int> { cell, _, _ in
             cell.configure(title: "All history")
         }
+        let hintCell = UICollectionView.CellRegistration<UICollectionViewListCell, String> { cell, _, text in
+            var content = UIListContentConfiguration.cell()
+            content.text = text
+            content.textProperties.font = TypographyV2.meta.font()
+            content.textProperties.color = Theme.onSurfaceVariant
+            content.textProperties.adjustsFontForContentSizeCategory = true
+            content.directionalLayoutMargins = NSDirectionalEdgeInsets(
+                top: Spacing.cardInner, leading: ShowsSheetLayout.plateInset,
+                bottom: Spacing.cardInner, trailing: ShowsSheetLayout.plateInset
+            )
+            cell.contentConfiguration = content
+            cell.backgroundConfiguration = .clear()
+        }
+        let noteCell = UICollectionView.CellRegistration<LibrarySectionTitleCell, String> { cell, _, text in
+            cell.configure(title: text, isHeader: false)
+        }
         dataSource = UICollectionViewDiffableDataSource<Section, Item>(
             collectionView: collectionView
         ) { view, indexPath, item in
@@ -375,6 +402,12 @@ final class LibrarySheetViewController: UIViewController {
                 return view.dequeueConfiguredReusableCell(using: recentCell, for: indexPath, item: url)
             case .allHistory:
                 return view.dequeueConfiguredReusableCell(using: allHistoryCell, for: indexPath, item: 0)
+            case .momentsHint:
+                return view.dequeueConfiguredReusableCell(
+                    using: hintCell, for: indexPath, item: "Hold a transcript line to keep it here."
+                )
+            case .note(let text):
+                return view.dequeueConfiguredReusableCell(using: noteCell, for: indexPath, item: text)
             }
         }
     }
@@ -395,6 +428,8 @@ final class LibrarySheetViewController: UIViewController {
             return momentsSection(environment)
         case .recent:
             return recentSection(environment)
+        case .empty:
+            return Self.titleSection(isFirst: true)
         }
     }
 
@@ -550,13 +585,19 @@ final class LibrarySheetViewController: UIViewController {
 extension LibrarySheetViewController: UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, shouldHighlightItemAt indexPath: IndexPath) -> Bool {
-        if case .title? = dataSource.itemIdentifier(for: indexPath) { return false }
-        return true
+        isSelectable(dataSource.itemIdentifier(for: indexPath))
     }
 
     func collectionView(_ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
-        if case .title? = dataSource.itemIdentifier(for: indexPath) { return false }
-        return true
+        isSelectable(dataSource.itemIdentifier(for: indexPath))
+    }
+
+    /// Titles, the Moments hint and the empty note are text, not targets.
+    private func isSelectable(_ item: Item?) -> Bool {
+        switch item {
+        case .title?, .momentsHint?, .note?: return false
+        default: return true
+        }
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
@@ -575,7 +616,7 @@ extension LibrarySheetViewController: UICollectionViewDelegate {
             presentDetail(episode)
         case .allHistory?:
             openHistory()
-        case .title?, nil:
+        case .title?, .momentsHint?, .note?, nil:
             break
         }
     }
@@ -609,9 +650,10 @@ final class LibrarySectionTitleCell: UICollectionViewCell {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    func configure(title: String) {
+    func configure(title: String, isHeader: Bool = true) {
         label.text = title
         accessibilityLabel = title
+        accessibilityTraits = isHeader ? .header : .staticText
     }
 }
 

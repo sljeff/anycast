@@ -13,13 +13,15 @@ import UIKit
 final class SearchEntryViewController: UIViewController, UICollectionViewDelegate {
 
     nonisolated enum Section: Hashable, Sendable {
-        case recentsHeader, recents, categoriesHeader, categories
+        case recentsHeader, recents, categoriesHeader, categories, hint
     }
 
     nonisolated enum Item: Hashable, Sendable {
         case header(Section)
         case recent(String)
         case category(String)
+        /// What this page does, until there is history to show instead.
+        case hint
     }
 
     /// A recent query or a category was chosen; the text is the query.
@@ -81,7 +83,7 @@ final class SearchEntryViewController: UIViewController, UICollectionViewDelegat
     func activate(_ item: Item) {
         switch item {
         case .recent(let query), .category(let query): onSelect?(query)
-        case .header: break
+        case .header, .hint: break
         }
     }
 
@@ -105,7 +107,10 @@ final class SearchEntryViewController: UIViewController, UICollectionViewDelegat
 
     private func apply(animated: Bool) {
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
-        if !recents.isEmpty {
+        if recents.isEmpty {
+            snapshot.appendSections([.hint])
+            snapshot.appendItems([.hint], toSection: .hint)
+        } else {
             snapshot.appendSections([.recentsHeader, .recents])
             snapshot.appendItems([.header(.recentsHeader)], toSection: .recentsHeader)
             snapshot.appendItems(recents.map(Item.recent), toSection: .recents)
@@ -155,6 +160,8 @@ final class SearchEntryViewController: UIViewController, UICollectionViewDelegat
         let headerCell = UICollectionView.CellRegistration<SearchEntryHeaderCell, Section> { [weak self] cell, _, section in
             if section == .recentsHeader {
                 cell.configure(title: "Recent", actionTitle: "Clear") { self?.clearRecents() }
+            } else if section == .hint {
+                cell.configure(title: Self.hintText, actionTitle: nil, onAction: nil, isHeader: false)
             } else {
                 cell.configure(title: "Categories", actionTitle: nil, onAction: nil)
             }
@@ -174,11 +181,16 @@ final class SearchEntryViewController: UIViewController, UICollectionViewDelegat
                 return view.dequeueConfiguredReusableCell(using: recentCell, for: indexPath, item: query)
             case .category(let name):
                 return view.dequeueConfiguredReusableCell(using: categoryCell, for: indexPath, item: name)
+            case .hint:
+                return view.dequeueConfiguredReusableCell(using: headerCell, for: indexPath, item: .hint)
             }
         }
     }
 
     // MARK: - Layout
+
+    /// Pasting a feed address is not handled yet, so the line promises names only.
+    static let hintText = "Search shows and episodes by name."
 
     /// Row and capsule minimum height.
     private static let rowHeight: CGFloat = 44
@@ -191,7 +203,7 @@ final class SearchEntryViewController: UIViewController, UICollectionViewDelegat
             // The last section rests clear of the tab bar and mini player.
             let isLast = index == sections.count - 1
             switch section {
-            case .recentsHeader, .categoriesHeader: return Self.headerSection()
+            case .recentsHeader, .categoriesHeader, .hint: return Self.headerSection()
             case .recents: return self.recentsSection(environment, isLast: isLast)
             case .categories: return Self.categoriesSection()
             }
@@ -352,7 +364,8 @@ private final class SearchEntryHeaderCell: UICollectionViewCell {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    func configure(title: String, actionTitle: String?, onAction: (() -> Void)?) {
+    func configure(title: String, actionTitle: String?, onAction: (() -> Void)?, isHeader: Bool = true) {
+        titleLabel.accessibilityTraits = isHeader ? .header : .staticText
         titleLabel.text = title
         actionButton.configuration?.title = actionTitle
         actionButton.isHidden = actionTitle == nil

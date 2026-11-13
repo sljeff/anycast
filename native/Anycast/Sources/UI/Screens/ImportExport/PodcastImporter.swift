@@ -166,6 +166,22 @@ nonisolated enum ImportResultText {
         return "Import \(joined) successfully"
     }
 
+    /// The batch toast told from the result: all-success keeps the titles
+    /// form; nothing imported says so; a partial run counts both sides, so a
+    /// failure is never reported as success.
+    static func batchFlow(result: PodcastImporter.Result) -> String {
+        if result.writeFailed { return ImportCopy.importWriteFailedMessage }
+        let imported = result.importedSubscriptions.count
+        if imported == 0 { return "No shows imported." }
+        let failed = result.failedURLCount
+        if failed <= 0 { return batchFlow(titles: result.titles) }
+        return "\(showsPhrase(imported)) imported. \(failed) couldn\u{2019}t be reached."
+    }
+
+    private static func showsPhrase(_ count: Int) -> String {
+        count == 1 ? "1 show" : "\(count) shows"
+    }
+
     /// "Import <title> successfully" — manual URL import of the first result
     /// (Dart force-unwrapped the title; an imported feed with nil title is
     /// the K4 tolerance and renders empty).
@@ -186,7 +202,7 @@ nonisolated enum ImportCopy {
     /// Database write failed during import — nothing was persisted, so the
     /// success toast must not fire (no Dart counterpart: its write errors
     /// propagated up the stack).
-    static let importWriteFailedMessage = "Couldn't save the imported feeds. Please try again."
+    static let importWriteFailedMessage = "Couldn\u{2019}t save. Nothing was imported."
     /// Export could not read the subscriptions (or write the OPML file) —
     /// sharing an empty or stale file would look like a valid backup.
     static let exportWriteFailedMessage = "Couldn't save your subscriptions file. Please try again."

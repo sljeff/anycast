@@ -217,6 +217,21 @@ struct PodcastImporterTests {
         #expect(ImportResultText.batchFlow(titles: []) == "Import  successfully")
     }
 
+    @Test("Result text: all failed never says successfully; partial counts both sides; a write failure says nothing was imported")
+    func resultText() {
+        func row(_ title: String) -> SubscriptionRow { SubscriptionRow(rssFeedUrl: "https://x/\(title)", title: title) }
+        let allFailed = PodcastImporter.Result(requestedURLCount: 3, importedSubscriptions: [])
+        #expect(ImportResultText.batchFlow(result: allFailed) == "No shows imported.")
+        let partial = PodcastImporter.Result(requestedURLCount: 3, importedSubscriptions: [row("A"), row("B")])
+        #expect(ImportResultText.batchFlow(result: partial) == "2 shows imported. 1 couldn\u{2019}t be reached.")
+        let one = PodcastImporter.Result(requestedURLCount: 4, importedSubscriptions: [row("A")])
+        #expect(ImportResultText.batchFlow(result: one) == "1 show imported. 3 couldn\u{2019}t be reached.")
+        let all = PodcastImporter.Result(requestedURLCount: 2, importedSubscriptions: [row("A"), row("B")])
+        #expect(ImportResultText.batchFlow(result: all) == "Import A, B successfully")
+        let writeFailed = PodcastImporter.Result(requestedURLCount: 2, importedSubscriptions: [], writeFailed: true)
+        #expect(ImportResultText.batchFlow(result: writeFailed) == "Couldn\u{2019}t save. Nothing was imported.")
+    }
+
     @Test("Batch flow text: >50 UTF-16 code units truncate to 50 + '...'")
     func batchTextTruncation() {
         let titles = [String(repeating: "a", count: 30), String(repeating: "b", count: 30)]

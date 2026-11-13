@@ -223,7 +223,7 @@ final class ImportExportDialogViewController: UIViewController,
             await self.runImport(
                 urls: entries.map(\.xmlURL),
                 reportsProgress: true,
-                completionText: { ImportResultText.batchFlow(titles: $0.titles) }
+                completionText: { ImportResultText.batchFlow(result: $0) }
             )
         }
     }
@@ -299,7 +299,7 @@ final class ImportExportDialogViewController: UIViewController,
         if !reportsProgress, ImportCopy.needsInvalidFeedAlert(result) {
             // Only the manual-URL flow alerts on empty results
             // (import_export.dart:196-226); the OPML flow toasts regardless
-            // — an all-failed import still "succeeds" with empty titles.
+            // and now says "No shows imported." when every address failed.
             let overlay = progressOverlay
             progressOverlay = nil
             overlay?.dismiss(animated: true) {

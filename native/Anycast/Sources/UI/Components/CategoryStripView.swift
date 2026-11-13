@@ -61,6 +61,12 @@ final class CategoryStripView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    /// Back to the "all" chip without firing `onSelect` (the owner already knows).
+    func resetSelection() {
+        selectedValue = nil
+        applySelection()
+    }
+
     /// Reloads the strip. `selected` not present in `categories` resets to all.
     func configure(categories: [String], selected: String?) {
         let newChips = CategoryStripModel.chips(categories: categories)

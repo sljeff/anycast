@@ -77,6 +77,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// The first `reload()` has landed; a refresh before it cannot tell
     /// new rows from rows the list simply had not loaded yet.
     private var didLoadOnce = false
+    /// The subscriptions have been read at least once; before that an empty
+    /// `shows` only means "not loaded yet", not "follows nothing".
+    private var didLoadSubscriptions = false
     /// Monotonic: an older overlapping reload never replaces a newer one.
     private var reloadGeneration = 0
     /// A refresh the reader did not ask for is running (header: "Updating…").
@@ -254,7 +257,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             lastRefresh: gate.lastRefresh,
             episodeCount: episodes.count
         )
-        header.configure(HeaderView.Configuration(title: "Podcast", statusText: status))
+        // Nothing followed: there is nothing to be "updated" or "unlistened".
+        let followsNothing = didLoadSubscriptions && shows.isEmpty
+        header.configure(HeaderView.Configuration(title: "Podcast", statusText: followsNothing ? nil : status))
     }
 
     /// The section kinds for the current content, top to bottom.
@@ -320,7 +325,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             config.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
                 self?.trailingSwipeActions(at: indexPath)
             }
-            return Self.rowsSection(config: config, environment: environment)
+            return Self.rowsSection(
+                config: config, environment: environment, hasRows: !displayedEpisodes.isEmpty
+            )
         case .tail:
             return Self.chromeSection(height: nil, bottomInset: Spacing.gap)
         }
@@ -330,7 +337,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// list configuration) on a grouped plate inset 16 from the edges — the
     /// same `GroupedPlateView` decoration Discover and Channel lists use.
     static func rowsSection(
-        config: UICollectionLayoutListConfiguration, environment: NSCollectionLayoutEnvironment
+        config: UICollectionLayoutListConfiguration, environment: NSCollectionLayoutEnvironment,
+        hasRows: Bool = true
     ) -> NSCollectionLayoutSection {
         let section = NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
         section.contentInsets = NSDirectionalEdgeInsets(
@@ -340,7 +348,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         plate.contentInsets = NSDirectionalEdgeInsets(
             top: 0, leading: Spacing.pageH, bottom: 0, trailing: Spacing.pageH
         )
-        section.decorationItems = [plate]
+        // An empty section would draw an empty plate, a stray white strip.
+        section.decorationItems = hasRows ? [plate] : []
         return section
     }
 
@@ -416,19 +425,21 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             chrome: header, to: collectionView, edge: .top, in: view, reach: view.topAnchor
         )
 
-        emptyStateView.onExplore = { [weak self] in
-            self?.context.tabs.select(2)
+        emptyStateView.onFindShow = { [weak self] in
+            // The Search tab.
+            self?.context.tabs.select(3)
         }
-        emptyStateView.onImportOPML = { [weak self] in
+        emptyStateView.onShowAll = { [weak self] in
+            guard let self else { return }
+            self.selectedCategory = nil
+            self.categoryStrip.resetSelection()
+            self.renderList(allowsDiff: false)
+        }
+        emptyStateView.onImport = { [weak self] in
             // Get.dialog(ImportExportBlock) — the T9 stub is the correct
             // presentation target for now.
             guard let self else { return }
             ImportExportDialogViewController.present(from: self, context: self.context)
-        }
-        emptyStateView.onHelp = { [weak self] in
-            // ImportInstructions sheet (feeds.dart:178-193).
-            guard let self else { return }
-            ImportInstructionsViewController.present(from: self)
         }
 
         historyFooterButton.addAction(
@@ -497,6 +508,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             selected: selectedCategory
         )
         shows = ShowsShelfLayout.ordered(subscriptions)
+        didLoadSubscriptions = true
         shelf.configure(shows: shows)
         // A selection that vanished (unsubscribed its last source) resets
         // to the all chip, like the strip's own configure does.
@@ -570,11 +582,28 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             }
         }
         commitNow()
-        collectionView.backgroundView = displayedEpisodes.isEmpty ? emptyStateView : nil
+        applyEmptyState()
         historyFooterButton.refresh(pageIsEmpty: displayedEpisodes.isEmpty, database: context.database)
         refreshChromeStatus()
         refreshVisibleRowPositions()
         playEntranceIfNeeded()
+    }
+
+    /// Hosts the empty state with the reason the list is empty, or clears it.
+    private func applyEmptyState() {
+        let displayed = displayedEpisodes
+        guard displayed.isEmpty else {
+            collectionView.backgroundView = nil
+            return
+        }
+        if didLoadSubscriptions && shows.isEmpty {
+            emptyStateView.show(.noSubscriptions)
+        } else if let category = selectedCategory {
+            emptyStateView.show(.filtered(category: category))
+        } else {
+            emptyStateView.show(.caughtUp(showCount: shows.count))
+        }
+        collectionView.backgroundView = emptyStateView
     }
 
     /// Applies rows that appeared or left as a batch update; the cards that
@@ -1068,7 +1097,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
         // Post-completion state, not a cached one: a concurrent refresh may
         // have emptied the list while the delete animation ran.
-        collectionView.backgroundView = displayedEpisodes.isEmpty ? emptyStateView : nil
+        applyEmptyState()
         historyFooterButton.refresh(pageIsEmpty: displayedEpisodes.isEmpty, database: context.database)
         refreshChromeStatus()
         refreshVisibleRowPositions()
@@ -1563,56 +1592,71 @@ final class HistoryTailCell: UICollectionViewCell {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
 
-// MARK: - Empty state (ImportBlock, feeds.dart:147-197)
+// MARK: - Empty state
 
-
-/// AnycastEmptyState + the ImportBlock action column on the shared
-/// `EmptyStateView`: Explore (primary) over a row with the secondary
-/// Import OPML button and the round help button. Hosted as the
-/// collection background so the page stays pull-to-refreshable.
+/// The three reasons the Inbox list can be empty, each with its own words
+/// (on the shared `EmptyStateView`): nothing followed yet, everything heard,
+/// or a category filter that hides every episode. Hosted as the collection
+/// background so the page stays pull-to-refreshable.
 final class InboxEmptyStateView: EmptyStateView {
 
-    var onExplore: (() -> Void)?
-    var onImportOPML: (() -> Void)?
-    var onHelp: (() -> Void)?
+    enum Reason: Equatable {
+        case noSubscriptions
+        case caughtUp(showCount: Int)
+        case filtered(category: String)
+    }
 
-    override init() {
-        super.init()
-        let explore = AnycastButton.make(.primary, title: "Explore", image: AppIcons.explore)
-        explore.addAction(UIAction { [weak self] _ in self?.onExplore?() }, for: .touchUpInside)
+    var onFindShow: (() -> Void)?
+    var onImport: (() -> Void)?
+    var onShowAll: (() -> Void)?
+    private(set) var reason: Reason?
 
-        let importButton = AnycastButton.make(.secondary, title: "Import OPML", image: UIImage(systemName: "arrow.down.doc"))
-        importButton.addAction(UIAction { [weak self] _ in self?.onImportOPML?() }, for: .touchUpInside)
+    func show(_ reason: Reason) {
+        guard reason != self.reason else { return }
+        self.reason = reason
+        configure(Self.content(for: reason, find: { [weak self] in self?.onFindShow?() },
+                               importAction: { [weak self] in self?.onImport?() },
+                               showAll: { [weak self] in self?.onShowAll?() }))
+    }
 
-        let help = AnycastIconButton(
-            style: .tonal,
-            icon: UIImage(systemName: "questionmark"),
-            accessibilityLabel: "Import help",
-            diameter: AnycastIconButton.largeDiameter
-        )
-        help.addAction(UIAction { [weak self] _ in self?.onHelp?() }, for: .touchUpInside)
+    /// "1 show" / "N shows".
+    static func showsPhrase(_ count: Int) -> String {
+        count == 1 ? "1 show" : "\(count) shows"
+    }
 
-        let buttonRow = UIStackView(arrangedSubviews: [importButton, help])
-        buttonRow.axis = .horizontal
-        buttonRow.alignment = .center
-        buttonRow.spacing = Spacing.md
+    static func copy(for reason: Reason) -> (title: String, message: String?) {
+        switch reason {
+        case .noSubscriptions:
+            return ("New episodes from shows you follow land here.", "Anycast can transcribe and translate them.")
+        case .caughtUp(let count):
+            return ("All caught up.", "New episodes from your \(showsPhrase(count)) land here.")
+        case .filtered(let category):
+            return ("No episodes in \(category).", nil)
+        }
+    }
 
-        NSLayoutConstraint.activate([
-            explore.heightAnchor.constraint(equalToConstant: AnycastIconButton.largeDiameter),
-            importButton.heightAnchor.constraint(equalToConstant: AnycastIconButton.largeDiameter),
-        ])
-        configure(Content(
-            icon: UIImage(systemName: "tray"),
-            title: "It’s empty here.",
-            message: "Let's change that!",
-            actions: [explore, buttonRow]
-        ))
-        // The two rows center independently; tying the Explore capsule's
-        // width to the row's total width (import + spacing + the 48 pt
-        // help button) makes them share left/right edges, so Explore's
-        // and Import's leading axes align instead of Import left-shifting.
-        // Activated AFTER configure(): both views must already sit in the
-        // action column, or the anchors have no common ancestor.
-        explore.widthAnchor.constraint(equalTo: buttonRow.widthAnchor).isActive = true
+    private static func content(
+        for reason: Reason,
+        find: @escaping () -> Void,
+        importAction: @escaping () -> Void,
+        showAll: @escaping () -> Void
+    ) -> Content {
+        let text = copy(for: reason)
+        var actions: [UIView] = []
+        switch reason {
+        case .noSubscriptions:
+            let findButton = AnycastButton.make(.primary, title: "Find a show")
+            findButton.addAction(UIAction { _ in find() }, for: .touchUpInside)
+            let link = EmptyStateView.linkButton(title: "Import from another app")
+            link.addAction(UIAction { _ in importAction() }, for: .touchUpInside)
+            actions = [findButton, link]
+        case .caughtUp:
+            break
+        case .filtered:
+            let button = AnycastButton.make(.secondary, title: "Show all")
+            button.addAction(UIAction { _ in showAll() }, for: .touchUpInside)
+            actions = [button]
+        }
+        return Content(title: text.title, message: text.message, actions: actions)
     }
 }

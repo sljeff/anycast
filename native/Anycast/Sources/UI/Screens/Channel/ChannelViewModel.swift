@@ -287,6 +287,9 @@ final class ChannelViewModel {
     private(set) var channel: SubscriptionRow
     private(set) var episodes: [FeedEpisodeRow] = []
     private(set) var isLoading = true
+    /// The last feed fetch returned nothing (offline, a dead address, a feed
+    /// that does not parse). Distinct from a feed that loaded with no episodes.
+    private(set) var fetchFailed = false
     private(set) var subscribed = false
     /// Whether the local DB exists-check has settled — the subscription
     /// capsule can render before the network fetch finishes (it used to
@@ -359,6 +362,21 @@ final class ChannelViewModel {
         }
         // Colour extraction runs beside the RSS fetch, not after it.
         let seedPalette = startPalette()
+        await fetchFeed()
+        // The feed may have supplied the cover (a seed without an image).
+        await startPalette()?.value
+        await seedPalette?.value
+    }
+
+    /// The Retry under "Couldn’t load this show.": the same fetch again.
+    func retryFetch() async {
+        fetchFailed = false
+        isLoading = true
+        await fetchFeed()
+        await startPalette()?.value
+    }
+
+    private func fetchFeed() async {
         let podcasts = await fetcher.fetchPodcasts(urls: [rssFeedURL], onlyFirstEpisode: false)
         if let podcast = podcasts.first {
             episodes = podcast.feedEpisodes
@@ -366,11 +384,11 @@ final class ChannelViewModel {
                 channel = podcast.subscription
             }
             channel.author = ChannelHeaderLogic.author(seed: channel.author, feed: podcast.subscription.author)
+            fetchFailed = false
+        } else {
+            fetchFailed = true
         }
         isLoading = false
-        // The feed may have supplied the cover (a seed without an image).
-        await startPalette()?.value
-        await seedPalette?.value
     }
 
     /// _updateColor (states/channel.dart:37-43): no URL → keep current color.

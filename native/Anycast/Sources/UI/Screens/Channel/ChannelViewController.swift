@@ -35,6 +35,9 @@ final class ChannelViewController: UIViewController {
     static let skeletonRowCount = 6
     private let fullPageSpinner = UIActivityIndicatorView(style: .large)
     private let emptyChannelLabel = UILabel()
+    /// "No episodes yet." or "Couldn’t load this show." + Retry, under the header and order row.
+    private let bodyState = EmptyStateView()
+    private var bodyStateTop: NSLayoutConstraint?
 
     private let expandCoordinator = CardExpandCoordinator()
     private var binder: ChannelEpisodeListBinder?
@@ -133,6 +136,7 @@ final class ChannelViewController: UIViewController {
                 _ = viewModel.channel
                 _ = viewModel.episodes
                 _ = viewModel.isLoading
+                _ = viewModel.fetchFailed
                 _ = viewModel.subscribed
                 _ = viewModel.subscriptionChecked
                 _ = viewModel.dominantColor
@@ -198,7 +202,17 @@ final class ChannelViewController: UIViewController {
         emptyChannelLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyChannelLabel)
 
+        bodyState.isHidden = true
+        bodyState.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(bodyState, aboveSubview: collectionView)
+        let bodyTop = bodyState.topAnchor.constraint(equalTo: view.topAnchor)
+        bodyStateTop = bodyTop
+
         NSLayoutConstraint.activate([
+            bodyTop,
+            bodyState.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bodyState.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bodyState.bottomAnchor.constraint(equalTo: actionRow.topAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -308,6 +322,7 @@ final class ChannelViewController: UIViewController {
     private func rebuildForGeometryChange() {
         appliedSafeAreaTop = view.safeAreaInsets.top
         headerView?.updateGeometry(foldGeometry)
+        bodyStateTop?.constant = foldGeometry.maxExtent + ChannelBodyHeaderCell.fixedHeight
         collectionView.setCollectionViewLayout(makeLayout(), animated: false)
         applyFold()
     }
@@ -412,7 +427,29 @@ final class ChannelViewController: UIViewController {
             }
         }
 
+        renderBodyState(viewModel)
         renderPlayerBar()
+    }
+
+    /// A show with no rows says why: the feed could not be read (Retry) or
+    /// it has no episodes. Nothing shows while loading or when rows exist.
+    private func renderBodyState(_ viewModel: ChannelViewModel) {
+        let shows = viewModel.episodes.isEmpty && !viewModel.isLoading
+        bodyState.isHidden = !shows
+        guard shows else { return }
+        if viewModel.fetchFailed {
+            let retry = AnycastButton.make(
+                .secondary, title: "Retry", image: UIImage(systemName: "arrow.clockwise")
+            )
+            retry.accessibilityIdentifier = "channel-retry"
+            retry.addAction(UIAction { [weak viewModel] _ in
+                guard let viewModel else { return }
+                Task { await viewModel.retryFetch() }
+            }, for: .touchUpInside)
+            bodyState.configure(.init(title: "Couldn’t load this show.", actions: [retry]))
+        } else {
+            bodyState.configure(.init(title: "No episodes yet."))
+        }
     }
 
     private var subscriptionDisplay: ChannelSubscriptionDisplay {
