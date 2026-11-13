@@ -275,7 +275,9 @@ public final class PlaybackService {
             guard let self else { return }
             let task = await self.cache.startDownload(url: urlString) { [weak self] progress in
                 Task { @MainActor in
-                    guard let self, let progress else { return }
+                    guard let self, let progress,
+                          DownloadProgressStep.isVisibleChange(from: self.cacheStates[urlString], to: progress)
+                    else { return }
                     self.cacheStates[urlString] = progress
                 }
             }

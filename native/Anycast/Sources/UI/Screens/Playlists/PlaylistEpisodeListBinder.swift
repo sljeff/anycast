@@ -30,6 +30,7 @@ final class PlaylistEpisodeListBinder: NSObject {
     private(set) var diskCachedURLs: Set<String> = []
 
     private let playbackObservation = ObservationLoop()
+    private let downloadObservation = ObservationLoop()
     private let positionObservation = ObservationLoop()
     private let aiObservation = ObservationLoop()
 
@@ -134,14 +135,34 @@ final class PlaylistEpisodeListBinder: NSObject {
     /// (play icon snapshot, AI four-state, download indicator) without a
     /// full data reload.
     func refreshVisibleCards() {
-        guard let collectionView else { return }
-        for path in collectionView.indexPathsForVisibleItems {
-            guard let cell = collectionView.cellForItem(at: path) as? EpisodeCardCell else { continue }
-            guard let episode = episode(at: path) else { continue }
-            let enclosureURL = episode.enclosureUrl ?? ""
+        forEachVisibleCard { cell, enclosureURL in
             updatePlayOverlay(on: cell, enclosureURL: enclosureURL)
             applyAIDisplay(on: cell, enclosureURL: enclosureURL)
             cell.updateDownload(downloadDisplay(for: enclosureURL))
+        }
+    }
+
+    /// Each live source refreshes only the part of the card it drives: a
+    /// download tick must not re-run the strip icons and play glyph of
+    /// every visible card.
+    private func refreshVisiblePlayOverlays() {
+        forEachVisibleCard { cell, enclosureURL in updatePlayOverlay(on: cell, enclosureURL: enclosureURL) }
+    }
+
+    private func refreshVisibleAIDisplays() {
+        forEachVisibleCard { cell, enclosureURL in applyAIDisplay(on: cell, enclosureURL: enclosureURL) }
+    }
+
+    private func refreshVisibleDownloads() {
+        forEachVisibleCard { cell, enclosureURL in cell.updateDownload(downloadDisplay(for: enclosureURL)) }
+    }
+
+    private func forEachVisibleCard(_ body: (EpisodeCardCell, String) -> Void) {
+        guard let collectionView else { return }
+        for path in collectionView.indexPathsForVisibleItems {
+            guard let cell = collectionView.cellForItem(at: path) as? EpisodeCardCell,
+                  let episode = episode(at: path) else { continue }
+            body(cell, episode.enclosureUrl ?? "")
         }
     }
 
@@ -187,9 +208,12 @@ final class PlaylistEpisodeListBinder: NSObject {
                 _ = playback.currentEpisodeContent
                 _ = playback.isPlaying
                 _ = playback.isLoading
-                _ = playback.cacheStates
             },
-            onChange: { [weak self] in self?.refreshVisibleCards() }
+            onChange: { [weak self] in self?.refreshVisiblePlayOverlays() }
+        )
+        downloadObservation.track(
+            read: { _ = playback.cacheStates },
+            onChange: { [weak self] in self?.refreshVisibleDownloads() }
         )
         positionObservation.track(
             read: { _ = playback.positionData },
@@ -198,7 +222,7 @@ final class PlaylistEpisodeListBinder: NSObject {
         let subtitles = context.subtitles
         aiObservation.track(
             read: { _ = subtitles.statuses },
-            onChange: { [weak self] in self?.refreshVisibleCards() }
+            onChange: { [weak self] in self?.refreshVisibleAIDisplays() }
         )
     }
 
@@ -224,9 +248,13 @@ final class PlaylistEpisodeListBinder: NSObject {
         manualDownloadTasks[enclosureURL] = Task { [weak self] in
             let task = await cacheStore.startDownload(url: enclosureURL) { [weak self] progress in
                 Task { @MainActor [weak self] in
-                    guard let self, let progress else { return }
+                    guard let self, let progress,
+                          DownloadProgressStep.isVisibleChange(
+                              from: self.manualDownloadProgress[enclosureURL], to: progress
+                          )
+                    else { return }
                     self.manualDownloadProgress[enclosureURL] = progress
-                    self.refreshVisibleCards()
+                    self.refreshVisibleDownloads()
                 }
             }
             let downloadResult = try? await task.value

@@ -253,40 +253,64 @@ final class PlayerTransportView: UIView {
 
     // MARK: - Rendering (ObservationLoop-driven)
 
-    private func render() {
-        let episode = context.playback.currentEpisode
-        let position = context.playback.positionData
+    /// Everything the controls show besides the position. Position ticks
+    /// arrive twice a second; only the scrubber moves with them, so the
+    /// buttons, glyph and accessibility are re-applied only when this
+    /// changes.
+    private struct ControlState: Equatable {
+        var visual: PlayerProgressVisualState
+        var controlsEnabled: Bool
+        var enclosureURL: String?
+        var isPlaying: Bool
+        var isLoading: Bool
+    }
 
-        let state = PlayerProgressVisualState.resolve(
-            hasEpisode: (episode?.enclosureUrl?.isEmpty == false),
-            isLoading: context.playback.isLoading,
-            durationMilliseconds: position.durationMilliseconds
-        )
-        progressBar.setAllowsSeek(state.allowsSeek, statusMessage: state.message)
+    private var renderedControlState: ControlState?
+
+    private func render() {
+        let playback = context.playback
+        let episode = playback.currentEpisode
+        let position = playback.positionData
+
         progressBar.update(
             positionMilliseconds: position.positionMilliseconds,
             bufferedMilliseconds: position.bufferedMilliseconds,
             durationMilliseconds: position.durationMilliseconds
         )
 
-        // Dart gates every control on loading + having an episode
-        // (Controls, player.dart:1310-1313); disabled tints to 38%.
-        let controlsEnabled = !context.playback.isLoading
-            && episode?.enclosureUrl?.isEmpty == false
-        replayButton.isEnabled = controlsEnabled
-        forwardButton.isEnabled = controlsEnabled
-        playPauseButton.isEnabled = controlsEnabled
-        let alpha: CGFloat = controlsEnabled ? 1 : 0.38
+        let hasEpisode = episode?.enclosureUrl?.isEmpty == false
+        let state = ControlState(
+            visual: PlayerProgressVisualState.resolve(
+                hasEpisode: hasEpisode,
+                isLoading: playback.isLoading,
+                durationMilliseconds: position.durationMilliseconds
+            ),
+            // Dart gates every control on loading + having an episode
+            // (Controls, player.dart:1310-1313); disabled tints to 38%.
+            controlsEnabled: !playback.isLoading && hasEpisode,
+            enclosureURL: episode?.enclosureUrl,
+            isPlaying: playback.isPlaying,
+            isLoading: playback.isLoading
+        )
+        guard state != renderedControlState else { return }
+        renderedControlState = state
+
+        progressBar.setAllowsSeek(state.visual.allowsSeek, statusMessage: state.visual.message)
+
+        replayButton.isEnabled = state.controlsEnabled
+        forwardButton.isEnabled = state.controlsEnabled
+        playPauseButton.isEnabled = state.controlsEnabled
+        let alpha: CGFloat = state.controlsEnabled ? 1 : 0.38
         replayButton.alpha = alpha
         forwardButton.alpha = alpha
         playPauseButton.alpha = alpha
 
         playPauseIcon.update(
             snapshot: .init(
-                enclosureURL: episode?.enclosureUrl,
-                currentEnclosureURL: episode?.enclosureUrl,
-                isPlaying: context.playback.isPlaying,
-                isLoading: context.playback.isLoading
+                enclosureURL: state.enclosureURL,
+                currentEnclosureURL: state.enclosureURL,
+                isPlaying: state.isPlaying,
+                isLoading: state.isLoading
             ),
             tint: Theme.playerText
         )
