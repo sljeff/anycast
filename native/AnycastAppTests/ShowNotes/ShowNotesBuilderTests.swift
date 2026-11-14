@@ -260,6 +260,32 @@ struct ShowNotesBuilderTests {
         #expect(abs((paragraphStyle(at: "Intro", in: result)?.lineHeightMultiple ?? 0) - 1.2) < 0.001)
     }
 
+    @Test("Block gaps scale with Dynamic Type and keep the 1.2 line multiple")
+    func blockGapsScale() {
+        let ax = UITraitCollection(mutations: {
+            $0.preferredContentSizeCategory = .accessibilityExtraExtraExtraLarge
+            $0.displayScale = 3.0
+            $0.userInterfaceStyle = .dark
+        })
+        let document = ShowNotesDocument(blocks: [
+            .paragraph(runs: [.text("Intro")]),
+            .heading(level: 2, runs: [.text("Head")]),
+            .quote(blocks: [.paragraph(runs: [.text("L1")])]),
+        ])
+        let result = ShowNotesBuilder().attributedString(from: document, style: style, traits: ax)
+        let paragraph = TypographyV2.scaledValue(style.paragraphSpacing, style: style.body, compatibleWith: ax)
+        let before = TypographyV2.scaledValue(style.headingSpacingBefore, style: style.heading, compatibleWith: ax)
+        let after = TypographyV2.scaledValue(style.headingSpacing, style: style.heading, compatibleWith: ax)
+        let indent = TypographyV2.scaledValue(style.quoteIndent, style: style.body, compatibleWith: ax)
+        #expect(paragraph > Spacing.md)
+        #expect(abs((paragraphStyle(at: "Intro", in: result)?.paragraphSpacing ?? 0) - paragraph) < 0.01)
+        let heading = paragraphStyle(at: "Head", in: result)
+        #expect(abs((heading?.paragraphSpacingBefore ?? 0) - before) < 0.01)
+        #expect(abs((heading?.paragraphSpacing ?? 0) - after) < 0.01)
+        #expect(abs((paragraphStyle(at: "L1", in: result)?.headIndent ?? 0) - indent) < 0.01)
+        #expect(abs((paragraphStyle(at: "Intro", in: result)?.lineHeightMultiple ?? 0) - 1.2) < 0.001)
+    }
+
     // MARK: Superscript / subscript
 
     @Test("Superscript/subscript: 0.75x size and ±0.35x baseline offset")

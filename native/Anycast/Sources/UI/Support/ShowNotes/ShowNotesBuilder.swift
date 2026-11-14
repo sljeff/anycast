@@ -86,6 +86,7 @@ struct ShowNotesBuilder {
 private final class Composer {
 
     private let style: ShowNotesStyle
+    private let metrics: ShowNotesStyle.ScaledMetrics
     private let attachmentProvider: ShowNotesAttachmentProviding
     private let bodyFont: UIFont
     private let headingFont: UIFont
@@ -104,6 +105,7 @@ private final class Composer {
 
     init(style: ShowNotesStyle, traits: UITraitCollection, attachmentProvider: ShowNotesAttachmentProviding) {
         self.style = style
+        self.metrics = style.scaledMetrics(traits: traits)
         self.attachmentProvider = attachmentProvider
         self.bodyFont = style.bodyFont(traits: traits)
         self.headingFont = style.headingFont(traits: traits)
@@ -126,11 +128,11 @@ private final class Composer {
                 // One tier: every heading level renders identically, so
                 // the level is intentionally ignored.
                 let attributes = headingAttributes()
-                let paragraph = makeParagraph(spacing: style.headingSpacing, indent: indent)
+                let paragraph = makeParagraph(spacing: metrics.headingSpacing, indent: indent)
                 // Above a heading the previous block already contributes its
                 // own after-gap; this before-gap lifts headings clear of
                 // body text (p→h = body.after + heading.before).
-                paragraph.paragraphSpacingBefore = style.headingSpacingBefore
+                paragraph.paragraphSpacingBefore = metrics.headingSpacingBefore
                 appendBlock(paragraph: paragraph, baseAttributes: attributes) {
                     append(runs: runs, attributes: attributes)
                 }
@@ -143,7 +145,7 @@ private final class Composer {
                 } else {
                     let attributes = bodyAttributes(color: bodyColor)
                     appendBlock(
-                        paragraph: makeParagraph(spacing: style.paragraphSpacing, indent: indent),
+                        paragraph: makeParagraph(spacing: metrics.paragraphSpacing, indent: indent),
                         baseAttributes: attributes
                     ) {
                         append(runs: runs, attributes: attributes)
@@ -163,7 +165,7 @@ private final class Composer {
             case .quote(let inner):
                 // Recurse: inner blocks indent one more level and tint body
                 // text with the quote color (headings/code keep their own).
-                append(blocks: inner, indent: indent + style.quoteIndent, bodyColor: style.quoteColor)
+                append(blocks: inner, indent: indent + metrics.quoteIndent, bodyColor: style.quoteColor)
 
             case .codeBlock(let text):
                 appendCodeBlock(text: text, indent: indent)
@@ -174,7 +176,7 @@ private final class Composer {
             case .divider:
                 let attributes = bodyAttributes(color: style.secondaryColor)
                 appendBlock(
-                    paragraph: makeParagraph(spacing: style.paragraphSpacing, indent: indent, alignment: .center),
+                    paragraph: makeParagraph(spacing: metrics.paragraphSpacing, indent: indent, alignment: .center),
                     baseAttributes: attributes
                 ) {
                     output.append(NSAttributedString(string: "· · ·", attributes: attributes))
@@ -260,12 +262,12 @@ private final class Composer {
             marker = "•\t"
         }
 
-        let firstLine = indent + CGFloat(depth) * style.listDepthStep
+        let firstLine = indent + CGFloat(depth) * metrics.listDepthStep
         // The fixed column is only the floor: "10.\t" at the current body
         // size (Dynamic Type grows it) must fit too, or the tab overshoots
         // its stop and wrapped lines mis-align under the marker.
-        let column = firstLine + max(style.listMarkerColumn, markerColumnWidth)
-        let paragraph = makeParagraph(spacing: style.listItemSpacing, indent: firstLine)
+        let column = firstLine + max(metrics.listMarkerColumn, markerColumnWidth)
+        let paragraph = makeParagraph(spacing: metrics.listItemSpacing, indent: firstLine)
         paragraph.headIndent = column
         // The marker ends with "\t"; the stop parks the item text at the
         // column so wrapped lines (headIndent) align under it.
@@ -283,7 +285,7 @@ private final class Composer {
     private func appendCodeBlock(text: String, indent: CGFloat) {
         let mono = style.monoFont(ofSize: bodyFont.pointSize, weight: .regular)
         let spaceWidth = (" " as NSString).size(withAttributes: [.font: mono]).width
-        let padCount = max(1, Int((style.codePadding / max(spaceWidth, 0.5)).rounded(.up)))
+        let padCount = max(1, Int((metrics.codePadding / max(spaceWidth, 0.5)).rounded(.up)))
         let pad = String(repeating: " ", count: padCount)
         // Block fill ships as `.backgroundColor` runs (spec-sanctioned);
         // padding is materialized as space columns and blank padded lines
@@ -300,7 +302,7 @@ private final class Composer {
             .backgroundColor: style.codeBackgroundColor,
         ]
         appendBlock(
-            paragraph: makeParagraph(spacing: style.paragraphSpacing, indent: indent),
+            paragraph: makeParagraph(spacing: metrics.paragraphSpacing, indent: indent),
             baseAttributes: attributes
         ) {
             output.append(NSAttributedString(string: padded, attributes: attributes))
@@ -312,7 +314,7 @@ private final class Composer {
     private func appendImageParagraph(images: [ShowNotesImage], indent: CGFloat) {
         let attributes = bodyAttributes(color: nil)
         appendBlock(
-            paragraph: makeParagraph(spacing: style.paragraphSpacing, indent: indent),
+            paragraph: makeParagraph(spacing: metrics.paragraphSpacing, indent: indent),
             baseAttributes: attributes
         ) {
             for image in images {

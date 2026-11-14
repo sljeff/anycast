@@ -11,6 +11,10 @@ import UIKit
 /// values, and a future retheme is one struct away. Values resolve from
 /// the design-system tokens (`TypographyV2`, `Theme`, `Spacing`,
 /// `Radius`); do not bypass them with literals.
+///
+/// The stored spacing is the default-size point size. `scaledMetrics`
+/// grows it with the neighboring text style, and at `.large` it is the
+/// stored value, so default Dynamic Type does not move.
 struct ShowNotesStyle {
 
     // MARK: Type
@@ -82,6 +86,41 @@ struct ShowNotesStyle {
 
     /// Extra indent per list `depth` level — `Spacing.gap`.
     var listDepthStep: CGFloat = Spacing.gap
+
+    /// Spacing after `scaledMetrics`. At the default content size each
+    /// field equals the stored token.
+    struct ScaledMetrics: Equatable {
+        var paragraphSpacing: CGFloat
+        var headingSpacing: CGFloat
+        var headingSpacingBefore: CGFloat
+        var listItemSpacing: CGFloat
+        var quoteIndent: CGFloat
+        var listMarkerColumn: CGFloat
+        var listDepthStep: CGFloat
+        var codePadding: CGFloat
+    }
+
+    /// Block gaps follow the text they separate. Body gaps use `body`;
+    /// heading gaps use `heading`. Line-height multiple stays put (the
+    /// notes already sit near 1.4).
+    func scaledMetrics(traits: UITraitCollection) -> ScaledMetrics {
+        func scaleBody(_ value: CGFloat) -> CGFloat {
+            TypographyV2.scaledValue(value, style: body, compatibleWith: traits)
+        }
+        func scaleHeading(_ value: CGFloat) -> CGFloat {
+            TypographyV2.scaledValue(value, style: heading, compatibleWith: traits)
+        }
+        return ScaledMetrics(
+            paragraphSpacing: scaleBody(paragraphSpacing),
+            headingSpacing: scaleHeading(headingSpacing),
+            headingSpacingBefore: scaleHeading(headingSpacingBefore),
+            listItemSpacing: scaleBody(listItemSpacing),
+            quoteIndent: scaleBody(quoteIndent),
+            listMarkerColumn: scaleBody(listMarkerColumn),
+            listDepthStep: scaleBody(listDepthStep),
+            codePadding: scaleBody(codePadding)
+        )
+    }
 
     // MARK: Fonts
 

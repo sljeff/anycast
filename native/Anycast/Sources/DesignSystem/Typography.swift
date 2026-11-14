@@ -98,26 +98,82 @@ nonisolated enum TypographyV2 {
         /// Which theme face renders this style (`ThemeSpec.Typography`).
         var role: ThemeSpec.FontRole = .text
 
-        func font(traits: UITraitCollection? = nil) -> UIFont {
+        /// Above the default content size, line height stays at or under this
+        /// multiple of the scaled point size. The default size keeps the
+        /// token (emphasis is 22 pt, about 1.29), which is the design value.
+        static let accessibilityLineHeightMultiple: CGFloat = 1.25
+
+        func font(traits: UITraitCollection? = nil, maximumPointSize: CGFloat? = nil) -> UIFont {
             let base = ThemeRegistry.current.typography.font(size, weight, role)
             let metrics = UIFontMetrics(forTextStyle: scalingTextStyle)
+            if let maximumPointSize {
+                if let traits {
+                    return metrics.scaledFont(
+                        for: base, maximumPointSize: maximumPointSize, compatibleWith: traits
+                    )
+                }
+                return metrics.scaledFont(for: base, maximumPointSize: maximumPointSize)
+            }
             if let traits {
                 return metrics.scaledFont(for: base, compatibleWith: traits)
             }
             return metrics.scaledFont(for: base)
         }
 
+        /// Line height for `traits`. At the default size (and smaller) this is
+        /// the scaled token, so emphasis stays 22 pt. Larger sizes use
+        /// `min(scaledToken, pointSize × 1.25)` so a fixed token cannot clip
+        /// the glyphs or stack lines tighter than the cap.
+        func resolvedLineHeight(for font: UIFont, traits: UITraitCollection?) -> CGFloat {
+            let metrics = UIFontMetrics(forTextStyle: scalingTextStyle)
+            let scaled: CGFloat
+            if let traits {
+                scaled = metrics.scaledValue(for: lineHeight, compatibleWith: traits)
+            } else {
+                scaled = metrics.scaledValue(for: lineHeight)
+            }
+            if scaled <= lineHeight + 0.5 {
+                return scaled
+            }
+            return min(scaled, font.pointSize * Self.accessibilityLineHeightMultiple)
+        }
+
         /// Attributed-string attributes covering font, line height and color.
+        /// Minimum and maximum line height are the same value, so a two-line
+        /// title matches the token instead of the font's natural line height.
         func attributes(traits: UITraitCollection? = nil) -> [NSAttributedString.Key: Any] {
+            let resolvedFont = font(traits: traits)
+            let line = resolvedLineHeight(for: resolvedFont, traits: traits)
             let paragraph = NSMutableParagraphStyle()
-            paragraph.minimumLineHeight = lineHeight
-            paragraph.maximumLineHeight = lineHeight
+            paragraph.minimumLineHeight = line
+            paragraph.maximumLineHeight = line
             return [
-                .font: font(traits: traits),
-                .paragraphStyle: paragraph.copy(),
+                .font: resolvedFont,
+                .paragraphStyle: paragraph,
                 .foregroundColor: color,
             ]
         }
+    }
+
+    /// `base` at the default content size, scaled with `style` otherwise.
+    /// Default (`.large` / unspecified) returns `base` unchanged, so a gap
+    /// that uses this matches the design point size.
+    static func scaledValue(
+        _ base: CGFloat,
+        style: Style,
+        compatibleWith traits: UITraitCollection?
+    ) -> CGFloat {
+        if let traits {
+            let category = traits.preferredContentSizeCategory
+            if category == .large || category == .unspecified {
+                return base
+            }
+        }
+        let metrics = UIFontMetrics(forTextStyle: style.scalingTextStyle)
+        if let traits {
+            return metrics.scaledValue(for: base, compatibleWith: traits)
+        }
+        return metrics.scaledValue(for: base)
     }
 
     static let displayLarge = Style(size: 48, lineHeight: 48, weight: .black, color: Theme.onSurface, scalingTextStyle: .largeTitle, role: .display)

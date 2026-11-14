@@ -184,7 +184,8 @@ final class DetailViewController: UIViewController {
     private var scrollActionTrailing: NSLayoutConstraint!
     private var scrollActionBottom: NSLayoutConstraint!
     /// Accessibility sizes unpin Play when the title, channel and date do
-    /// not fit above it. They then scroll with the notes.
+    /// not fit above it, and when pinning would leave a blank band over
+    /// short notes. The controls then scroll with the notes.
     private var scrollsChrome = false
     /// One flash after the actions join the scroll view, so a cut-off block
     /// reads as more content rather than as the end of the text.
@@ -208,6 +209,10 @@ final class DetailViewController: UIViewController {
         /// Clear band between the notes' fade and the action row.
         static let rowGap: CGFloat = Spacing.sm
     }
+
+    /// Accessibility sizes cap the Play label and its icon here. A long press
+    /// shows the system Large Content Viewer at the full size.
+    static let playLabelMaximumPointSize: CGFloat = 34
 
     static let mediumDetent = UISheetPresentationController.Detent.Identifier("detail-medium")
 
@@ -488,24 +493,35 @@ final class DetailViewController: UIViewController {
         sheetPresentationController?.invalidateDetents()
     }
 
-    /// Pins Play unless the title, channel and date would sit under the fade
-    /// or past the scroll view. The comparison uses the pinned chrome height,
-    /// not the live scroll-view frame, so turning scrolling on does not
-    /// immediately turn it back off.
+    /// Pins Play unless the identity would sit under the fade, or the notes
+    /// are too short to fill the band above a bottom-pinned transcript and
+    /// Play. The comparison uses the pinned chrome height, not the live
+    /// scroll-view frame, so turning scrolling on does not immediately turn
+    /// it back off. A shorter capped Play button must not, by itself, pin
+    /// a short sheet and open that blank band.
     private func updateChromeScrolling() {
         guard view.bounds.height > 1, contentContainer.bounds.width > 1 else { return }
+        guard contentStack.bounds.height > 1 else { return }
         let transcriptHeight = transcriptSlot.isHidden ? 0 : transcriptSlot.bounds.height
         let transcriptGapHeight = transcriptSlot.isHidden ? 0 : Spacing.md
         let bottomInset = max(sheetChrome().inset, view.safeAreaInsets.bottom)
         let chrome = Layout.rowGap + transcriptHeight + transcriptGapHeight
             + actionRow.bounds.height + bottomInset
-        let visibleBottom = view.bounds.height - chrome - Layout.fadeHeight
+        let pinnedScrollHeight = view.bounds.height - chrome
         let identityBottom = max(
             bottom(of: metaLabel, in: contentContainer),
             bottom(of: channelBlock, in: contentContainer)
         )
         guard identityBottom > 0 else { return }
-        let shouldScroll = identityBottom > visibleBottom + 0.5
+        // Header plus notes only. Once the chrome flows it is added under
+        // the stack, and measuring the container would count it and pin again.
+        let notesHeight = contentStack.frame.maxY + Layout.inset
+        let shouldScroll = DetailChromeScrolling.shouldScroll(
+            identityBottom: identityBottom,
+            notesHeight: notesHeight,
+            pinnedScrollHeight: pinnedScrollHeight,
+            fadeHeight: Layout.fadeHeight
+        )
         guard shouldScroll != scrollsChrome else { return }
         setScrollsChrome(shouldScroll)
         needsDetentRefresh = true
@@ -575,18 +591,29 @@ final class DetailViewController: UIViewController {
 
     /// Inset, corner radius and control height for the transcript card, Play
     /// and •••. Default text keeps the 52 pt capsule at a 28 pt inset.
-    /// Accessibility sizes grow Play until the capsule would cross the sheet
-    /// arc, then stop. The inset is whatever makes that capsule concentric.
+    /// Accessibility sizes grow Play from the capped label until the capsule
+    /// would cross the sheet arc, then stop. The inset is whatever makes
+    /// that capsule concentric.
     private func sheetChrome() -> (inset: CGFloat, radius: CGFloat, height: CGFloat) {
         let base = Radius.sheetCapsuleHeight
         guard traitCollection.preferredContentSizeCategory.isAccessibilityCategory else {
             return (Spacing.sheetContent, Radius.sheetConcentric, base)
         }
-        let line = TypographyV2.emphasis.font(traits: traitCollection).lineHeight
+        let line = playLabelFont().lineHeight
         let natural = line + Spacing.gap * 2
         let height = min(max(natural, base), Radius.maximumSheetCapsuleHeight)
         let inset = Radius.sheetCorner - height / 2
         return (inset, Radius.concentric(insetFromSheetEdge: inset), height)
+    }
+
+    /// Emphasis, capped at accessibility sizes so the capsule stays near the
+    /// ••• button instead of growing with the full headline size.
+    private func playLabelFont() -> UIFont {
+        let style = TypographyV2.emphasis
+        guard traitCollection.preferredContentSizeCategory.isAccessibilityCategory else {
+            return style.font(traits: traitCollection)
+        }
+        return style.font(traits: traitCollection, maximumPointSize: Self.playLabelMaximumPointSize)
     }
 
     /// Side and bottom inset for Play once it scrolls with the notes. The
@@ -627,12 +654,9 @@ final class DetailViewController: UIViewController {
         artwork.translatesAutoresizingMaskIntoConstraints = false
         artworkSide = artwork.widthAnchor.constraint(equalToConstant: Layout.artworkMedium)
 
-        titleLabel.font = TypographyV2.emphasis.font()
-        titleLabel.text = episode.title
-        titleLabel.textColor = TypographyV2.emphasis.color
         titleLabel.numberOfLines = 3
         titleLabel.lineBreakMode = .byTruncatingTail
-        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.adjustsFontForContentSizeCategory = false
         titleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
 
         // The show: a Meta-styled link to the Channel sheet.
@@ -654,9 +678,7 @@ final class DetailViewController: UIViewController {
         hostButton.addAction(UIAction { [weak self] _ in self?.channelTapped() }, for: .touchUpInside)
 
         let meta = UILabel()
-        meta.font = TypographyV2.meta.font()
-        meta.textColor = TypographyV2.meta.color
-        meta.adjustsFontForContentSizeCategory = true
+        meta.adjustsFontForContentSizeCategory = false
         meta.numberOfLines = 1
         meta.text = metaText(playTimeInMeta: false)
 
@@ -667,7 +689,7 @@ final class DetailViewController: UIViewController {
         meta.setContentCompressionResistancePriority(.required, for: .vertical)
         metaLabel = meta
         channelNameLabel.textColor = TypographyV2.meta.color
-        channelNameLabel.adjustsFontForContentSizeCategory = true
+        channelNameLabel.adjustsFontForContentSizeCategory = false
         channelNameLabel.clipsToBounds = false
         channelNameLabel.isAccessibilityElement = false
         channelNameLabel.isUserInteractionEnabled = false
@@ -793,7 +815,15 @@ final class DetailViewController: UIViewController {
             arrange(infoStack, [channelBlock, metaLabel, trailingSpacer])
             headerStack.axis = .vertical
             headerStack.alignment = .fill
-            headerStack.spacing = Spacing.xs
+            headerStack.spacing = TypographyV2.scaledValue(
+                Spacing.md, style: .emphasis, compatibleWith: traitCollection
+            )
+            infoStack.spacing = TypographyV2.scaledValue(
+                Spacing.xs, style: .meta, compatibleWith: traitCollection
+            )
+            contentStack.spacing = TypographyV2.scaledValue(
+                Spacing.cardInner, style: .body, compatibleWith: traitCollection
+            )
         } else {
             artworkSide.constant = isLarge ? Layout.artworkLarge : Layout.artworkMedium
             titleLabel.numberOfLines = isLarge ? 4 : 3
@@ -808,8 +838,62 @@ final class DetailViewController: UIViewController {
             headerStack.axis = .horizontal
             headerStack.alignment = .top
             headerStack.spacing = Spacing.pageH
+            infoStack.spacing = Spacing.xs
+            contentStack.spacing = Spacing.cardInner
             if scrollsChrome { setScrollsChrome(false) }
         }
+        scrollTranscriptTop.constant = contentStack.spacing
+        applyTitleLineHeight()
+        applyMetaLineHeight(wrapped: accessibility)
+    }
+
+    /// Emphasis line height, 22 pt at the default size and capped at larger
+    /// sizes. The paragraph style carries it; the label's own font does not.
+    private func applyTitleLineHeight() {
+        applyBlockText(
+            titleLabel,
+            text: episode.title,
+            style: .emphasis,
+            honorLineHeight: true
+        )
+    }
+
+    /// Channel and date are one line at the default size, so they keep the
+    /// font's natural line height. When they wrap, they use the meta line
+    /// height: 20 pt at the default size, and at most 1.25× the point size
+    /// above that. Accessibility sizes append the play time (the Play
+    /// capsule shows its compact, verb-only title there).
+    private func applyMetaLineHeight(wrapped: Bool) {
+        let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        applyBlockText(
+            metaLabel,
+            text: metaText(playTimeInMeta: accessibility && playLabel.fraction > 0),
+            style: .meta,
+            honorLineHeight: wrapped
+        )
+    }
+
+    private func applyBlockText(
+        _ label: UILabel,
+        text: String,
+        style: TypographyV2.Style,
+        honorLineHeight: Bool
+    ) {
+        label.adjustsFontForContentSizeCategory = false
+        guard honorLineHeight else {
+            label.attributedText = nil
+            label.font = style.font(traits: traitCollection)
+            label.textColor = style.color
+            label.text = text
+            return
+        }
+        var attributes = style.attributes(traits: traitCollection)
+        if let paragraph = (attributes[.paragraphStyle] as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle {
+            paragraph.lineBreakMode = label.lineBreakMode
+            paragraph.lineBreakStrategy = label.lineBreakStrategy
+            attributes[.paragraphStyle] = paragraph
+        }
+        label.attributedText = NSAttributedString(string: text, attributes: attributes)
     }
 
     /// Moves `views` into `stack` in order and drops anything else. A matching
@@ -838,15 +922,18 @@ final class DetailViewController: UIViewController {
     /// same block, so the label cannot swallow the tap, and it keeps the
     /// default size's accessibility label and button trait.
     private func showWrappingChannelName() {
-        channelNameLabel.font = TypographyV2.meta.font(traits: traitCollection)
-        channelNameLabel.textColor = TypographyV2.meta.color
-        channelNameLabel.text = episode.channelTitle
         channelNameLabel.numberOfLines = 0
         channelNameLabel.lineBreakMode = .byWordWrapping
         channelNameLabel.lineBreakStrategy = .pushOut
         channelNameLabel.textAlignment = .natural
         channelNameLabel.isHidden = false
         channelNameLabel.isUserInteractionEnabled = false
+        applyBlockText(
+            channelNameLabel,
+            text: episode.channelTitle,
+            style: .meta,
+            honorLineHeight: true
+        )
         channelBlock.isHidden = false
         channelBlock.isUserInteractionEnabled = true
         if channelButton.superview !== channelBlock {
@@ -962,7 +1049,7 @@ final class DetailViewController: UIViewController {
         configuration.title = accessibility ? label.compactTitle : label.title
         configuration.titleLineBreakMode = .byTruncatingTail
         playButton.configuration = configuration
-        metaLabel.text = metaText(playTimeInMeta: accessibility && label.fraction > 0)
+        applyMetaLineHeight(wrapped: accessibility)
     }
 
     private var playLabel: PlayLabel {
@@ -989,12 +1076,30 @@ final class DetailViewController: UIViewController {
     /// default 12 pt inset when the 52 pt height already has room.
     private func fitPlayButton(height: CGFloat) {
         guard var configuration = playButton.configuration else { return }
-        let line = TypographyV2.emphasis.font(traits: traitCollection).lineHeight
-        let vertical = max(0, min(Spacing.gap, (height - line) / 2))
+        let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        let font = playLabelFont()
+        let vertical = max(0, min(Spacing.gap, (height - font.lineHeight) / 2))
         configuration.contentInsets = NSDirectionalEdgeInsets(
             top: vertical, leading: Spacing.cardInner, bottom: vertical, trailing: Spacing.cardInner
         )
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = font
+            return outgoing
+        }
+        configuration.preferredSymbolConfigurationForImage = accessibility
+            ? UIImage.SymbolConfiguration(pointSize: font.pointSize, weight: .regular)
+            : UIImage.SymbolConfiguration(textStyle: .body)
         playButton.configuration = configuration
+        playButton.titleLabel?.adjustsFontForContentSizeCategory = false
+        if accessibility {
+            playButton.enableIconLargeContentViewer(image: configuration.image ?? AppIcons.play)
+            if let title = configuration.title, !title.isEmpty {
+                playButton.largeContentTitle = title
+            }
+        } else {
+            playButton.showsLargeContentViewer = false
+        }
     }
 
     // MARK: - Actions (Play capsule with progress; the rest behind •••)
