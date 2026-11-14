@@ -375,7 +375,7 @@ private final class SearchEntryHeaderCell: UICollectionViewCell {
 /// One recent query as a row of the grouped plate: the clock-arrow symbol
 /// and the query on one truncating line. A touch fills the row (the plate's
 /// corners clip the fill); nothing scales.
-private final class SearchRecentCell: UICollectionViewListCell {
+final class SearchRecentCell: UICollectionViewListCell {
 
     private static let iconSide: CGFloat = 20
     /// Where the query (and the row separator) starts.
@@ -420,6 +420,14 @@ private final class SearchRecentCell: UICollectionViewListCell {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        // A reused row must never inherit an entrance or press pose.
+        contentView.layer.removeAllAnimations()
+        contentView.alpha = 1
+        contentView.transform = .identity
+    }
+
     func configure(query: String, isFirst: Bool, isLast: Bool) {
         queryLabel.text = query
         accessibilityLabel = query
@@ -442,7 +450,7 @@ private final class SearchRecentCell: UICollectionViewListCell {
 
 /// A category as a tonal capsule: sand fill, the name centred on one
 /// truncating line, at least 44 pt tall. A touch deepens the fill.
-private final class SearchCategoryCell: UICollectionViewCell {
+final class SearchCategoryCell: UICollectionViewCell {
 
     private let nameLabel = UILabel()
 
@@ -473,6 +481,14 @@ private final class SearchCategoryCell: UICollectionViewCell {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        // A reused chip must never inherit an entrance or press pose.
+        contentView.layer.removeAllAnimations()
+        contentView.alpha = 1
+        contentView.transform = .identity
+    }
 
     func configure(name: String) {
         nameLabel.text = name

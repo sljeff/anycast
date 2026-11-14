@@ -168,8 +168,7 @@ final class EpisodeCardCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        descriptionTask?.cancel()
-        descriptionTask = nil
+        cancelDescriptionTask()
         renderedDescriptionHTML = nil
         onCoverTap = nil
         onCardTap = nil
@@ -179,6 +178,16 @@ final class EpisodeCardCell: UICollectionViewCell {
         contentView.layer.removeAllAnimations()
         contentView.alpha = 1
         contentView.transform = .identity
+    }
+
+    /// Drops the in-flight description resolve. Called on reuse and on
+    /// every configure whose description source differs from the one the
+    /// parse belongs to — the completion would otherwise write the prior
+    /// episode's text onto the new content (only the source identity
+    /// cancels it; a same-HTML reconfigure keeps it running).
+    private func cancelDescriptionTask() {
+        descriptionTask?.cancel()
+        descriptionTask = nil
     }
 
     // MARK: - Configure
@@ -193,15 +202,18 @@ final class EpisodeCardCell: UICollectionViewCell {
         rightTextLabel.isHidden = content.rightText.isEmpty
 
         if let plain = content.descriptionPlainText {
+            if renderedDescriptionHTML != nil {
+                cancelDescriptionTask()
+            }
             renderedDescriptionHTML = nil
             descriptionLabel.text = plain
         } else if let html = content.descriptionHTML {
             if html != renderedDescriptionHTML {
-                renderedDescriptionHTML = html
                 // Cancel the prior episode's in-flight resolve and clear the
                 // reused text — a stale description must never linger while
                 // the new one is parsed.
-                descriptionTask?.cancel()
+                cancelDescriptionTask()
+                renderedDescriptionHTML = html
                 descriptionLabel.text = ""
                 descriptionTask = Task { [weak self] in
                     let text = await PlainTextHTMLCache.shared.plainText(for: html)
@@ -218,6 +230,9 @@ final class EpisodeCardCell: UICollectionViewCell {
                 }
             }
         } else {
+            if renderedDescriptionHTML != nil {
+                cancelDescriptionTask()
+            }
             renderedDescriptionHTML = nil
             descriptionLabel.text = ""
         }

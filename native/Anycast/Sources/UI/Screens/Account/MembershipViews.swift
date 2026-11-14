@@ -83,7 +83,12 @@ final class AccountRowView: UIControl {
     }
 
     func setSubtitle(_ text: String?) {
+        // The status row's issue line assigns an attributed string, whose
+        // attributes rewrite the label's style properties; restore the
+        // row's base style so neither path can leak into the other.
         subtitleLabel.attributedText = nil
+        subtitleLabel.font = TypographyV2.meta.font()
+        subtitleLabel.textColor = Theme.onSurfaceVariant
         subtitleLabel.text = text
         subtitleLabel.isHidden = text == nil
     }
