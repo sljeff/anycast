@@ -50,6 +50,10 @@ final class ShowCoverCell: UICollectionViewCell {
         super.prepareForReuse()
         onTap = nil
         coverView.kf.cancelDownloadTask()
+        // A reused cell must never inherit an entrance or press pose.
+        contentView.layer.removeAllAnimations()
+        contentView.alpha = 1
+        contentView.transform = .identity
     }
 
     override var isHighlighted: Bool {

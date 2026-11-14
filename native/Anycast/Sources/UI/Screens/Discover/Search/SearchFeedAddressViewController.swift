@@ -248,13 +248,8 @@ final class SearchFeedAddressViewController: UIViewController {
             coverView.kf.cancelDownloadTask()
             coverView.image = nil
             coverView.backgroundColor = AnycastColor.sandAlpha4
-            func bar(_ text: String, _ font: UIFont) -> NSAttributedString {
-                NSAttributedString(string: text, attributes: [
-                    .font: font, .foregroundColor: UIColor.clear, .backgroundColor: AnycastColor.sandAlpha4,
-                ])
-            }
-            titleLabel.attributedText = bar("Placeholder show title", titleLabel.font)
-            hostLabel.attributedText = bar("placeholder.example", hostLabel.font)
+            titleLabel.setSkeletonBar("Placeholder show title")
+            hostLabel.setSkeletonBar("placeholder.example")
             plate.isAccessibilityElement = true
             plate.accessibilityLabel = "Loading"
         case .notAFeed:
@@ -267,10 +262,8 @@ final class SearchFeedAddressViewController: UIViewController {
             plate.isUserInteractionEnabled = true
             coverView.backgroundColor = nil
             let title = data.subscription.title ?? ""
-            titleLabel.attributedText = nil
-            titleLabel.text = title
-            hostLabel.attributedText = nil
-            hostLabel.text = FeedAddress.host(of: address)
+            titleLabel.setRealText(title)
+            hostLabel.setRealText(FeedAddress.host(of: address))
             coverView.setArtwork(
                 data.subscription.imageUrl.flatMap(URL.init(string:)), title: title, side: PodcastCardCell.coverSide
             )
