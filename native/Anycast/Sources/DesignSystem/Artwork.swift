@@ -80,15 +80,31 @@ extension UIImageView {
     /// Loads a cover with the shared placeholder shown while loading and on
     /// failure (no spinners or generic glyphs). `side` is the view's point
     /// size (the largest it reaches); the image is decoded at its bucket.
+    /// A memory hit is applied immediately, before Kingfisher can swap in
+    /// the placeholder on a recycled cell. A network arrival crossfades in
+    /// `Motion.quick`; Reduce Motion and cache hits do not animate.
     @MainActor
     func setArtwork(_ url: URL?, title: String?, side: CGFloat) {
         applyArtworkHairline()
         let placeholder = ArtworkPlaceholder.image(for: title)
+        guard let url else {
+            kf.cancelDownloadTask()
+            image = placeholder
+            return
+        }
+        let options = ArtworkSizing.processingOptions(side: side)
+        if let memory = ImageCache.default.retrieveImageInMemoryCache(
+            forKey: url.absoluteString, options: options
+        ) {
+            kf.cancelDownloadTask()
+            image = memory
+            return
+        }
+        let transition: ImageTransition = Motion.reduceMotion ? .none : .fade(Motion.quick)
         kf.setImage(
             with: url,
             placeholder: placeholder,
-            options: ArtworkSizing.processingOptions(side: side)
-                + [.transition(.none), .onFailureImage(placeholder)]
+            options: options + [.transition(transition), .onFailureImage(placeholder)]
         )
     }
 

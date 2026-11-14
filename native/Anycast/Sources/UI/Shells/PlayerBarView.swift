@@ -14,9 +14,10 @@ import AnycastKit
 /// layers), keeping only a clip shape for the content. The bar carries no
 /// progress line: position lives on the full-screen player.
 ///
-/// Gestures (03 §3.1): whole-bar tap opens the full-screen player; ANY
-/// vertical drag — up or down, no threshold, the shipped quirk — also opens
-/// it. The play/pause and +30 s controls never bubble to the open gesture.
+/// Gestures (03 §3.1): whole-bar tap opens the full-screen player. An upward
+/// drag follows the finger and springs open or back; a pan under 12 pt does
+/// nothing. Reduce Motion crossfades the player instead of sliding it. The
+/// play/pause and +30 s controls never bubble to the open gesture.
 @MainActor
 final class PlayerBarView: UIView {
 
@@ -42,6 +43,8 @@ final class PlayerBarView: UIView {
 
     /// Set by the host (UIContext.makePlayerBar pre-wires it).
     var onOpenPlayer: (() -> Void)?
+    /// Upward drag. Wired by `UIContext.makePlayerBar` to the interactive open.
+    var onVerticalPan: ((UIPanGestureRecognizer) -> Void)?
 
     private let playback: PlaybackService
     private let style: HostingStyle
@@ -52,7 +55,6 @@ final class PlayerBarView: UIView {
     private let titleLabel = UILabel()
     private let playPauseControl = PlayPauseIconControl(size: 32)
     private let forwardButton = UIButton(type: .custom)
-    private var openedByPan = false
     /// Last URL handed to the cover view. render() can re-run on any
     /// observed change — an unconditional cancel+setImage would restart an
     /// in-flight cover download each time (slow networks never finish
@@ -286,17 +288,7 @@ final class PlayerBarView: UIView {
     }
 
     @objc private func panHandled(_ gesture: UIPanGestureRecognizer) {
-        if gesture.state == .began {
-            openedByPan = false
-        }
-        guard !openedByPan else { return }
-        // The shipped quirk: ANY vertical displacement opens the player —
-        // no direction or threshold judgment (bottom_nav_bar.dart:110-117).
-        let translation = gesture.translation(in: self)
-        if abs(translation.y) >= 1 {
-            openedByPan = true
-            onOpenPlayer?()
-        }
+        onVerticalPan?(gesture)
     }
 }
 

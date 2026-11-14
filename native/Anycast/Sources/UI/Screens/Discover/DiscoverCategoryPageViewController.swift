@@ -195,6 +195,7 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
 
         let skeleton = display == .skeleton
         let signature = model.channels.map(\.rssFeedUrl)
+        let hadContent = !lastChannelSignature.isEmpty
         if signature != lastChannelSignature || skeleton != showsSkeleton {
             lastChannelSignature = signature
             let startsSkeleton = skeleton && !showsSkeleton
@@ -207,6 +208,12 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
                 UIView.animate(withDuration: Motion.quick) { self.collectionView.alpha = 1 }
             } else {
                 collectionView.alpha = 1
+            }
+            // The first channel arrival rises in after the reload; later
+            // reloads stay plain.
+            if !hadContent && !signature.isEmpty, view.window != nil {
+                let cards = collectionView.visibleCells.filter { $0 is PodcastCardCell }
+                MotionArrival.reveal(in: collectionView, cells: cards, staggered: true)
             }
         }
     }

@@ -684,10 +684,17 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         renderStatus()
 
         let signature = viewModel.channels.map(\.rssFeedUrl)
+        let hadContent = !lastChannelSignature.isEmpty
         if signature != lastChannelSignature {
             lastChannelSignature = signature
             UIView.performWithoutAnimation {
                 collectionView.reloadData()
+            }
+            // The first result arrival rises in after the reload; later
+            // reloads stay plain.
+            if !hadContent && !signature.isEmpty, view.window != nil {
+                let cards = collectionView.visibleCells.filter { $0 is PodcastCardCell }
+                MotionArrival.reveal(in: collectionView, cells: cards, staggered: true)
             }
         }
     }

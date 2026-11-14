@@ -34,6 +34,9 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     /// The first non-empty list rises in once per instance
     /// (`CardEntranceAnimator`); later reloads and reorders never replay it.
     private var didPlayEntrance = false
+    /// Prototype: keep the first list at alpha 0 until its entrance pose is
+    /// parked, so the final layout is not drawn for a frame and then hidden.
+    private var holdingEntrance = false
 
     private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
     private(set) var binder: PlaylistEpisodeListBinder!
@@ -106,6 +109,7 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        playEntranceIfNeeded()
         // Cross-screen mutations (adds from Channel/Feeds, K3 completions)
         // are picked up on appear — the repository is not observable.
         Task { await reloadEpisodes() }
@@ -114,6 +118,11 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         playEntranceIfNeeded()
+        if holdingEntrance {
+            // No cells to park; show the list instead of leaving it blank.
+            holdingEntrance = false
+            collectionView.alpha = 1
+        }
     }
 
     // MARK: - Build
@@ -323,7 +332,18 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(episodes.compactMap(\.enclosureUrl))
-        dataSource.apply(snapshot, animatingDifferences: false)
+        let hold = !didPlayEntrance && !episodes.isEmpty
+        if hold {
+            collectionView.alpha = 0
+            holdingEntrance = true
+        }
+        // Reorders keep their interactive movement. Later inserts and
+        // deletes animate; Reduce Motion updates instantly.
+        let animateDiff = !Motion.reduceMotion
+            && didPlayEntrance
+            && liftedCell == nil
+            && pendingReorderCount == 0
+        dataSource.apply(snapshot, animatingDifferences: animateDiff)
         renderLoadingState()
         playEntranceIfNeeded()
     }
@@ -333,8 +353,14 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     /// animate), so that case is retried from `viewDidAppear`.
     private func playEntranceIfNeeded() {
         guard !didPlayEntrance, view.window != nil, !isLoading, !episodes.isEmpty else { return }
+        guard collectionView.bounds.width > 0 else { return }
+        collectionView.layoutIfNeeded()
+        let cards = collectionView.visibleCells.filter { $0 is EpisodeCardCell }
+        guard !cards.isEmpty else { return }
         didPlayEntrance = true
+        holdingEntrance = false
         CardEntranceAnimator.play(in: collectionView)
+        collectionView.alpha = 1
     }
 
     private func renderLoadingState() {

@@ -133,6 +133,18 @@ nonisolated enum Motion {
 
     static var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
 
+    /// Posted after Reduce Motion actually changes. In-flight view animations
+    /// have already been snapped to their end state when it turned on.
+    static let reduceMotionDidChange = Notification.Name("anycast.reduceMotionDidChange")
+
+    /// Listens for the system Reduce Motion notification, and re-checks when
+    /// the app becomes active so a toggle made in Settings is applied even
+    /// if the notification was delivered while we were suspended.
+    @MainActor
+    static func installReduceMotionObserverIfNeeded() {
+        ReduceMotionWatch.install()
+    }
+
     /// `UIView.animate` convenience with the standard v2 curve/duration.
     @MainActor
     static func animate(_ duration: TimeInterval = Motion.standard, _ animations: @escaping () -> Void, completion: (() -> Void)? = nil) {
@@ -192,5 +204,58 @@ extension UIControl {
                 options: [.allowUserInteraction, .beginFromCurrentState]
             ) { self.transform = .identity }
         }, for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
+    }
+}
+
+/// Snaps view animations already on screen when Reduce Motion turns on, then
+/// tells listeners (skeleton pulse, an open drag) to re-read the setting.
+@MainActor
+private final class ReduceMotionWatch {
+    static let shared = ReduceMotionWatch()
+    private var tokens: [NSObjectProtocol] = []
+    private var lastEnabled = UIAccessibility.isReduceMotionEnabled
+
+    static func install() {
+        shared.start()
+    }
+
+    private func start() {
+        guard tokens.isEmpty else { return }
+        let names = [
+            UIAccessibility.reduceMotionStatusDidChangeNotification,
+            UIApplication.didBecomeActiveNotification,
+        ]
+        tokens = names.map { name in
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                Task { @MainActor in
+                    ReduceMotionWatch.shared.noteChange()
+                }
+            }
+        }
+    }
+
+    /// Snaps spatial animations only when the setting actually flips on.
+    /// `didBecomeActive` re-reads the value so a Settings toggle is picked
+    /// up even when the accessibility notification arrived while suspended.
+    private func noteChange() {
+        let enabled = UIAccessibility.isReduceMotionEnabled
+        guard enabled != lastEnabled else { return }
+        lastEnabled = enabled
+        if enabled {
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            for scene in scenes {
+                for window in scene.windows {
+                    Self.strip(window)
+                }
+            }
+        }
+        NotificationCenter.default.post(name: Motion.reduceMotionDidChange, object: nil)
+    }
+
+    private static func strip(_ view: UIView) {
+        view.layer.removeAllAnimations()
+        for child in view.subviews {
+            strip(child)
+        }
     }
 }

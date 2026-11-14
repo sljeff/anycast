@@ -295,8 +295,7 @@ final class ChannelSearchViewController: UIViewController {
 
     private func renderPlayerBar() {
         let visible = context.playback.currentEpisode != nil
-        playerBar.isHidden = !visible
-        playerBarHeight.constant = visible ? 58 : 0
+        MiniPlayerInsertion.apply(visible: visible, bar: playerBar, height: playerBarHeight, in: view)
     }
 
     private func refreshVisibleCards() {

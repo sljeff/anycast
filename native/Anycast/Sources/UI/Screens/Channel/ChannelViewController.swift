@@ -61,6 +61,9 @@ final class ChannelViewController: UIViewController {
     /// `ChannelHeaderView.onContentHeightChange`).
     private var contentBlockHeight = ChannelFoldGeometry.fallbackContentHeight
     private var lastEpisodeSignature: [String?] = []
+    /// The latest-button loading state from the previous render; a change
+    /// crossfades instead of snapping the glyph to a spinner.
+    private var lastLatestLoading: Bool?
 
     private let modelObservation = ObservationLoop()
     private let playbackObservation = ObservationLoop()
@@ -319,11 +322,24 @@ final class ChannelViewController: UIViewController {
     /// The pinned supplementary's absolute height tracks the current safe
     /// area and the measured content block; extents never use fixed status
     /// bar numbers.
-    private func rebuildForGeometryChange() {
+    private func rebuildForGeometryChange(animated: Bool = false) {
         appliedSafeAreaTop = view.safeAreaInsets.top
         headerView?.updateGeometry(foldGeometry)
-        bodyStateTop?.constant = foldGeometry.maxExtent + ChannelBodyHeaderCell.fixedHeight
-        collectionView.setCollectionViewLayout(makeLayout(), animated: false)
+        let top = foldGeometry.maxExtent + ChannelBodyHeaderCell.fixedHeight
+        let move = animated && !Motion.reduceMotion
+        if move {
+            UIView.animate(
+                withDuration: Motion.standard,
+                delay: 0,
+                options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState]
+            ) {
+                self.bodyStateTop?.constant = top
+                self.view.layoutIfNeeded()
+            }
+        } else {
+            bodyStateTop?.constant = top
+        }
+        collectionView.setCollectionViewLayout(makeLayout(), animated: move)
         applyFold()
     }
 
@@ -332,7 +348,8 @@ final class ChannelViewController: UIViewController {
     private func contentHeightMeasured(_ height: CGFloat) {
         guard abs(height - contentBlockHeight) > 0.5 else { return }
         contentBlockHeight = height
-        DispatchQueue.main.async { [weak self] in self?.rebuildForGeometryChange() }
+        let animate = view.window != nil
+        DispatchQueue.main.async { [weak self] in self?.rebuildForGeometryChange(animated: animate) }
     }
 
     private func makeLayout() -> UICollectionViewCompositionalLayout {
@@ -411,6 +428,7 @@ final class ChannelViewController: UIViewController {
 
         // Plain no-animation rebuild (08 §7.2 — the Flutter Obx rebuild).
         let signature = viewModel.showEpisodes.map(\.enclosureUrl)
+        let hadEpisodes = !lastEpisodeSignature.isEmpty
         if signature != lastEpisodeSignature || skeleton != showsSkeleton {
             let startsSkeleton = skeleton && !showsSkeleton
             lastEpisodeSignature = signature
@@ -424,6 +442,12 @@ final class ChannelViewController: UIViewController {
                 UIView.animate(withDuration: Motion.quick) {
                     for cell in self.collectionView.visibleCells { cell.alpha = 1 }
                 }
+            }
+            // The first episode arrival rises in after the reload, matching
+            // the card grids; later reloads stay plain.
+            if !hadEpisodes && !signature.isEmpty, view.window != nil {
+                let rows = collectionView.visibleCells.filter { $0 is ChannelEpisodeRowCell }
+                MotionArrival.reveal(in: collectionView, cells: rows, staggered: true)
             }
         }
 
@@ -465,9 +489,13 @@ final class ChannelViewController: UIViewController {
     /// (bottom_nav_bar.dart:86-88).
     private func renderPlayerBar() {
         let visible = context.playback.currentEpisode != nil
-        playerBar.isHidden = !visible
-        playerBarHeight.constant = visible ? 58 : 0
-        updateListBottomInset()
+        MiniPlayerInsertion.apply(
+            visible: visible,
+            bar: playerBar,
+            height: playerBarHeight,
+            in: view,
+            alongside: { [weak self] in self?.updateListBottomInset() }
+        )
     }
 
     /// The list runs under the floating capsule (and the home indicator),
@@ -553,7 +581,23 @@ final class ChannelViewController: UIViewController {
         subscribeButton.accessibilityLabel = display.toggleAccessibilityLabel
         subscribeButton.isEnabled = display != .loading
         subscribeButton.alpha = display == .loading ? 0.5 : 1
-        latestButton.configuration = latestConfiguration(loading: viewModel?.isLoading ?? false)
+        let loading = viewModel?.isLoading ?? false
+        let configuration = latestConfiguration(loading: loading)
+        let crossfade = lastLatestLoading != nil
+            && lastLatestLoading != loading
+            && view.window != nil
+        if crossfade {
+            UIView.transition(
+                with: latestButton,
+                duration: Motion.reduceMotion ? 0 : Motion.quick,
+                options: .transitionCrossDissolve
+            ) {
+                self.latestButton.configuration = configuration
+            }
+        } else {
+            latestButton.configuration = configuration
+        }
+        lastLatestLoading = loading
     }
 
     // MARK: - Fold
