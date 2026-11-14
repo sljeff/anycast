@@ -114,6 +114,28 @@ enum TranscriptStateReducer {
         }
     }
 
+    /// Same enclosure, poll status `succeeded`, but the last row fetch did
+    /// not land a usable transcript. Flutter rebuilds its FutureBuilder on
+    /// every `subtitleUrls` change (player.dart). A native observation tick
+    /// has to re-fetch explicitly, or `succeeded` + `.empty` stays on the
+    /// processing spinner even after the row is on disk.
+    static func shouldReloadStoredRow(
+        url: String,
+        subtitleStatus: String?,
+        row: TranscriptRowPhase
+    ) -> Bool {
+        guard !url.isEmpty, subtitleStatus == "succeeded" else { return false }
+        return row == .empty || row == .failed
+    }
+
+    /// Flutter rewrites the poll map to processing only from the succeeded
+    /// FutureBuilder (player.dart:782-786). A fetch while status is still
+    /// nil is the Generate prompt; marking that unusable would replace the
+    /// prompt with a spinner.
+    static func shouldMarkUnusable(subtitleStatus: String?) -> Bool {
+        subtitleStatus == "succeeded"
+    }
+
     private static func translationPhase(
         translationStatus: String?,
         translationRow: TranslationRowPhase

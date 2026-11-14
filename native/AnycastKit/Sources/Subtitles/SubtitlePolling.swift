@@ -178,7 +178,11 @@ public final class SubtitlePollController {
 
         switch result.status {
         case "succeeded":
-            setStatus("succeeded", for: url)
+            // Persist first. `SubtitleRepository.insert` is a silent no-op
+            // when language is nil or the payload is empty / "null".
+            // Advertising "succeeded" before a usable row exists leaves the
+            // poll map stuck: this loop only revisits "processing" URLs, so
+            // the transcript page spins on a row that never arrives.
             let payload = SubtitleSegment.encode(result.segments ?? [])
             try? await subtitles.insert(SubtitleRow(
                 enclosureUrl: url,
@@ -187,6 +191,16 @@ public final class SubtitlePollController {
                 language: result.language,
                 summary: nil
             ))
+            if let stored = try? await subtitles.get(byEnclosureURL: url),
+               stored.hasUsableTranscriptPayload {
+                setStatus("succeeded", for: url)
+            } else {
+                // A blank / "null" row would reseed "succeeded" on the next
+                // foreground `start()` and stick the spinner again. Keep
+                // "processing" so the 15 s round retries.
+                try? await subtitles.delete(byEnclosureURL: url)
+                setStatus("processing", for: url)
+            }
         case "failed":
             // Visible for this run so the UI can offer Retry. The local row
             // is deleted, so a relaunch — which reseeds from the database —
@@ -197,6 +211,13 @@ public final class SubtitlePollController {
             break // still processing
         }
         return nil
+    }
+
+    /// Flutter player.dart:783-784: an unusable stored payload is deleted
+    /// and the poll map returns to "processing" so the 15 s loop retries
+    /// instead of leaving a permanent succeeded-with-no-row spinner.
+    public func markUnusable(url: String) {
+        setStatus("processing", for: url)
     }
 
     /// Drops the URL's subtitle state and row. Not called on queue removal
