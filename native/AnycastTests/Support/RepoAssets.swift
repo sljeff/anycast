@@ -2,19 +2,20 @@ import Foundation
 import Testing
 
 /// Locates the repository root from the test source location and loads M0
-/// assets. Payloads are gitignored by design; `tool/m0/regen_all.sh` (run
-/// once on this machine) materializes them (test/fixtures/README.md).
+/// assets. The Flutter-generated payloads (db/**, opml/app_export.opml) are
+/// frozen and tracked in git; the live-collected corpus stays regenerated
+/// by `tool/m0/regen_all.sh` (test/fixtures/README.md).
 enum RepoAssets {
 
     static let repoRoot: URL = {
         var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         for _ in 0..<8 {
-            if FileManager.default.fileExists(atPath: directory.appendingPathComponent("pubspec.yaml").path) {
+            if FileManager.default.fileExists(atPath: directory.appendingPathComponent("native/project.yml").path) {
                 return directory
             }
             directory.deleteLastPathComponent()
         }
-        fatalError("Repository root (pubspec.yaml) not found above \(#filePath)")
+        fatalError("Repository root (native/project.yml) not found above \(#filePath)")
     }()
 
     static func fixture(_ relativePath: String) -> URL {

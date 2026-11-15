@@ -9,34 +9,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly PROJECT_ROOT
-readonly PLATFORM="${1:-}"
+readonly RESOURCES_DIR="${PROJECT_ROOT}/native/Anycast/Resources"
 readonly CHECKSUM_FILE="${PROJECT_ROOT}/config/infisical-config.sha256"
-readonly ANDROID_PACKAGE="com.kindjeff.anycast"
 readonly IOS_BUNDLE_ID="com.kindjeff.anycast"
 
-if [[ "${PLATFORM}" != "android" && "${PLATFORM}" != "ios" ]]; then
-  echo "Usage: $0 <android|ios>" >&2
-  exit 2
-fi
-
-for required_command in install perl; do
+for required_command in install perl plutil; do
   if ! command -v "${required_command}" >/dev/null 2>&1; then
     echo "Required command is missing: ${required_command}" >&2
     exit 1
   fi
 done
-
-if [[ "${PLATFORM}" == "android" ]] &&
-   ! command -v jq >/dev/null 2>&1; then
-  echo "Required command is missing: jq" >&2
-  exit 1
-fi
-
-if [[ "${PLATFORM}" == "ios" ]] &&
-   ! command -v plutil >/dev/null 2>&1; then
-  echo "Required command is missing: plutil" >&2
-  exit 1
-fi
 
 if [[ ! -f "${CHECKSUM_FILE}" ]]; then
   echo "Missing reviewed configuration checksums: ${CHECKSUM_FILE}" >&2
@@ -45,15 +27,8 @@ fi
 
 required_secrets=(
   PURCHASES_IOS_API_KEY
-  PURCHASES_ANDROID_API_KEY
-  FIREBASE_OPTIONS_DART
+  IOS_GOOGLE_SERVICE_INFO_PLIST
 )
-
-if [[ "${PLATFORM}" == "android" ]]; then
-  required_secrets+=(ANDROID_GOOGLE_SERVICES_JSON)
-else
-  required_secrets+=(IOS_GOOGLE_SERVICE_INFO_PLIST)
-fi
 
 for secret_name in "${required_secrets[@]}"; do
   if [[ -z "${!secret_name:-}" ]]; then
@@ -63,16 +38,13 @@ for secret_name in "${required_secrets[@]}"; do
 done
 
 if [[ "${PURCHASES_IOS_API_KEY}" == *$'\n'* ||
-      "${PURCHASES_IOS_API_KEY}" == *$'\r'* ||
-      "${PURCHASES_ANDROID_API_KEY}" == *$'\n'* ||
-      "${PURCHASES_ANDROID_API_KEY}" == *$'\r'* ]]; then
-  echo "RevenueCat SDK keys must each be a single line" >&2
+      "${PURCHASES_IOS_API_KEY}" == *$'\r'* ]]; then
+  echo "The RevenueCat SDK key must be a single line" >&2
   exit 1
 fi
 
-if [[ "${PURCHASES_IOS_API_KEY}" != appl_* ||
-      "${PURCHASES_ANDROID_API_KEY}" != goog_* ]]; then
-  echo "Expected RevenueCat public iOS and Android SDK keys" >&2
+if [[ "${PURCHASES_IOS_API_KEY}" != appl_* ]]; then
+  echo "Expected a RevenueCat public iOS SDK key" >&2
   exit 1
 fi
 
@@ -153,75 +125,37 @@ install_staged_file() {
   install -m 600 "${stage_file}" "${destination}"
 }
 
-{
-  printf 'PURCHASES_IOS_API_KEY=%s\n' "${PURCHASES_IOS_API_KEY}"
-  printf 'PURCHASES_ANDROID_API_KEY=%s\n' "${PURCHASES_ANDROID_API_KEY}"
-} >"${TEMP_DIR}/dotenv"
+printf '%s' "${IOS_GOOGLE_SERVICE_INFO_PLIST}" \
+  >"${TEMP_DIR}/GoogleService-Info.plist"
 
-printf '%s' "${FIREBASE_OPTIONS_DART}" \
-  >"${TEMP_DIR}/firebase_options.dart"
-
-if ! grep -q 'class DefaultFirebaseOptions' \
-  "${TEMP_DIR}/firebase_options.dart"; then
-  echo "Infisical firebase_options.dart did not pass validation" >&2
+plutil -lint "${TEMP_DIR}/GoogleService-Info.plist" >/dev/null
+plist_bundle_id="$(
+  plutil -extract BUNDLE_ID raw -o - \
+    "${TEMP_DIR}/GoogleService-Info.plist"
+)"
+if [[ "${plist_bundle_id}" != "${IOS_BUNDLE_ID}" ]]; then
+  echo "Unexpected iOS Firebase bundle ID" >&2
   exit 1
 fi
+unset plist_bundle_id
+
+printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>PURCHASES_IOS_API_KEY</key>\n\t<string>%s</string>\n</dict>\n</plist>\n' \
+  "${PURCHASES_IOS_API_KEY}" >"${TEMP_DIR}/Secrets.plist"
+
+plutil -lint "${TEMP_DIR}/Secrets.plist" >/dev/null
 
 verify_reviewed_digest \
-  lib/firebase_options.dart \
-  "${TEMP_DIR}/firebase_options.dart"
+  native/Anycast/Resources/GoogleService-Info.plist \
+  "${TEMP_DIR}/GoogleService-Info.plist"
 verify_reviewed_digest \
-  .env \
-  "${TEMP_DIR}/dotenv"
-
-if [[ "${PLATFORM}" == "android" ]]; then
-  printf '%s' "${ANDROID_GOOGLE_SERVICES_JSON}" \
-    >"${TEMP_DIR}/google-services.json"
-
-  jq -e \
-    --arg package_name "${ANDROID_PACKAGE}" \
-    '
-      (.project_info.project_id | type == "string" and length > 0) and
-      any(.client[]?; .client_info.android_client_info.package_name == $package_name)
-    ' \
-    "${TEMP_DIR}/google-services.json" >/dev/null
-
-  verify_reviewed_digest \
-    android/app/google-services.json \
-    "${TEMP_DIR}/google-services.json"
-
-  install_staged_file \
-    "${TEMP_DIR}/google-services.json" \
-    "${PROJECT_ROOT}/android/app/google-services.json"
-else
-  printf '%s' "${IOS_GOOGLE_SERVICE_INFO_PLIST}" \
-    >"${TEMP_DIR}/GoogleService-Info.plist"
-
-  plutil -lint "${TEMP_DIR}/GoogleService-Info.plist" >/dev/null
-  plist_bundle_id="$(
-    plutil -extract BUNDLE_ID raw -o - \
-      "${TEMP_DIR}/GoogleService-Info.plist"
-  )"
-  if [[ "${plist_bundle_id}" != "${IOS_BUNDLE_ID}" ]]; then
-    echo "Unexpected iOS Firebase bundle ID" >&2
-    exit 1
-  fi
-  unset plist_bundle_id
-
-  verify_reviewed_digest \
-    ios/Runner/GoogleService-Info.plist \
-    "${TEMP_DIR}/GoogleService-Info.plist"
-
-  install_staged_file \
-    "${TEMP_DIR}/GoogleService-Info.plist" \
-    "${PROJECT_ROOT}/ios/Runner/GoogleService-Info.plist"
-fi
+  native/Anycast/Resources/Secrets.plist \
+  "${TEMP_DIR}/Secrets.plist"
 
 install_staged_file \
-  "${TEMP_DIR}/dotenv" \
-  "${PROJECT_ROOT}/.env"
+  "${TEMP_DIR}/GoogleService-Info.plist" \
+  "${RESOURCES_DIR}/GoogleService-Info.plist"
 install_staged_file \
-  "${TEMP_DIR}/firebase_options.dart" \
-  "${PROJECT_ROOT}/lib/firebase_options.dart"
+  "${TEMP_DIR}/Secrets.plist" \
+  "${RESOURCES_DIR}/Secrets.plist"
 
-echo "Materialized reviewed ${PLATFORM} app configuration."
+echo "Materialized reviewed native iOS app configuration."

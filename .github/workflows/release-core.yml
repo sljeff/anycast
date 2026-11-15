@@ -34,17 +34,34 @@ jobs:
             exit 1
           fi
 
-          pubspec_version="$(
-            awk '$1 == "version:" { print $2; exit }' pubspec.yaml
+          # Version source of truth is native/project.yml (AGENTS.md):
+          # MARKETING_VERSION (major.minor.patch) and
+          # CURRENT_PROJECT_VERSION (build number). First quoted
+          # assignment of each key wins; malformed or missing values
+          # fail loudly below.
+          marketing_version="$(
+            sed -n -E 's/^[[:space:]]*MARKETING_VERSION:[[:space:]]*"([^"]+)".*/\1/p' \
+              native/project.yml | head -1
           )"
-          if [[ ! "${pubspec_version}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)\+([1-9][0-9]*)$ ]]; then
-            echo "pubspec.yaml version must look like 1.2.3+45." >&2
+          build_version="$(
+            sed -n -E 's/^[[:space:]]*CURRENT_PROJECT_VERSION:[[:space:]]*"([^"]+)".*/\1/p' \
+              native/project.yml | head -1
+          )"
+
+          if [[ -z "${marketing_version}" || -z "${build_version}" ]]; then
+            echo "native/project.yml must define MARKETING_VERSION and CURRENT_PROJECT_VERSION." >&2
+            exit 1
+          fi
+          if [[ ! "${marketing_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "MARKETING_VERSION must look like 1.2.3." >&2
+            exit 1
+          fi
+          if [[ ! "${build_version}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "CURRENT_PROJECT_VERSION must be a positive integer." >&2
             exit 1
           fi
 
-          build_name="${BASH_REMATCH[1]}"
-          build_number="${BASH_REMATCH[2]}"
-          expected_tag="rc-${pubspec_version}"
+          expected_tag="rc-${marketing_version}+${build_version}"
           if [[ "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
             echo "Expected tag ${expected_tag}, got ${GITHUB_REF_NAME}." >&2
             exit 1
@@ -60,175 +77,25 @@ jobs:
           fi
 
           {
-            printf 'build_name=%s\n' "${build_name}"
-            printf 'build_number=%s\n' "${build_number}"
+            printf 'build_name=%s\n' "${marketing_version}"
+            printf 'build_number=%s\n' "${build_version}"
             printf 'release_name=%s\n' "${GITHUB_REF_NAME}"
           } >>"${GITHUB_OUTPUT}"
-
-  android:
-    name: Android to Play Internal
-    needs: validate
-    runs-on: ubuntu-24.04
-    timeout-minutes: 50
-    environment:
-      name: release
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-      - name: Check out tagged source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
-
-      - name: Set up Java
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
-        with:
-          distribution: temurin
-          java-version: 17.0.20+8
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          channel: stable
-          flutter-version: 3.38.3
-          cache: false
-
-      - name: Install Android SDK components
-        shell: bash
-        run: |
-          set -euo pipefail
-          android_sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          sdkmanager="${android_sdk_root%/}/cmdline-tools/latest/bin/sdkmanager"
-          if [[ -z "${android_sdk_root}" || ! -x "${sdkmanager}" ]]; then
-            echo "Android SDK manager was not found." >&2
-            exit 1
-          fi
-          "${sdkmanager}" --install \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "ndk;28.2.13676358" >/dev/null
-
-      - name: Install locked Dart dependencies
-        run: flutter pub get --enforce-lockfile
-
-      - name: Fetch reviewed app configuration
-        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
-        with:
-          method: oidc
-          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
-          oidc-audience: https://github.com/sljeff
-          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
-          env-slug: ${{ vars.INFISICAL_ENV_SLUG }}
-          secret-path: /app-config
-          include-imports: false
-          recursive: false
-
-      - name: Materialize Android app configuration
-        run: ./scripts/materialize_app_config.sh android
-
-      - name: Clear raw app configuration
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo 'ANDROID_GOOGLE_SERVICES_JSON='
-            echo 'IOS_GOOGLE_SERVICE_INFO_PLIST='
-            echo 'FIREBASE_OPTIONS_DART='
-            echo 'PURCHASES_IOS_API_KEY='
-            echo 'PURCHASES_ANDROID_API_KEY='
-          } >>"${GITHUB_ENV}"
-
-      - name: Fetch Android upload signing
-        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
-        with:
-          method: oidc
-          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
-          oidc-audience: https://github.com/sljeff
-          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
-          env-slug: ${{ vars.INFISICAL_ENV_SLUG }}
-          secret-path: /android-signing
-          include-imports: false
-          recursive: false
-
-      - name: Prepare temporary Android signing
-        run: ./scripts/prepare_android_signing.sh
-
-      - name: Clear raw Android signing values
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo 'ANDROID_UPLOAD_KEYSTORE_B64='
-            echo 'ANDROID_KEY_ALIAS='
-            echo 'ANDROID_KEY_PASSWORD='
-            echo 'ANDROID_STORE_PASSWORD='
-          } >>"${GITHUB_ENV}"
-
-      - name: Build signed app bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          flutter build appbundle \
-            --release \
-            --build-name "${{ needs.validate.outputs.build_name }}" \
-            --build-number "${{ needs.validate.outputs.build_number }}"
-          jarsigner -verify \
-            build/app/outputs/bundle/release/app-release.aab >/dev/null
-
-      - name: Remove Android build credentials
-        if: always()
-        shell: bash
-        run: |
-          set +e
-          if [[ -f android/key.properties && ! -L android/key.properties ]]; then
-            rm -f -- android/key.properties
-          fi
-          signing_dir="${RUNNER_TEMP%/}/anycast-android-signing"
-          if [[ -d "${signing_dir}" &&
-                "${signing_dir}" == "${RUNNER_TEMP%/}/anycast-android-signing" ]]; then
-            rm -rf -- "${signing_dir}"
-          fi
-          rm -f -- \
-            .env \
-            android/app/google-services.json \
-            lib/firebase_options.dart
-          exit 0
-
-      - name: Authenticate to Google Play
-        id: google-auth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
-        with:
-          project_id: ${{ vars.GCP_PROJECT_ID }}
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_PLAY_SERVICE_ACCOUNT }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
-          access_token_lifetime: 900s
-          create_credentials_file: false
-          export_environment_variables: false
-
-      - name: Upload to Google Play Internal
-        env:
-          GOOGLE_PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
-          AAB_PATH: build/app/outputs/bundle/release/app-release.aab
-          RELEASE_NAME: ${{ needs.validate.outputs.release_name }}
-        run: ./scripts/upload_play.sh
 
   ios:
     name: iOS to TestFlight
     needs: validate
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 70
     environment:
       name: release
     permissions:
       contents: read
       id-token: write
+    env:
+      # Must match the CI workflow's pinned toolchain (Xcode 27 is the
+      # only toolchain the native project is verified against).
+      XCODE_VERSION: '27.0'
 
     steps:
       - name: Check out tagged source
@@ -236,39 +103,22 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
-        with:
-          xcode-version: 16.4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
-        with:
-          ruby-version: 3.3.11
-          bundler-cache: true
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          channel: stable
-          flutter-version: 3.38.3
-          cache: false
-
-      - name: Verify CocoaPods toolchain
+      - name: Select pinned Xcode
         shell: bash
         run: |
           set -euo pipefail
-          test "$(bundle exec pod --version)" = "1.16.2"
-
-      - name: Install locked dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          flutter pub get --enforce-lockfile
-          (
-            cd ios
-            bundle exec pod install --deployment
-          )
+          XCODE_APP="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::error::Pinned Xcode ${XCODE_VERSION} is not installed on this image; bump XCODE_VERSION as a reviewed change. Present:" >&2
+            ls -d /Applications/Xcode_*.app >&2 || true
+            exit 1
+          fi
+          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          xcodebuild -version | head -1 | grep -q "^Xcode ${XCODE_VERSION}" || {
+            echo "::error::$XCODE_APP reports itself as $(xcodebuild -version | head -1)." >&2
+            exit 1
+          }
 
       - name: Fetch reviewed app configuration
         uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
@@ -282,18 +132,20 @@ jobs:
           include-imports: false
           recursive: false
 
-      - name: Materialize iOS app configuration
-        run: ./scripts/materialize_app_config.sh ios
+      - name: Materialize native app configuration
+        run: ./scripts/materialize_app_config.sh
 
       - name: Clear raw app configuration
         if: always()
         shell: bash
         run: |
           {
-            echo 'ANDROID_GOOGLE_SERVICES_JSON='
             echo 'IOS_GOOGLE_SERVICE_INFO_PLIST='
-            echo 'FIREBASE_OPTIONS_DART='
             echo 'PURCHASES_IOS_API_KEY='
+            # Legacy names the Infisical path may still carry until the
+            # cutover secret cleanup lands there.
+            echo 'ANDROID_GOOGLE_SERVICES_JSON='
+            echo 'FIREBASE_OPTIONS_DART='
             echo 'PURCHASES_ANDROID_API_KEY='
           } >>"${GITHUB_ENV}"
 
@@ -336,30 +188,36 @@ jobs:
             echo 'APP_STORE_CONNECT_PRIVATE_KEY_B64='
           } >>"${GITHUB_ENV}"
 
-      - name: Archive signed iOS app
+      - name: Archive signed native iOS app
         shell: bash
         run: |
           set -euo pipefail
+          # Homebrew ships no versioned xcodegen formula, so the pin is a
+          # post-install assertion (same pin as CI).
+          brew install xcodegen
+          test "$(xcodegen --version)" = "Version: 2.46.0"
+          (
+            cd native
+            xcodegen generate
+          )
+
           archive_path="${RUNNER_TEMP%/}/Anycast.xcarchive"
           xcodebuild \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
+            -project native/Anycast.xcodeproj \
+            -scheme Anycast \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -archivePath "${archive_path}" \
-            archive \
-            DEVELOPMENT_TEAM=5TQ9AN87D8 \
-            FLUTTER_BUILD_NAME="${{ needs.validate.outputs.build_name }}" \
-            FLUTTER_BUILD_NUMBER="${{ needs.validate.outputs.build_number }}" \
             MARKETING_VERSION="${{ needs.validate.outputs.build_name }}" \
-            CURRENT_PROJECT_VERSION="${{ needs.validate.outputs.build_number }}"
+            CURRENT_PROJECT_VERSION="${{ needs.validate.outputs.build_number }}" \
+            archive
 
-          runner_info="${archive_path}/Products/Applications/Runner.app/Info.plist"
-          runner_app="${archive_path}/Products/Applications/Runner.app"
-          share_app="${runner_app}/PlugIns/Share Extension.appex"
+          app_path="${archive_path}/Products/Applications/Anycast.app"
+          app_info="${app_path}/Info.plist"
+          share_app="${app_path}/PlugIns/Share Extension.appex"
           share_info="${share_app}/Info.plist"
-          for info_path in "${runner_info}" "${share_info}"; do
+          for info_path in "${app_info}" "${share_info}"; do
             test "$(plutil -extract CFBundleShortVersionString raw -o - "${info_path}")" \
               = "${{ needs.validate.outputs.build_name }}"
             test "$(plutil -extract CFBundleVersion raw -o - "${info_path}")" \
@@ -387,21 +245,21 @@ jobs:
           }
 
           verify_profile_uuid \
-            "${runner_app}" \
+            "${app_path}" \
             8556542b-9ee1-4053-87f9-7a8a939124e5 \
-            Runner
+            Anycast
           verify_profile_uuid \
             "${share_app}" \
             64282043-b776-4bbb-9f70-7b4bbc5a3a39 \
             "Share Extension"
-          codesign --verify --deep --strict "${runner_app}"
+          codesign --verify --deep --strict "${app_path}"
 
           export_path="${RUNNER_TEMP%/}/anycast-ios-export"
           xcodebuild \
             -exportArchive \
             -archivePath "${archive_path}" \
             -exportPath "${export_path}" \
-            -exportOptionsPlist ios/ExportOptions.plist
+            -exportOptionsPlist native/ExportOptions.plist
 
           ipa_path="$(find "${export_path}" -maxdepth 1 -type f -name '*.ipa' -print -quit)"
           if [[ -z "${ipa_path}" || ! -f "${ipa_path}" ]]; then
@@ -427,7 +285,7 @@ jobs:
           verify_profile_uuid \
             "${exported_app}" \
             8556542b-9ee1-4053-87f9-7a8a939124e5 \
-            "Exported Runner"
+            "Exported Anycast"
           verify_profile_uuid \
             "${exported_app}/PlugIns/Share Extension.appex" \
             64282043-b776-4bbb-9f70-7b4bbc5a3a39 \
@@ -436,14 +294,13 @@ jobs:
 
           printf 'IOS_IPA_PATH=%s\n' "${ipa_path}" >>"${GITHUB_ENV}"
 
-      - name: Remove iOS app configuration
+      - name: Remove native app configuration
         if: always()
         shell: bash
         run: |
           rm -f -- \
-            .env \
-            ios/Runner/GoogleService-Info.plist \
-            lib/firebase_options.dart
+            native/Anycast/Resources/GoogleService-Info.plist \
+            native/Anycast/Resources/Secrets.plist
 
       - name: Upload to TestFlight
         shell: bash

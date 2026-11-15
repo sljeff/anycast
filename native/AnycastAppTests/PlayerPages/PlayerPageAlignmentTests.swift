@@ -245,7 +245,24 @@ struct PlayerPageAlignmentTests {
 
         /// The bounding box of the control's visible glyph pixels (alpha
         /// above a small threshold), in the control's own coordinates.
+        /// Glyph geometry is independent of the control's state, but a
+        /// fresh install has no episode, so the transport and share
+        /// controls render disabled at alpha 0.38 (PlayerTransportView /
+        /// PlayerMainPageViewController) — too faint for the threshold.
+        /// Render the control enabled at full opacity, then restore.
         static func inkRect(of view: UIView) -> CGRect? {
+            let control = view as? UIControl
+            let previousAlpha = view.alpha
+            let previousEnabled = control?.isEnabled
+            view.alpha = 1
+            control?.isEnabled = true
+            view.layoutIfNeeded()
+            defer {
+                view.alpha = previousAlpha
+                if let previousEnabled { control?.isEnabled = previousEnabled }
+                view.layoutIfNeeded()
+            }
+
             let scale: CGFloat = 4
             let format = UIGraphicsImageRendererFormat()
             format.scale = scale

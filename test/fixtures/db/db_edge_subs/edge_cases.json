@@ -1,0 +1,20 @@
+{
+  "title_collision": {
+    "resident": {
+      "rssFeedUrl": "https://edge.example.com/feed-a.xml",
+      "title": "Collision Channel",
+      "id": 1
+    },
+    "incoming": {
+      "rssFeedUrl": "https://edge.example.com/feed-b.xml",
+      "title": "Collision Channel",
+      "note": "INSERT OR REPLACE by title: replaces resident row, id changes"
+    }
+  },
+  "cross_list_move": {
+    "enclosureUrl": "https://edge.example.com/ep-cross.mp3",
+    "from_playlist": 1,
+    "to_playlist": 2,
+    "note": "INSERT OR REPLACE by enclosureUrl: moves to the new list"
+  }
+}

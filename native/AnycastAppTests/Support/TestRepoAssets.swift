@@ -8,12 +8,12 @@ enum TestRepoAssets {
     static let repoRoot: URL = {
         var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         for _ in 0..<8 {
-            if FileManager.default.fileExists(atPath: directory.appendingPathComponent("pubspec.yaml").path) {
+            if FileManager.default.fileExists(atPath: directory.appendingPathComponent("native/project.yml").path) {
                 return directory
             }
             directory.deleteLastPathComponent()
         }
-        fatalError("Repository root (pubspec.yaml) not found above \(#filePath)")
+        fatalError("Repository root (native/project.yml) not found above \(#filePath)")
     }()
 
     static func golden(_ fileName: String) -> URL {

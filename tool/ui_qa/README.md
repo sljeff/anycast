@@ -35,24 +35,29 @@ fail the test on P0/P1. Everything lands under `native/build/runs/<name>/`
 
 Options: `--skip-build`, `--no-seed`, `--udid`, `QA_UDID` env.
 
-## Flutter↔native AX diff (the "和之前不一致" finder)
+## AX diff between two builds (the "和之前不一致" finder)
 
 The same crawl tour drives *any* installed `com.kindjeff.anycast` — the
-UITest talks to apps through accessibility, not linkage. So:
+UITest talks to apps through accessibility, not linkage. So any two builds of
+the app can be compared — a baseline branch vs the working tree, before and
+after a refactor, iOS 18 vs iOS 27:
 
 ```sh
-tool/ui_qa/capture_flutter.sh                     # build + install + seed Flutter Runner.app
-tool/ui_qa/crawl.sh ref-flutter --reference build/ios/iphonesimulator/Runner.app
-tool/ui_qa/crawl.sh qa-native --skip-build        # native build (already installed)
-python3 tool/ui_qa/axdiff.py native/build/runs/ref-flutter native/build/runs/qa-native
+tool/ui_qa/crawl.sh ref-baseline --reference <path/to/baseline/Anycast.app>
+tool/ui_qa/crawl.sh qa-current --skip-build       # current build (already installed)
+python3 tool/ui_qa/axdiff.py native/build/runs/ref-baseline native/build/runs/qa-current
 ```
+
+(An earlier variant diffed the Flutter build against the native one; the
+Flutter app was removed from the repository on 2026-11-15, so the
+cross-framework comparison — and its capture script — are gone. `axdiff.py`
+keeps working for native↔native comparisons.)
 
 `axdiff.py` matches elements per state by (type, label) and reports
 missing / extra / moved (>4pt) / resized (>2pt) / enabled-flipped — the
 icon-misaligned, size-inconsistent, missing-surface classes as a table
-instead of a vibe. Flutter's AX tree is coarser (semantics nodes), so
-unlabeled decorative noise is expected; labeled controls and text are the
-signal. `--reference` patches the xctestrun's `UITargetAppPath`, so the
+instead of a vibe. Labeled controls and text are the signal.
+`--reference` patches the xctestrun's `UITargetAppPath`, so the
 crawl binary is unchanged.
 
 ## Video + frame heuristics

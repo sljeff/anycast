@@ -7,8 +7,8 @@
 #   tool/ui_qa/crawl.sh <run-name> --reference <target.app>
 #
 # --reference runs the dump-only tour against whatever app the xctestrun
-# points at. Pass the Flutter build's Runner.app to capture the Flutter AX
-# reference (see capture_flutter.sh), then axdiff.py against a native run.
+# points at. Pass another build's Anycast.app to capture an AX reference,
+# then axdiff.py it against a current run (see README.md).
 #
 # Artifacts under native/build/runs/<run-name>/ (disposable):
 #   result.xcresult    raw test bundle

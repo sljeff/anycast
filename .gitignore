@@ -1,19 +1,28 @@
-# custom
-/android/app/google-services.json
-/ios/Runner/GoogleService-Info.plist
-/lib/firebase_options.dart
+# Secrets and local configuration
 *.env
 .env.*
 !.env.example
 *.keystore
+*.jks
 *.p12
 *.mobileprovision
 AuthKey_*.p8
 .sentryclirc
 sentry.properties
 
-# Do not remove or rename entries in this file, only add new ones
-# See https://github.com/flutter/flutter/issues/128635 for more context.
+# Retired Flutter/Android working trees (removed from git 2026-11-15).
+# The directories themselves stay on disk until their leftover ignored
+# content (generated config, keystores, Pods, build caches) is reviewed
+# and deleted by hand — ignore everything still under them.
+/android/
+/ios/
+/lib/
+/integration_test/
+/build/
+/.dart_tool/
+/coverage/
+/.flutter-plugins
+/.flutter-plugins-dependencies
 
 # Miscellaneous
 *.class
@@ -21,9 +30,8 @@ sentry.properties
 *.pyc
 *.swp
 .DS_Store
-.atom/
 .buildlog/
-.history
+.history/
 .svn/
 
 # IntelliJ related
@@ -37,130 +45,26 @@ sentry.properties
 .project
 .settings/
 .vscode/*
-
-# Flutter repo-specific
-/bin/cache/
-/bin/internal/bootstrap.bat
-/bin/internal/bootstrap.sh
-/bin/mingit/
-/dev/benchmarks/mega_gallery/
-/dev/bots/.recipe_deps
-/dev/bots/android_tools/
-/dev/devicelab/ABresults*.json
-/dev/docs/doc/
-/dev/docs/api_docs.zip
-/dev/docs/flutter.docs.zip
-/dev/docs/lib/
-/dev/docs/pubspec.yaml
-/dev/integration_tests/**/xcuserdata
-/dev/integration_tests/**/Pods
-/packages/flutter/coverage/
-version
-analysis_benchmark.json
-
-# packages file containing multi-root paths
-.packages.generated
-
-# Flutter/Dart/Pub related
-**/doc/api/
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-**/generated_plugin_registrant.dart
-.packages
-.pub-preload-cache/
-.pub-cache/
-.pub/
-build/
-flutter_*.png
-linked_*.ds
-unlinked.ds
-unlinked_spec.ds
-
-# Android related
-.gradle/
-**/android/captures/
-**/android/local.properties
-**/android/**/GeneratedPluginRegistrant.java
-**/android/key.properties
-*.jks
-
-# iOS/XCode related
-**/ios/**/*.mode1v3
-**/ios/**/*.mode2v3
-**/ios/**/*.moved-aside
-**/ios/**/*.pbxuser
-**/ios/**/*.perspectivev3
-**/ios/**/*sync/
-**/ios/**/.sconsign.dblite
-**/ios/**/.tags*
-**/ios/**/.vagrant/
-**/ios/**/DerivedData/
-**/ios/**/Icon?
-**/ios/**/Pods/
-**/ios/**/.symlinks/
-**/ios/**/profile
-**/ios/**/xcuserdata
-**/ios/.generated/
-**/ios/Flutter/.last_build_id
-**/ios/Flutter/App.framework
-**/ios/Flutter/Flutter.framework
-**/ios/Flutter/Flutter.podspec
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/ephemeral
-**/ios/Flutter/app.flx
-**/ios/Flutter/app.zip
-**/ios/Flutter/flutter_assets/
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/ServiceDefinitions.json
-**/ios/Runner/GeneratedPluginRegistrant.*
-
-# macOS
-**/Flutter/ephemeral/
-**/Pods/
-**/macos/Flutter/GeneratedPluginRegistrant.swift
-**/macos/Flutter/ephemeral
-**/xcuserdata/
-
-# Windows
-**/windows/flutter/generated_plugin_registrant.cc
-**/windows/flutter/generated_plugin_registrant.h
-**/windows/flutter/generated_plugins.cmake
-
-# Linux
-**/linux/flutter/generated_plugin_registrant.cc
-**/linux/flutter/generated_plugin_registrant.h
-**/linux/flutter/generated_plugins.cmake
-
-# Coverage
-coverage/
-
-# Symbols
-app.*.symbols
-
-# Exceptions to above rules.
-!**/ios/**/default.mode1v3
-!**/ios/**/default.mode2v3
-!**/ios/**/default.pbxuser
-!**/ios/**/default.perspective3v3
-!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
-!/dev/ci/**/Gemfile.lock
 !.vscode/settings.json
 
-# M0 test fixtures: payloads are regenerated from their recorded sources
-# (capture manifests, response headers, collectors in tool/m0/); only the
-# provenance records and the test/golden/ expectations are tracked.
-# See test/fixtures/README.md for the regeneration workflow.
+# M0 test fixtures.
+# The Flutter app was removed from this repository (2026-11-15), so
+# payloads only the Flutter code could produce are FROZEN and tracked in
+# git — they can never be regenerated (last regenerable commit: a48c34d,
+# branch `native`, Flutter app pinned to 1.2.1+38):
+#   test/fixtures/db/**                       real app DB/cache encodings
+#   test/fixtures/opml/app_export.opml        the app's real OPML export
+# Everything else is still regenerated from its recorded sources and
+# stays gitignored (test/fixtures/README.md).
 /test/fixtures/audio/
-/test/fixtures/db/
 /test/fixtures/images/
-/test/fixtures/opml/
 /test/fixtures/api/
 /test/fixtures/channels_index.json
 /test/fixtures/rss/**/*.xml
+/test/fixtures/opml/*
+!test/fixtures/opml/app_export.opml
 
 # Native iOS scratch build outputs (xcodebuild -derivedDataPath build/…).
-# Already covered by the generic `build/` above; kept explicit for clarity.
 /native/build/
 
 # swift-snapshot-testing mismatch artifacts (SnapshotBaseline writes them

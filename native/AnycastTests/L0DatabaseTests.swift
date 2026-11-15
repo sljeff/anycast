@@ -169,6 +169,89 @@ struct L0DatabaseTests {
         #expect(comparison.mismatches.isEmpty)
     }
 
+    /// Ported from the retired Dart `test/compatibility/` suite (removed
+    /// with the Flutter app): upgraded databases must land on EXACTLY the
+    /// schema a fresh install builds — every table, every column (type,
+    /// NOT NULL, default, primary key) and every unique/index column set.
+    /// The row-level golden parity above proves the data; this proves the
+    /// shape, so an upgrade path that skips an index or drifts a column
+    /// default cannot hide behind matching rows.
+    @Test("Upgraded buckets share the exact schema of a fresh install (columns, defaults, indexes)")
+    func upgradedSchemaParity() async throws {
+        // Fresh reference built by the current creators + seeds.
+        let freshDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-fresh-parity-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: freshDirectory, withIntermediateDirectories: true)
+        let fresh = try await AppDatabase.openAt(
+            freshDirectory.appendingPathComponent("anycast.db"), localeIdentifier: "en_US"
+        )
+        defer { SandboxCleanup.remove(freshDirectory, closing: [fresh.queue]) }
+        let freshSnapshot = try await schemaSnapshot(fresh)
+
+        // Every released schema users can still carry: v3 (early 1.0.0,
+        // before build 26) and v4 (1.0.0+26 through 1.2.1+38).
+        for bucket in ["db_v3", "db_light"] {
+            let (database, sandbox) = try await openSandbox(bucket)
+            defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
+            let snapshot = try await schemaSnapshot(database)
+            if snapshot != freshSnapshot {
+                let differingTables = Set(snapshot.keys).symmetricDifference(freshSnapshot.keys)
+                    .sorted()
+                var detail = differingTables.map { "table presence: \($0)" }
+                for table in Set(snapshot.keys).intersection(freshSnapshot.keys).sorted() {
+                    if snapshot[table] != freshSnapshot[table] {
+                        detail.append("\(table):\n  upgraded: \(snapshot[table] ?? "")\n  fresh:    \(freshSnapshot[table] ?? "")")
+                    }
+                }
+                Issue.record("\(bucket): schema differs from a fresh install —\n\(detail.joined(separator: "\n"))")
+            }
+            #expect(snapshot == freshSnapshot, "\(bucket) must match a fresh install's schema")
+        }
+    }
+
+    /// sqlite_master shape as a comparable dictionary: per table, the
+    /// ordered `table_info` columns and the index column sets (index NAMES
+    /// are sqlite-internal sequence numbers, so compare semantics only —
+    /// the same rule the Dart snapshot used).
+    private func schemaSnapshot(_ database: AppDatabase) async throws -> [String: String] {
+        try await database.queue.read { db in
+            let tables = try String.fetchAll(
+                db,
+                sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+            var snapshot: [String: String] = [:]
+            for table in tables {
+                let columns = try String.fetchAll(
+                    db,
+                    sql: """
+                    SELECT name || ' ' || type
+                         || ' notnull=' || "notnull"
+                         || ' default=' || COALESCE(dflt_value, 'NULL')
+                         || ' pk=' || pk
+                    FROM pragma_table_info('\(table)')
+                    ORDER BY cid
+                    """
+                )
+                let indexes = try Row.fetchAll(
+                    db,
+                    sql: "SELECT name, \"unique\" FROM pragma_index_list('\(table)') ORDER BY name"
+                )
+                var indexLines: [String] = []
+                for index in indexes {
+                    let indexName = index["name"] as String
+                    let unique = index["unique"] as Int
+                    let columns = try String.fetchAll(
+                        db,
+                        sql: "SELECT name FROM pragma_index_info('\(indexName)') ORDER BY seqno"
+                    )
+                    indexLines.append("index unique=\(unique) cols=\(columns.joined(separator: ","))")
+                }
+                snapshot[table] = (columns + indexLines.sorted()).joined(separator: "\n")
+            }
+            return snapshot
+        }
+    }
+
     @Test("db_crashed: hot journal recovers cleanly, data matches golden")
     func crashedRecovery() async throws {
         let (database, sandbox) = try await openSandbox("db_crashed")
@@ -606,7 +689,11 @@ struct L0DatabaseTests {
         let headAfter = try await database.playlistRepository().episode(byEnclosureURL: headURL)
         #expect(headAfter?.playedDuration == 42_000)
 
-        // removeTop cascade: playlistEpisode + subtitle + translation rows.
+        // removeTop: the playlistEpisode row goes; its subtitle and
+        // translation rows SURVIVE — the Dart K3 cascade was deliberately
+        // dropped (323bead: transcripts cost quota and stay readable from
+        // detail sheets and history replay; pinned separately by
+        // removeEpisodeKeepsTranscripts).
         try await database.subtitleRepository().insert(
             SubtitleRow(enclosureUrl: headURL, status: "succeeded",
                         subtitle: "[{\"start\":0.0,\"end\":1.0,\"text\":\"x\"}]", language: "en")
@@ -622,7 +709,8 @@ struct L0DatabaseTests {
             let t = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM translation WHERE enclosureUrl = ?", arguments: [headURL]) ?? 0
             return (e, s, t)
         }
-        #expect(episodeRows == 0 && subtitleRows == 0 && translationRows == 0)
+        #expect(episodeRows == 0, "the queue row is removed")
+        #expect(subtitleRows == 1 && translationRows == 1, "transcript rows survive queue removal")
 
         // Trim: feed keeps pubDate-newest N (db_light history is empty —
         // the resume rows below repopulate it).

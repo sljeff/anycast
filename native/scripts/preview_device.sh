@@ -24,8 +24,8 @@ if [[ -f .preview.env ]]; then
   source .preview.env
 fi
 team="${ANYCAST_PREVIEW_TEAM:-}"
-# The production bundle id is com.kindjeff.anycast (ios/Runner and
-# native/project.yml agree); the backend validates the Sign in with Apple
+# The production bundle id is com.kindjeff.anycast (native/project.yml);
+# the backend validates the Sign in with Apple
 # ID token audience against it, so testing login requires overriding
 # ANYCAST_PREVIEW_BUNDLE_ID=com.kindjeff.anycast. The default below keeps
 # a .dev seed so a day-to-day preview never collides with a real store

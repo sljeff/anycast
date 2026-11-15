@@ -75,7 +75,7 @@ for i in range(500):
     g.append(f'  <outline text="Podcast {i}" title="Podcast {i}" type="rss" xmlUrl="https://example.com/feeds/{i}.xml"/>')
 g.append('</body></opml>')
 open(os.path.join(o, 'giant_500.opml'), 'w').write('\n'.join(g))
-print('opml written (overcast / xiaoyuzhou / giant_500); app_export.opml comes from the Dart generator')
+print('opml written (overcast / xiaoyuzhou / giant_500); app_export.opml is frozen and tracked (Flutter-generated, cannot be rebuilt)')
 PY
 
 echo "== images =="
