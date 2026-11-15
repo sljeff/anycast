@@ -150,16 +150,21 @@ than only mocks. Only explicitly reconstructible cache data may be invalidated.
 ## Local Xcode build artifacts
 
 Every local `xcodebuild` invocation must reuse a single shared DerivedData
-directory, from `native/`:
+directory and a single shared package checkout directory, from `native/`:
 
 ```sh
 xcodebuild -project Anycast.xcodeproj -scheme Anycast \
-  -derivedDataPath build/dd ...
+  -derivedDataPath build/dd \
+  -clonedSourcePackagesDirPath build/SourcePackages ...
 ```
 
 - Never create a fresh `dd-*` path per run. Each new path recompiles the
   entire SwiftPM dependency graph (~7 GB for the Firebase/gRPC stack);
   scratch dirs previously consumed ~113 GB and filled the disk.
+- Always pass `-clonedSourcePackagesDirPath build/SourcePackages`, as
+  `native/scripts/ui_check.sh` and `native/scripts/preview_device.sh` do.
+  Omitting it clones a second full copy of every package (~6 GB) into
+  `build/dd/SourcePackages`.
 - If a genuinely clean build is needed, delete `native/build/dd` first —
   do not add a sibling directory.
 - Small per-run outputs (`.xcresult` bundles, screenshots, logs) may go

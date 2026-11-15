@@ -103,7 +103,8 @@ smoke flows:
 
 ```sh
 xcodebuild -project Anycast.xcodeproj -scheme Anycast \
-  -destination 'id=<simulator-udid>' -derivedDataPath build/dd build
+  -destination 'id=<simulator-udid>' -derivedDataPath build/dd \
+  -clonedSourcePackagesDirPath build/SourcePackages build
 xcrun simctl install <udid> build/dd/Build/Products/Debug-iphonesimulator/Anycast.app
 xcrun simctl launch <udid> com.kindjeff.anycast   # creates the data container
 container=$(xcrun simctl get_app_container <udid> com.kindjeff.anycast data)
