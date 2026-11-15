@@ -1,0 +1,14 @@
+[
+ {
+  "file": "truncated.xml",
+  "note": "first 40% of a real feed, cut mid-tag"
+ },
+ {
+  "file": "html_error_page.xml",
+  "note": "HTML 503 page served with 200 by real hosts"
+ },
+ {
+  "file": "bom_prefixed.xml",
+  "note": "UTF-8 BOM prepended to a real feed"
+ }
+]

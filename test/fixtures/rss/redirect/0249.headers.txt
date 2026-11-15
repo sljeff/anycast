@@ -1,0 +1,21 @@
+HTTP/2 301 
+content-type: text/html; charset=utf-8
+content-length: 72
+location: https://feeds.simplecast.com/FRhlISgU
+server: envoy
+date: Tue, 22 Sep 2026 02:16:15 GMT
+access-control-allow-origin: *
+x-podcache-hostname: app539-us-east-2
+x-ratelimit-limit: 1000
+x-ratelimit-limit: 500
+x-ratelimit-remaining: 999
+x-ratelimit-remaining: 499
+x-ratelimit-reset: 1790043675
+x-ratelimit-reset: 1790043435
+strict-transport-security: max-age=31536000; includeSubDomains
+x-envoy-upstream-service-time: 7
+x-cache: Miss from cloudfront
+via: 1.1 6dddb00d156bc90e84fe8c9d69f4809e.cloudfront.net (CloudFront)
+x-amz-cf-pop: SFO53-P2
+x-amz-cf-id: A8yBSPpbuVk2wujRhNjscT6SRpIqqCzNPmin_AzH-KLK9vxwcTK1Fw==
+

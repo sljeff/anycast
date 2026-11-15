@@ -1,0 +1,45 @@
+[
+ {
+  "file": "no_duration.xml",
+  "missing": [
+   "itunes:duration"
+  ],
+  "items": 12,
+  "url": "constructed:https://www.ximalaya.com/album/68171496.xml",
+  "bucket": "missing_fields"
+ },
+ {
+  "file": "no_image.xml",
+  "missing": [
+   "itunes:image"
+  ],
+  "items": 12,
+  "url": "constructed:https://www.ximalaya.com/album/68171496.xml",
+  "bucket": "missing_fields"
+ },
+ {
+  "file": "no_pubdate.xml",
+  "missing": [
+   "pubDate"
+  ],
+  "items": 12,
+  "url": "constructed:https://www.ximalaya.com/album/68171496.xml",
+  "bucket": "missing_fields"
+ },
+ {
+  "file": "no_author.xml",
+  "missing": [
+   "itunes:author"
+  ],
+  "items": 12,
+  "url": "constructed:https://www.ximalaya.com/album/68171496.xml",
+  "bucket": "missing_fields"
+ },
+ {
+  "file": "mixed_duration_formats.xml",
+  "note": "HH:MM:SS and plain-seconds durations alternate",
+  "items": 12,
+  "url": "constructed:https://www.ximalaya.com/album/68171496.xml",
+  "bucket": "missing_fields"
+ }
+]

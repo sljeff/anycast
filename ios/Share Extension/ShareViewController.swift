@@ -7,7 +7,6 @@
 
 import UIKit
 import Social
-import receive_sharing_intent
 import MobileCoreServices
 import Photos
 

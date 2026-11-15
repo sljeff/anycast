@@ -1,0 +1,195 @@
+import UIKit
+
+/// Centralized icon accessors. The Dart baseline mixes five icon packs
+/// (03 §5.3); the native port maps them to the nearest SF Symbol, except the
+/// two brand SVGs that live in the asset catalog as template imagesets
+/// (`BrandaiChat`, `BrandaiTranscript`).
+///
+/// Those imagesets are not symbol sets: `SymbolConfiguration` point size and
+/// weight do not affect them. Hosts scale them with `UIImage.withIconMetrics`.
+/// A symbol set needs an SF Symbols template (filled paths, margin guides,
+/// and weight variants). The source SVGs are stroke/fill artwork; dropping
+/// them into a symbol set would fail asset compilation, so they stay
+/// imagesets until a template export exists.
+///
+/// Fill means selected, in progress, or success (tab selection, subscribed,
+/// sleep on, transcript succeeded). Idle actions stay outline. Transport
+/// play/pause stay filled, which is how the HIG draws playback. Failures
+/// use `exclamationmark.triangle`, not a filled bubble. `xmark` is only
+/// Close / Dismiss; every Remove and Delete uses `trash`.
+///
+/// Mapping table (dart icon → SF Symbol):
+///
+///   Material                 → SF Symbol
+///   home_rounded             → house.fill
+///   video_library_rounded    → play.rectangle.on.rectangle
+///                               (videos.fill is not offered on iOS 18)
+///   search / search_rounded  → magnifyingglass
+///   settings_rounded         → gearshape (outline; filled only when selected)
+///   round_settings           → gearshape
+///   replay_10                → gobackward.10
+///   forward_30               → goforward.30
+///   play_arrow_rounded       → play.fill
+///   image                    → photo
+///   image_not_supported      → photo (approximation; no slashed-photo symbol)
+///   more_vert_rounded        → ellipsis
+///   person                   → person
+///   info                     → info.circle.fill
+///   info_outline             → info.circle
+///   exit_to_app              → rectangle.portrait.and.arrow.right
+///   close                    → xmark (Close / Dismiss only)
+///   delete_outline           → trash (every Remove and Delete)
+///   question_mark_rounded    → questionmark
+///   check                    → checkmark
+///   podcasts_rounded         → dot.radiowaves.left.and.right
+///                               (podcast is not offered on iOS)
+///
+///   ic (Material round set)  → SF Symbol
+///   round_podcasts           → dot.radiowaves.left.and.right
+///   round_pause              → pause.fill
+///   round_download           → arrow.down.circle
+///   round_file_download      → arrow.down.circle
+///   round_clear / clear      → trash when it removes a row; xmark when it
+///                               dismisses a sheet
+///   round_playlist_add       → text.badge.plus
+///   round_playlist_add_check → checklist
+///   round_ios_share          → square.and.arrow.up
+///   round_arrow_back         → chevron.left
+///   round_add_circle_outline → plus.circle
+///   round_help               → questionmark.circle
+///   round_check_circle       → checkmark.circle.fill
+///   round_sms_failed         → exclamationmark.bubble.fill
+///                               (legacy accessor; transcript failure uses
+///                               exclamationmark.triangle)
+///   round_apple              → apple.logo
+///   email                    → envelope
+///   content_copy             → doc.on.doc
+///   baseline_explore         → safari.fill
+///   outline_explore          → safari
+///   baseline_offline_share   → arrow.up.doc (export-to-file approximation)
+///
+///   icon_park_solid.check_one                → checkmark.circle.fill
+///   ph.arrow_elbow_down_right_bold           → arrow.turn.down.right
+///   FluentIcons.mail_inbox_all_24_filled     → tray / tray.fill (selected)
+///   FluentIcons.library_24_filled            → books.vertical / .fill (selected)
+///   MdiIcons.cloudSearch                     → safari (2.0: discover ≠ search)
+///   Remix.forward_30_fill                    → goforward.30
+///
+///   Ri.google_fill is a brand logo with no SF Symbol — the login task
+///   bundles the Google "G" as an asset instead.
+nonisolated enum AppIcons {
+
+    // Tab bar (03 §1.1)
+    static let home = symbol("house.fill")
+    static let playlist = symbol("play.rectangle.on.rectangle")
+    static let playlistSelected = symbol("play.rectangle.on.rectangle.fill")
+    /// Compass: "discover", distinct from the header search field.
+    static let discover = symbol("safari")
+    static let discoverSelected = symbol("safari.fill")
+
+    // PodcastsPage secondary tabs (03 §2.1): outline when unselected,
+    // filled when selected.
+    static let inbox = symbol("tray")
+    static let inboxSelected = symbol("tray.fill")
+    static let subscriptions = symbol("books.vertical")
+    static let subscriptionsSelected = symbol("books.vertical.fill")
+
+    // Cards & actions (03 §2.11 / §2.2)
+    static let play = symbol("play.fill")
+    static let pause = symbol("pause.fill")
+    static let addToList = symbol("text.badge.plus")
+    static let addedToList = symbol("checklist")
+    static let remove = symbol("trash")
+    static let download = symbol("arrow.down.circle")
+    static let downloadDone = symbol("checkmark.circle.fill")
+
+    // Detail (03 §1.3 / §2.11)
+    static let share = symbol("square.and.arrow.up")
+    static let back = symbol("chevron.left")
+
+    // Channel subscription toggle: outline = not subscribed, filled = subscribed.
+    static let subscribe = symbol("bookmark")
+    static let subscribed = symbol("bookmark.fill")
+
+    // Player (03 §2.10)
+    static let replay10 = symbol("gobackward.10")
+    static let forward30 = symbol("goforward.30")
+    static let playerEpisode = symbol("list.bullet")
+    static let sleepTimer = symbol("moon")
+    /// Sleep timer engaged (end of episode). Countdown replaces the glyph
+    /// with the remaining minutes; fill is the on state when the glyph shows.
+    static let sleepTimerActive = symbol("moon.fill")
+    static let playerMain = symbol("dot.radiowaves.left.and.right")
+
+    // Settings & login (03 §2.13 / §2.14)
+    static let settings = symbol("gearshape")
+    static let search = symbol("magnifyingglass")
+    static let recentSearch = symbol("clock.arrow.circlepath")
+    static let close = symbol("xmark")
+    static let delete = symbol("trash")
+    /// Forward disclosure. Mirrors in right-to-left layouts.
+    static let disclosure = symbol("chevron.forward")
+    /// Trailing mark on rows that open a web page.
+    static let externalLink = symbol("arrow.up.right")
+    static let retry = symbol("arrow.clockwise")
+    /// Transcript failure. Outline, shared by the playlist strip, the
+    /// transcript page, and the detail transcript row when generation
+    /// failed and Retry is offered (not `exclamationmark.bubble.fill`).
+    static let transcriptFailed = symbol("exclamationmark.triangle")
+    static let check = symbol("checkmark")
+    static let person = symbol("person")
+    static let signInOut = symbol("rectangle.portrait.and.arrow.right")
+    static let info = symbol("info.circle.fill")
+    static let infoOutline = symbol("info.circle")
+    static let help = symbol("questionmark.circle")
+    static let questionMark = symbol("questionmark")
+    static let more = symbol("ellipsis")
+    static let copy = symbol("doc.on.doc")
+    static let explore = symbol("safari.fill")
+    static let exploreOutline = symbol("safari")
+    static let exportFile = symbol("arrow.up.doc")
+    static let appleLogo = symbol("apple.logo")
+    static let email = symbol("envelope")
+    static let addCircle = symbol("plus.circle")
+    static let checkCircle = symbol("checkmark.circle.fill")
+    static let smsFailed = symbol("exclamationmark.bubble.fill")
+    static let photo = symbol("photo")
+    static let elbowIndent = symbol("arrow.turn.down.right")
+    /// Detail transcript row / menu: lines once a transcript exists.
+    static let transcriptLines = symbol("text.alignleft")
+    /// Detail ••• "Ask AI" — a bubble, not the player-page brand mark.
+    static let chatBubble = symbol("bubble.left")
+    /// Transcript line menu: keep the sentence as a moment.
+    static let keepMoment = symbol("text.quote")
+
+    /// Brand SVGs (template imagesets; tint with tintColor). Ask AI is
+    /// `aiChat`; generating or opening a transcript is `aiTranscript`.
+    static let aiChat = UIImage(named: "BrandaiChat")
+    static let aiTranscript = UIImage(named: "BrandaiTranscript")
+
+    /// Every SF Symbol name referenced above — the registration test asserts
+    /// each resolves on the running OS (a typo would otherwise render blanks).
+    static let symbolNames: [String] = [
+        "house.fill", "play.rectangle.on.rectangle", "safari", "tray.fill",
+        "books.vertical.fill", "play.fill", "pause.fill", "text.badge.plus",
+        "checklist", "xmark", "trash", "arrow.down.circle", "checkmark.circle.fill",
+        "square.and.arrow.up", "chevron.left", "chevron.forward", "gobackward.10",
+        "goforward.30", "gearshape", "dot.radiowaves.left.and.right", "moon", "moon.fill",
+        "arrow.clockwise", "exclamationmark.triangle", "gearshape.fill",
+        "magnifyingglass", "trash", "checkmark", "person",
+        "rectangle.portrait.and.arrow.right", "info.circle.fill",
+        "info.circle", "questionmark.circle", "questionmark", "ellipsis",
+        "doc.on.doc", "safari.fill", "safari", "arrow.up.doc", "apple.logo",
+        "envelope", "plus.circle", "exclamationmark.bubble.fill", "photo",
+        "arrow.turn.down.right", "text.alignleft", "exclamationmark.triangle",
+        "bubble.left", "text.quote", "arrow.up.right",
+    ]
+
+    private static func symbol(_ name: String) -> UIImage {
+        guard let image = UIImage(systemName: name) else {
+            assertionFailure("SF Symbol \(name) did not resolve")
+            return UIImage()
+        }
+        return image
+    }
+}

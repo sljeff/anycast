@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+Date: Tue, 22 Sep 2026 02:17:18 GMT
+Content-Type: application/xml;charset=UTF-8
+Set-Cookie: HWWAFSESID=0eb45148c01a8d4357f; path=/
+Set-Cookie: HWWAFSESTIME=1790043437362; path=/
+Vary: Accept-Encoding
+X-B3-Back-Id: forab
+x-server-costtime: 15
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Credentials: true
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Headers: Authorization,Content-Type,x-clamper-server-ip,X-Requested-With,xm-sign
+Server: CW
+Content-Length: 2189262
+X-NWS-LOG-UUID: 4158943473922910312
+Connection: keep-alive
+X-Cache-Lookup: Cache Miss
+

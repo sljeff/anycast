@@ -78,7 +78,7 @@ dependencies:
   firebase_core: ^4.2.1
   firebase_auth: ^6.1.2
   google_sign_in: ^7.2.0
-  purchases_flutter: ^9.9.9
+  purchases_flutter: ^10.13.1
   jiffy: ^6.3.1
   sentry_flutter: ^9.8.0
   modal_bottom_sheet: ^3.0.0
@@ -98,7 +98,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  sqflite_common_ffi: 2.3.7+1
+  integration_test:
+    sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -106,7 +107,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  flutter_launcher_icons: "^0.14.4"
+  flutter_launcher_icons: ^0.14.4
+  sqflite_common_ffi: 2.4.0+3
 
 flutter_launcher_icons:
   android: "launcher_icon"

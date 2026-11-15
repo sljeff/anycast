@@ -1,0 +1,248 @@
+import Foundation
+import Testing
+import AnycastKit
+@testable import Anycast
+
+/// T7 write flows: the settings coordinator's notification payloads and box
+/// propagation over a real database, the stepper writes, plus the
+/// language-change side-effect ordering (reset before persist, mirroring
+/// Dart `setTargetLanguage`).
+@MainActor
+struct SettingsWriteFlowTests {
+
+    private func makeCoordinator() async throws -> (coordinator: SettingsCoordinator, box: SettingsBox, database: AppDatabase, databaseURL: URL) {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("t7-settings-\(UUID().uuidString).sqlite")
+        let database = try await AppDatabase.openAt(url, localeIdentifier: "en_US")
+        let box = SettingsBox(AppSettings.defaults(localeIdentifier: "en_US"))
+        let coordinator = SettingsCoordinator(
+            repository: database.settingsRepository(),
+            settingsBox: box
+        )
+        return (coordinator, box, database, url)
+    }
+
+    @Test("Country change: persists, refreshes the box, posts the payload")
+    func countryChangeNotification() async throws {
+        let (coordinator, box, database, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        var notes = NotificationCenter.default.notifications(
+            named: SettingsCoordinator.countryCodeDidChange, object: nil
+        ).makeAsyncIterator()
+
+        await coordinator.updateCountryCode("JP")
+
+        let note = await notes.next()
+        #expect(note?.userInfo?[SettingsCoordinator.countryCodeKey] as? String == "JP")
+        #expect(box.current.countryCode == "JP")
+
+        // The row survives a reopen (persisted, not in-memory only).
+        let reloaded = try await database.settingsRepository().load()
+        #expect(reloaded.countryCode == "JP")
+    }
+
+    @Test("History Limit commit persists the limit, then trims History to it")
+    func historyLimitCommitTrims() async throws {
+        let (coordinator, box, database, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        for index in 1...5 {
+            try await database.historyRepository().insert(HistoryEpisodeRow(
+                title: "Episode \(index)",
+                enclosureUrl: "https://example.test/limit-\(index).mp3",
+                lastPlayedAt: Int64(index) * 1_000
+            ))
+        }
+        let commit = SettingsHistoryLimitCommit(
+            coordinator: coordinator, settingsBox: box, history: database.historyRepository()
+        )
+
+        // Holding a lower limit (the draft) never touches the database.
+        var draft = SettingsPageModel.LimitDraft(stored: box.current.maxHistoryEpisodes)
+        draft.step(.decrease, in: SettingsCodec.maxEpisodesChoices)
+        #expect(try await database.historyRepository().count() == 5)
+
+        let remaining = await commit.run(3)
+        #expect(remaining == 3)
+        #expect(box.current.maxHistoryEpisodes == 3)
+        let stored = try await database.settingsRepository().load()
+        #expect(stored.maxHistoryEpisodes == 3)
+        let kept = try await database.historyRepository().listAll()
+        #expect(kept.map(\.enclosureUrl) == [
+            "https://example.test/limit-5.mp3",
+            "https://example.test/limit-4.mp3",
+            "https://example.test/limit-3.mp3",
+        ], "the oldest plays go first")
+    }
+
+    @Test("History Limit commit above the count removes nothing")
+    func historyLimitCommitAboveCount() async throws {
+        let (coordinator, box, database, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try await database.historyRepository().insert(HistoryEpisodeRow(
+            title: "One", enclosureUrl: "https://example.test/one.mp3", lastPlayedAt: 1
+        ))
+        let commit = SettingsHistoryLimitCommit(
+            coordinator: coordinator, settingsBox: box, history: database.historyRepository()
+        )
+        #expect(await commit.run(300) == 1)
+        #expect(box.current.maxHistoryEpisodes == 300)
+    }
+
+    @Test("Language change: persists '' or a code and posts the payload")
+    func languageChangeNotification() async throws {
+        let (coordinator, box, _, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        var notes = NotificationCenter.default.notifications(
+            named: SettingsCoordinator.targetLanguageDidChange, object: nil
+        ).makeAsyncIterator()
+
+        await coordinator.updateTargetLanguage("zh")
+        var note = await notes.next()
+        #expect(note?.userInfo?[SettingsCoordinator.targetLanguageKey] as? String == "zh")
+        #expect(box.current.targetLanguage == "zh")
+        #expect(SettingsPageModel.showsTargetLanguage(targetLanguage: box.current.targetLanguage))
+
+        // Switch off writes the empty string and still notifies.
+        await coordinator.updateTargetLanguage("")
+        note = await notes.next()
+        #expect(note?.userInfo?[SettingsCoordinator.targetLanguageKey] as? String == "")
+        #expect(box.current.targetLanguage == "")
+        #expect(!SettingsPageModel.showsTargetLanguage(targetLanguage: box.current.targetLanguage))
+    }
+
+    @Test("Limits writes post the numeric payloads (interval seconds, caps)")
+    func limitsNotifications() async throws {
+        let (coordinator, box, _, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        var notes = NotificationCenter.default.notifications(
+            named: SettingsCoordinator.limitsDidChange, object: nil
+        ).makeAsyncIterator()
+
+        await coordinator.updateAutoRefreshInterval(600)
+        var note = await notes.next()
+        #expect(note?.userInfo?[SettingsCoordinator.autoRefreshIntervalKey] as? Int64 == 600)
+        #expect(box.current.autoRefreshInterval == 600)
+
+        await coordinator.updateMaxFeedEpisodes(300)
+        note = await notes.next()
+        #expect(note?.userInfo?[SettingsCoordinator.maxFeedEpisodesKey] as? Int64 == 300)
+        #expect(box.current.maxFeedEpisodes == 300)
+
+        await coordinator.updateMaxHistoryEpisodes(50)
+        note = await notes.next()
+        #expect(note?.userInfo?[SettingsCoordinator.maxHistoryEpisodesKey] as? Int64 == 50)
+        #expect(box.current.maxHistoryEpisodes == 50)
+    }
+
+    @Test("Cache limit write: persists, refreshes the box, posts the payload")
+    func cacheLimitNotification() async throws {
+        let (coordinator, box, database, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        var notes = NotificationCenter.default.notifications(
+            named: SettingsCoordinator.limitsDidChange, object: nil
+        ).makeAsyncIterator()
+
+        await coordinator.updateMaxCacheCount(50)
+
+        let note = await notes.next()
+        #expect(note?.userInfo?[SettingsCoordinator.maxCacheCountKey] as? Int64 == 50)
+        #expect(box.current.maxCacheCount == 50)
+        let reloaded = try await database.settingsRepository().load()
+        #expect(reloaded.maxCacheCount == 50)
+    }
+
+    @Test("Each stepper row steps through the writer into the coordinator and the box")
+    func stepperWrites() async throws {
+        let (coordinator, box, database, databaseURL) = try await makeCoordinator()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        let writer = SettingsStepWriter(coordinator: coordinator)
+
+        let rows: [SettingsPageModel.Row] = [
+            .maxFeedEpisodes, .maxHistoryEpisodes, .cacheLimit,
+        ]
+        for row in rows {
+            let choices = try #require(SettingsPageModel.stepperChoices(for: row))
+            let before = try #require(SettingsPageModel.stepperValue(for: row, settings: box.current))
+            let up = SettingsPageModel.steppedValue(from: before, .increase, in: choices)
+            let down = SettingsPageModel.steppedValue(from: before, .decrease, in: choices)
+            #expect(up != before || down != before, "\(row) default must have a neighbour")
+
+            await writer.write(up, for: row)
+            #expect(SettingsPageModel.stepperValue(for: row, settings: box.current) == up, "\(row) up")
+            await writer.write(down, for: row)
+            #expect(SettingsPageModel.stepperValue(for: row, settings: box.current) == down, "\(row) down")
+        }
+
+        // Every write landed in the database, not just the box.
+        let reloaded = try await database.settingsRepository().load()
+        #expect(SettingsPageModel.stepperValue(for: .cacheLimit, settings: reloaded)
+            == SettingsPageModel.stepperValue(for: .cacheLimit, settings: box.current))
+        #expect(reloaded.maxFeedEpisodes == box.current.maxFeedEpisodes)
+        #expect(reloaded.maxHistoryEpisodes == box.current.maxHistoryEpisodes)
+
+        // Rows that are not steppers write nothing.
+        let snapshot = box.current
+        await writer.write(1, for: .country)
+        #expect(box.current == snapshot)
+    }
+
+    @Test("Language applier resets the translation map before persisting")
+    func languageApplierOrdering() async {
+        let calls = Calls()
+        let applier = SettingsLanguageChangeApplier(
+            resetTranslations: { calls.record("reset") },
+            persist: { language in
+                calls.record("persist:\(language)")
+            }
+        )
+        await applier.apply("ja")
+        #expect(calls.order == ["reset", "persist:ja"])
+    }
+
+    @Test("Live applier wires the real poller reset into the real write path")
+    func liveApplierWiring() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("t7-poller-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let database = try await AppDatabase.openAt(url, localeIdentifier: "en_US")
+        let box = SettingsBox(AppSettings.defaults(localeIdentifier: "en_US"))
+        let coordinator = SettingsCoordinator(
+            repository: database.settingsRepository(),
+            settingsBox: box
+        )
+        // A real poller over the same stack PlaybackStack builds.
+        let poller = TranslationPollController(
+            api: APIClient(client: HTTPClient(), tokenProvider: { nil }),
+            translations: database.translationRepository(),
+            subtitles: database.subtitleRepository(),
+            targetLanguage: { box.current.targetLanguage },
+            subtitleStatuses: { [:] }
+        )
+        var notes = NotificationCenter.default.notifications(
+            named: SettingsCoordinator.targetLanguageDidChange, object: nil
+        ).makeAsyncIterator()
+
+        let applier = SettingsLanguageChangeApplier.live(
+            translations: poller,
+            coordinator: coordinator
+        )
+        await applier.apply("zh")
+
+        // Persist + box refresh + notification all happened, and the reset
+        // ran on the live poller (map empty, no state left behind).
+        let note = await notes.next()
+        #expect(note?.userInfo?[SettingsCoordinator.targetLanguageKey] as? String == "zh")
+        #expect(box.current.targetLanguage == "zh")
+        #expect(poller.statuses.isEmpty)
+    }
+
+    private final class Calls: @unchecked Sendable {
+        private let lock = NSLock()
+        private(set) var order: [String] = []
+        func record(_ step: String) {
+            lock.lock()
+            order.append(step)
+            lock.unlock()
+        }
+    }
+}

@@ -1,0 +1,9 @@
+[
+ {
+  "file": "giant_1200_items.xml",
+  "items": 1200,
+  "note": "item[600].description is >1MB",
+  "url": "constructed:https://www.ximalaya.com/album/68171496.xml",
+  "bucket": "giant"
+ }
+]

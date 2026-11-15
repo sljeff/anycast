@@ -1,0 +1,18 @@
+HTTP/2 200 
+via: 1.1 varnish, 1.1 varnish, 1.1 varnish
+content-type: application/rss+xml; charset=utf-8
+access-control-allow-origin: *
+x-powered-by: Express
+etag: W/"168d6-fSW+SsBZYcg2tAXDkhw9d65rGLo"
+cache-control: public, s-maxage=605142, max-age=300
+x-timer: S1790026029.362936,VS0,VE449
+accept-ranges: bytes
+age: 41340
+date: Tue, 22 Sep 2026 08:56:10 GMT
+x-served-by: cache-iad-kiad7000041-IAD, cache-iad-kiad7000041-IAD, cache-iad-kiad7000140-IAD, cache-sjc10049-SJC
+x-cache: MISS, HIT, HIT
+x-cache-hits: 0, 1, 0
+vary: Authorization, Accept-Encoding
+strict-transport-security: max-age=86400
+content-length: 92374
+

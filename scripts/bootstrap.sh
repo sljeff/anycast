@@ -165,6 +165,29 @@ fi
 
 unset purchase_ios_api_key purchase_android_api_key
 
+figma_v2_url="$(read_secret FIGMA_ANYCAST_V2_URL)"
+
+if [[ -z "${figma_v2_url}" ]]; then
+  echo "The Figma v2 design link is empty" >&2
+  exit 1
+fi
+
+if [[ "${figma_v2_url}" == *$'\n'* ||
+      "${figma_v2_url}" == *$'\r'* ||
+      "${figma_v2_url}" == *" "* ]]; then
+  echo "The Figma v2 design link must be a single line without spaces" >&2
+  exit 1
+fi
+
+if [[ "${figma_v2_url}" != https://www.figma.com/* ]]; then
+  echo "Expected an https://www.figma.com/ design link" >&2
+  exit 1
+fi
+
+printf 'FIGMA_ANYCAST_V2_URL=%s\n' "${figma_v2_url}" >"${TEMP_DIR}/figma_v2_dotenv"
+
+unset figma_v2_url
+
 fetch_to_stage \
   ANDROID_GOOGLE_SERVICES_JSON \
   google-services.json
@@ -210,8 +233,14 @@ verify_reviewed_digest \
 verify_reviewed_digest \
   .env \
   "${TEMP_DIR}/dotenv"
+verify_reviewed_digest \
+  native/.env \
+  "${TEMP_DIR}/figma_v2_dotenv"
 
 install_staged_file "${TEMP_DIR}/dotenv" "${PROJECT_ROOT}/.env"
+install_staged_file \
+  "${TEMP_DIR}/figma_v2_dotenv" \
+  "${PROJECT_ROOT}/native/.env"
 install_staged_file \
   "${TEMP_DIR}/google-services.json" \
   "${PROJECT_ROOT}/android/app/google-services.json"

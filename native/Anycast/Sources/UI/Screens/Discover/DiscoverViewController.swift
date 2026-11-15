@@ -1,0 +1,235 @@
+import UIKit
+import AnycastKit
+
+/// Discover destination with the shared title/search/settings header over a
+/// horizontally scrolling category strip and swipeable per-category channel
+/// lists. The category fetch starts in viewDidLoad — the shell prewarms the
+/// tab at launch, which is the IndexedStack parity (07 §2.1 note). A
+/// country change reloads every page that has ever displayed (the Dart Obx
+/// on countryCode rebuilds all alive FutureBuilders).
+@MainActor
+final class DiscoverViewController: UIViewController {
+
+    private let context: UIContext
+    private var viewModel: DiscoverViewModel!
+
+    private let header = HeaderView()
+
+    // Body
+    private var categoryStrip: ChipTabBarView?
+    private var didAttachStripEdge = false
+    private var pagingContainer: DiscoverPagingContainer?
+    private let bodySpinner = UIActivityIndicatorView(style: .large)
+    private let failedState = EmptyStateView()
+
+    private let observation = ObservationLoop()
+    /// Block-API observer token — touched only on the main thread
+    /// (registered in viewDidLoad, removed in deinit); `nonisolated(unsafe)`
+    /// because deinit is nonisolated under strict concurrency.
+    private nonisolated(unsafe) var countryObserver: NSObjectProtocol?
+
+    // MARK: - Construction
+
+    init(context: UIContext) {
+        self.context = context
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    deinit {
+        if let countryObserver {
+            NotificationCenter.default.removeObserver(countryObserver)
+        }
+    }
+
+    // MARK: - Lifecycle
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        Theme.installPageBase(on: view)
+
+        viewModel = DiscoverViewModel(
+            api: context.api,
+            countryProvider: { [settingsBox = context.settingsBox] in
+                settingsBox.current.countryCode
+            }
+        )
+
+        buildHeader()
+        buildBodyOverlay()
+
+        observation.track(
+            read: { [weak self] in
+                guard let self else { return }
+                _ = self.viewModel.categoriesLoading
+                _ = self.viewModel.categoriesFailed
+                _ = self.viewModel.categories
+            },
+            onChange: { [weak self] in self?.renderCategories() }
+        )
+
+        // The launch-time prefetch (IndexedStack parity — the shell's
+        // loadViewIfNeeded prewarm lands here).
+        renderCategories()
+        viewModel.loadCategories()
+
+        // Dart Obx on SettingsController.countryCode (discover.dart:63).
+        countryObserver = NotificationCenter.default.addObserver(
+            forName: SettingsCoordinator.countryCodeDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.viewModel.countryDidChange()
+        }
+    }
+
+    // MARK: - Shared page header
+
+    private func buildHeader() {
+        header.configure(HeaderView.Configuration(title: "Discover"))
+        header.onSettings = { [weak self] in self?.openSettings() }
+        header.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(header)
+
+        NSLayoutConstraint.activate([
+            header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+        ])
+    }
+
+    private func openSettings() {
+        AppSheets.presentExpand(SettingsViewController(context: context), from: topMostPresented())
+    }
+
+    // MARK: - Body
+
+    private func buildBodyOverlay() {
+        bodySpinner.color = Theme.primary
+        bodySpinner.hidesWhenStopped = true
+        bodySpinner.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(bodySpinner)
+
+        // A failed (or empty) category list: one sentence and Retry.
+        let retry = AnycastButton.make(
+            .secondary, title: "Retry", image: UIImage(systemName: "arrow.clockwise")
+        )
+        retry.accessibilityIdentifier = "discover-load-retry"
+        retry.addAction(UIAction { [weak self] _ in self?.viewModel.loadCategories() }, for: .touchUpInside)
+        failedState.configure(.init(title: "Couldn’t load Discover.", actions: [retry]))
+        failedState.isHidden = true
+        failedState.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(failedState)
+
+        NSLayoutConstraint.activate([
+            bodySpinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            bodySpinner.centerYAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -160
+            ),
+            failedState.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            failedState.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            failedState.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+        ])
+    }
+
+    /// The strip + paging area anchors under the shared page header; the
+    /// safe-area bottom keeps clear of the shell's floating mini player
+    /// through the shell's additionalSafeAreaInsets (iOS 18 fallback).
+    private func buildTabsAndPages(names: [String]) {
+        let strip = ChipTabBarView(titles: names)
+        strip.translatesAutoresizingMaskIntoConstraints = false
+        strip.onSelect = { [weak self] index in
+            self?.selectCategory(index, animatedPages: true)
+        }
+        view.addSubview(strip)
+
+        let container = DiscoverPagingContainer(pageCount: names.count)
+        container.view.translatesAutoresizingMaskIntoConstraints = false
+        addChild(container)
+        view.addSubview(container.view)
+        container.didMove(toParent: self)
+        container.onSwipeSelect = { [weak self] index in
+            self?.selectCategory(index, animatedPages: false)
+        }
+        container.topChromeInset = ChipTabBarView.chipHeight
+        container.onSelectedPageScrollViewChange = { [weak self] in
+            guard let self else { return }
+            let list = self.pagingContainer?.selectedPageScrollView
+            self.setBottomEdgeScrollView(list)
+            guard let list else { return }
+            if self.didAttachStripEdge {
+                ScrollEdgeChrome.retarget(chrome: strip, to: list, edge: .top)
+            } else {
+                self.didAttachStripEdge = true
+                ScrollEdgeChrome.attach(chrome: strip, to: list, edge: .top, in: self.view)
+            }
+        }
+        container.onScrub = { [weak self] index in
+            // Mid-drag materialization — the PageView builds the page it is
+            // being dragged toward; the strip indicator tracks the drag
+            // (DefaultTabController links bar and view).
+            self?.materializeAround(index: index)
+            self?.categoryStrip?.select(index, animated: false)
+        }
+
+        NSLayoutConstraint.activate([
+            strip.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            strip.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            strip.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Spacing.gap),
+            strip.heightAnchor.constraint(equalToConstant: 44),
+
+            container.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            container.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // The lists run under the strip (content fades out behind it);
+            // `topChromeInset` keeps the first row below it.
+            container.view.topAnchor.constraint(equalTo: strip.topAnchor),
+            container.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        view.bringSubviewToFront(strip)   // the pages now run under it
+
+        categoryStrip = strip
+        pagingContainer = container
+        materializeAround(index: 0)
+    }
+
+    private func selectCategory(_ index: Int, animatedPages: Bool) {
+        materializeAround(index: index)
+        categoryStrip?.select(index, animated: true)
+        pagingContainer?.select(index, animated: animatedPages)
+    }
+
+    /// Installs page controllers for the materialized model indices near the
+    /// selection. `selectCategory` only returns NEW models — but pages can
+    /// pre-exist (buildPagesIfNeeded materializes 0/1 before the container
+    /// exists), so install every live model in range; `install` is a no-op
+    /// for slots that already hold a page.
+    private func materializeAround(index: Int) {
+        _ = viewModel.selectCategory(index)
+        for i in index - 1 ... index + 1 {
+            guard let model = viewModel.pages[i] else { continue }
+            pagingContainer?.install(
+                DiscoverCategoryPageViewController(context: context, model: model),
+                at: i
+            )
+        }
+    }
+
+    private func renderCategories() {
+        switch viewModel.categoriesPhase {
+        case .loading:
+            bodySpinner.startAnimating()
+            failedState.isHidden = true
+        case .networkError:
+            bodySpinner.stopAnimating()
+            failedState.isHidden = false
+        case .loaded(let names):
+            bodySpinner.stopAnimating()
+            failedState.isHidden = true
+            if categoryStrip == nil {
+                buildTabsAndPages(names: names)
+            }
+        }
+    }
+}

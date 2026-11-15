@@ -1,0 +1,4 @@
+{
+  "bucket": "db_corrupt_notadb",
+  "open_error": "SqfliteFfiException(sqlite_error: 26, , SqliteException(26): while selecting from statement, file is not a database, file is not a database (code 26)"
+}

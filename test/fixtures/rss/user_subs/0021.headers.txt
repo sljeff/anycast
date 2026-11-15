@@ -1,0 +1,64 @@
+HTTP/2 301 
+date: Tue, 22 Sep 2026 08:56:40 GMT
+content-type: text/html; charset=UTF-8
+location: http://etw.fm/rss
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=EvJ3ZGd7WvzTfSsgSv%2FOU7g%2FdzDjeq8VNF2DSDtjHIa2USfML%2BTkmU4KRjfllpnDOiUYyAYWsjoMNfFa3JG4LtX7RlwAh2qnf8LNBRGOGAUN39TgTKDTnjgd3Alg"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a3f019039875eb2a-SJC
+alt-svc: h3=":443"; ma=86400
+
+HTTP/1.1 301 Moved Permanently
+Date: Tue, 22 Sep 2026 08:56:41 GMT
+Content-Type: text/html; charset=UTF-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+Location: https://etw.fm/rss
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=HgNRmVj%2Fp0hkljzKYcfQmXmT1w02cUXrH9%2BE7lNQH4meAnx0GmLC03XN1RcsBcYQPRcrfqMYLK6ahE49iBnbabj1c2NhJxIX2oW1iJb3cg6HLTzuO3lj%2FUY%3D"}]}
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+Server: cloudflare
+CF-RAY: a3f01908298e1688-SJC
+alt-svc: h3=":443"; ma=86400
+
+HTTP/2 302 
+date: Tue, 22 Sep 2026 08:56:42 GMT
+content-type: text/html; charset=utf-8
+location: https://feeds.fireside.fm/shengdongjixi/rss
+age: 192
+alt-svc: h3=":443"; ma=86400
+cache-control: max-age=3600, public
+referrer-policy: strict-origin-when-cross-origin
+server: cloudflare
+vary: Origin
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-host: etw.fm
+x-permitted-cross-domain-policies: none
+x-request-id: 25c4c733-9dca-4603-a070-83df8221e10e
+x-server: cache04
+x-url: /rss
+x-xss-protection: 0
+cf-cache-status: DYNAMIC
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=au4w4MkExXSHl1BuKqpO3QAaTppJ2Tj2XWVy6kuzP716uVv1%2F6KyyFp3JdG690wWZKISOH2zh7isrz2U0o2EuHnovU3jK8JoAGzanvqaXow%2BVBJu2WS5xfw%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+cf-ray: a3f0190f69e8456e-SJC
+
+HTTP/2 200 
+date: Tue, 22 Sep 2026 08:56:43 GMT
+content-type: application/xml; charset=utf-8
+content-length: 6667234
+server: cloudflare
+cache-control: max-age=900, public, stale-if-error=86400, stale-while-revalidate=86400
+etag: "3c116e388797033be8c9b870ae530829"
+last-modified: Thu, 17 Sep 2026 11:30:05 GMT
+x-request-id: a660038e-21da-42d7-be74-3ba80f5b0aab
+vary: Accept-Encoding
+x-backend-server: app02
+x-served-by: Fireside
+x-content-type-options: nosniff
+age: 389
+accept-ranges: bytes
+cf-cache-status: HIT
+cf-ray: a3f0191688ff6c4d-SJC
+

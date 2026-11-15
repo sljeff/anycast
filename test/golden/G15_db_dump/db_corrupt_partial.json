@@ -1,0 +1,4 @@
+{
+  "bucket": "db_corrupt_partial",
+  "open_error": "SqfliteFfiException(sqlite_error: 11, , SqliteException(11): while selecting from statement, database disk image is malformed, database disk image is malformed (code 11)"
+}

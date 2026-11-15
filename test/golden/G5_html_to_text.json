@@ -1,0 +1,112 @@
+{
+  "source": "htmlToText (rss_fetcher.dart:159-179) + renderHtml 判定 (formatters.dart:80-110)",
+  "cases": [
+    {
+      "input": "plain text without markup",
+      "startsWith_lt": false,
+      "sanitized": "",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "plain text without markup",
+      "renderHtml_uses": "raw text"
+    },
+    {
+      "input": "<p>simple <b>bold</b> paragraph</p>",
+      "startsWith_lt": true,
+      "sanitized": "<p>simple <b>bold</b> paragraph</p>",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "simple bold paragraph",
+      "renderHtml_uses": "sanitized"
+    },
+    {
+      "input": "<p>entity &amp; &lt;test&gt; &quot;quoted&quot;</p>",
+      "startsWith_lt": true,
+      "sanitized": "<p>entity &amp; &lt;test&gt; \"quoted\"</p>",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "entity & <test> \"quoted\"",
+      "renderHtml_uses": "sanitized"
+    },
+    {
+      "input": "<div><span>nested</span> <a href=\"https://x.com\">link</a></div>",
+      "startsWith_lt": true,
+      "sanitized": "<div><span>nested</span> <a href=\"https://x.com\">link</a></div>",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "nested link",
+      "renderHtml_uses": "sanitized"
+    },
+    {
+      "input": "<script>alert(1)</script><p>after script</p>",
+      "startsWith_lt": true,
+      "sanitized": "<p>after script</p>",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "after script",
+      "renderHtml_uses": "sanitized"
+    },
+    {
+      "input": "<p></p>",
+      "startsWith_lt": true,
+      "sanitized": "<p></p>",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "",
+      "renderHtml_uses": "sanitized"
+    },
+    {
+      "input": "<p>   </p>",
+      "startsWith_lt": true,
+      "sanitized": "<p>   </p>",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "",
+      "renderHtml_uses": "sanitized"
+    },
+    {
+      "input": "<p>中文段落与 emoji 🎧</p>",
+      "startsWith_lt": true,
+      "sanitized": "<p>中文段落与 emoji 🎧</p>",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "中文段落与 emoji 🎧",
+      "renderHtml_uses": "sanitized"
+    },
+    {
+      "input": "<p style=\"color:red\">styled</p>",
+      "startsWith_lt": true,
+      "sanitized": "<p>styled</p>",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "styled",
+      "renderHtml_uses": "sanitized"
+    },
+    {
+      "input": "   <p>leading whitespace html</p>   ",
+      "startsWith_lt": true,
+      "sanitized": "<p>leading whitespace html</p>",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "leading whitespace html",
+      "renderHtml_uses": "sanitized"
+    },
+    {
+      "input": "text starting with lesser-than < symbol",
+      "startsWith_lt": false,
+      "sanitized": "",
+      "sanitize_error": null,
+      "sanitize_empty_fallback_to_htmlToText": false,
+      "htmlToText": "text starting with lesser-than < symbol",
+      "renderHtml_uses": "raw text"
+    }
+  ],
+  "corpus_channel_descriptions_htmlToText": {
+    "0421.xml": "最新热门开心段子！每日爆更！皂皂：薯山小卖店（淘）《欢乐江湖》完整版在这里！！！公众号/微博：NJ薯条酱  主播微信：aiyashutiao]]>",
+    "0415.xml": "良依之约：因为钢琴相遇，所以给你弹一辈子琴，谈一辈子爱。钢琴谱、简谱，在我微博搜曲名。]]>",
+    "0414.xml": "",
+    "0002.xml": "A weekly podcast featuring the leading thinkers in business and management.",
+    "0003.xml": "Women face gender discrimination throughout our careers. It doesn't have to derail our ambitions — but how do we prepare to deal with it? There's no workplace orientation session about narrowing the wage gap, standing up to interrupting male colleagues, or taking on many other issues we encounter at work. So HBR staffers Amy Bernstein, Amy Gallo, and Emily Caulfield are untangling some of the knottiest problems. They interview experts on gender, tell stories about their own experiences, and give lots of practical advice to help you succeed in spite of the obstacles.",
+    "0005.xml": "きくドラ"
+  }
+}

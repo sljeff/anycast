@@ -1,0 +1,26 @@
+{
+  "source": "resMap2Channel (api/podcasts.dart:32-43)",
+  "input": {
+    "rss_url": "https://example.com/feed.xml",
+    "title": "  Padded Channel Title  ",
+    "description": "\n description with newlines \t",
+    "small_cover_url": "https://img.example.com/x.jpg",
+    "link": "https://example.com/",
+    "keywords": [
+      "tech",
+      "news",
+      " culture "
+    ],
+    "author": "  Author Name  "
+  },
+  "output": {
+    "rssFeedUrl": "https://example.com/feed.xml",
+    "title": "Padded Channel Title",
+    "description": "description with newlines",
+    "imageUrl": "https://img.example.com/x.jpg",
+    "link": "https://example.com/",
+    "categories": "tech,news, culture ",
+    "author": "Author Name",
+    "email": ""
+  }
+}

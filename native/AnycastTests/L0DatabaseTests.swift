@@ -1,0 +1,786 @@
+import Foundation
+import GRDB
+import Testing
+@testable import AnycastKit
+
+/// L0 data-compatibility matrix (docs/migration/05 §2.1–§2.3) against the
+/// M0 fixture buckets, golden-compared via G15.
+@Suite(.serialized)
+struct L0DatabaseTests {
+
+    private func sandboxURL(_ bucket: String) throws -> URL {
+        try RepoAssets.sandboxedCopy(ofFixtureDirectory: "db/\(bucket)")
+    }
+
+    private func openSandbox(_ bucket: String) async throws -> (AppDatabase, URL) {
+        let sandbox = try sandboxURL(bucket)
+        let database = try await AppDatabase.openAt(sandbox.appendingPathComponent("anycast.db"))
+        return (database, sandbox)
+    }
+
+    // MARK: - §2.1 read matrix
+
+    @Test("Buckets open at v4 and match their G15 golden dump row-for-row")
+    func goldenDumpParity() async throws {
+        let buckets = ["db_light", "db_heavy", "db_dirty", "db_user", "db_device", "db_edge_subs", "db_crashed"]
+        for bucket in buckets {
+            let (database, sandbox) = try await openSandbox(bucket)
+            defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
+
+            let version = try await database.queue.read { db in
+                try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
+            }
+            #expect(version == Schema.version, "\(bucket): user_version")
+
+            // lastPlayedAt is added on upgrade (NULL for existing rows) and
+            // is not part of the v4 golden dumps.
+            let comparison = try await G15.compare(
+                database: database, goldenBucket: bucket, sandbox: sandbox,
+                ignoringColumns: ["lastPlayedAt"]
+            )
+            if !comparison.mismatches.isEmpty {
+                Issue.record("\(bucket): \(comparison.mismatches.joined(separator: "; ").prefix(3000))")
+            }
+            #expect(comparison.mismatches.isEmpty)
+        }
+    }
+
+    @Test("Read orderings: playlist position ASC, feed pubDate DESC, history lastPlayedAt DESC, subscription title ASC (BINARY)")
+    func readOrderings() async throws {
+        let (database, sandbox) = try await openSandbox("db_heavy")
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
+
+        let playlists = try await database.playlistRepository().listPlaylists()
+        let playlistPositions = playlists.compactMap(\.position)
+        #expect(playlistPositions == playlistPositions.sorted(), "playlist position ASC")
+
+        let queue = try await database.playlistRepository().listEpisodes(playlistId: 1)
+        let positions = queue.compactMap(\.position)
+        #expect(positions == positions.sorted(), "queue position ASC")
+
+        let feed = try await database.feedRepository().listAll()
+        let feedDates = feed.compactMap(\.pubDate)
+        #expect(feedDates == feedDates.sorted(by: >), "feed pubDate DESC")
+
+        let history = try await database.historyRepository().listAll()
+        let playedAt = history.map { $0.lastPlayedAt ?? Int64.min }
+        #expect(playedAt == playedAt.sorted(by: >), "history lastPlayedAt DESC")
+        // Released fixtures predate the column. The v5 migration leaves it
+        // NULL (unknown play time); the id tie-break keeps the old order.
+        #expect(history.allSatisfy { $0.lastPlayedAt == nil }, "migrated lastPlayedAt stays NULL")
+        let historyIds = history.compactMap(\.id)
+        #expect(historyIds == historyIds.sorted(by: >), "NULL rows keep id DESC")
+
+        // SQLite BINARY collation is byte order — compare against the
+        // database's own ordering, never a localized Swift sort.
+        let (swiftTitles, expectedTitles) = try await database.queue.read { db in
+            let expected = try String.fetchAll(db, sql: "SELECT title FROM subscription ORDER BY title ASC")
+            let actual = try String.fetchAll(db, sql: "SELECT title FROM subscription")
+            return (actual, expected)
+        }
+        #expect(swiftTitles == expectedTitles)
+    }
+
+    @Test("Settings decode: CSV/enums/units per G9 caliber (db defaults)")
+    func settingsDecode() async throws {
+        let (database, sandbox) = try await openSandbox("db_light")
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
+        let settings = try await database.settingsRepository().load()
+        #expect(settings.autoRefreshInterval == 300)
+        #expect(settings.speed == 1.0)
+        #expect(!settings.darkMode && !settings.skipSilence)
+        #expect(settings.autoSleepTimer == "0,0,0")
+        let decodedTimer = SettingsCodec.decodeAutoSleepTimer(settings.autoSleepTimer)
+        #expect(decodedTimer?.startHour == 0 && decodedTimer?.endHour == 0 && decodedTimer?.minsIndex == 0)
+        #expect(settings.maxCacheCount == 10)
+        #expect(settings.maxFeedEpisodes == 100 && settings.maxHistoryEpisodes == 100)
+        #expect(settings.continuousPlaying)
+    }
+
+    @Test("cache audio variants: emptied cache dir tolerated, missing meta DB tolerated, orphan rows ignored")
+    func tmpAndMetaVariants() async throws {
+        let fileManager = FileManager.default
+
+        // (a) full bucket: meta DB opens and maps URLs (real-device layout:
+        // Library/Caches/anycast_episode/, 01 §4.1 2026-09-23 correction).
+        let full = try sandboxURL("db_light")
+        let fullMeta = await CacheMetaDatabase.open(
+            at: full.appendingPathComponent("Library/Application Support/anycast_episode.db")
+        )
+        defer { SandboxCleanup.remove(full, closing: [fullMeta.queue]) }
+        #expect(fullMeta.isAvailable, "meta DB opens")
+        let rows = await fullMeta.allRows()
+        #expect(!rows.isEmpty)
+        if let url = rows.first?.url {
+            let mapped = await fullMeta.entry(forURL: url)
+            #expect(mapped != nil, "url-keyed lookup resolves (key column = the URL itself)")
+        }
+
+        // (b) cache dir emptied, meta DB kept → open tolerates; mapping still
+        // readable (missing FILES are playback-time misses, never errors).
+        let emptied = try sandboxURL("db_light")
+        let tmpDir = emptied.appendingPathComponent("Library/Caches/anycast_episode")
+        if fileManager.fileExists(atPath: tmpDir.path) {
+            for file in try fileManager.contentsOfDirectory(atPath: tmpDir.path) {
+                try fileManager.removeItem(at: tmpDir.appendingPathComponent(file))
+            }
+        }
+        let emptiedDB = try await AppDatabase.openAt(emptied.appendingPathComponent("anycast.db"))
+        _ = try await emptiedDB.settingsRepository().load()
+        let emptiedMeta = await CacheMetaDatabase.open(
+            at: emptied.appendingPathComponent("Library/Application Support/anycast_episode.db")
+        )
+        defer { SandboxCleanup.remove(emptied, closing: [emptiedDB.queue, emptiedMeta.queue]) }
+        #expect(emptiedMeta.isAvailable, "meta DB still readable with empty tmp")
+
+        // (c) meta DB removed, tmp files kept → tolerant open, no mapping.
+        let metaless = try sandboxURL("db_light")
+        let metaURL = metaless.appendingPathComponent("Library/Application Support/anycast_episode.db")
+        if fileManager.fileExists(atPath: metaURL.path) {
+            try fileManager.removeItem(at: metaURL)
+        }
+        let metalessDB = try await AppDatabase.openAt(metaless.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(metaless, closing: [metalessDB.queue]) }
+        _ = try await metalessDB.settingsRepository().load()
+        let missingMeta = await CacheMetaDatabase.open(at: metaURL)
+        #expect(!missingMeta.isAvailable, "missing meta DB → unavailable, not an error")
+    }
+
+    @Test("db_v3 upgrades to latest: continuousPlaying default 1, history backfill, everything else untouched")
+    func v3Upgrade() async throws {
+        let sandbox = try sandboxURL("db_v3")
+        let database = try await AppDatabase.openAt(sandbox.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
+
+        let version = try await database.queue.read { db in
+            try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
+        }
+        #expect(version == Schema.version)
+
+        let settings = try await database.settingsRepository().load()
+        #expect(settings.continuousPlaying)
+
+        // The v3 golden is the PRE-migration dump: everything except the
+        // migration-added columns must be untouched (05 §2.1).
+        let comparison = try await G15.compare(
+            database: database, goldenBucket: "db_v3", sandbox: sandbox,
+            ignoringColumns: ["continuousPlaying", "lastPlayedAt"]
+        )
+        #expect(comparison.mismatches.isEmpty)
+    }
+
+    @Test("db_crashed: hot journal recovers cleanly, data matches golden")
+    func crashedRecovery() async throws {
+        let (database, sandbox) = try await openSandbox("db_crashed")
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
+        let comparison = try await G15.compare(
+            database: database, goldenBucket: "db_crashed", sandbox: sandbox,
+            ignoringColumns: ["lastPlayedAt"]
+        )
+        #expect(comparison.mismatches.isEmpty)
+    }
+
+    @Test("db_corrupt ×3: quarantine + fresh rebuild + report, never a crash loop (K25)")
+    func corruptQuarantine() async throws {
+        for bucket in ["db_corrupt_notadb", "db_corrupt_truncated", "db_corrupt_partial"] {
+            let sandbox = try sandboxURL(bucket)
+            let url = sandbox.appendingPathComponent("anycast.db")
+
+            let quarantines = QuarantineRecorder()
+            let database = try await AppDatabase.openAt(url, onQuarantine: quarantines.handler)
+            defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
+
+            #expect(quarantines.events.count == 1, "\(bucket): quarantined exactly once")
+            #expect(FileManager.default.fileExists(atPath: url.path + ".corrupt"),
+                    "\(bucket): original preserved as .corrupt")
+
+            // Rebuilt store: latest schema + default rows.
+            let version = try await database.queue.read { db in
+                try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
+            }
+            #expect(version == Schema.version)
+            let playlists = try await database.playlistRepository().listPlaylists()
+            #expect(playlists.first?.title == "Default")
+            let settings = try await database.settingsRepository().load()
+            #expect(settings.autoRefreshInterval == 300)
+
+            // Reopen is stable — no loop, no second quarantine.
+            let secondRecorder = QuarantineRecorder()
+            _ = try await AppDatabase.openAt(url, onQuarantine: secondRecorder.handler)
+            #expect(secondRecorder.events.isEmpty, "\(bucket): healthy rebuilt database must not quarantine again")
+        }
+    }
+
+    @Test("Fresh install: creators + default rows + locale-derived country/language")
+    func freshInstallDefaults() async throws {
+        func freshDatabase(locale: String) async throws -> (AppDatabase, URL) {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("anycast-fresh-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let database = try await AppDatabase.openAt(
+                directory.appendingPathComponent("anycast.db"),
+                localeIdentifier: locale
+            )
+            return (database, directory)
+        }
+
+        let (database, freshDirectory) = try await freshDatabase(locale: "zh-Hans-CN")
+        defer { SandboxCleanup.remove(freshDirectory, closing: [database.queue]) }
+
+        let playlists = try await database.playlistRepository().listPlaylists()
+        #expect(playlists == [PlaylistRow(id: 1, title: "Default", position: 1)])
+
+        let pointer = try await database.playerRepository().loadPointer()
+        #expect(pointer?.currentPlaylistId == nil)
+
+        let settings = try await database.settingsRepository().load()
+        #expect(settings.countryCode == "CN")
+        #expect(settings.targetLanguage == "zh")
+        #expect(settings.darkMode == false)
+        #expect(settings.speed == 1.0)
+        #expect(settings.autoSleepTimer == "0,0,0")
+        #expect(settings.maxCacheCount == 10)
+        #expect(settings.autoRefreshInterval == 300)
+        #expect(settings.maxFeedEpisodes == 100 && settings.maxHistoryEpisodes == 100)
+        #expect(settings.continuousPlaying)
+
+        // Dart-style underscore identifiers go through the same rule (G9).
+        let (underscored, underscoredDirectory) = try await freshDatabase(locale: "zh_Hans_CN")
+        defer { SandboxCleanup.remove(underscoredDirectory, closing: [underscored.queue]) }
+        let settings2 = try await underscored.settingsRepository().load()
+        #expect(settings2.countryCode == "CN" && settings2.targetLanguage == "zh")
+
+        // No-separator fallback: en/US.
+        let (bare, bareDirectory) = try await freshDatabase(locale: "en")
+        defer { SandboxCleanup.remove(bareDirectory, closing: [bare.queue]) }
+        let settings3 = try await bare.settingsRepository().load()
+        #expect(settings3.countryCode == "US" && settings3.targetLanguage == "en")
+    }
+
+    // MARK: - §2.2 semantic traps
+
+    @Test("JSON columns decode to double-second segments; summary NULL reads clean; sqlite_sequence readable")
+    func semanticTraps() async throws {
+        let (database, sandbox) = try await openSandbox("db_heavy")
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
+
+        let subtitleURL = try await database.queue.read { db in
+            try String.fetchOne(db, sql: "SELECT enclosureUrl FROM subtitle LIMIT 1")
+        }
+        guard let subtitleURL else {
+            Issue.record("db_heavy has subtitle rows")
+            return
+        }
+
+        let subtitle = try await database.subtitleRepository().get(byEnclosureURL: subtitleURL)
+        #expect(subtitle != nil)
+        let segments = subtitle?.segments ?? []
+        #expect(!segments.isEmpty)
+        #expect(segments.allSatisfy { ($0.start ?? 0) >= 0 && ($0.end ?? 0) > ($0.start ?? 0) })
+        #expect(subtitle?.summary == nil, "summary column is always NULL")
+        #expect(segments.contains { ($0.start ?? 0).rounded() != ($0.start ?? 0) },
+                "fractional seconds survive as doubles")
+
+        let sequenceNames = try await database.queue.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM sqlite_sequence")
+        }
+        #expect(sequenceNames.contains("translation"))
+
+        let (dirty, dirtySandbox) = try await openSandbox("db_dirty")
+        defer { SandboxCleanup.remove(dirtySandbox, closing: [dirty.queue]) }
+        let episodes = try await dirty.feedRepository().listAll()
+        #expect(episodes.contains { $0.duration == nil || $0.pubDate == nil || $0.description == nil })
+    }
+
+    @Test("UNIQUE semantics: same episode moves across playlists; same-title subscriptions replace; language switch replaces translation")
+    func uniqueSemantics() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-unique-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let database = try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
+
+        // Same enclosureUrl re-inserted → one row (K14 move semantics).
+        let episode = PlaylistEpisodeRow(
+            title: "E1", enclosureUrl: "https://x.example/ep1.mp3", playlistId: 1
+        )
+        try await database.playlistRepository().insertOrUpdateByIndex(episode, playlistId: 1, index: 0)
+        try await database.playlistRepository().insertOrUpdateByIndex(episode, playlistId: 1, index: 0)
+        let episodeCount = try await database.queue.read { db in
+            try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM playlistEpisode WHERE enclosureUrl = ?",
+                arguments: ["https://x.example/ep1.mp3"]
+            ) ?? 0
+        }
+        #expect(episodeCount == 1)
+
+        // K14 CROSS-playlist: UNIQUE(enclosureUrl) is table-global, so the
+        // same episode added to a different playlist must MOVE there — a
+        // plain insert would throw on the constraint (the shipped Dart
+        // looked the row up table-wide and updated it).
+        try await database.queue.write { db in
+            try db.execute(sql: "INSERT INTO playlist (title, position) VALUES ('Second', 2)")
+        }
+        let secondPlaylistID = try await database.queue.read { db in
+            try Int64.fetchOne(db, sql: "SELECT id FROM playlist WHERE title = 'Second'")
+        }
+        guard let secondPlaylistID else {
+            Issue.record("second playlist created")
+            return
+        }
+        try await database.playlistRepository().insertOrUpdateByIndex(
+            episode, playlistId: secondPlaylistID, index: 0
+        )
+        let (movedPlaylistID, rowsAfterMove) = try await database.queue.read { db in
+            let playlistID = try Int64.fetchOne(
+                db, sql: "SELECT playlistId FROM playlistEpisode WHERE enclosureUrl = ?",
+                arguments: ["https://x.example/ep1.mp3"]
+            )
+            let count = try Int.fetchOne(
+                db, sql: "SELECT COUNT(*) FROM playlistEpisode WHERE enclosureUrl = ?",
+                arguments: ["https://x.example/ep1.mp3"]
+            ) ?? 0
+            return (playlistID, count)
+        }
+        #expect(rowsAfterMove == 1, "cross-playlist add must not duplicate")
+        #expect(movedPlaylistID == secondPlaylistID, "cross-playlist add moves the row (K14)")
+
+        // Same-title subscription replaces the row, id changes (K13).
+        try await database.subscriptionRepository().addMany([
+            SubscriptionRow(rssFeedUrl: "https://a.example/feed", title: "Same", description: "one"),
+        ])
+        let idAfterFirst = try await database.queue.read { db in
+            try Int64.fetchOne(db, sql: "SELECT id FROM subscription WHERE title = 'Same'")
+        }
+        try await database.subscriptionRepository().addMany([
+            SubscriptionRow(rssFeedUrl: "https://b.example/feed", title: "Same", description: "two"),
+        ])
+        let (idAfterSecond, url, subscriptionCount) = try await database.queue.read { db in
+            let id = try Int64.fetchOne(db, sql: "SELECT id FROM subscription WHERE title = 'Same'")
+            let url = try String.fetchOne(db, sql: "SELECT rssFeedUrl FROM subscription WHERE title = 'Same'")
+            let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM subscription") ?? 0
+            return (id, url, count)
+        }
+        #expect(subscriptionCount == 1, "title collision replaces")
+        #expect(url == "https://b.example/feed")
+        #expect(idAfterFirst != idAfterSecond, "replaced row gets a new id")
+
+        // Translation: switching language replaces (UNIQUE enclosureUrl, K15).
+        let segments = [SubtitleSegment(start: 0.0, end: 1.5, text: "hola")]
+        let encoded = SubtitleSegment.encode(segments)
+        try await database.translationRepository().insert(
+            TranslationRow(enclosureUrl: "https://x.example/ep1.mp3", status: "succeeded",
+                           translation: encoded, language: "es")
+        )
+        try await database.translationRepository().insert(
+            TranslationRow(enclosureUrl: "https://x.example/ep1.mp3", status: "succeeded",
+                           translation: encoded, language: "zh")
+        )
+        let translationCount = try await database.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM translation") ?? 0
+        }
+        #expect(translationCount == 1, "language switch replaces the row")
+    }
+
+    /// 2026-09-23 fix: neighbor lookups are index-aligned with the FULL
+    /// ordered list — a NULL-position row (dirty data) means "no neighbor on
+    /// that side" in Dart (`episodes[i].position` is nil), not a row that
+    /// drops out of the array (the old `compactMap` shifted every lookup).
+    @Test("NULL-position rows: neighbors come from the full ordered list")
+    func nullPositionNeighbors() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-nullpos-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let database = try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
+
+        // ORDER BY position ASC puts the NULL row first: [A(NULL), B(2.0)].
+        try await database.queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO playlistEpisode (enclosureUrl, playlistId, position)
+                VALUES ('https://a.example/ep.mp3', 1, NULL),
+                       ('https://b.example/ep.mp3', 1, 2.0)
+                """)
+        }
+
+        // Insert at index 1: Dart's left neighbor is episodes[0] = the NULL
+        // row (no left neighbor), right neighbor is episodes[1] = 2.0 — so
+        // the position lands just BELOW 2.0. The compactMap bug treated B as
+        // the left neighbor and landed above it.
+        let episode = PlaylistEpisodeRow(
+            title: "c", enclosureUrl: "https://c.example/ep.mp3", playlistId: 1
+        )
+        try await database.playlistRepository().insertOrUpdateByIndex(episode, playlistId: 1, index: 1)
+
+        let inserted = try await database.playlistRepository()
+            .episode(byEnclosureURL: "https://c.example/ep.mp3")
+        #expect(inserted?.position == 2.0 - PlaylistPositioning.minPositionGap * 3)
+    }
+
+    @Test("K26 move semantics: cross-index moves persist across reopen (drag-index convention)")
+    func k26MoveSemantics() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-k26-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("anycast.db")
+        let database = try await AppDatabase.openAt(url)
+
+        func episode(_ name: String) -> PlaylistEpisodeRow {
+            PlaylistEpisodeRow(
+                title: name, enclosureUrl: "https://x.example/\(name).mp3", playlistId: 1
+            )
+        }
+        let repository = database.playlistRepository()
+        for (index, name) in ["A", "B", "C"].enumerated() {
+            try await repository.insertOrUpdateByIndex(episode(name), playlistId: 1, index: index)
+        }
+
+        // Downward move, drag-gesture convention (Flutter onReorder counts
+        // the dragged item at its old slot: slot 0 → the end reports 3).
+        // Expected [B, C, A]; the K26 bug computed the midpoint against the
+        // pre-move list, landing back at the old spot after a restart.
+        try await repository.insertOrUpdateByIndex(episode("A"), playlistId: 1, index: 3)
+
+        var reopened = try await AppDatabase.openAt(url)
+        defer { SandboxCleanup.remove(directory, closing: [database.queue, reopened.queue]) }
+        let afterDownMove = try await reopened.playlistRepository().listEpisodes(playlistId: 1)
+        #expect(afterDownMove.compactMap(\.title) == ["B", "C", "A"],
+                "downward move survives reopen")
+
+        // Upward move: [B, C, A] → C (slot 1) to the top reports 0.
+        try await reopened.playlistRepository().insertOrUpdateByIndex(episode("C"), playlistId: 1, index: 0)
+        reopened = try await AppDatabase.openAt(url)
+        let afterUpMove = try await reopened.playlistRepository().listEpisodes(playlistId: 1)
+        #expect(afterUpMove.compactMap(\.title) == ["C", "B", "A"],
+                "upward move survives reopen")
+    }
+
+    @Test("removing a queue episode keeps its paid subtitle and translation rows")
+    func removeEpisodeKeepsTranscripts() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-remove-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let database = try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
+
+        let repository = database.playlistRepository()
+        let url = "https://x.example/keep.mp3"
+        try await repository.insertOrUpdateByIndex(
+            PlaylistEpisodeRow(title: "Keep", enclosureUrl: url, playlistId: 1), playlistId: 1, index: 0
+        )
+        try await database.subtitleRepository().insert(SubtitleRow(
+            enclosureUrl: url, status: "succeeded",
+            subtitle: SubtitleSegment.encode([SubtitleSegment(start: 0, end: 1, text: "hi")]),
+            language: "en"
+        ))
+        try await database.translationRepository().insert(TranslationRow(
+            enclosureUrl: url, status: "succeeded",
+            translation: SubtitleSegment.encode([SubtitleSegment(start: 0, end: 1, text: "你好")]),
+            language: "zh"
+        ))
+
+        try await repository.removeEpisode(byEnclosureURL: url)
+
+        #expect(try await repository.listEpisodes(playlistId: 1).isEmpty)
+        #expect(try await database.subtitleRepository().get(byEnclosureURL: url) != nil)
+        #expect(try await database.translationRepository().get(byEnclosureURL: url, language: "zh") != nil)
+    }
+
+    @Test("moveExisting: moves only, never inserts — the reorder resurrection guard")
+    func moveExistingNeverInserts() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-move-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("anycast.db")
+        let database = try await AppDatabase.openAt(url)
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
+
+        func episode(_ name: String) -> PlaylistEpisodeRow {
+            PlaylistEpisodeRow(
+                title: name, enclosureUrl: "https://x.example/\(name).mp3", playlistId: 1
+            )
+        }
+        let repository = database.playlistRepository()
+        for (index, name) in ["A", "B", "C"].enumerated() {
+            try await repository.insertOrUpdateByIndex(episode(name), playlistId: 1, index: index)
+        }
+
+        // A row a completion cascaded away mid-drag: the reorder must drop,
+        // not resurrect it with the stale in-memory copy.
+        try await repository.removeEpisode(byEnclosureURL: "https://x.example/B.mp3")
+        let movedGone = try await repository.moveExisting(
+            byEnclosureURL: "https://x.example/B.mp3", playlistId: 1, index: 0
+        )
+        #expect(movedGone == false)
+        var rows = try await repository.listEpisodes(playlistId: 1)
+        #expect(rows.compactMap(\.title) == ["A", "C"], "a cascaded-away row was resurrected")
+
+        // A real move matches insertOrUpdateByIndex's drag convention.
+        let movedReal = try await repository.moveExisting(
+            byEnclosureURL: "https://x.example/A.mp3", playlistId: 1, index: 2
+        )
+        #expect(movedReal == true)
+        rows = try await repository.listEpisodes(playlistId: 1)
+        #expect(rows.compactMap(\.title) == ["C", "A"])
+
+        // The same URL in ANOTHER playlist is not dragged over: the row
+        // stays where it is and this playlist is untouched.
+        var other = episode("D")
+        other.playlistId = 2
+        try await repository.insertOrUpdateByIndex(other, playlistId: 2, index: 0)
+        let movedForeign = try await repository.moveExisting(
+            byEnclosureURL: "https://x.example/D.mp3", playlistId: 1, index: 0
+        )
+        #expect(movedForeign == false)
+        rows = try await repository.listEpisodes(playlistId: 1)
+        #expect(rows.compactMap(\.title) == ["C", "A"], "a foreign-playlist row was pulled in")
+        let playlist2 = try await repository.listEpisodes(playlistId: 2)
+        #expect(playlist2.compactMap(\.title) == ["D"], "the foreign-playlist row moved")
+    }
+
+    @Test("moveExisting matches insertOrUpdateByIndex's move semantics across directions")
+    func moveExistingMatchesAddOrMove() async throws {
+        // Differential: identical seeds, one entry each, every (from, to)
+        // — the reorder path must not drift from the K26-pinned move.
+        for (from, to) in [(0, 2), (2, 0), (1, 3), (3, 1), (0, 1), (2, 3)] {
+            let viaMove = try await Self.movedList(entry: .moveExisting, from: from, to: to)
+            let viaAddOrMove = try await Self.movedList(entry: .insertOrUpdateByIndex, from: from, to: to)
+            #expect(viaMove == viaAddOrMove, "moveExisting(\(from), \(to)) diverged: \(viaMove) vs \(viaAddOrMove)")
+        }
+    }
+
+    private enum MoveEntry {
+        case moveExisting, insertOrUpdateByIndex
+    }
+
+    private static func movedList(entry: MoveEntry, from: Int, to: Int) async throws -> [String] {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-move-diff-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("anycast.db")
+        let database = try await AppDatabase.openAt(url)
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
+
+        func episode(_ name: String) -> PlaylistEpisodeRow {
+            PlaylistEpisodeRow(
+                title: name, enclosureUrl: "https://x.example/\(name).mp3", playlistId: 1
+            )
+        }
+        let repository = database.playlistRepository()
+        for (index, name) in ["A", "B", "C", "D"].enumerated() {
+            try await repository.insertOrUpdateByIndex(episode(name), playlistId: 1, index: index)
+        }
+
+        let movedName = ["A", "B", "C", "D"][from]
+        switch entry {
+        case .moveExisting:
+            try await repository.moveExisting(
+                byEnclosureURL: "https://x.example/\(movedName).mp3", playlistId: 1, index: to
+            )
+        case .insertOrUpdateByIndex:
+            try await repository.insertOrUpdateByIndex(
+                episode(movedName), playlistId: 1, index: to
+            )
+        }
+        let rows = try await repository.listEpisodes(playlistId: 1)
+        return rows.compactMap(\.title)
+    }
+
+    // MARK: - §2.3 write-back loop
+
+    @Test("Write-back: progress to queue head, removeTop cascade, trims, history re-insert, K31 reopen")
+    func writeBackLoop() async throws {
+        let sandbox = try sandboxURL("db_light")
+        let url = sandbox.appendingPathComponent("anycast.db")
+        let database = try await AppDatabase.openAt(url)
+        defer { SandboxCleanup.remove(sandbox, closing: [database.queue]) }
+
+        // Progress lands on the queue HEAD row by enclosureUrl.
+        let queue = try await database.playlistRepository().listEpisodes(playlistId: 1)
+        guard let head = queue.first, let headURL = head.enclosureUrl else {
+            Issue.record("db_light has a queue head")
+            return
+        }
+        try await database.playlistRepository().updatePlayedDuration(42_000, byEnclosureURL: headURL)
+        let headAfter = try await database.playlistRepository().episode(byEnclosureURL: headURL)
+        #expect(headAfter?.playedDuration == 42_000)
+
+        // removeTop cascade: playlistEpisode + subtitle + translation rows.
+        try await database.subtitleRepository().insert(
+            SubtitleRow(enclosureUrl: headURL, status: "succeeded",
+                        subtitle: "[{\"start\":0.0,\"end\":1.0,\"text\":\"x\"}]", language: "en")
+        )
+        try await database.translationRepository().insert(
+            TranslationRow(enclosureUrl: headURL, status: "succeeded",
+                           translation: "[{\"start\":0.0,\"end\":1.0,\"text\":\"x\"}]", language: "zh")
+        )
+        try await database.playlistRepository().removeEpisode(byEnclosureURL: headURL)
+        let (episodeRows, subtitleRows, translationRows) = try await database.queue.read { db in
+            let e = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM playlistEpisode WHERE enclosureUrl = ?", arguments: [headURL]) ?? 0
+            let s = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM subtitle WHERE enclosureUrl = ?", arguments: [headURL]) ?? 0
+            let t = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM translation WHERE enclosureUrl = ?", arguments: [headURL]) ?? 0
+            return (e, s, t)
+        }
+        #expect(episodeRows == 0 && subtitleRows == 0 && translationRows == 0)
+
+        // Trim: feed keeps pubDate-newest N (db_light history is empty —
+        // the resume rows below repopulate it).
+        try await database.feedRepository().trim(keeping: 5)
+        let (feedCount, feedDates) = try await database.queue.read { db in
+            let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM feedEpisode") ?? 0
+            let dates = try Int64.fetchAll(db, sql: "SELECT pubDate FROM feedEpisode ORDER BY pubDate DESC")
+            return (count, dates)
+        }
+        #expect(feedCount == 5)
+        #expect(feedDates == feedDates.sorted(by: >), "retained side = newest")
+
+        // History identity is independent of any caller-supplied id. That id
+        // used to be the playlist rowid, and INSERT OR REPLACE could overwrite
+        // a different history row that happened to hold it. Re-listening the
+        // same enclosure bumps lastPlayedAt, keeps the history primary key,
+        // and sorts first.
+        try await database.historyRepository().insert(HistoryEpisodeRow(
+            id: 42, title: "played", enclosureUrl: "https://resume.example/ep.mp3",
+            pubDate: 1_000, lastPlayedAt: 1_000
+        ))
+        try await database.historyRepository().insert(HistoryEpisodeRow(
+            title: "newer-than-resume", enclosureUrl: "https://newer.example/ep.mp3",
+            lastPlayedAt: 2_000
+        ))
+        let storedFirstID = try await database.queue.read { db in
+            try Int64.fetchOne(
+                db,
+                sql: "SELECT id FROM historyEpisode WHERE enclosureUrl = 'https://resume.example/ep.mp3'"
+            ) ?? -1
+        }
+        #expect(storedFirstID != 42, "history primary key is not the caller-supplied playlist id")
+
+        try await database.historyRepository().insert(HistoryEpisodeRow(
+            id: storedFirstID, title: "collision", enclosureUrl: "https://collision.example/ep.mp3",
+            lastPlayedAt: 2_500
+        ))
+        let untouchedTitle = try await database.queue.read { db in
+            try String.fetchOne(
+                db,
+                sql: "SELECT title FROM historyEpisode WHERE enclosureUrl = 'https://resume.example/ep.mp3'"
+            )
+        }
+        #expect(untouchedTitle == "played", "a colliding caller id does not replace another episode")
+
+        try await database.historyRepository().insert(HistoryEpisodeRow(
+            id: 42, title: "played-again", enclosureUrl: "https://resume.example/ep.mp3",
+            pubDate: 1_000, lastPlayedAt: 3_000
+        ))
+        let listed = try await database.historyRepository().listAll()
+        #expect(listed.map(\.enclosureUrl) == [
+            "https://resume.example/ep.mp3",
+            "https://collision.example/ep.mp3",
+            "https://newer.example/ep.mp3",
+        ])
+        #expect(listed.first?.id == storedFirstID, "re-listen keeps the history row id")
+        #expect(listed.first?.title == "played-again")
+        #expect(listed.count == 3, "upsert never duplicates an enclosure")
+
+        // Trim history keeping the most recently played row.
+        try await database.historyRepository().trim(keeping: 1)
+        let historyAfterTrim = try await database.historyRepository().listAll()
+        #expect(historyAfterTrim.map(\.enclosureUrl) == ["https://resume.example/ep.mp3"], "history keeps lastPlayedAt-newest")
+
+        // New row ids never collide with existing data.
+        try await database.feedRepository().insertMany([
+            FeedEpisodeRow(title: "new", enclosureUrl: "https://new.example/ep.mp3"),
+        ])
+        let collisions = try await database.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM (SELECT id FROM feedEpisode GROUP BY id HAVING COUNT(*) > 1)") ?? 0
+        }
+        #expect(collisions == 0)
+
+        // clear() then reopen: missing player row is "no state" (K31), the
+        // row is restored idempotently, and the store stays on the latest
+        // schema + rollback journal (write-back compatibility, 05 §2.4).
+        try await database.playerRepository().clear()
+        let reopened = try await AppDatabase.openAt(url)
+        let pointer = try await reopened.playerRepository().loadPointer()
+        #expect(pointer?.currentPlaylistId == nil)
+
+        let (version, journalMode) = try await reopened.queue.read { db in
+            let v = try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0
+            let j = try String.fetchAll(db, sql: "PRAGMA journal_mode")
+            return (v, j.first ?? "")
+        }
+        #expect(version == Schema.version)
+        #expect(journalMode.lowercased() == "delete", "rollback journal, never WAL")
+
+        // Idempotent reopen after mutations.
+        _ = try await AppDatabase.openAt(url)
+    }
+
+    @Test("Feed count follows inserts and trim")
+    func feedCount() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("feed-count-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let database = try await AppDatabase.openAt(url, localeIdentifier: "en_US")
+        #expect(try await database.feedRepository().count() == 0)
+        try await database.feedRepository().insertMany((1...4).map {
+            FeedEpisodeRow(title: "e\($0)", enclosureUrl: "https://count.example/\($0).mp3", pubDate: Int64($0))
+        })
+        #expect(try await database.feedRepository().count() == 4)
+        try await database.feedRepository().trim(keeping: 2)
+        #expect(try await database.feedRepository().count() == 2)
+    }
+
+    @Test("Subtitle insert gate (1.2.1+38 baseline): incomplete payloads are dropped, complete rows persist")
+    func subtitleInsertGate() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anycast-gate-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let database = try await AppDatabase.openAt(directory.appendingPathComponent("anycast.db"))
+        defer { SandboxCleanup.remove(directory, closing: [database.queue]) }
+
+        // No language → dropped.
+        try await database.subtitleRepository().insert(
+            SubtitleRow(enclosureUrl: "https://a.example/1", status: "succeeded",
+                        subtitle: "[{\"start\":0.0,\"end\":1.0,\"text\":\"t\"}]", language: nil)
+        )
+        // Empty subtitle → dropped.
+        try await database.subtitleRepository().insert(
+            SubtitleRow(enclosureUrl: "https://a.example/2", status: "succeeded",
+                        subtitle: "", language: "en")
+        )
+        // Literal "null" subtitle → dropped.
+        try await database.subtitleRepository().insert(
+            SubtitleRow(enclosureUrl: "https://a.example/3", status: "succeeded",
+                        subtitle: "null", language: "en")
+        )
+        // Complete → persisted.
+        try await database.subtitleRepository().insert(
+            SubtitleRow(enclosureUrl: "https://a.example/4", status: "succeeded",
+                        subtitle: "[{\"start\":0.0,\"end\":130.0,\"text\":\"t\"}]", language: "en")
+        )
+
+        let statuses = try await database.subtitleRepository().listStatuses()
+        #expect(statuses == ["https://a.example/4": "succeeded"])
+
+        // Encode writes Dart-style doubles (write-back parity: a rolled-back
+        // Flutter build reading `130` as int would TypeError).
+        let encoded = SubtitleSegment.encode([SubtitleSegment(start: 130, end: 131.25, text: "a\"b")])
+        #expect(encoded == "[{\"start\":130.0,\"end\":131.25,\"text\":\"a\\\"b\"}]")
+    }
+}
+
+/// Thread-safe quarantine spy (the handler can fire from any executor).
+final class QuarantineRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var events: [(url: URL, reason: String)] = []
+
+    var handler: AppDatabase.QuarantineHandler {
+        let recorder = self
+        return { url, reason in
+            recorder.lock.lock()
+            recorder.events.append((url, reason))
+            recorder.lock.unlock()
+        }
+    }
+}

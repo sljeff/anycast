@@ -1,0 +1,12 @@
+{
+  "source": "buildExportText (pages/player.dart:950-978)",
+  "cases": {
+    "full": "# Episode 42 - Some Channel\n\n---\n\n[00:00.000]line one\n[00:03.900]\n[00:04.000]line two\n[00:08.500]\n\n\n--- Translation ---\n\n[00:00.000]第一行\n[00:03.900]\n\n",
+    "no_translation": "# Episode 42 - Some Channel\n\n---\n\n[00:00.000]line one\n[00:03.900]\n[00:04.000]line two\n[00:08.500]\n\n",
+    "empty_translation_string": "# Episode 42 - Some Channel\n\n---\n\n[00:00.000]line one\n[00:03.900]\n[00:04.000]line two\n[00:08.500]\n\n",
+    "null_title_defaults": "# Subtitle\n\n---\n\n[00:00.000]line one\n[00:03.900]\n[00:04.000]line two\n[00:08.500]\n\n",
+    "empty_channel_title_only": "# Solo\n\n---\n\n[00:00.000]line one\n[00:03.900]\n[00:04.000]line two\n[00:08.500]\n\n",
+    "title_with_slash": "# EP/1: crash test - Chan\n\n---\n\n[00:00.000]line one\n[00:03.900]\n[00:04.000]line two\n[00:08.500]\n\n"
+  },
+  "note": "title_with_slash documents K29: filename uses raw subject"
+}

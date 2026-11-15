@@ -1,0 +1,23 @@
+HTTP/1.1 200 OK
+Server: Tengine
+Content-Type: application/xml; charset=utf-8
+Content-Length: 158120
+Connection: keep-alive
+Vary: Accept-Encoding
+Date: Tue, 22 Sep 2026 08:07:37 GMT
+x-jike-cluster: tencent-xiaoyuzhou
+vary: Origin
+access-control-allow-credentials: true
+access-control-expose-headers: x-jike-access-token, x-jike-refresh-token
+x-envoy-upstream-service-time: 52
+x-server: Potato-Server
+X-Request-Id: 102aae4b4d9395e9fa1000d6f79d0b7d
+Via: cache55.l2cn8878[0,1,200-0,H], cache59.l2cn8878[2,0], ens-cache16.cn8656[22,39,200-0,M], ens-cache11.cn8656[46,0]
+Age: 2918
+Ali-Swift-Global-Savetime: 1790064457
+X-Cache: MISS TCP_REFRESH_MISS dirn:10:210749976
+X-Swift-SaveTime: Tue, 22 Sep 2026 08:56:15 GMT
+X-Swift-CacheTime: 83482
+Timing-Allow-Origin: *
+EagleId: 7abfab1f17900673757238044e
+

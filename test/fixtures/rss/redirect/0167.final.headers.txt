@@ -1,0 +1,17 @@
+HTTP/2 200 
+age: 18
+alt-svc: h3=":443"; ma=86400
+content-type: application/rss+xml; charset=utf-8
+date: Tue, 22 Sep 2026 02:17:28 GMT
+etag: W/"a27bc0613cfd6c197575eba26071ccdc"
+last-modified: Mon, 21 Sep 2026 19:54:26 GMT
+server: AmazonS3
+vary: Accept-Encoding
+vary: Origin
+via: 1.1 d705c76c44006be42a0a88f6c66930ae.cloudfront.net (CloudFront)
+x-amz-cf-id: PeDNiUbro0DQtzjG3jtsO_TTR_Km1ZISOvug0UFBD9kru0p29CU--Q==
+x-amz-cf-pop: PIT50-P1
+x-amz-server-side-encryption: AES256
+x-amz-version-id: gUjCn5ZnNFGAGkNu4mBppio97X_XZXRW
+x-cache: Hit from cloudfront
+

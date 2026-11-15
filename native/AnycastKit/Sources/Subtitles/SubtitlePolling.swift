@@ -1,0 +1,391 @@
+import Foundation
+import Observation
+
+/// Timer abstraction whose ONLY job is making the polling CADENCE
+/// assertable: the interval handed to the factory is red-line material
+/// (15 s transcription / 10 s translation — never faster, 02 §6 line 5,
+/// 05 §4.1). Production uses a main-runloop timer; tests record the
+/// interval and fire rounds manually.
+public protocol PollTimer: AnyObject, Sendable {
+    func cancel()
+}
+
+public protocol PollTimerFactory: Sendable {
+    func periodic(milliseconds: Int64, fire: @escaping @Sendable () async -> Void) -> any PollTimer
+}
+
+/// Main-runloop `Timer` whose tick hops into an async round on the main
+/// actor (the Dart `Timer.periodic` ran on the main isolate).
+public struct MainPollTimerFactory: PollTimerFactory {
+
+    public init() {}
+
+    public func periodic(milliseconds: Int64, fire: @escaping @Sendable () async -> Void) -> any PollTimer {
+        MainPollTimer(milliseconds: milliseconds, fire: fire)
+    }
+
+    final class MainPollTimer: PollTimer, @unchecked Sendable {
+        private let lock = NSLock()
+        private var timer: Timer?
+
+        init(milliseconds: Int64, fire: @escaping @Sendable () async -> Void) {
+            let timer = Timer.scheduledTimer(
+                withTimeInterval: Double(milliseconds) / 1000,
+                repeats: true
+            ) { _ in
+                Task { await fire() }
+            }
+            lock.lock()
+            self.timer = timer
+            lock.unlock()
+        }
+
+        func cancel() {
+            lock.lock()
+            timer?.invalidate()
+            timer = nil
+            lock.unlock()
+        }
+    }
+}
+
+// MARK: - Transcription polling (states/subtitle.dart)
+
+/// The transcription state machine: user `add()` triggers + the background
+/// poller converge on one idempotent endpoint. Port decisions:
+/// - cadence exactly 15 s (red line; "no processing → no request" is the
+///   built-in idle path);
+/// - **K27**: background errors are SILENT — transport failures and 5xx/429
+///   keep the `processing` state and the poller running (the server is
+///   idempotent by enclosure_url); only 401/login surfaces, to any page;
+///   user-triggered `add()` still returns its error signal for a dialog;
+/// - a server `failed` answer deletes the local row and keeps an in-memory
+///   `failed` status for this run (Retry). A relaunch reseeds from the
+///   database, which no longer has the row, and the UI returns to Generate;
+/// - iteration runs over a snapshot key list — the old concurrent
+///   modification crash (08 §12.1-6) is not ported.
+@MainActor
+@Observable
+public final class SubtitlePollController {
+
+    nonisolated public static let pollIntervalMilliseconds: Int64 = 15_000
+
+    /// url → status ("processing" / "succeeded" / server strings pass
+    /// through), the old `subtitleUrls` map.
+    public private(set) var statuses: [String: String] = [:]
+    /// Every write to `statuses` re-renders each screen observing it (the
+    /// whole map is one observed property), so a status that did not
+    /// change is not written — a retrying translation stays `processing`
+    /// across rounds.
+    private func setStatus(_ status: String?, for url: String) {
+        if statuses[url] != status { statuses[url] = status }
+    }
+    /// K27: 401 during background polling still routes to the login sheet.
+    public var onLoginRequired: (() -> Void)?
+
+    private let api: APIClient
+    private let subtitles: SubtitleRepository
+    private let timerFactory: any PollTimerFactory
+    private var timer: (any PollTimer)?
+    private var isRefreshing = false
+
+    public init(api: APIClient, subtitles: SubtitleRepository,
+                timerFactory: any PollTimerFactory = MainPollTimerFactory()) {
+        self.api = api
+        self.subtitles = subtitles
+        self.timerFactory = timerFactory
+    }
+
+    /// Startup (after settings load — the DAG rules): seed from stored rows
+    /// (only `succeeded` rows exist on disk, 01 §1.1) and schedule the 15 s
+    /// poller.
+    public func start() async {
+        statuses = (try? await subtitles.listStatuses()) ?? [:]
+        guard timer == nil else { return }
+        timer = timerFactory.periodic(milliseconds: Self.pollIntervalMilliseconds) { [weak self] in
+            await self?.refreshProcessing()
+        }
+    }
+
+    /// 08 §4.1: background suspends the poller; returning to the foreground
+    /// runs one immediate round (covering what was missed) and resumes.
+    public func setActive(_ active: Bool) async {
+        if active {
+            await start()
+            await refreshProcessing()
+        } else {
+            timer?.cancel()
+            timer = nil
+        }
+    }
+
+    /// One polling round: every `processing` URL, sequentially — exactly the
+    /// Dart `refreshProcessing` minus the CME.
+    public func refreshProcessing() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        for url in statuses.keys.sorted() where statuses[url] == "processing" {
+            await apply(url: url, result: try? await api.getSubtitles(enclosureURL: url))
+        }
+    }
+
+    /// User-triggered transcription ("Generate transcript"). Returns the
+    /// error signal for the UI to present (K27: user-initiated failures
+    /// stay visible; nil = no dialog).
+    @discardableResult
+    public func add(url: String) async -> APIClient.ErrorSignal? {
+        let previous = statuses[url]
+        setStatus("processing", for: url)
+        do {
+            let result = try await api.getSubtitles(enclosureURL: url)
+            let signal = await apply(url: url, result: result, userTriggered: true)
+            if signal != nil {
+                // A refused user trigger (quota 403 and any other
+                // dialog-worthy error) must not leave the optimistic
+                // processing flag. 401 returns nil from apply and keeps
+                // processing until the login sheet is dismissed. Background
+                // rounds never enter add(); they keep processing on
+                // transport errors (K27).
+                setStatus(previous, for: url)
+            }
+            return signal
+        } catch {
+            setStatus(previous, for: url)
+            return .errorBody(status: 0, body: error.localizedDescription)
+        }
+    }
+
+    /// The Dart `_applyResult` (+ error-signal routing).
+    private func apply(url: String, result: APIClient.SubtitleResult?,
+                       userTriggered: Bool = false) async -> APIClient.ErrorSignal? {
+        guard let result else {
+            // Transport-level throw during a background round: silent, keep
+            // polling (K27). (add() handles its own catch.)
+            return nil
+        }
+
+        if let signal = result.error {
+            if case .loginRequired = signal {
+                onLoginRequired?()
+                return nil
+            }
+            // K27: server text on a user trigger; silent in the background
+            // round (processing continues).
+            return userTriggered ? signal : nil
+        }
+
+        switch result.status {
+        case "succeeded":
+            // Persist first. `SubtitleRepository.insert` is a silent no-op
+            // when language is nil or the payload is empty / "null".
+            // Advertising "succeeded" before a usable row exists leaves the
+            // poll map stuck: this loop only revisits "processing" URLs, so
+            // the transcript page spins on a row that never arrives.
+            let payload = SubtitleSegment.encode(result.segments ?? [])
+            try? await subtitles.insert(SubtitleRow(
+                enclosureUrl: url,
+                status: "succeeded",
+                subtitle: payload,
+                language: result.language,
+                summary: nil
+            ))
+            if let stored = try? await subtitles.get(byEnclosureURL: url),
+               stored.hasUsableTranscriptPayload {
+                setStatus("succeeded", for: url)
+            } else {
+                // A blank / "null" row would reseed "succeeded" on the next
+                // foreground `start()` and stick the spinner again. Keep
+                // "processing" so the 15 s round retries.
+                try? await subtitles.delete(byEnclosureURL: url)
+                setStatus("processing", for: url)
+            }
+        case "failed":
+            // Visible for this run so the UI can offer Retry. The local row
+            // is deleted, so a relaunch — which reseeds from the database —
+            // returns to Generate.
+            setStatus("failed", for: url)
+            try? await subtitles.delete(byEnclosureURL: url)
+        default:
+            break // still processing
+        }
+        return nil
+    }
+
+    /// Flutter player.dart:783-784: an unusable stored payload is deleted
+    /// and the poll map returns to "processing" so the 15 s loop retries
+    /// instead of leaving a permanent succeeded-with-no-row spinner.
+    public func markUnusable(url: String) {
+        setStatus("processing", for: url)
+    }
+
+    /// Drops the URL's subtitle state and row. Not called on queue removal
+    /// or completion (no K3 cascade: transcripts are paid for and stay).
+    public func remove(url: String) async {
+        setStatus(nil, for: url)
+        try? await subtitles.delete(byEnclosureURL: url)
+    }
+
+    /// Login-cancel rollback for pending generates. While signed out,
+    /// every `processing` entry is unpollable local state — its requests
+    /// 401 — so the rollback always restores a truthful UI: the Generate
+    /// button on every page observing `statuses`, and a URL set that the
+    /// 15 s poller no longer touches (no more re-401 → re-present login
+    /// rounds). Clearing a genuinely server-accepted in-flight entry from
+    /// a pre-sign-out tap is deliberate: the endpoint is idempotent by
+    /// enclosure_url, so Generate can be tapped again once signed in.
+    /// (`start()` reseeds `statuses` from the DB when the app returns to
+    /// the foreground, and shipped releases persist only `succeeded`
+    /// rows.) Iteration is safe — Dictionary for-in enumerates a
+    /// snapshot, so clearing inside the loop cannot trap.
+    public func cancelLoginGatedProcessing() {
+        for (url, status) in statuses where status == "processing" {
+            setStatus(nil, for: url)
+        }
+    }
+}
+
+// MARK: - Translation polling (states/translation.dart)
+
+/// The 10 s translation loop over succeeded subtitles:
+/// - skip when no target language; skip same-language subtitles (detected
+///   == target — re-checked each tick like the Dart loop, no network);
+/// - cached translation rows short-circuit to `succeeded`;
+/// - **K9**: failures (HTTP error, thrown transport error, or
+///   `translation: null`) count per URL; after 5 consecutive failures the
+///   URL moves to `failed` and leaves the loop — the old app re-requested
+///   forever with a permanent "Translating subtitles..." bar;
+/// - in-flight dedup so overlapping ticks never double-request.
+@MainActor
+@Observable
+public final class TranslationPollController {
+
+    nonisolated public static let pollIntervalMilliseconds: Int64 = 10_000
+    /// K9: consecutive-failure cap before an URL leaves the loop.
+    nonisolated public static let failureCap = 5
+
+    public private(set) var statuses: [String: String] = [:]
+    /// Every write to `statuses` re-renders each screen observing it (the
+    /// whole map is one observed property), so a status that did not
+    /// change is not written — a retrying translation stays `processing`
+    /// across rounds.
+    private func setStatus(_ status: String?, for url: String) {
+        if statuses[url] != status { statuses[url] = status }
+    }
+
+    private let api: APIClient
+    private let translations: TranslationRepository
+    private let subtitles: SubtitleRepository
+    private let targetLanguage: @MainActor () -> String
+    private let subtitleStatuses: @MainActor () -> [String: String]
+    private let timerFactory: any PollTimerFactory
+    private var timer: (any PollTimer)?
+    private var inFlight: Set<String> = []
+    private var failureCounts: [String: Int] = [:]
+
+    public init(api: APIClient,
+                translations: TranslationRepository,
+                subtitles: SubtitleRepository,
+                targetLanguage: @escaping @MainActor () -> String,
+                subtitleStatuses: @escaping @MainActor () -> [String: String],
+                timerFactory: any PollTimerFactory = MainPollTimerFactory()) {
+        self.api = api
+        self.translations = translations
+        self.subtitles = subtitles
+        self.targetLanguage = targetLanguage
+        self.subtitleStatuses = subtitleStatuses
+        self.timerFactory = timerFactory
+    }
+
+    public func start() {
+        guard timer == nil else { return }
+        timer = timerFactory.periodic(milliseconds: Self.pollIntervalMilliseconds) { [weak self] in
+            await self?.refresh()
+        }
+    }
+
+    public func setActive(_ active: Bool) async {
+        if active {
+            start()
+            await refresh()
+        } else {
+            timer?.cancel()
+            timer = nil
+        }
+    }
+
+    /// One round: the Dart `refreshSucceededSubtitles` (snapshot iteration).
+    public func refresh() async {
+        guard !targetLanguage().isEmpty else { return }
+        let subtitleStatus = subtitleStatuses()
+        for url in subtitleStatus.keys.sorted()
+        where subtitleStatus[url] == "succeeded"
+            && statuses[url] != "succeeded"
+            && statuses[url] != "failed" {
+            await loadTranslation(url)
+        }
+    }
+
+    public func loadTranslation(_ url: String) async {
+        guard inFlight.insert(url).inserted else { return }
+        defer { inFlight.remove(url) }
+
+        let language = targetLanguage()
+        guard !language.isEmpty else { return }
+
+        // Same-language (or unknown-language) subtitles are skipped, but
+        // stay eligible — the Dart loop re-checked them every tick.
+        guard let detected = (try? await subtitles.get(byEnclosureURL: url))??.language,
+              detected != language
+        else { return }
+
+        if (try? await translations.get(byEnclosureURL: url, language: language)) != nil {
+            setStatus("succeeded", for: url)
+            failureCounts[url] = 0
+            return
+        }
+
+        setStatus("processing", for: url)
+        do {
+            let result = try await api.getTranslation(enclosureURL: url, language: language)
+            guard case .segments(let segments) = result else {
+                registerFailure(url)
+                return
+            }
+            try? await translations.insert(TranslationRow(
+                enclosureUrl: url,
+                status: "succeeded",
+                translation: SubtitleSegment.encode(segments),
+                language: language
+            ))
+            setStatus("succeeded", for: url)
+            failureCounts[url] = 0
+        } catch {
+            registerFailure(url)
+        }
+    }
+
+    private func registerFailure(_ url: String) {
+        let count = (failureCounts[url] ?? 0) + 1
+        failureCounts[url] = count
+        if count >= Self.failureCap {
+            setStatus("failed", for: url)
+        }
+    }
+
+    /// Language switch clears the in-memory map (the Dart
+    /// `setTargetLanguage` reset).
+    public func resetForLanguageChange() {
+        statuses.removeAll()
+        failureCounts.removeAll()
+    }
+
+    /// Drops the URL's translation state and row. Not called on queue
+    /// removal or completion (no K3 cascade: translations are paid for).
+    public func remove(url: String) async {
+        setStatus(nil, for: url)
+        failureCounts[url] = nil
+        try? await translations.delete(byEnclosureURL: url)
+    }
+}

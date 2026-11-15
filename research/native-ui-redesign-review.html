@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anycast native UI redesign review</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #171717;
+      background: #fff;
+      --muted: #666;
+      --line: #dedede;
+      --soft: #f6f6f6;
+      --blue: #006bff;
+      --green: #18794e;
+      --amber: #8a5b00;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(100% - 32px, 1000px); margin: 32px auto 80px; }
+    header { border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+    .eyebrow { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+    h1 { font-size: clamp(28px, 5vw, 42px); line-height: 1.12; letter-spacing: -.035em; margin: 10px 0 12px; }
+    h2 { font-size: 22px; line-height: 1.25; margin: 0 0 14px; letter-spacing: -.02em; }
+    h3 { font-size: 16px; margin: 22px 0 8px; }
+    p { margin: 8px 0 14px; }
+    .lede { max-width: 760px; font-size: 17px; }
+    .meta { color: var(--muted); font-size: 13px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 0 4px; }
+    nav a { color: var(--blue); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; text-decoration: none; }
+    nav a:focus-visible, a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+    section { border-bottom: 1px solid var(--line); padding: 28px 0; scroll-margin-top: 16px; }
+    .callout { border-left: 3px solid var(--blue); padding: 2px 0 2px 14px; margin: 16px 0; }
+    .issue { background: var(--soft); padding: 14px 16px; margin: 12px 0; border-radius: 6px; }
+    .label { display: inline-block; font-size: 12px; font-weight: 650; margin-right: 8px; }
+    .pass { color: var(--green); }
+    .watch { color: var(--amber); }
+    ul, ol { padding-left: 22px; }
+    li { margin: 5px 0; }
+    code { font: 0.92em ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 18px; }
+    th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+    th { font-size: 13px; color: var(--muted); font-weight: 600; }
+    footer { color: var(--muted); font-size: 13px; padding-top: 18px; }
+    @media (max-width: 600px) {
+      main { width: min(100% - 24px, 1000px); margin-top: 20px; }
+      th, td { padding: 8px 6px; }
+      table { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Product UI review · 2026-10-08</div>
+    <h1>Native UI should follow Flutter’s flow and Anycast 2.0’s visual system</h1>
+    <p class="lede">The device preview exposed a gap in visual finish. The native branch already has v2 color, type, spacing, and shell work, but its navigation still differs from the current Flutter app and several screens mix migrated and legacy treatments.</p>
+    <p class="meta">Decision: preserve Flutter navigation and actions; apply the sand-based Anycast 2.0 visual language to every native screen. Keep the iOS 18 floor.</p>
+    <nav aria-label="Review sections">
+      <a class="tab" data-target="#flow" href="#flow">Flow</a>
+      <a class="tab" data-target="#visuals" href="#visuals">Visual system</a>
+      <a class="tab" data-target="#states" href="#states">States and access</a>
+      <a class="tab" data-target="#delivery" href="#delivery">Implementation and QA</a>
+    </nav>
+  </header>
+
+  <section class="dimension" id="flow">
+    <h2>Keep the three Flutter destinations and their actions</h2>
+    <p>Flutter currently opens <strong>Podcast</strong>, <strong>Playlist</strong>, and <strong>Discover</strong>. Podcast contains Inbox and Subscriptions. Search and Settings open from the page header, and the mini player sits above the bottom navigation.</p>
+    <p>The native v2 shell currently exposes Inbox, Queue, and Library, with Search in the bottom bar. That moves Subscriptions into Library and hides Discover from the primary navigation. The different entry points make the native app feel like a separate product even where the screens are polished.</p>
+    <table>
+      <thead><tr><th>Flutter flow</th><th>Native destination</th><th>Visual reference</th></tr></thead>
+      <tbody>
+        <tr><td>Podcast → Inbox / Subscriptions</td><td>Inbox and subscriptions screens in one parent flow</td><td>Anycast 2.0 Inbox, category strip, episode cards</td></tr>
+        <tr><td>Playlist</td><td>Playlist episodes, ordering, history, item actions</td><td>Anycast 2.0 Queue and Library card language</td></tr>
+        <tr><td>Discover → categories → channel → episode</td><td>Discover, channel, detail, search entry/results</td><td>2.0 typography, surfaces, chips, sheets</td></tr>
+        <tr><td>Mini player → full player / transcript</td><td>Existing playback and transcript destinations</td><td>Anycast 2.0 Player and Transcript references</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong>Keep:</strong> repository and playback state, authentication, network requests, sorting semantics, gestures, and route outcomes. Change page composition only where needed to match the Flutter destination structure.</div>
+  </section>
+
+  <section class="dimension" id="visuals">
+    <h2>Complete the existing v2 migration instead of adding a second style layer</h2>
+    <p><code>Theme.swift</code>, <code>TypographyV2</code>, <code>Metrics.swift</code>, and the asset catalog already contain the sand/gold token system. The inbox shell and some screens use those tokens; other screens still call legacy style accessors or force dark appearance.</p>
+    <ul>
+      <li>Use the light/dark sand palette, gold accent, type scale, spacing, radii, and motion already defined in the native design system.</li>
+      <li>Standardize page headers, cards, category controls, buttons, sheets, empty states, and feedback across all screens.</li>
+      <li>Use the Anycast 2.0 UIKit implementation and local screenshots as component references; bind them to native repositories and view models rather than its showcase data.</li>
+      <li>Keep artwork-led player screens in the fixed warm-dark treatment defined by the tokens.</li>
+      <li>Guard iOS 26 glass materials and provide the documented UIKit material fallback on iOS 18.</li>
+    </ul>
+    <div class="issue"><span class="label watch">Constraint</span> Anycast 2.0 targets iOS 26 Liquid Glass; native supports iOS 18. Glass cannot become the only surface implementation.</div>
+  </section>
+
+  <section class="dimension" id="states">
+    <h2>Make visual states and controls agree with their behavior</h2>
+    <p>Every migrated page should cover loading, empty, error, long text, and missing artwork. Any visible button, swipe affordance, or disclosure must keep its current action and accessibility label.</p>
+    <ul>
+      <li>Check light and dark appearances, including sheets, keyboard, and system bars.</li>
+      <li>Check Dynamic Type, VoiceOver labels, safe-area insets, and long CJK/Latin titles.</li>
+      <li>Keep mini player taps distinct from Play/Skip controls; preserve seek, reorder, dismiss, and transcript-follow gestures.</li>
+      <li>Do not add new destinations or features from exploratory Figma frames.</li>
+    </ul>
+  </section>
+
+  <section class="dimension" id="delivery">
+    <h2>Implement in user-path order and verify on the device</h2>
+    <ol>
+      <li>Align the root shell and header actions with Flutter’s Podcast / Playlist / Discover flow; place Inbox and Subscriptions inside Podcast.</li>
+      <li>Finish Inbox, Subscriptions, Discover, channel, episode detail, Playlist, and mini player surfaces.</li>
+      <li>Finish full player, transcript, search, chat, settings, auth, paywall, and import/share sheets.</li>
+      <li>Update focused visual smoke, layout, navigation, and snapshot coverage while preserving business-logic tests.</li>
+    </ol>
+    <p><strong>Acceptance:</strong> the same seed data and actions produce the same Flutter flow; all native screens use one coherent 2.0 visual language; no core UI depends on iOS 26; iPhone 15 Pro review confirms safe areas, text sizing, and the main interactions.</p>
+    <p class="meta">Reference set inspected: current Flutter <code>main.dart</code>, <code>BottomNavBar</code>, <code>MyAppBar</code>, <code>AnycastTheme</code>; native v2 migration spec and UIKit design system; local Anycast 2.0 UIKit views and screenshots. Frame-level Figma MCP access is not available in this task session.</p>
+  </section>
+  <footer>Canonical decision record for the native visual redesign. Changes to this record should track an explicit design decision.</footer>
+</main>
+</body>
+</html>

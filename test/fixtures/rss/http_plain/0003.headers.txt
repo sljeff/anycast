@@ -1,0 +1,24 @@
+HTTP/1.1 200 OK
+Content-Type: text/xml; charset=utf-8
+feedburnerv2: 
+Last-Modified: Sat, 19 Sep 2026 13:23:36 GMT
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: Mon, 01 Jan 1990 00:00:00 GMT
+Date: Tue, 22 Sep 2026 02:14:55 GMT
+Accept-CH: Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Full-Version, Sec-CH-UA-Full-Version-List, Sec-CH-UA-Model, Sec-CH-UA-WoW64, Sec-CH-UA-Form-Factors, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version
+Permissions-Policy: ch-ua-arch=*, ch-ua-bitness=*, ch-ua-full-version=*, ch-ua-full-version-list=*, ch-ua-model=*, ch-ua-wow64=*, ch-ua-form-factors=*, ch-ua-platform=*, ch-ua-platform-version=*
+Content-Security-Policy: script-src 'nonce-vSz0wWy-WUcigWkIl0Yvvg' 'unsafe-inline';object-src 'self';base-uri 'self';report-uri /_/RaichuFeedServer/cspreport;worker-src 'self'
+Content-Security-Policy: script-src 'unsafe-inline' 'unsafe-eval' blob: data: 'self' https://apis.google.com https://ssl.gstatic.com https://www.google.com https://www.googletagmanager.com https://www.gstatic.com https://www.google-analytics.com;report-uri /_/RaichuFeedServer/cspreport/allowlist
+Content-Security-Policy: require-trusted-types-for 'script';report-uri /_/RaichuFeedServer/cspreport
+Cross-Origin-Resource-Policy: same-site
+Cross-Origin-Opener-Policy: same-origin
+reporting-endpoints: default="/_/RaichuFeedServer/web-reports?context=eJzj4tDikmII0JBiEOLhmH_y-FU2gQfvH7UwKlkm5RfGJ5amZObrFpQm5WQWZ6QWFesCBXWLEjOTM0p101JTU4pTi8pSi-KNDIzMDCyNDPQMjOMLDAB-TBvZ"
+Server: ESF
+X-XSS-Protection: 0
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Accept-Ranges: none
+Vary: Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site,Accept-Encoding
+Transfer-Encoding: chunked
+

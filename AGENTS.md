@@ -37,6 +37,31 @@ secret output. Do not change `config/infisical-config.sha256` merely to make
 validation pass; a digest change must correspond to an intentional, reviewed
 Infisical configuration change.
 
+## Git write operations require explicit user consent
+
+Do not perform the following git write operations (including but not limited
+to) without the user's **explicit consent in the current conversation**:
+
+- `git commit`, `git push`
+- creating / deleting / switching branches (including force operations)
+- `git reset` / `revert` / `rebase` / `merge` / `cherry-pick`
+- adding or deleting `git tag`s; changing `git remote`s
+- any `git push --force`; deleting remote refs
+
+Every such operation must be requested separately each time; consent given
+once does not carry over to the next operation. Editing files, running tests,
+and reading the repository are not restricted. When the user explicitly
+instructs a commit or push in the current exchange, follow that instruction
+for that instance.
+
+## Language of committed artifacts
+
+Write in English anything that is committed and consumed by others: code, code
+comments, logic reference documentation, commit messages, and pull request
+descriptions. Personal or limited-scope material — plan documents, user
+conversations, temporary scripts — is not restricted and may use whatever
+language suits its audience. Keep this file itself in English.
+
 ## Git and release flow
 
 Use a short-lived branch and pull request for every change to `main`. Do not
@@ -121,6 +146,48 @@ Tests must cover:
 Retain old-schema fixtures and their coverage while users can still upgrade
 from those releases. Tests must execute the real SQLite migration path rather
 than only mocks. Only explicitly reconstructible cache data may be invalidated.
+
+## Local Xcode build artifacts
+
+Every local `xcodebuild` invocation must reuse a single shared DerivedData
+directory and a single shared package checkout directory, from `native/`:
+
+```sh
+xcodebuild -project Anycast.xcodeproj -scheme Anycast \
+  -derivedDataPath build/dd \
+  -clonedSourcePackagesDirPath build/SourcePackages ...
+```
+
+- Never create a fresh `dd-*` path per run. Each new path recompiles the
+  entire SwiftPM dependency graph (~7 GB for the Firebase/gRPC stack);
+  scratch dirs previously consumed ~113 GB and filled the disk.
+- Always pass `-clonedSourcePackagesDirPath build/SourcePackages`, as
+  `native/scripts/ui_check.sh` and `native/scripts/preview_device.sh` do.
+  Omitting it clones a second full copy of every package (~6 GB) into
+  `build/dd/SourcePackages`.
+- If a genuinely clean build is needed, delete `native/build/dd` first —
+  do not add a sibling directory.
+- Small per-run outputs (`.xcresult` bundles, screenshots, logs) may go
+  under `native/build/runs/<name>/`.
+- Everything under `native/build/` is disposable and gitignored; wipe the
+  whole directory to reclaim space. Nothing else may live there.
+
+## Simulator targets
+
+The migration is validated against exactly two iOS versions — do not spin up
+additional simulator runtimes or device types:
+
+- **iOS 27 (primary).** iPhone 18 Pro, UDID `AFD8A99E-5B4B-43DB-B9E4-86BCC022B2F3`.
+  This is the shipping target: all development iteration, screenshot review,
+  and test runs go here first. The committed screen baselines live under
+  `__Snapshots__/ScreenBaselineCaptureTests/iOS-27/`.
+- **iOS 18 (acceptance only).** iPhone 16 Pro, UDID
+  `E9B0FF99-0465-4B18-8D2B-947A8CC0DFF1`. Run it once at milestone sign-off to
+  confirm the older-OS floor still works; do not use it as the iteration
+  target.
+
+If a UDID no longer resolves (runtime reinstalled), pick the same device
+class and update this section.
 
 ## Required checks
 

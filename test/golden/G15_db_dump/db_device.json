@@ -1,0 +1,721 @@
+{
+  "bucket": "db_device",
+  "user_version": 4,
+  "playlist": [
+    {
+      "id": 1,
+      "title": "Default",
+      "position": 1
+    }
+  ],
+  "player": [
+    {
+      "id": 1,
+      "currentPlaylistId": 1
+    }
+  ],
+  "settings": [
+    {
+      "id": 1,
+      "darkMode": 0,
+      "speed": 1.0,
+      "skipSilence": 0,
+      "autoSleepTimer": "0,0,0",
+      "maxCacheCount": 10,
+      "countryCode": "JP",
+      "targetLanguage": "zh",
+      "autoRefreshInterval": 300,
+      "maxFeedEpisodes": 100,
+      "maxHistoryEpisodes": 100,
+      "continuousPlaying": 1
+    }
+  ],
+  "subscription": [
+    {
+      "id": 25,
+      "rssFeedUrl": "https://anchor.fm/s/f2cbc0a8/podcast/rss",
+      "title": "小岛大浪吹",
+      "description": "茶余饭后热点谈资，格调、装B、吹牛学习宝典",
+      "imageUrl": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/40634394/40634394-1708995409355-c68b62f5f1abf.jpg",
+      "link": "https://podcasters.spotify.com/pod/show/pgue76a3798",
+      "categories": "",
+      "author": "小岛大浪",
+      "email": "zddkzd@protonmail.com",
+      "lastUpdated": 1758507326000
+    },
+    {
+      "id": 26,
+      "rssFeedUrl": "https://crazy.capital/feed",
+      "title": "疯投圈",
+      "description": "一起探索好玩的商业世界",
+      "imageUrl": "https://crazy.capital/assets/icon-square-normal-dark-cn@4x.png",
+      "link": "https://crazy.capital",
+      "categories": "",
+      "author": "黄海、Rio",
+      "email": "hi@crazy.capital",
+      "lastUpdated": 1788861600000
+    },
+    {
+      "id": 27,
+      "rssFeedUrl": "https://feed.xyzfm.space/9bmupxfae9qd",
+      "title": "投资ABC",
+      "description": "《投资ABC》是一档由有知有行出品的播客节目。\n\n在这里，我们会和你分享那些投资中绕不开的知识。",
+      "imageUrl": "https://image.xyzcdn.net/Fh8TGNcezIrm8AJDBNSW6h46y727.jpg",
+      "link": "https://www.xiaoyuzhoufm.com/podcast/64b0bfde585daadfc82f3b12?utm_source=rss",
+      "categories": "",
+      "author": "有知有行",
+      "email": "zoeeeeyang@gmail.com",
+      "lastUpdated": 1789344000000
+    },
+    {
+      "id": 28,
+      "rssFeedUrl": "https://feed.xyzfm.space/dk4yh3pkpjp3",
+      "title": "张小珺Jùn｜商业访谈录",
+      "description": "和你一起，从这里，探索新世界！\n\n《张小珺商业访谈录》是一档深度访谈节目，以2至7小时的长对话为形式，聚焦真实的人物表达与高密度的前沿信息。由语言即世界工作室出品。\n\n主持人张小珺是财经媒体人，专注中国科技业深度报道，覆盖AI、科技巨头、风险投资与知名人物。曾13次获得国内外新闻奖项，其中2022年至2024年连续三届获得亚洲卓越新闻奖（SOPA）——被称为“亚洲普利策”。她也是语言即世界工作室的创始人。\n\n“如果我的访谈能陪你走一段孤独的未知的路，也许有一天可以离目的地更近一点，我就很温暖。”——张小珺",
+      "imageUrl": "https://image.xyzcdn.net/Fnuyt9PQDQx0I0wlErG3ZHcW9Gpu.png",
+      "link": "https://www.xiaoyuzhoufm.com/podcast/626b46ea9cbbf0451cf5a962?utm_source=rss",
+      "categories": "",
+      "author": "张小珺",
+      "email": "benitazhang2021@163.com",
+      "lastUpdated": 1788393600000
+    },
+    {
+      "id": 29,
+      "rssFeedUrl": "https://feed.xyzfm.space/h4tfwertttht",
+      "title": "反潮流俱乐部",
+      "description": "在瞬时狂欢的世界中，和充满好奇心的行动派主播拾壹一起，跟着声音去体验、探索、寻求理解。\n本节目由声动活泼制作播出。\n订阅和播放节目如果遇到任何问题，欢迎联系声小音（微信：shengfm1）",
+      "imageUrl": "https://image.xyzcdn.net/Fj9COAxsW7-zNoCgVPo-USL7mzer",
+      "link": "https://www.xiaoyuzhoufm.com/podcast/5e284c37418a84a0462634a4?utm_source=rss",
+      "categories": "",
+      "author": "声动活泼",
+      "email": "login@shengfm.cn",
+      "lastUpdated": 1638230400000
+    },
+    {
+      "id": 30,
+      "rssFeedUrl": "https://feed.xyzfm.space/j8yp8gxkmgqr",
+      "title": "知行小酒馆",
+      "description": "《知行小酒馆》是有知有行出品的一档分享投资与生活的播客节目。我们关注投资理财，更关注怎样更好地生活。在我们看来，投资成功，是我们变成一个更好的人之后，自然的结果。\n\n如果你对节目有任何建议，或者有推荐的嘉宾，或者只是想与我们分享你和小酒馆的故事，可以给我们发邮件，来信请寄：allinthebeer@gmail.com\n\n如果你有长期投资的需求，非常欢迎下载 有知有行App，里面有你一定能读懂的好课程《投资第一课》，也有专业的投资观察《知行黑板报》，更有我们全员持有的好产品「长钱账户」「稳钱账户」「海外长钱」，人称「长稳海三胞胎」。",
+      "imageUrl": "https://image.xyzcdn.net/Fso6ZPHSi62eZJOLhorcqpx8TEwv.jpg",
+      "link": "https://www.xiaoyuzhoufm.com/podcast/6013f9f58e2f7ee375cf4216?utm_source=rss",
+      "categories": "",
+      "author": "有知有行",
+      "email": "allinthebeer@gmail.com",
+      "lastUpdated": 1789732800000
+    },
+    {
+      "id": 31,
+      "rssFeedUrl": "https://feed.xyzfm.space/mjvd3fknfr4v",
+      "title": "味之道",
+      "description": "《味之道》是由席妙雅主持的美食播客。美味是感性的体验，但同时需要开放的心态和眼界，以及精准的判断力。",
+      "imageUrl": "https://image.xyzcdn.net/FgSiqL_1hShvKUe1anxlLSepoeNj.png",
+      "link": "https://www.xiaoyuzhoufm.com/podcast/5e284e15418a84a04626be80?utm_source=rss",
+      "categories": "",
+      "author": "席妙雅",
+      "email": "957669158@qq.com",
+      "lastUpdated": 1787824800000
+    },
+    {
+      "id": 32,
+      "rssFeedUrl": "https://feed.xyzfm.space/mkkxu98dm89e",
+      "title": "小Lin说",
+      "description": "商业财经不无聊~\n毕业于北京大学经济学院 | 前华尔街摩根大通分析师 | 创业\n‼全网同名无小号，不会以任何方式私信粉丝，谨防受骗~",
+      "imageUrl": "https://image.xyzcdn.net/FjHZc1Wna6WsGcIrnz_1FOCkN_r3.png",
+      "link": "https://www.xiaoyuzhoufm.com/podcast/665ff98194977a26ef5490e8?utm_source=rss",
+      "categories": "",
+      "author": "小Lin说",
+      "email": "xiao_lin_shuo@163.com",
+      "lastUpdated": 1789012819000
+    },
+    {
+      "id": 33,
+      "rssFeedUrl": "https://feed.xyzfm.space/wmnkvmrpwuww",
+      "title": "罗永浩的十字路口",
+      "description": "本节⽬是⼀档由罗永浩主持的深度播客类节⽬，每集长达三到五个小时。\n我们与时代浪潮中的⼈物展开对话，聚焦于科技与⼈⽂领域，讲述个体命运故事，探讨时代发展趋势。",
+      "imageUrl": "https://image.xyzcdn.net/FvR7Od3_I3OQq0ac_8xMPc4zqdOt.png",
+      "link": "https://www.xiaoyuzhoufm.com/podcast/68981df29e7bcd326eb91d88?utm_source=rss",
+      "categories": "",
+      "author": "罗永浩的十字路口",
+      "email": "luoshizilukou@gmail.com",
+      "lastUpdated": 1788235710000
+    },
+    {
+      "id": 34,
+      "rssFeedUrl": "https://feed.xyzfm.space/wqgumr8kx8h8",
+      "title": "不可逃课BookTalk",
+      "description": "不可逃课BookTalk 是三个职场打工人在忙碌的生活中抽空看书、一起聊天的谈话节目。\n我们希望能通过这档节目让自己保持阅读和思考，同时又能和好朋友分享观点、简单地聊一聊。\n\n节目主播：米娅、锦鲤、安妮\n\n目前节目是每两周更新一次，一般是周五上线新的一期。订阅我们，就可以第一时间收到节目更新啦！",
+      "imageUrl": "https://image.xyzcdn.net/Fh99r2SqgMvFPW-JewXsrk7m9qn8.jpg",
+      "link": "https://www.xiaoyuzhoufm.com/podcast/6354b5052a992d56e91e6520?utm_source=rss",
+      "categories": "",
+      "author": "不可逃课BookTalk",
+      "email": "booktalkfm@163.com",
+      "lastUpdated": 1789081200000
+    },
+    {
+      "id": 35,
+      "rssFeedUrl": "https://feed.xyzfm.space/x734thm8c63f",
+      "title": "外部性",
+      "description": "关于经济与投资话题的播客。\n\n人心决定的经济世界中，外部性无处不在。\n\n不讲陈词滥调，以干货为主。\n\n添加微信waibuxing可以领取主播推荐书单一份。\n\n查看付费课程请复制打开链接：https://appuz6ddnhy8318.h5.xiaoeknow.com",
+      "imageUrl": "https://image.xyzcdn.net/Fu92p1_WTZJzbZjyoXO52fZ0VLkE.png",
+      "link": "https://www.xiaoyuzhoufm.com/podcast/62f0866a8591545f27dc71fb?utm_source=rss",
+      "categories": "",
+      "author": "李铁ironlee",
+      "email": "252089023@qq.com",
+      "lastUpdated": 1787241600000
+    },
+    {
+      "id": 36,
+      "rssFeedUrl": "https://feeds.fireside.fm/teahour/rss",
+      "title": "Teahour",
+      "description": "Teahour 2.0 已经推出，前 10 期节目会在两边同步更新，之后会只在 https://teahour.dev/ 更新，请注意订阅新 feed 以免错过最新更新。 Teahour.fm 专注程序员感兴趣的话题，包括 Web 设计和开发，移动应用设计和开发，创业以及一切 Geek 的话题。",
+      "imageUrl": "https://media24.fireside.fm/file/fireside-images-2024/podcasts/images/6/635ad9f1-6ce0-4f31-84cf-030e0c949169/cover.jpg?v=2",
+      "link": "https://teahour.fm",
+      "categories": "",
+      "author": "Teahour",
+      "email": "poshboytl@gmail.com",
+      "lastUpdated": 1776222000000
+    },
+    {
+      "id": 37,
+      "rssFeedUrl": "https://hardimage.pro/episodes/feed.xml",
+      "title": "硬影像",
+      "description": "《硬影像》由 IPN 出品，由罗登主持，是一个关注影像之一切的播客。谈论影像背后的技术，历史和哲理。",
+      "imageUrl": "https://i.typlog.com/hardimage/8404435997_461926.png?x-oss-process=style/sl",
+      "link": "https://hardimage.pro",
+      "categories": "",
+      "author": "IPN",
+      "email": "hardimage@ipn.li",
+      "lastUpdated": 1787188871000
+    },
+    {
+      "id": 38,
+      "rssFeedUrl": "https://miechakucha.com/episodes/feed.xml",
+      "title": "滅茶苦茶",
+      "description": "不倫不類、不易流行。瞭解日本是不夠的，我們要活用日本。\n\n李如一主理，IPN 出品。\n\nhttps://miechakucha.com\n\nmiechakucha@ipn.li",
+      "imageUrl": "https://i.typlog.com/miechakucha/8404585230_630287.png?x-oss-process=style/sl",
+      "link": "https://miechakucha.com",
+      "categories": "",
+      "author": "IPN",
+      "email": "miechakucha@ipn.li",
+      "lastUpdated": 1789101431000
+    },
+    {
+      "id": 39,
+      "rssFeedUrl": "https://pan.icu/feed",
+      "title": "内核恐慌",
+      "description": "一档号称硬核却没什么干货的信息技术主题娱乐节目",
+      "imageUrl": "https://pan.icu/assets/icon@16x.png",
+      "link": "https://pan.icu",
+      "categories": "",
+      "author": "吴涛、Rio",
+      "email": "hi@pan.icu",
+      "lastUpdated": 1751846400000
+    },
+    {
+      "id": 40,
+      "rssFeedUrl": "https://pretro.xyz/feed",
+      "title": "提前怀旧",
+      "description": "一切未来终将成为过去。欢迎收听《提前怀旧》，一档由任宁和 Rio 主持的科技评论节目。",
+      "imageUrl": "https://pretro.xyz/assets/icon-pretro-1800.png",
+      "link": "https://pretro.xyz",
+      "categories": "",
+      "author": "任宁、Rio",
+      "email": "you@pretro.xyz",
+      "lastUpdated": 1692716400000
+    },
+    {
+      "id": 41,
+      "rssFeedUrl": "https://sspai.typlog.io/episodes/feed.xml",
+      "title": "少数派播客 SSPAI Podcast",
+      "description": "少数派旗下播客节目，高效工作，品质生活。欢迎访问 SSPAI.com 了解更多精彩内容。",
+      "imageUrl": "https://i.typlog.com/sspai/8339963934_163514.png?x-oss-process=style/sl",
+      "link": "https://www.sspai.com",
+      "categories": "",
+      "author": "少数派",
+      "email": "nick@sspai.com",
+      "lastUpdated": 1781579371000
+    },
+    {
+      "id": 42,
+      "rssFeedUrl": "https://storyfm.cn/feed/episodes",
+      "title": "故事FM",
+      "description": "欢迎收听故事FM 。在这里，我们用你的声音，讲述你的故事。合作邮箱：bd@storyfm.cn",
+      "imageUrl": "https://media-one.wavpub.com/covers/1ebcbf5d-9dd2-4b69-b681-b54c22541cf2/977035cf6ab63b6e.png",
+      "link": "https://storyfm.cn/",
+      "categories": "",
+      "author": "寇爱哲",
+      "email": "kouaizhe@gmail.com",
+      "lastUpdated": 1789648032000
+    },
+    {
+      "id": 43,
+      "rssFeedUrl": "https://taiyilaile.com/episodes/feed.xml",
+      "title": "太医来了",
+      "description": "《太医来了》由 IPN 出品、由前骨科医生初洋和妇产科医生田吉顺主持，是中文互联网第一档医生谈话类播客。节目里没有老专家讲养生，只有几个医生聊聊医院里的事儿，顺便给大家做做科普。\n\nhttps://taiyilaile.com\n\ntaiyilaile@ipn.li",
+      "imageUrl": "https://i.typlog.com/taiyilaile/8404436016_571689.png?x-oss-process=style/sl",
+      "link": "https://taiyilaile.com",
+      "categories": "",
+      "author": "IPN",
+      "email": "taiyilaile@ipn.li",
+      "lastUpdated": 1517878800000
+    },
+    {
+      "id": 44,
+      "rssFeedUrl": "https://www.etw.fm/rss",
+      "title": "声东击西",
+      "description": "社会剧烈变动，我们如何理解自己所处的坐标？ 作为拥有记者背景的观察者和记录者，我们以审慎的视角捕捉当下的社会切片，不仅对话提供启发的专业人士，也记录那些身处风暴中心的个体叙事。 声东击西试图推开那些被日常限制的窗户，通过创新的声音实验与深度访谈，帮你厘清社会变迁的脉络，并探寻这些宏大变化如何真实地投影在你我的生活之中。 🎙 本节目由声动活泼制作播出",
+      "imageUrl": "https://media24.fireside.fm/file/fireside-images-2024/podcasts/images/8/8dd8a56f-9636-415a-8c00-f9ca6778e511/cover.jpg?v=4",
+      "link": "https://etw.fm",
+      "categories": "",
+      "author": "ETW Studio",
+      "email": "login@shengfm.cn",
+      "lastUpdated": 1789643700000
+    },
+    {
+      "id": 45,
+      "rssFeedUrl": "https://www.thetype.com/typechat/feed/",
+      "title": "字谈字畅",
+      "description": "《字谈字畅》是第一档用华语制作的字体排印主题播客节目，由 Eric Liu 与钱争予搭档主播。The Type 出品。",
+      "imageUrl": "https://www.thetype.com/wp-content/uploads/2015/09/TypeChat-iTunesCoverArt-v1.0.0.jpg",
+      "link": "https://www.thetype.com/typechat/",
+      "categories": "",
+      "author": "The Type",
+      "email": "podcast@thetype.com",
+      "lastUpdated": 1790052102000
+    },
+    {
+      "id": 46,
+      "rssFeedUrl": "https://www.ximalaya.com/album/41563226.xml",
+      "title": "FView Friday",
+      "description": "说点客观发生的，聊点主观想聊的，欢迎来到爱否科技全新音视频直播节目——FView Friday",
+      "imageUrl": "https://fdfs.xmcdn.com/group82/M07/7C/2B/wKg5HF9gmWHg-TzYAABvn_pFZPs249.png",
+      "link": "https://www.ximalaya.com/album/41563226",
+      "categories": "",
+      "author": "爱否科技",
+      "email": "2652003556@qq.com",
+      "lastUpdated": 1789810175000
+    },
+    {
+      "id": 47,
+      "rssFeedUrl": "https://www.ximalaya.com/album/4867505.xml",
+      "title": "代码时间",
+      "description": "代码时间是一个面向程序员的中文播客节目, 致力于通过语音的方式传播程序员的正能量。节目的shownotes请移步节目主页。",
+      "imageUrl": "https://fdfs.xmcdn.com/group19/M00/9A/18/wKgJK1ey2nKBF5TTAAIYz2ivNpY331.png",
+      "link": "https://www.ximalaya.com/album/4867505",
+      "categories": "",
+      "author": "业余西",
+      "email": "codetimecn@gmail.com",
+      "lastUpdated": 1559459082000
+    },
+    {
+      "id": 48,
+      "rssFeedUrl": "https://yitianshijie.net/episodes/feed.xml",
+      "title": "一天世界",
+      "description": "一天世界，昆乱不挡。不鳥萬如一主理。IPN 出品。\n\n《一天世界》博客：http://blog.yitianshijie.net",
+      "imageUrl": "https://i.typlog.com/yitianshijie/7W/tnVvKh-Z0xzWG-t4G7mA.png?x-oss-process=style/sl",
+      "link": "https://yitianshijie.net",
+      "categories": "",
+      "author": "不鳥萬如一",
+      "email": "yitianshijie@ipn.li",
+      "lastUpdated": 1725627753000
+    }
+  ],
+  "feedEpisode": [
+    {
+      "id": 25,
+      "title": "中共还能撑多久？暴力革命的成本与忍耐极限！",
+      "description": "<p>由於中共政權與國家體系高度綁定，缺乏和平退場機制，其執政團隊的解散幾乎必然伴隨流血和暴力革命，這使得推翻政權的成本極高，普通民眾的忍耐程度也相對提高。目前尚未出現大規模生存威脅，糧食產量連年增長，民眾缺乏發起暴力革命的最強烈誘因。在外部壓力方面，美國將對華競爭定位為削弱而非旨在改變中國制度，行動保持克制，不會將中共逼入絕路。</p>",
+      "duration": 1598000,
+      "enclosureUrl": "https://anchor.fm/s/f2cbc0a8/podcast/play/108627905/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-8-22%2F407903299-44100-2-30668f64e8c05.m4a",
+      "pubDate": 1758507326000,
+      "imageUrl": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_episode/40634394/40634394-1758506825185-f2ff6fa2a3bd4.jpg",
+      "channelTitle": "小岛大浪吹",
+      "rssFeedUrl": "https://anchor.fm/s/f2cbc0a8/podcast/rss"
+    },
+    {
+      "id": 26,
+      "title": "147 ✪ SHEIN回港上市、新拼姆开启自营",
+      "description": "<p>过去十年，中国跨境电商依靠强大的供应链能力和价格优势快速走向全球，SHEIN、Temu 等企业成为中国企业出海的代表。但随着这些企业在海外市场不断扩大影响力，也开始面对来自监管政策和贸易规则的全新挑战。</p>\n\n<p>SHEIN 凭借独创的“小单快返”模式，将中国制造的速度发挥到极致。上市地绕了地球一圈之后，终于成功在香港上市。在这一里程碑背后，SHEIN 商业模式的正在面临挑战：当关税、本地化要求成为新的竞争条件，SHEIN 最核心的“快”优势是否正在被削弱？从中国直邮到海外仓布局，跨境电商的供应链模式会发生怎样的变化？</p>\n\n<p>Temu 则试图走向另一条路径，加大对自营标准品的投入。为什么拼多多要推出“新拼姆”自营模式？从低价平台到品质平台，这场拼多多全力推动的升级迭代，能否改变海外消费者对 Temu 的认知？当 Temu 直接面对亚马逊这样的全球电商巨头，中国电商出海下一阶段的竞争核心究竟是什么？</p>\n\n<p>本期节目，我们从 SHEIN 与 Temu 的最新变化出发，拆解中国跨境电商从供应链红利走向全球化深水区后，正在面临的新机会与新挑战。</p>\n\n<h2>疯投圈会员社群</h2>\n\n<p>疯投圈开设有会员社群，在这里您可以结识志同道合的朋友、发现业务合作的伙伴。社群每年在北京、上海、杭州、广州、深圳、香港六个城市举办仅限会员参加的线下活动，其他城市也会不定期举行小型的会员聚会。通过面对面的交流，您可以与其他会员进一步加深了解、促成合作。</p>\n\n<p>会员还可以获得由疯投圈播客节目内容重新人工整理编辑而成的《疯投圈文字精选》，适合阅读习惯，方便查询检索节目中提到的图表、数据、观点、结论。</p>\n\n<p>微信搜索关注「疯投圈」服务号并发送关键词「会员」了解详情和加入社群。</p>\n\n<figure>\n<img src=https://rio.xyzcdn.net/assets/crazy-capital-community.png>\n</figure>\n\n<h2>黄海的的商业世界</h2>\n\n<p>微信搜索「疯投圈」的服务号，发送关键词「星球」加入「黄海的商业世界」。</p>\n\n<h2>黄海的新书《趋势红利》</h2>\n\n<p>微信搜索「疯投圈」的视频号，可以在「商品」分类置顶里面找到黄海的新书《趋势红利》。</p>\n\n<p>您也可以在里面购买其他我们筛选的商品来支持我们节目。</p>\n\n<h2>商务合作</h2>\n\n<p>商务合作请发送电子邮件至 <a href=mailto:biz@crazy.capital>biz@crazy.capital</a></p>",
+      "duration": 4203000,
+      "enclosureUrl": "https://rio.xyzcdn.net/crazycapital/ep147.mp3",
+      "pubDate": 1788861600000,
+      "imageUrl": "https://crazy.capital/assets/icon-square-normal-dark-cn@4x.png",
+      "channelTitle": "疯投圈",
+      "rssFeedUrl": "https://crazy.capital/feed"
+    },
+    {
+      "id": 27,
+      "title": "E63 从收租到收息：为什么这些年，大家越来越关注红利投资了？",
+      "description": "<p><strong>📙 </strong>欢迎来到《投资ABC》，这是一档由 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a> 出品的播客节目。在这里，我们会和陈鹏博士一起，和你分享那些投资中绕不开的知识，我是 Amiee。</p><p>前段时间，我听到一个有趣的说法：如果我们的生活是一座花园，那么现金流就是灌溉花草、让它们生长的水。无论是过好当下，还是为未来积累资产，它都是重要的基础。</p><p>这或许解释了为什么小时候，我常听大人们说，理想的生活，就是拥有几间位置不错的铺头：不仅每个月有租金到账，铺头本身还可能升值；租金收入有结余，就攒起来，再去买下一间。这个「鸡生蛋、蛋生鸡」的循环，构成了我最早对财富增长的想象。</p><p>所以，第一次听到「红利投资」时，我就有一种莫名的熟悉感：找到那些愿意持续分红的公司，长期持有，并定期获得现金流——听起来，就像是把铺头搬进了证券账户。</p><p>而且，相比市场中不断波动的价格和反复变化的故事，真正分到手里的钱，似乎格外踏实，看得见，摸得着。</p><p>我还经常听人说，市场下跌时，红利策略往往相对抗跌；而除了分红，它所持有的股票本身也可能升值。眼前有现金流，未来有上涨空间，似乎鱼与熊掌兼得。</p><p>直到有一天，我兴致勃勃地向本期节目的嘉宾 Jason 分享自己对红利投资的理解，他却告诉我：<strong>红利策略所呈现的许多特征，也会随着市场环境而变化</strong>。我这才意识到，红利投资或许并不是我想象中的「电子铺头」。</p><p>Jason 是标普道琼斯指数公司的产品经理，长期研究红利与因子类指数的设计，也积累了许多来自市场一线的观察。我很好奇：一个每天与红利指数打交道的人，究竟如何理解红利投资？</p><p>于是，我迫不及待地邀请他来做客，一起聊聊<strong>红利策略具有哪些特征，我们又该如何理解这些特征，从而对红利投资建立更合理的预期</strong>。</p><h2>🔗 官方地址</h2><p>欢迎<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/n/materials/2262\">点击这里</a>，查看我们在有知有行准备的全文逐字稿、图表以及重点总结。</p><h2>🎙️ 本期嘉宾</h2><p><strong>Jason：</strong> 标普道琼斯指数产品经理，曾任德明信基金研究员。</p><h2>⏳ 时间戳</h2><p><a class=\"timestamp\">03:46</a> 理想生活的底气：拥有持续产生现金流的资产，鸡生蛋，蛋生鸡</p><p><a class=\"timestamp\">07:39</a> 红利初代配方：十只被市场冷落的「落水狗」，竟在二十多年里跑赢道琼斯工业指数</p><p><a class=\"timestamp\">12:52</a> 「一笔好的交易，可能是一笔坏的长期投资」</p><p><a class=\"timestamp\">21:35</a> 抗跌，保守时代的「最大公约数」？</p><p><a class=\"timestamp\">26:12</a> <strong>全收益视角下，红利投资回报的三个组成部分 ——</strong></p><p><a class=\"timestamp\">35:49</a> 底层蓄水池丰盈时，分红的流向：公司 ➡️ 基金 ➡️ 投资人</p><p><a class=\"timestamp\">39:30</a> <strong>「别杀会下金蛋的鹅，但股价跌了怎么办」「知道未来会跌，你应该去做空，但问题是，你知道吗」</strong></p><p><a class=\"timestamp\">45:23</a> 红利低波、红利动量，这些陌生的复合名字，是什么意思？</p><p><a class=\"timestamp\">54:40</a> <strong>平衡与一致，红利投资的两个重要参数</strong></p><h2>🔍 相关内容</h2><p><a class=\"timestamp\">01:08</a> 分红（Dividend）：公司将可供分配利润的一部分，以现金等形式分配给股东，是股东获得投资回报的一种方式。</p><p><a class=\"timestamp\">10:27</a> 股息率：通常指一只股票的年化每股现金股息与当前股价之比，用来衡量以当前价格买入后所对应的分红收益水平。股息率不等于基金实际向投资者派发的分红比例。</p><p><a class=\"timestamp\">12:14</a> 此处提到的是肯尼斯·弗伦奇（Kenneth French）数据资料库中的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://mba.tuck.dartmouth.edu/pages/Faculty/ken.french/Data_Library/det_port_form_dp.html\">「按股息率构建的投资组合」（Portfolios Formed on Dividend Yield）数据集</a>。</p><p><a class=\"timestamp\">13:34</a> 此处提到阿斯沃斯·达摩达兰（Aswath Damodaran）教授于 2017 年撰写的文章<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.nasdaq.com/articles/bitcoin-boom-asset-currency-commodity-or-collectible-2017-10-25\">《The Bitcoin Boom: Asset, Currency, Commodity or Collectible?》（《比特币繁荣：资产、货币、商品，还是收藏品？》）。</a></p><p><a class=\"timestamp\">18:20</a> 估值变化：市场给予公司的估值倍数发生变化，例如市盈率上升或下降。</p><p><a class=\"timestamp\">19:53</a> 从截至 2023 年底的数据来看，A股是全球分红增长较快的市场之一。2023 年，A股上市公司的现金分红总额达到日本市场的两倍以上，相当于美国市场分红总额的 40% 以上。2013 - 2023 年，A股分红的年复合增长率为 10.6%，高于同期 4.7% 的全球平均水平。</p><img src=\"https://image.xyzcdn.net/Fp_GPzZq9m8ERfm7OwquEoQL1Sed.png\"><blockquote><p>图表来源：标普道琼斯指数有限公司，<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.spglobal.com/spdji/zh/documents/research/research-exploring-china-a-share-dividends-and-high-yield-strategy-performance-zh.pdf\">《分析 A 股红利市场与高股息率策略》</a></p></blockquote><p><a class=\"timestamp\">25:20</a> 此处提到的文章<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.spglobal.com/spdji/zh/documents/education/talking-points-finding-resilience-amid-uncertainty-zh.pdf\">《市场热话：在不确定环境中寻求稳定——中国 A 股市场的红利低波策略》</a>。</p><p><a class=\"timestamp\">26:34</a> 2005 - 2025 年，A股全收益指数的长期年化收益率约为 10.40%。按下图中的股息模型，股息及其再投资合计 1.56%，约占总收益的 15%。</p><img src=\"https://image.xyzcdn.net/FohIoKLOXv1o_MVirRY6DTKwGaG4.png\"><blockquote><p>图表来源：<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/sbbi2025/preface\">《中国大类资产投资 2025 年报》</a></p></blockquote><p><a class=\"timestamp\">26:36</a> 全收益指数：除了反映指数成分股价格的变化，还计入现金分红，并假设分红继续投入指数，因此能更完整地反映持有一组股票获得的整体收益。</p><p><a class=\"timestamp\">26:44</a> 此处提到的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/sbbi2025/preface\">《中国大类资产投资 2025 年报》</a></p><p><a class=\"timestamp\">27:20</a> 盈利增长（Earnings Growth）：公司或指数成分股的每股盈利随时间增长的部分。</p><p><a class=\"timestamp\">28:52</a> 价值因子：根据股票价格相对于盈利、账面价值、销售额等基本面指标的高低，识别估值相对较低股票的一类系统性选股特征。</p><p><a class=\"timestamp\">29:21</a> 成长因子：根据公司的盈利、收入等基本面指标及其增长情况，识别成长性相对较高股票的一类系统性选股特征。</p><p><a class=\"timestamp\">36:37</a> 派息型份额（Distribution Shares）：海外基金常见的一种份额类型，会按照基金的分配政策向投资者派息。</p><p><a class=\"timestamp\">36:40</a> 累积型份额（Accumulation Shares）：海外基金常见的一种份额类型，通常不向投资者派息，而是将相应资金留在基金中继续投资，并反映在基金份额净值中。</p><p><a class=\"timestamp\">44:24</a> 价格指数：反映指数成分股价格的变化，不计入成分股派发的常规现金分红。</p><p><strong>🎧 往期节目</strong></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/episode/6a49f7a92e335a35a80e3e55\">E58 指数编制：看似冰冷的规则机器，却在塑造你我眼中的市场</a></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/episode/6a12b7b38b5c94538e9fa0b8\">E55 都说 A 股全是情绪、没有价值，是真的吗？｜中国大类资产投资 2025 年报</a></p><h2>🎺 创作团队</h2><p><strong>制作｜</strong> 有知有行</p><p><strong>嘉宾</strong> <strong>｜</strong>Jason</p><p><strong>主持｜</strong> Amiee</p><p><strong>声音设计｜</strong> 甜食</p><p><strong>感谢志愿者步枫、饭粒、小马、小洲对本期节目的协助。</strong></p><p></p><p>💰<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a>「有知有行」成立于 2020 年，目前在陪伴投资者用正确的方式学习投资，下场实操。凭借在投资领域的良好口碑，有知有行在初创阶段已与一大批忠实用户同行。未来我们希望成为一家财富管理公司，不仅帮助投资者学习投资，也能让大家在有知有行安心交易，踏实赚钱。<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/s/f4C2nY7P\"> 欢迎在各大应用商店搜索「有知有行」下载我们的 App</a>。</p><p>🎈本播客所述投资相关内容皆以交流分享为目的，仅供参考，不构成任何市场预测、判断，或投资、咨询建议。市场有风险，投资需谨慎。主持人及嘉宾对投资相关内容的准确性、可靠性、时效性及完整性不作任何明示或暗示的保证，并提醒您对相关内容请结合自身情况进行独立评估，依据或使用相关内容所造成的后果由您独自承担。</p><p>感谢您对本播客原创内容的青睐。如需转载或引用本播客所述内容，请注明出处。转载前请与有知有行联系并取得同意。</p><br><a href=\"https://oia.xiaoyuzhoufm.com/player/6aa630e9492687f6aad90bfa?openTranscript=true&utm_source=rss&as=cHQ9MTIyNjE5MjQ3JmN0PXJzcyZtdD04&autoOpen=false\">在小宇宙查看该单集文稿</a>",
+      "duration": 3777000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/64b0bfde585daadfc82f3b12/6aa630e9492687f6aad90bfa/media.xyzcdn.net/64b0bfde585daadfc82f3b12/li5GZjW3QtYUlvvM5Rx1wnljeaiO.m4a",
+      "pubDate": 1789344000000,
+      "imageUrl": "https://image.xyzcdn.net/FoZpNQGSGjOnnYYSN0iIMW_9bLSj.jpeg",
+      "channelTitle": "投资ABC",
+      "rssFeedUrl": "https://feed.xyzfm.space/9bmupxfae9qd"
+    },
+    {
+      "id": 28,
+      "title": "153. 和曾鸣聊产业史观：残酷的真相、会消亡的公司、优秀≠卓越、“OAI、Anth大概率不是原生时代大赢家”",
+      "description": "<img src=\"https://image.xyzcdn.net/ltK0RxY6lnxA8-Eg0TfgpZzXZ93Q.png\"><p>今天的嘉宾是战略学家曾鸣教授。曾教授曾经是阿里巴巴集团总参谋长，也参与过两所商学院创建（长江商学院和湖畔），但他更令人熟悉的身份是：一名对企业战略有许多深度思考的研究者。不少创业者和企业家都受到过他的启发。</p><p>作为观察过互联网完整周期的研究者，今天我们聊了聊他对AI新时代、新范式的完整思考，并和历史上关键转折时期做了对照——聊完让我有了更全局的视角。</p><p>对AI的产业发展，<strong>曾教授提出了许多非共识判断，甚至是一些“暴论”。</strong></p><p>这里我先摘录15条：</p><blockquote><p>AI产业化会有三个阶段：1）第一个阶段，技术逐渐被社会接受，成为社会基础设施；2）第二个阶段，基于基础设施产生海量新应用，进入百花齐放的时代；3）第三个阶段，当这些海量应用出现，大家发现需要一些更底层的方法运行新的世界，我把它叫作“原生应用阶段”。</p><p>我只是研究商业世界的动力学规律，我能看到的理论框架告诉我：第一阶段的企业，很难活到第二阶段；第二阶段的企业，很难活到第三阶段。</p><p>对比互联网时代，我们现在刚刚走到浏览器阶段，甚至比Yahoo还要早。</p><p>模型公司怎么类比？它有点像另外一个已经消失了的公司——美国在线AOL，它是互联网基础接入服务商，让所有人都能够接到互联网上，这本身是个巨大的工程。今天，大模型则是让所有人都可以轻易接入智能的入口，它也是一个基础设施服务商。</p><p>直白一点说，模型公司就是未来的AI云公司。</p><p>公共基础设施的行业，只有一种商业模式是成立的，叫寡头垄断加政府强监管——我知道这个现实对很多现在创业的人很残酷。</p><p>Anthropic、OpenAI，大概率不是原生应用阶段的大玩家、大赢家。</p><p>因为经济学基本规律，只要有同质化的供给，你就不可能获取高额利润，你就是一家不怎么值钱的公司。</p><p>下个阶段就是看谁是Netscape、谁是Yahoo，谁把Agent的标准建立起来，谁抢住Agent的用户入口。未来三年是有可能开始出现Agent入口的。</p><p>新的平台大概率不诞生自旧的平台。因为旧平台做的是简单信息匹配，新平台要做的是能力跟需求的匹配，复杂度高了很多。</p><p>作为工业化革命的产物，科层制管理的公司制度会衰亡——就是说，“公司”会消亡。这没有什么可以遗憾的呀，将来有更好玩的——你说多少人现在去公司上班是开心的？</p><p>我从来觉得在巨浪面前没有人是安全的。谁觉得安全，谁就是最不安全的。</p><p>CEO不能有老板心态。谁还认你啊？——现在说我都不陪老登玩了，我还陪你老板玩？</p><p>张：这个时代的企业过渡到下一个时代的企业，还能做得非常好的，多不多？曾：不是多不多的问题，是有没有的问题。张：有没有？曾：基本没有。</p><p>这一点都不让人绝望啊，人有生老病死，公司也有生老病死，没有比这更正常的了。这样，新公司才有机会，年轻人才有梦想，这多好的一件事情啊！</p></blockquote><p>好了，更多内容还是收看我们的播客吧:)</p><p>接下来，就是我对曾教授的访谈。</p><p><strong>OUTLINE:</strong></p><p><a class=\"timestamp\">00:03:08</a> 来自商业规律的残酷真相</p><p><a class=\"timestamp\">00:39:53</a> 新平台不来自旧平台</p><p><a class=\"timestamp\">01:06:15</a> “公司”要被淘汰</p><p><a class=\"timestamp\">01:31:10</a> 优秀≠卓越</p><p><a class=\"timestamp\">01:38:17</a> 战略生成系统</p><p><a class=\"timestamp\">02:02:48</a> 没有巨头是安全的</p><p><a class=\"timestamp\">02:18:01</a> 创造就是“无中生有”</p><p><strong>LINKS：</strong></p><p>我们的播客在<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast/626b46ea9cbbf0451cf5a962\">小宇宙</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://podcasts.apple.com/cn/podcast/%E5%BC%A0%E5%B0%8F%E7%8F%BAj%C3%B9n-%E5%95%86%E4%B8%9A%E8%AE%BF%E8%B0%88%E5%BD%95/id1634356920\">Apple Podcast</a>、Spotify等全音频平台播出；</p><p>我们的视频播客在<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast/626b46ea9cbbf0451cf5a962\">小宇宙</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://b23.tv/FZ0s2Q1\">Bilibili</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://xhslink.com/m/4clvm6edHk1\">小红书</a>、视频号、抖音等全视频平台播出；</p><p>如果你想服用文字版，请搜索我们工作室的公众号：语言即世界language is world。</p><p><strong>DISCLAIMER: </strong>本内容不作为投资建议。</p><p><strong>CONTACT: </strong>xiaojunzhang@lisw.ai</p><p><strong>Jump into the new world-and explore with us!</strong>😉</p>",
+      "duration": 9258000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/626b46ea9cbbf0451cf5a962/6a97f287f03e74ee6b03ea5b/media.xyzcdn.net/626b46ea9cbbf0451cf5a962/luZvhPtdKotbkVR-SHFRKVVUiM2P.m4a",
+      "pubDate": 1788393600000,
+      "imageUrl": "https://image.xyzcdn.net/FsGPZo8RfYBhZ7boAgv0PtVf7zBE.png",
+      "channelTitle": "张小珺Jùn｜商业访谈录",
+      "rssFeedUrl": "https://feed.xyzfm.space/dk4yh3pkpjp3"
+    },
+    {
+      "id": 29,
+      "title": "冬日活泼特辑｜声动游乐场开园，请来一探究竟吧！",
+      "description": "<p>「声动活泼游乐场」开园啦！尖叫、欢笑，还有游戏？<br>想马上邀请你通过声音来一探究竟！<br><img src=\"https://files.fireside.fm/file/fireside-uploads/images/4/4931937e-0184-4c61-a658-6b03c254754d/xjglzH8u.png\" alt=\"poster\"></p><p>在这个小短剧中，我们埋了一些彩蛋，希望你能喜欢！</p><p>为了能和大家玩儿起来，我们也藏了一个小小的<strong>声音互动游戏</strong>。想要和我们一起玩耍，就请订阅我们的付费<a href=\"https://mp.weixin.qq.com/s/7wQXF9ycbj30nzRgLkc30w\" rel=\"nofollow\">newsletter</a>，获得一张解谜地图，好去寻找那些和声音有关的线索。至于详细的玩法儿，就请收好下面的独家攻略吧！ </p><p><strong>第一步：订阅newsletter</strong><br>成功订阅我们的newsletter后（订阅方法在最后），你会很快收到一封包含两份游戏道具的邮件回复。其中包含「声动游乐场导览图」高清大图版和「答题卡」各一张。拿到道具后，就可以准备解谜啦！</p><p><img src=\"https://files.fireside.fm/file/fireside-uploads/images/4/4931937e-0184-4c61-a658-6b03c254754d/qyhejtE3.jpg\" alt=\"ditu\"><br><em>「声动游乐场」电子包浆版示意图</em></p><p><strong>第二步：游戏玩法详情</strong><br>1 准备好本期节目和两个道具<br>2 收听「游乐场小短剧」，并根据剧情，在「声动游乐场导览图」中找出相应的线索；<br>3 将相应线索，填入答题卡，得到答案！    </p><p><strong>第三步：把答案发给我们</strong><br>将答案发送到邮箱 <a href=\"mailto:newsletter@shengfm.cn\" rel=\"nofollow\">newsletter@shengfm.cn</a>，至此就算结束游戏啦。<br>我们将于 12 月 14 日揭晓谜底，前 50 位回复邮件并回答正确的听众，将会获得我们为你准备的惊喜礼包。为了这份礼包，也请加油哦！<br>另外，特别感谢本次赞助惊喜大礼包奖品的好朋友品牌：永璞咖啡、吻吻鱼、新经典文化。 </p><p>期待收到大家的谜底，我们好早早给大家发出礼物。</p><p><strong>附：如何订阅newsletter</strong><br>关于付费 newsletter 后你能获得什么，请点击阅读 <a href=\"https://mp.weixin.qq.com/s/7wQXF9ycbj30nzRgLkc30w\" rel=\"nofollow\">一封来自胡同中的邀请</a> 来了解更多。</p><p>如果你是国内用户，请扫👇 <br><img src=\"https://files.fireside.fm/file/fireside-uploads/images/4/4931937e-0184-4c61-a658-6b03c254754d/SrswgRtk.png\" alt=\"guoneiqrcode\"></p><p>如果你是海外用户，请扫👇 <br><img src=\"https://files.fireside.fm/file/fireside-uploads/images/4/4931937e-0184-4c61-a658-6b03c254754d/bBxw4lBh.png\" alt=\"abroadqrcode\"></p><p>订阅前后如遇任何问题，请联系 <a href=\"mailto:newsletter@shengfm.cn\" rel=\"nofollow\">newsletter@shengfm.cn</a> 或 声小音（微信号：shengfm1）<br>最后也祝大家玩儿得开心，拿到礼物！</p><br><a href=\"https://oia.xiaoyuzhoufm.com/player/61a56abdcdbb278b1a0d19a0?openTranscript=true&utm_source=rss&as=cHQ9MTIyNjE5MjQ3JmN0PXJzcyZtdD04&autoOpen=false\">在小宇宙查看该单集文稿</a>",
+      "duration": 407000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/5e284c37418a84a0462634a4/61a56abdcdbb278b1a0d19a0/media.xyzcdn.net/lqT_8UuHrq10G7mOefIQUgiD39-6.m4a",
+      "pubDate": 1638230400000,
+      "imageUrl": "https://image.xyzcdn.net/Fj9COAxsW7-zNoCgVPo-USL7mzer",
+      "channelTitle": "反潮流俱乐部",
+      "rssFeedUrl": "https://feed.xyzfm.space/h4tfwertttht"
+    },
+    {
+      "id": 30,
+      "title": "E252 公积金新规来了，这笔钱该怎么用？这份行动清单供你参考",
+      "description": "<img src=\"https://image.xyzcdn.net/Fk5nraEU-OYEXsuDv6aDf1oHDEXM.jpg\"><p><strong>🏡 公积金该存，还是取？聊聊新规对我们可能的影响。</strong></p><p>欢迎来到知行小酒馆，这是一档由 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a> 出品的播客节目。我们关注投资，更关注怎样更好地生活，我是雨白。</p><p>三年前，五险一金研究小组也聊过一期公积金。当时我们给的建议很直接：应取尽取，应用尽用。</p><p>三年过去，公积金政策、房地产市场、就业环境，以及我们自己的生活都变了不少。今年 9 月 20 号，公积金新规就要正式实施了，借着这一契机，我们也想来重新聊聊这个话题：三年后的今天，我们对公积金的看法有改变吗？<strong>这次公积金的新规，对不同的人群到底有什么影响？</strong></p><p>这次我重新召集了五险一金研究小组，组员包括小酒馆的制作人周一，还有我们节目的老朋友，「面基」的主播老钱。我们会从各自的经验出发，聊聊这次新规可能产生的影响，也希望能帮你判断，<strong>公积金在你的生活里，到底能起什么作用。</strong></p><p>如果你也有一笔公积金，却不太确定这笔钱怎样才能发挥最大的效用，希望这期能对你有些帮助。</p><h2>🔗 官方地址</h2><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/n/materials/2266\">如果你所使用的客户端显示不全，请点此访问有知有行的官网查看全文</a></p><h2>🍻 本期嘉宾</h2><p><strong>老钱：</strong>小酒馆的老朋友，播客「<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast/6388760f22567e8ea6ad070f\">面基</a>」主播。公众号：老钱日日谈</p><h2>🪡 时间轴</h2><p><a class=\"timestamp\">02:35</a> 再聊公积金，研究小组成员各自的感受——</p><p><a class=\"timestamp\">07:47</a> <strong>什么是公积金？</strong></p><p><a class=\"timestamp\">13:14</a> 开通公积金自动提取半年后，我主动选择了暂停</p><p><a class=\"timestamp\">20:57</a> 小提示：公积金 ≠ 银行存款，虚假提取可能面临处罚</p><p><a class=\"timestamp\">23:43</a> <strong>公积金新规主要有哪些变化？直接看这里 👉</strong></p><p><a class=\"timestamp\">32:20</a> 如果你未来可能有买房的计划，请一定慎重提取公积金</p><p><a class=\"timestamp\">44:05</a> <strong>灵活就业者请看 👀 如果我想自行缴存公积金，该怎么算？</strong></p><p><a class=\"timestamp\">52:44</a> 是不是足额缴纳公积金，也许能成为观察一家公司的切片</p><p><a class=\"timestamp\">59:06</a> <strong>公积金存取行动清单 📋</strong></p><h2>🔍 猜你想看</h2><blockquote><p>由于平台字数限制，完整版公积金资料库，欢迎<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/n/materials/2266\">点此前往有知有行官网</a>查看。</p></blockquote><p><strong>🟤 关于公积金新规</strong></p><p>本次新规为 2026 年 7 月 31 日国务院第 93 次常务会议通过，将于&nbsp;<strong>2026 年 9 月 20 日起施行</strong>的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.gov.cn/gongbao/2026/issue_12946/202608/content_7079363.html\">《国务院关于修改〈住房公积金管理条例〉的决定》</a>。此次修订是 1999 年《条例》出台以来近 20 年幅度最大的一次系统性修订，《决定》共有 20 条。</p><p>在这期节目中，我们提到本次修订主要有以下重要变化：</p><ol><li><p><strong>拓宽账户余额的提取和使用范围</strong></p><ol><li><p>装修自住住房、支付自住住房物业费、国务院批准的其他住房消费情形首次纳入可提取情形；</p></li><li><p>对提取住房公积金支付房租的，不再设置「房租超过家庭工资收入规定比例」的门槛限制；</p></li></ol></li><li><p><strong>扩大制度覆盖面</strong>，灵活就业人员可自愿缴存住房公积金，并按规定享受相应政策支持；</p></li></ol><ul><li><p><strong>提升住房公积金管理服务效能</strong>，缩短住房公积金提取及贷款申请的受理时限；</p></li></ul><blockquote><p>职工申请提取住房公积金的，住房公积金管理中心应当自受理申请之日起 3 日内作出准予提取或者不准提取的决定，并通知申请人；</p><p>申请住房公积金贷款的，住房公积金管理中心应当自受理申请之日起 10 日内作出准予贷款或者不准贷款的决定，并通知申请人。</p></blockquote><ol><li><p><strong>推动住房公积金缴存记录等全国范围内互信互认。</strong></p></li></ol><p><strong>🟤 补充资料</strong></p><p><a class=\"timestamp\">00:05:01</a> 中国人民银行、国家金融监督管理总局于 2026 年 8 月 28 日联合印发<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.pbc.gov.cn/tiaofasi/144941/3581332/2026082817013334439/index.html\">《关于改革完善房地产信贷管理 推动加快构建房地产发展新模式的意见》</a>，<strong>将个人住房贷款最长期限由 30 年延长至 40 年。</strong></p><p><a class=\"timestamp\">00:11:36</a>&nbsp;<strong>转移支付</strong>：通过政府无偿支出实现社会收入和财富再分配的一种手段，该支出不涉及商品或服务的交换。社会保障、政府对特定企业的补贴等都属于转移支付的一种体现。</p><p><a class=\"timestamp\">00:11:36</a><strong>&nbsp;现收现付制</strong>：一种社会保障资金的运作方式，以横向平衡原则为依据，用同一时代工作者的缴费，来直接支付当下保险受益人的开支。</p><p><a class=\"timestamp\">00:11:58</a> 截至 2024 年末，住房公积金累计缴存总额 327941.35 亿元，缴存余额 109252.79 亿元、同比增长 8.61%。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.gov.cn/zhengce/zhengceku/202506/P020250601601759182303.pdf\">《全国住房公积金2024年年度报告》</a></p><blockquote><p>需要注意的是：这笔缴存余额中，约 8.07 万亿元已形成个人住房贷款，占缴存余额的 73.86%。个贷资产由于已经锁定在长期贷款合同中，因此不具备即时释放的条件，只能随借款人还本付息逐步回流。剩余非个贷资产约为 2.86 万亿元，但这只账面上限，不能作为可统一释放的「闲置资金」，因此无法据此给出具体「有几千亿能够释放」的结论。解读来自<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://mp.weixin.qq.com/s/yyv8YpQ1-Je3mxmHK1vpNg\">《招商宏观 | 住房公积金还能释放多少空间？》</a></p></blockquote><p><a class=\"timestamp\">00:12:06</a> 截至 2026 年 8 月，中国境内住户存款总额已达到约 172.89 万亿元。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.pbc.gov.cn/diaochatongjisi/attachDir/2026/09/2026091418214943327.pdf\">《金融机构人民币信贷收支表》</a></p><p><a class=\"timestamp\">00:12:53</a>&nbsp;<strong>社零总额：</strong>「社会消费品零售总额」的简称，指企业（单位、个体户）通过交易直接售给个人、社会集团非生产、非经营用的实物商品金额，以及提供餐饮服务所取得的收入金额。2025 年，全年社会消费品零售总额已超 50 亿元。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.stats.gov.cn/sj/zxfb/202602/t20260228_1962662.html\">《中华人民共和国2025年国民经济和社会发展统计公报》</a></p><p><a class=\"timestamp\">00:22:03</a> 详见《住房公积金管理条例》第四十一条规定。</p><blockquote><p><strong>第四十一条</strong>　以欺诈、伪造证明材料或者其他手段违法提取住房公积金的，由住房公积金管理中心责令限期退回违法提取的住房公积金，3年内不得提取住房公积金或者使用住房公积金贷款。</p></blockquote><p><a class=\"timestamp\">00:30:22</a> 2024 年，住房公积金缴存额 36317.83 亿元，发放住房公积金个人住房贷款 230.56 万笔，发放金额 13043.07 亿元；当年新发放贷款与当年缴存额的比率约为 35.91%。如果回顾过往数据，2016 年住房公积金缴存额 16562.88 亿元，发放住房公积金个人住房贷款 327.49 万笔、12701.71 亿元，当年新发放贷款与当年缴存额的比率约为 76.69%。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.gov.cn/zhengce/zhengceku/202506/P020250601601759182303.pdf\">《全国住房公积金2024年年度报告》</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"http://www.fangchan.com/policy/34/2017-06-01/6275875030002110515.html\">《全国住房公积金2016年年度报告》</a></p><p><a class=\"timestamp\">00:35:35</a> 一线城市二手房价格变化见下图。图片来源：嘉宾供图</p><img src=\"https://image.xyzcdn.net/Fj7m64vfizrV0PHG1ZmRJGj4CKyH.png\"><p><a class=\"timestamp\">00:38:53</a> 截至2025 年，中国灵活就业人员已达约 2.8 亿人。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.fxbaogao.com/view?id=5461464\">《2025 中国蓝领群体就业研究报告》</a></p><p><a class=\"timestamp\">00:39:32</a> 数据补充：2024 年，住房公积金实缴人数 17628.75 万人，其中北京实缴职工 939.75 万人，上海实缴职工 931.26 万人，广州 533.62 万人，深圳实缴职工 721.65 万人，非一线城市城镇缴存人数约 14502.47 万人，灵活就业人员实缴人数 218.82 万人。而 2024 年度城镇就业人员 47345 万人，全国参加城镇职工基本养老保险人数 53449 万人。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.gov.cn/zhengce/zhengceku/202506/P020250601601759182303.pdf\">《全国住房公积金2024年年度报告》</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.stats.gov.cn/sj/zxfb/202502/t20250228_1958817.html\">《中华人民共和国2024年国民经济和社会发展统计公报》</a></p><p><a class=\"timestamp\">00:39:18</a>&nbsp;<strong>LPR（贷款市场报价利率）</strong>：指由各报价行根据其对最优质客户执行的贷款利率，按照公开市场操作利率加点形成的方式报价，由中国人民银行授权全国银行间同业拆借中心计算得出并发布的利率。各银行实际发放的贷款利率可根据借款人的信用情况，考虑抵押、期限、利率浮动方式和类型等要素，在贷款市场报价利率基础上加减点确定。</p><p><a class=\"timestamp\">00:49:05</a> 更正，此处主要指<strong>职业年金</strong>：指机关事业单位及其工作人员在参加机关事业单位基本养老保险的基础上，建立的补充养老保险制度。</p><p><a class=\"timestamp\">00:50:33</a>&nbsp;<strong>个人养老金</strong>：一项由个人自愿参加，用于补充养老保障的制度。个人养老金每年缴纳上限为 12000 元，缴费完全由参加人个人承担，资金在专属账户中实行完全累积。缴费在个税前扣除，领取时按 3% 的税率单独计税。</p><p><a class=\"timestamp\">00:51:19</a> 2025年，全国城镇非私营单位就业人员年平均工资 129441 元，全国城镇私营单位就业人员年平均工资 71590 元。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.stats.gov.cn/sj/zxfb/202605/t20260515_1963707.html\">《2025年城镇单位就业人员年平均工资情况》</a></p><p><a class=\"timestamp\">00:51:52</a> 见住房城乡建设部、自然资源部、金融监管总局于 2026 年 8 月 28 日联合印发的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.mohurd.gov.cn/gongkai/zc/wjk/art/2026/art_45644612a7064289bdc0d5b1427a25d8.html\">《关于完善商品住房销售制度的通知》</a>。</p><blockquote><p>通知提出，各地要完善商品住房预售管理。需规范商品住房预售条件，商品住房项目实行预售的，单体建筑应完成主体结构封顶；需加强预售资金监管，购房人支付的首付款、个人住房贷款等购房资金应全部存入资金监管账户。</p></blockquote><p><a class=\"timestamp\">01:01:01</a> 此处提及的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.zzz.gov.cn/dkjsq/calculator.html#\">住房公积金贷款计算器</a></p><p><strong>往期节目</strong></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/episode/6438fc399361a4e7c3863b9a\">E83 我们对公积金的态度：应用尽用，能取就取</a></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast-topic/6543a79ce5f242983f76c231\">知行小酒馆｜五险一金系列</a></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast-topic/6543a57bde390991a499adac\">知行小酒馆｜房产万事屋系列</a></p><h2>🌐 知行小酒馆公告牌</h2><p><strong>✨ 有知有行 App 3.0 版本上线啦</strong></p><p>过去几年，不少同路人都在问我们：什么时候可以不用跳转，直接在有知有行买入长稳海？现在终于可以告诉大家，<strong>从这一版本起，「长钱账户」「稳钱账户」「海外长钱」都已经支持在</strong><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\"><strong>有知有行 App</strong></a><strong> 里直接买入。</strong></p><p>谢谢你陪我们走到这里，有知有行还在继续成长，也希望可以继续陪伴你通过安心投资，一步步接近更好的生活。</p><blockquote><p>长钱账户、稳钱账户和海外长钱的销售、投顾服务，分别由海南有知有行基金销售有限公司和嘉实财富提供。产品的过往业绩不预示其未来表现，为其他投资者创造的收益也不构成业绩表现的保证。请在全面了解产品的风险收益特征后独立作出投资决策。</p></blockquote><img src=\"https://image.xyzcdn.net/FjkPEsamj3dEI6owRy7KgQNVsu1r.png\"><p><strong>🍻 我们是谁？</strong>「知行小酒馆」是 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a> 出品的一档分享投资与生活的播客节目，每周五晚八点更新。我们关注投资理财，更关注怎样更好地生活。在我们看来，投资成功，是我们变成一个更好的人之后，自然的结果。</p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a> 成立于 2020 年，目前在陪伴投资者用正确的方式学习投资，下场实操。凭借在投资领域的良好口碑，有知有行在初创阶段已与一大批忠实用户同行。未来我们希望成为一家财富管理公司，不仅帮助投资者学习投资，也能让大家在有知有行安心交易，踏实赚钱。<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">欢迎在「有知有行」社区 和我们互动交流</a>。</p><h2>🎺 创作团队</h2><p><strong>主持 </strong>雨白 周一｜<strong>嘉宾</strong> 老钱｜<strong>制作 </strong>周一｜<strong>后期</strong> 孙称｜<strong>单集封面 </strong>雨白供图（摄于阿那亚金山岭中心小镇）</p><p><strong>免责声明</strong></p><p>本播客所述投资相关内容皆以交流分享为目的，仅供参考，不构成任何市场预测、判断，或投资、咨询建议。市场有风险，投资需谨慎。主持人及嘉宾对投资相关内容的准确性、可靠性、时效性及完整性不作任何明示或暗示的保证，并提醒您对相关内容请结合自身情况进行独立评估，依据或使用相关内容所造成的后果由您独自承担。</p><p>感谢您对本播客原创内容的青睐。如转载或引用本播客所述内容，请注明出处。转载前请与有知有行联系并取得同意。</p>",
+      "duration": 3882000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/6013f9f58e2f7ee375cf4216/6aace1189d326477816b0a46/media.xyzcdn.net/6013f9f58e2f7ee375cf4216/lmju8EfE2LJPb5eO90bmgk8KrdQT.m4a",
+      "pubDate": 1789732800000,
+      "imageUrl": "https://image.xyzcdn.net/FgHMruqZPGrhCFyHomAt9Y9d6A8f.jpg",
+      "channelTitle": "知行小酒馆",
+      "rssFeedUrl": "https://feed.xyzfm.space/j8yp8gxkmgqr"
+    },
+    {
+      "id": 31,
+      "title": "S04.04：「捡菌子不仅是人与自然的链接，更是人与人之间的链接。」",
+      "description": "<p>本期节目，妙雅和丸子请来《食菌记》作者柳开林。柳老师从小在云南捡菌子，一次门头沟的意外发现，又把他带回了菌子的世界。</p><p>菌子的魅力，当然在鲜，也在它的神秘和不确定：同一片山林，有没有收获，要看树种、季节、雨水、光照和地势；同一种菌子，在云南、北京和广东，又有完全不同的理解与吃法。</p><p>我们从云南菌子的「鄙视链」聊起：鸡枞、干巴菌、见手青，谁才是云南人的心头好？再走进北京的板栗林和蒙古栎林，学习怎样找到菌子、怎样处理泥土和虫眼，以及怎样把刚采回来的见手青、美味牛肝菌做得香气四溢。</p><p>这不只是一集关于菌子的节目，也是一种重新进入山林、理解食物，并与自然发生连接的方式。</p><p><strong>📢 号外</strong></p><p>「味之道」未来更多美味事件发酵，可加微信 weizhidao01 ，信息将第一时间在微信发布。☺️</p><figure><img src=\"https://image.xyzcdn.net/FvI54p8tmJjv14UA889J-19fjVvz.jpg\"></figure><p><strong>本期嘉宾</strong></p><p>柳开林：《食菌记》作者  </p><p>小红书：食菌记|柳老师 凡物可爱品牌创始人 菌子小馆GuguGaga合伙人</p><p>碗丸：美食撰稿人（专注于日料食材、跨文化比较），餐厅和食品相关品牌顾问</p><p>公众号：碗丸食事     知乎/小红书：碗丸</p><p><strong>本期时间线</strong></p><p>- <a class=\"timestamp\">00:00</a> 开场：柳开林、丸子登场——北京也能捡菌子？</p><p>- <a class=\"timestamp\">01:47</a> 一次门头沟的发现，如何变成《食菌记》</p><p>- <a class=\"timestamp\">16:47</a> 云南菌子“鄙视链”：鸡枞、干巴菌、见手青谁排第一</p><p>- <a class=\"timestamp\">23:59</a> 见手青到底是什么：红葱、白葱与黑见手</p><p>- <a class=\"timestamp\">27:22</a> 北京寻菌指南：先认树，再看季节、光照和坡度</p><p>- <a class=\"timestamp\">34:07</a> 捡菌子实战：雨后几天去、几点出发、带什么装备</p><p>- <a class=\"timestamp\">43:43</a> 干巴菌为什么难洗，味道又为什么让人上瘾</p><p>- <a class=\"timestamp\">45:56</a> 鸡枞怎么吃：广东清蒸与云南火腿煮汤</p><p>- <a class=\"timestamp\">49:29</a> 两斤北京菌子怎么做：青椒烩与干椒香煎</p><p>- <a class=\"timestamp\">53:07</a> 一个人吃掉近两斤红葱：柳老师的中毒经历</p><p>- <a class=\"timestamp\">57:08</a> 从知识到生意：开餐厅、做野生菌饺子</p><p>- <a class=\"timestamp\">62:16</a> 捡菌子的治愈感：来自山林的强正反馈</p><p>柳老师北京捡到的菌子</p><img src=\"https://image.xyzcdn.net/FufMd3xzbfk7gIbbklxwQfh6yHD4.jpg\"><img src=\"https://image.xyzcdn.net/FkxniyVxzKZUQmV_AaF6VSIIjdrY.jpg\"><p>北京见手青</p><img src=\"https://image.xyzcdn.net/FsyBId9dpVUh-sAv60fAbGS8eZrp.jpeg\"><p>北京美味牛肝菌</p><img src=\"https://image.xyzcdn.net/FkLimV9yygdKvMyKot0A7wGwu4li.jpeg\"><p>青椒烩牛肝菌</p><img src=\"https://image.xyzcdn.net/FrUlkmkMfjVk1kMYKVEWbHFL32ih.JPG\"><p>野生菌饺子</p><img src=\"https://image.xyzcdn.net/FsTcs3SQsyg9imjCY19mg2vGRaaV.JPG\"><p>干辣椒炒见手青</p><img src=\"https://image.xyzcdn.net/FqqV77ka3XD-GfGR_1BXUyLthGej.JPG\"><p></p><br><a href=\"https://oia.xiaoyuzhoufm.com/player/6a8fcd4d1352af56ff3cce6d?openTranscript=true&utm_source=rss&as=cHQ9MTIyNjE5MjQ3JmN0PXJzcyZtdD04&autoOpen=false\">在小宇宙查看该单集文稿</a>",
+      "duration": 3928000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/5e284e15418a84a04626be80/6a8fcd4d1352af56ff3cce6d/media.xyzcdn.net/5e284e15418a84a04626be80/lj4fNGXrmEX4S8SqIv_Ki4C-I9JB.m4a",
+      "pubDate": 1787824800000,
+      "imageUrl": "https://image.xyzcdn.net/FpJk60DiaWFC_dqHcIeLbAv4hbHp.JPG",
+      "channelTitle": "味之道",
+      "rssFeedUrl": "https://feed.xyzfm.space/mjvd3fknfr4v"
+    },
+    {
+      "id": 32,
+      "title": "特朗普关税被判违法，这一整年白忙了? 现在关税什么情况?",
+      "description": "<p>&nbsp;</p><p>【章节】</p><p><a class=\"timestamp\">01:42</a> ——判决</p><p><a class=\"timestamp\">02:28</a>——多少钱?</p><p><a class=\"timestamp\">03:16</a>——退钱</p><p><a class=\"timestamp\">04:50</a>——新关税</p><p><a class=\"timestamp\">08:16</a>——赢家输家</p><br><a href=\"https://oia.xiaoyuzhoufm.com/player/6aa229e4492687f6aad7af0d?openTranscript=true&utm_source=rss&as=cHQ9MTIyNjE5MjQ3JmN0PXJzcyZtdD04&autoOpen=false\">在小宇宙查看该单集文稿</a>",
+      "duration": 631000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/665ff98194977a26ef5490e8/6aa229e4492687f6aad7af0d/media.xyzcdn.net/665ff98194977a26ef5490e8/ll81cf7R6ODbJO5zoSxpLO1f_KEG.m4a",
+      "pubDate": 1789012819000,
+      "imageUrl": "https://image.xyzcdn.net/FikChQ9_U_8axp3eRuWEsQxg3Z7S.jpg",
+      "channelTitle": "小Lin说",
+      "rssFeedUrl": "https://feed.xyzfm.space/mkkxu98dm89e"
+    },
+    {
+      "id": 33,
+      "title": "手工耿×罗永浩！“村口的五金店里，出现了一个达达主义艺术家”",
+      "description": "<p><strong>《十字路口》播客节目简介</strong></p><p>本节⽬是⼀档由罗永浩主持的深度播客类节⽬，每集长达三到五个小时。我们与时代浪潮中的⼈物展开对话，聚焦于科技与⼈⽂领域，讲述个体命运故事，探讨时代发展趋势。</p><p><strong>本期嘉宾：手工耿</strong></p><p>手工耿×罗永浩！“村口的五金店里，出现了一个达达主义艺术家”</p><p>全世界都爱看他的手工创作视频。无数人从他的视频中得到欢乐，也因此把他看作一个纯粹的搞笑创作者。几乎所有人都认为他是故意在做一些没用的东西，他却真诚地认为他在创造的是有用的东西，不仅仅是娱乐。</p><p>在有用和无用，严肃和好笑，民间手艺和现代艺术之间，他无意识地占据了一个独一无二的位置。但这并不是他设计出来的，而是他本就如此。他是一个天然的、不自觉的、没被现代艺术理论污染过的现代艺术家，这也正是他长红不衰，且有别于他的那些肤浅模仿者的重要原因。</p><p>眼看就要第十个年头了，这一次，他终于忍不住问道：“你能说出一个我做的真没用的东西吗？”</p><p>《罗永浩的十字路口》第三十六期，我们邀请了著名的民间发明家和现代艺术家手工耿，欢迎收听我们的对谈，和很多人想象的不一样，这其实是一次严肃的访谈。欢迎一起走进手工耿的奇想世界。</p><img src=\"https://image.xyzcdn.net/FnJaIbva6ZInwBTrTxqotugsnT1q.png\"><p>【你将听到】</p><p><a class=\"timestamp\">00:01:56</a>手工赠礼</p><p><a class=\"timestamp\">00:25:09</a>童年三件套</p><p><a class=\"timestamp\">00:48:23</a>招财猫打雪仗</p><p><a class=\"timestamp\">01:04:56</a>谁爱看手工耿</p><p><a class=\"timestamp\">01:22:45</a>这下火了</p><p><a class=\"timestamp\">01:35:22</a>初次流量变现</p><p><a class=\"timestamp\">01:47:58</a>父母的认可</p><p><a class=\"timestamp\">02:04:51</a>渐入佳境</p><p><a class=\"timestamp\">02:22:23</a>手工耿的宝库</p><p><a class=\"timestamp\">02:48:15</a>危险的倒立洗头</p><p><a class=\"timestamp\">03:04:41</a>运气和努力</p><p><a class=\"timestamp\">03:22:37</a>外号大赏</p><p></p><p>❤️参与录制：</p><p>公众号关注「罗永浩的十字路口」，点击菜单“观众招募”，就有机会进入观众招募群，希望下一次录制看到你的身影。</p><p>🙋话题征集：</p><p>公众号关注「罗永浩的十字路口」，写下你最想听的话题内容，比如“情绪稳定”，就有机会成为我们下期的讨论主题。</p><p>👩🏻‍💻了解更多：</p><p>微博 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://weibo.com/u/7762107285\">@罗永浩的十字路口</a></p><p>小红书 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaohongshu.com/user/profile/630fb094000000001200c9f8?xsec_token=ABK3ZzbS_1knRDAWEbDt8_OF_nrL9jX9Ss823dFGgisUY%3D&amp;xsec_source=pc_search&amp;m_source=baidusem\">@罗永浩的十字路口</a></p><p>抖音 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.douyin.com/user/MS4wLjABAAAAdYnizw-yHaCBKEeZugZp-kWwLCjvB8GW-iR0I3BdxmkdyKxQkCODEKwzMTvYQgB0?from_tab_name=main\">@罗永浩的十字路口</a></p><p>B站 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://space.bilibili.com/538596213?spm_id_from=333.337.0.0\">@罗永浩的十字路口</a></p><p>🤝商务合作：</p><p>欢迎戳戳 jayci_chen@163.com</p><img src=\"https://image.xyzcdn.net/Fkk8GLBZU_qOlj6v-Aa_CIqQF70A.png\"><p></p>",
+      "duration": 13421000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/68981df29e7bcd326eb91d88/6a9625b9f03e74ee6b02f0df/media.xyzcdn.net/68981df29e7bcd326eb91d88/lgBDj_JuqsLYGA0uLvvRqWNEDgA1.m4a",
+      "pubDate": 1788235710000,
+      "imageUrl": "https://image.xyzcdn.net/Fh0gDXTs_lGDTSs6R9tJH6_YS01i.png",
+      "channelTitle": "罗永浩的十字路口",
+      "rssFeedUrl": "https://feed.xyzfm.space/wmnkvmrpwuww"
+    },
+    {
+      "id": 34,
+      "title": "Vol.131《写信人》以最真挚的方式书写人生",
+      "description": "<p>本期节目和大家分享来自作家弗吉尼娅·埃文斯‌的作品《写信人》。这是一部完全由书信、邮件、便条和未寄出的信件草稿构成的小说。故事发生在21世纪，主人公西比尔，73岁，离婚，独居，在法律界成就斐然，现已退休，她坚持每周一、三、五的上午写信，写给所有让她有感触的人。通过西比尔的书信，作为读者的我们得以从中拼凑出她的人生和与她相关的数十个支线故事，陪伴西比尔直面她深藏在内心的伤痛，并走过人生的最后十年。</p><p><strong>本期节目你会听到：</strong></p><p>1. 书籍介绍 <a class=\"timestamp\">01:48</a></p><p>2. 作者介绍 <a class=\"timestamp\">08:30</a></p><p>3. 闲聊：上一次写信是什么时候？写信和其他方式有什么不同？ <a class=\"timestamp\">16:51</a></p><p>4. 片段分享 </p><p>    西比尔是如何写信的 <a class=\"timestamp\">28:47</a></p><p>    西比尔开始写信的原因 <a class=\"timestamp\">36:36</a></p><p>    关于人生四季 <a class=\"timestamp\">41:18</a></p><p><strong>片尾曲：</strong><em>Mia Wray - Where I Stand</em></p><br><a href=\"https://oia.xiaoyuzhoufm.com/player/6aa2cd629d32647781673ae0?openTranscript=true&utm_source=rss&as=cHQ9MTIyNjE5MjQ3JmN0PXJzcyZtdD04&autoOpen=false\">在小宇宙查看该单集文稿</a>",
+      "duration": 3341000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/6354b5052a992d56e91e6520/6aa2cd629d32647781673ae0/media.xyzcdn.net/6354b5052a992d56e91e6520/lmNLLiKUh5RIBZeI3uh_MBNhVwy1.m4a",
+      "pubDate": 1789081200000,
+      "imageUrl": "https://image.xyzcdn.net/FuSXp5Q3LDZH8DYSA9t8VTGNAi4E.png",
+      "channelTitle": "不可逃课BookTalk",
+      "rssFeedUrl": "https://feed.xyzfm.space/wqgumr8kx8h8"
+    },
+    {
+      "id": 35,
+      "title": "101.一口气聊透王阳明和他的心学思想（下篇：本体工夫）",
+      "description": "<p><strong>Shownotes</strong></p><p>陈献章</p><p>心即理</p><p>教之三变</p><p>知行合一</p><p>吉尔伯特·赖尔（Gilbert Ryle，1900—1976）与know how/know what</p><p>致良知</p><p>格物致知</p><p>四贤从祀（王阳明、陈献章、胡居仁、薛瑄）</p><p>李贽与泰州学派</p><p><strong>财新联合外部性为粉丝朋友们提供了财新会员优惠。</strong></p><p>过去常有听友问我日常看哪些信息源，我的回答一直都是：</p><p>“财新是我唯一固定看的媒体。”</p><p>没错，不管是我日常的播客制作，文章写作，还是投资研究，财新都是唯一一个我固定看的内容平台。甚至有时候我直接把财新当搜索引擎用，不管是用来查证市场上时不时出现的小作文真假，还是对一个陌生行业进行深度研究和学习，财新都是我重要的信息来源。</p><p>在中国如果要关注财经类的信息，财新实际上已经是一个不可获缺的基础设施了。每年不到500元的价格，在我看来简直是一个在中国常年存在的套利机会。以财新的信息质量，每年5000元以上我觉得才是合理估值。</p><p>本次财新优惠活动的具体信息如下：</p><p><strong>财新通一年期会员，原价648元，优惠后498元，</strong><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://cchuodong.caixin.com/market/ms/cx_forward.html?activitycode=F4XAWA4B\"><strong>优惠链接点此</strong></a></p><p><strong>财新数据通PRO年卡，原价1998元，优惠后1518元，</strong><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://cchuodong.caixin.com/market/ms/cx_forward.html?activitycode=F4XAWA4B\"><strong>优惠链接点此</strong></a></p><p>注意：优惠券的有效期只有7天。希望购买的朋友领券之后记得尽快下单别忘了。</p><p><strong>主播：李铁ironlee</strong></p><p><strong>节目公众号：外部性（部分单集的播客文字稿可以关注公众号获取）</strong></p><p><strong>外部性付费内容合集</strong></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://appuz6ddnhy8318.h5.xiaoeknow.com/xe.community.community_service/v2/feedList?app_id=appuz6ddnhy8318&amp;community_id=c_64bf612d885c6_86T6NJzJ4006&amp;product_id=&amp;share_user_id=&amp;share_type=\"><strong>会员文章</strong></a></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://appuz6ddnhy8318.h5.xiaoeknow.com/p/course/ecourse/course_2TENPZFoZ3VUkXU6UDPNurt1zlH\"><strong>宏观经济与个人投资课</strong></a></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://appuz6ddnhy8318.h5.xiaoeknow.com/p/course/ecourse/course_2eFhL2XHYV3lM4jIldVQ6M8BObT\"><strong>个股投资私教计划</strong></a></p><p>结尾音乐由我的朋友王儒西制作</p><br><a href=\"https://oia.xiaoyuzhoufm.com/player/6a85356e8156bf33621aa476?openTranscript=true&utm_source=rss&as=cHQ9MTIyNjE5MjQ3JmN0PXJzcyZtdD04&autoOpen=false\">在小宇宙查看该单集文稿</a>",
+      "duration": 2575000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/62f0866a8591545f27dc71fb/6a85356e8156bf33621aa476/media.xyzcdn.net/62f0866a8591545f27dc71fb/loRxhpY-sZUbGSW0eV9SnYdf8KeK.m4a",
+      "pubDate": 1787241600000,
+      "imageUrl": "https://image.xyzcdn.net/Fu92p1_WTZJzbZjyoXO52fZ0VLkE.png",
+      "channelTitle": "外部性",
+      "rssFeedUrl": "https://feed.xyzfm.space/x734thm8c63f"
+    },
+    {
+      "id": 36,
+      "title": "Teahour 2.0 #7 Vibe Coding 好上瘾",
+      "description": "<p>Shownotes: <a href=\"https://teahour.dev/episodes/7\" rel=\"nofollow noopener\">https://teahour.dev/episodes/7</a></p><p>Special Guests: Howard and Mike Chong.</p>",
+      "duration": 5475000,
+      "enclosureUrl": "https://aphid.fireside.fm/d/1437767933/635ad9f1-6ce0-4f31-84cf-030e0c949169/88bb53c9-58e2-423a-9f04-ec182c740246.mp3",
+      "pubDate": 1776222000000,
+      "imageUrl": "https://media24.fireside.fm/file/fireside-images-2024/podcasts/images/6/635ad9f1-6ce0-4f31-84cf-030e0c949169/cover.jpg?v=2",
+      "channelTitle": "Teahour",
+      "rssFeedUrl": "https://feeds.fireside.fm/teahour/rss"
+    },
+    {
+      "id": 37,
+      "title": "EP160：意义的获取、创立和消亡：牧童歌、Minstrel Boy、浪漫主义的起源（上）",
+      "description": "<h2>内容简介</h2>\n<p>从牧童歌到 Minstrel Boy，我一直在犹豫说和不说，直到找到内在的联系。</p>\n<p>《硬影像》网站：<a href=\"https://hardimage.pro\">https://hardimage.pro</a></p>\n<h2>登场人物</h2>\n<ul>\n<li>罗登：编剧导演</li>\n</ul>",
+      "duration": 6030000,
+      "enclosureUrl": "https://r.typlog.com/eyJzIjoxNDE3LCJlIjo4OTMzNSwidCI6MX0.9zafQGh74Pqpu3ZTNVAoK2mss8g/hardimage/8212811156_774414.mp3",
+      "pubDate": 1787188871000,
+      "imageUrl": "https://i.typlog.com/hardimage/8212811150_77881.png?x-oss-process=image/auto-orient,1/interlace,1/quality,q_90/resize,m_fill,w_1920,h_1920/format,jpg",
+      "channelTitle": "硬影像",
+      "rssFeedUrl": "https://hardimage.pro/episodes/feed.xml"
+    },
+    {
+      "id": 38,
+      "title": "EP27: 手書、擬聲、擬態",
+      "description": "<h2>內容簡介</h2>\n<p>爲什麼手寫，爲什麼要學習象聲詞。</p>\n<p>注：本節目無 AI 成分。</p>\n<h2>相關鏈接</h2>\n<ul>\n<li><a href=\"https://nealstephenson.substack.com/p/writing-by-hand-is-good-for-your\">Neal Stephenson: Writing by Hand is Good for your Brain</a></li>\n<li><a href=\"https://blog.yitianshijie.net/2026/05/27/5963/\">反對數字化教學/提倡手寫的相關報道</a></li>\n<li><a href=\"https://fitzcarraldoeditions.com/books/fifty-sounds/\">Polly Barton: <em>Fifty Sounds</em></a></li>\n<li><a href=\"https://ja.wikipedia.org/wiki/%E5%A4%96%E5%9B%BD%E8%AA%9E%E9%9D%92%E5%B9%B4%E6%8B%9B%E8%87%B4%E4%BA%8B%E6%A5%AD\">日本政府的「外国語青年招致事業」（JET Program）</a></li>\n</ul>\n<h2>登場人物</h2>\n<ul>\n<li>Lawrence: 《一天世界》《滅茶苦茶》《無次元》作者。IPN 創始人。</li>\n</ul>",
+      "duration": 2893000,
+      "enclosureUrl": "https://r.typlog.com/eyJzIjoxNDEyLCJlIjo4OTY1MSwidCI6MX0.HO2HS6A9qZQ2irSOh4Ib1dOEV4Y/miechakucha/8210898626_409494.mp3",
+      "pubDate": 1789101431000,
+      "imageUrl": "https://i.typlog.com/miechakucha/8210899952_04113.png?x-oss-process=image/auto-orient,1/interlace,1/quality,q_90/resize,m_fill,w_1920,h_1920/format,jpg",
+      "channelTitle": "滅茶苦茶",
+      "rssFeedUrl": "https://miechakucha.com/episodes/feed.xml"
+    },
+    {
+      "id": 39,
+      "title": "72. 中文播客活化石与真OG",
+      "description": "<p>庆祝Apple 播客20周年的节目，实在太长了拆成两期播出。本期前半截两位「中文播客活化石™」回顾了自己从接触播客到制作播客的历程；后半截讨论如何挑选作为生产力工具（而不是玩游戏用）的桌面显示器。</p>\n\n<p>（未完待续）</p>\n\n<h2>相关链接</h2>\n\n<ul>\n<li><a href=\"https://apple.co/anniversary\">Apple 播客20周年</a></li>\n<li>吴涛的经典款<a href=\"https://en.wikipedia.org/wiki/IPod_Classic\">iPod Classic</a></li>\n<li>Steve Jobs 发布iPhone时的经典介绍<a href=\"https://youtu.be/x7qPAY9JqE4?si=mbwldFXGk39Dwfbc&amp;t=82\">An iPod, a Phone, and an Internet Communicator</a></li>\n<li><a href=\"https://en.wikipedia.org/wiki/Palm_%28PDA%29\">Palm</a>个人数字助理（<a href=\"https://en.wikipedia.org/wiki/Personal_digital_assistant\">Personal Digital Assistant</a>）</li>\n<li>把iPod变成iPhone的<a href=\"https://zh.wikipedia.org/zh-cn/苹果皮\">苹果皮</a></li>\n<li>做解压玩具的<a href=\"https://shop230971425.taobao.com/\">傲娇老铁匠</a></li>\n<li><a href=\"https://en.wikipedia.org/wiki/HTTP_Live_Streaming\">HTTP Live Streaming</a></li>\n<li><a href=\"https://learn.microsoft.com/en-us/office/vba/library-reference/concepts/getting-started-with-vba-in-office\">Getting started with VBA in Office</a></li>\n<li><a href=\"https://en.wikipedia.org/wiki/Vibe_coding\">Vibe coding</a></li>\n<li><a href=\"https://nssurge.com/\">Surge</a>老刘的文章《<a href=\"https://yachen.com/2025/06/06/2025-ai/\">2025 年的 AI 协助编程观察</a>》</li>\n<li>编程语言的<a href=\"https://en.wikipedia.org/wiki/Expressive_power_%28computer_science%29\">表达能力</a></li>\n<li><a href=\"https://en.wikipedia.org/wiki/Window_manager\">窗口管理器（Window Manager）</a></li>\n<li>Rio 一直在用的macOS上的窗口管理器<a href=\"https://mizage.com/divvy/\">Divvy</a>（已放弃维护更新）</li>\n<li><a href=\"https://en.wikipedia.org/wiki/Abandonware\">Abandonware</a>（放弃维护的软件）</li>\n<li>吴涛在节目里面没有想起名字的窗口管理器<a href=\"https://github.com/koekeishiya/yabai\">Yabai</a></li>\n<li>吴涛在用的另一款macOS上的窗口管理器<a href=\"https://github.com/MrKai77/Loop\">Loop</a></li>\n<li><a href=\"https://pan.icu/11\">「内核恐慌」第11期节目</a>后半段聊过Divvy以及Linux上的<a href=\"https://i3wm.org/\">平铺窗口管理器i3</a></li>\n<li><a href=\"https://en.wikipedia.org/wiki/Liquid-crystal_display\">LCD液晶显示器</a></li>\n<li><a href=\"https://en.wikipedia.org/wiki/Display_resolution_standards\">显示分辨率标准</a>：SD/HD/FHD/QHD/UHD</li>\n<li><a href=\"https://en.wikipedia.org/wiki/Pixel_density\">像素密度</a>（<a href=\"https://en.wikipedia.org/wiki/Dots_per_inch\">Dots Per Inch</a>）和点距（<a href=\"https://en.wikipedia.org/wiki/Dot_pitch\">Dot Pitch</a>）</li>\n<li>复杂笔画汉字：龍龖龘（Lóng Dá Dá）、𰻞𰻞麵（Biáng Biáng Miàn）</li>\n<li>视力（<a href=\"https://en.wikipedia.org/wiki/Visual_acuity\">Visual Acuity</a>）与角分辨率（<a href=\"https://en.wikipedia.org/wiki/Angular_resolution\">Angular Resolution</a>）</li>\n<li>Rio 在<a href=\"https://www.zhihu.com/question/20088580/answer/13935004\">知乎关于 Retina 分辨率的回答</a></li>\n</ul>",
+      "duration": 4828000,
+      "enclosureUrl": "https://rio.xyzcdn.net/kernelpanic/kernelpanic-ep72.mp3",
+      "pubDate": 1751846400000,
+      "imageUrl": "https://pan.icu/assets/icon@16x.png",
+      "channelTitle": "内核恐慌",
+      "rssFeedUrl": "https://pan.icu/feed"
+    },
+    {
+      "id": 40,
+      "title": "15. 深圳故事",
+      "description": "<p>2½个深圳人和1½个非深圳人在<a href=\"https://www.aranya.com.cn/peitaiho.html\">北戴河阿那亚</a>的海边聊聊关于深圳的故事。</p>\n\n<p>这期节目录制于2023年4月22日，时逢「<a href=\"https://www.xiaoyuzhoufm.com/collection/episode/645dc61a6878fe5c619f3228\" title=\"声量 The Power of Voice\">声量 The Power of Voice</a>」播客活动，所以里面也有《<a href=\"https://www.xiaoyuzhoufm.com/podcast/5e3bdf08418a84a046fb556c\" title=\"大内密谈话\">大内密谈</a>》的主播相征和<a href=\"https://sspai.com\" title=\"少数派\">少数派</a>的创始人老麦。当天并没想当《提前怀旧》来录，所以由相征来控制节奏，但结束后觉得可以当成一集突发的番外。</p>\n\n<hr />\n\n<p>也欢迎您收听两位主播的其他几档节目：</p>\n\n<ul>\n<li>任宁和枪枪主持的《<a href=\"https://www.weareones.com/podcast\">迟早更新</a>》</li>\n<li>Rio 和黄海主持的《<a href=\"https://crazy.capital\">疯投圈</a>》</li>\n<li>Rio 和吴涛主持的《<a href=\"https://pan.icu\">内核恐慌</a>》</li>\n</ul>\n\n<h2>相关链接</h2>\n\n<ul>\n<li>「<a href=\"https://www.xiaoyuzhoufm.com/collection/episode/645dc61a6878fe5c619f3228\" title=\"声量 The Power of Voice\">声量 The Power of Voice</a>」大型线下播客派对回顾</li>\n<li><a href=\"https://www.xiaoyuzhoufm.com/podcast/5e3bdf08418a84a046fb556c\" title=\"大内密谈话\">大内密谈</a></li>\n<li><a href=\"https://sspai.com\" title=\"少数派\">少数派</a></li>\n<li><a href=\"http://tezo.club\">Tezo</a></li>\n<li><a href=\"https://www.mcf.org.cn\">红树林基金会</a></li>\n<li>陈秉安的书《<a href=\"https://book.douban.com/subject/5253517/\">大逃港</a>》</li>\n<li>老亨的文章《<a href=\"https://stock.stcn.com/djjd/202009/t20200903_2318047.html\">深圳 40 年，城之为城</a>》</li>\n<li>党文婷的文章《<a href=\"https://difang.gmw.cn/sz/2020-10/12/content_34259027.htm\">从关山难越到一路坦途——深圳布吉关退出历史舞台的始末</a>》</li>\n<li>北京大学国家发展研究院综合课题组的文章《<a href=\"https://nsd.pku.edu.cn/attachments/13e1adef756e4ba8af2ae6019a57f71f.pdf\">深圳土地制度改革研究报告</a>》</li>\n<li>冯文波的文章《<a href=\"http://news.ouc.edu.cn/huilange/hlg/2016/30/index.html\">谋海兴渔 浪潮再起——中国海洋大学科研团队攻关黄海冷水团鲑鳟养殖技术纪实</a>》</li>\n<li>林良展的文章《<a href=\"http://www.szbaike.com/social/education/e-collection/2023-03-29/5641.html\">深圳的前世今生——深圳城市建筑的变迁</a>》</li>\n<li>陈影宏的口述笔记《<a href=\"https://m.thepaper.cn/baijiahao_19453683\">讲述麦当劳光华餐厅的故事</a>》</li>\n<li>滕晗的文章《<a href=\"https://m.thepaper.cn/newsDetail_forward_20730281\">中国制造十年进化论｜深圳：「工业第一城」如何腾笼换鸟</a>》</li>\n<li>Brooke Crothers 的文章《<a href=\"https://www.forbes.com/sites/brookecrothers/2021/02/14/this-chinese-city-has-16000-electric-buses-and-22000-electric-taxis\">This Chinese City Has 16,000 Electric Buses And 22,000 Electric Taxis</a>》</li>\n<li>刘畅的文章《<a href=\"http://www.ceec.cn/zyzx/sjhjzz/zzlm/lssj/201912/W020191203554970153265.pdf\">深圳：提供城市公共服务领域 机动车电动化的「中国方案」</a>》</li>\n<li>范昊、李博超、郭嘉的文章《<a href=\"https://www.archiposition.com/items/5de316b961\">深圳湾超级总部基地最新进展，施工现场直击</a>》</li>\n<li>马骥远的文章《<a href=\"http://jb.sznews.com/attachment/pdf/201907/02/98b6d170-b5d9-4bf9-b011-0a7d9c58e4d9.pdf\">许多人因为这条大道爱上深圳</a>》</li>\n<li><a href=\"https://www.teamlab.art/zh-hans/e/shenzhen/\">teamLab 舞动艺术展 &amp; 未來游乐园</a></li>\n</ul>",
+      "duration": 3020000,
+      "enclosureUrl": "https://rio.xyzcdn.net/pretro/ep15.mp3",
+      "pubDate": 1692716400000,
+      "imageUrl": "https://pretro.xyz/assets/icon-pretro-1800.png",
+      "channelTitle": "提前怀旧",
+      "rssFeedUrl": "https://pretro.xyz/feed"
+    },
+    {
+      "id": 41,
+      "title": "线索若隐若现：深入 Tim Cook 和 Nike 的商业连接",
+      "description": "<p>一直以来，Apple 和 Nike 之间的商业关系在公众视野里简单明了——早在 iPod 时代，双方就联合推出过 <a href=\"https://investors.nike.com/investors/news-events-and-reports/investor-news/investor-news-details/2006/Nike-and-Apple-Launch-Nike--iPod-Sport-Kit/default.aspx\">Nike+iPod Sport Kit</a>，这套设备可以把用户的跑步资料导入 iPod，并与音乐数据结合。Apple Watch Series 2 发布之后，Apple Watch Nike+ 版同步推出，从此以后，Nike 特别版就成了每代 Apple Watch 的标配——「长期品牌与产品合作伙伴」就是概括双方关系最简单的方式。</p>\n<p>但在两者中间，Apple 的 CEO Tim Cook 一直扮演着连接者的角色，他和 Nike 之间的关系也因此而显得十分微妙。二〇〇五年，Tim Cook 开始担任 Nike 的董事，二〇一六年又升格为「首席独立董事」，在 Nike 内部拥有着超然的地位。与之相应，尽管疫情后的 Nike 业绩不佳，人气和股价持续下滑，Tim Cook 却持续增持 Nike 的股票，以这种方式公开表达对 Nike 的支持。生活中，身为狂热运动迷的 Tim Cook 也一直在公开场合穿各种款式的 Nike 运动鞋。即使不考虑商业上的连接，他和 Nike 的绑定程度也丝毫不亚于 <a href=\"https://www.complex.com/sneakers/a/brendan-dunne/steve-jobs-new-balance-992-sneakers-dad-shoes\">Steve Jobs 之于 New Balance</a>。</p>\n<p>在本期节目中，我们邀请到了《<a href=\"https://www.xiaoyuzhoufm.com/podcast/5e393a72418a84a046bd59a4\">翻转体育</a>》主播、熟悉体育品牌商业运作的滑轮老师，一起深入 Apple、Nike 和 Tim Cook 之间的商业三角关系，去看看 Apple 如何从 Nike 挖人、挖品牌、挖数据，直接促成了 Apple Watch 从时尚单品向运动健康设备的转型；Tim Cook 的体育审美和他在体育行业的人脉，如何直接影响了 Apple 在体育流媒体领域的布局；Cook 和 Nike 之间的真实关系如何，处于动荡和转型期的 Nike 又从 Cook 身上获得了什么。</p>\n<h2>你会在节目中听到</h2>\n<ul>\n<li><a href=\"#t=00:00:04\">00:00:04</a> 开场，聊聊 Apple、Nike 和 Tim Cook 之间的三角关系</li>\n<li><a href=\"#t=00:01:59\">00:01:59</a> 一段处于「真空地带」的关系</li>\n<li><a href=\"#t=00:07:13\">00:07:13</a> Tim Cook 可以多大程度上影响 Nike 的商业决策</li>\n<li><a href=\"#t=00:12:39\">00:12:39</a> Apple 为什么会选择 Nike</li>\n<li><a href=\"#t=00:16:18\">00:16:18</a> Nike 促成了 Apple Watch 的巨大成功</li>\n<li><a href=\"#t=00:24:49\">00:24:49</a> Nike 为什么愿意接纳 Apple，甚至允许对方安排一个董事</li>\n<li><a href=\"#t=00:27:04\">00:27:04</a> 从时尚单品到运动健康设备</li>\n<li><a href=\"#t=00:31:53\">00:31:53</a> Tim Cook 的体育爱好和审美极大地影响了 Apple 对体育的投入决策</li>\n<li><a href=\"#t=00:57:24\">00:57:24</a> 在 Tim Cook 入局 Nike 之后，Apple 的运动健康业务越做越好，但 Nike 得到什么了？</li>\n<li><a href=\"#t=01:10:27\">01:10:27</a> 如果 Tim Cook 彻底退休，Apple 和 Nike 还能保持连接吗？</li>\n<li><a href=\"#t=01:16:31\">01:16:31</a> Tim Cook 对 Nike 有个人情感吗？</li>\n</ul>\n<h2>拓展链接</h2>\n<ul>\n<li>必听的关联节目《<a href=\"https://sspai.com/post/78214\">阿迪达斯 vs. 耐克：体育商业巨头的足球战争</a>》</li>\n<li><a href=\"https://appleinsider.com/articles/24/10/21/apple-ceo-tim-cook-continues-to-kick-it-with-nike-almost-20-years-later\">Apple Insider 关于 Tim Cook 和 Nike 关系的文章</a></li>\n<li><a href=\"https://www.apple.com/tn/leadership/tim-cook/\">Tim Cook 毕业于奥本大学</a></li>\n<li><a href=\"https://www.engadget.com/2009-09-29-apple-hires-former-newton-guru-as-new-vp-of-product-marketing.html\">发明了 Newton 的 Michael Tchao</a></li>\n<li><a href=\"https://www.forbes.com/sites/carminegallo/2011/05/16/steve-jobs-get-rid-of-the-crappy-stuff/\">乔布斯让 Nike 丢掉那些小垃圾</a></li>\n<li><a href=\"https://www.wired.com/2012/01/nike-fuelband\">Nike FuelBand</a></li>\n<li><a href=\"https://allthingsd.com/20130819/apple-hires-nike-fuelband-guru-jay-blahnik/\">Jay Blahnik</a></li>\n<li><a href=\"https://www.fastcompany.com/3018686/why-did-apple-just-hire-a-nike-shoe-designer/\">Ben Shaffer 和他的创新厨房（Innovation Kitchen）</a></li>\n<li><a href=\"https://blog.finishline.com/2013/04/16/nike-flywire-technology/\">飞线（Flywire）技术</a></li>\n<li><a href=\"https://www.goodreads.com/en/book/show/27220736-shoe-dog\">鞋狗</a></li>\n<li><a href=\"https://blog.google/products-and-platforms/devices/fitbit-acquisition/\">Fitbit 被 Google 收购</a></li>\n<li><a href=\"https://www.apple.com/tv-pr/originals/ted-lasso/\">Ted Lasso</a></li>\n<li><a href=\"https://www.gq.com/story/apple-sports-streaming-mls-eddy-cue\">梅西条款、MLS 和 Apple 的体育转播布局</a></li>\n<li><a href=\"https://www.gq.com/story/apple-sports-streaming-mls-eddy-cue\">Eddy Cue 和 Apple 的体育内容策略</a></li>\n<li><a href=\"https://investors.nike.com/investors/news-events-and-reports/investor-news/investor-news-details/2017/NIKE-INC-IS-ACCELERATING-A-CONSUMER-LED-TRANSFORMATION-TO-IGNITE-ITS-NEXT-PHASE-OF-LONG-TERM-GROWTH/default.aspx\">Nike 的 DTC 策略</a></li>\n<li><a href=\"https://www.retaildive.com/news/how-nike-is-using-dtc-and-data-to-expand-its-empire/596602/\">Nike 如何用 DTC 和数据扩张业务</a></li>\n<li><a href=\"https://www.wweek.com/news/business/2018/04/29/how-a-packet-of-anonymous-surveys-from-women-employees-blew-up-the-executive-ranks-at-nike/\">Nike 和 MeToo 运动</a></li>\n<li><a href=\"https://markcubancompanies.com/marks-bio/\">Mark Cuban</a></li>\n</ul>\n<h2>订阅少数派播客</h2>\n<ul>\n<li><a href=\"https://sspai.typlog.io/feed/audio.xml\">节目 RSS 链接</a></li>\n<li><a href=\"https://podcasts.apple.com/hk/podcast/%E4%B8%80%E6%B4%BE-podcast/id1483157529\">Apple Podcasts</a></li>\n<li><a href=\"https://www.xiaoyuzhoufm.com/podcast/5e280fb1418a84a0461fc567\">小宇宙</a></li>\n</ul>\n<h2>人物介绍</h2>\n<ul>\n<li>张奕源 Nick：少数派编辑部成员</li>\n<li>滑轮：《<a href=\"https://www.xiaoyuzhoufm.com/podcast/5e393a72418a84a046bd59a4\">翻转体育</a>》播客主播</li>\n</ul>\n<p>⠀有任何想对我们说、听我们聊的，都欢迎写信至 nick@sspai.com。</p>",
+      "duration": 5214000,
+      "enclosureUrl": "https://r.typlog.com/eyJzIjoxODkzLCJlIjo4Nzg0NCwidCI6MX0.tnM4OCkZPaXBDROwALgWKqbArkk/sspai/8218162930_348547.mp3",
+      "pubDate": 1781579371000,
+      "imageUrl": "https://i.typlog.com/sspai/8218421207_519109.jpg?x-oss-process=image/auto-orient,1/interlace,1/quality,q_90/resize,m_fill,w_1920,h_1920/format,jpg",
+      "channelTitle": "少数派播客 SSPAI Podcast",
+      "rssFeedUrl": "https://sspai.typlog.io/episodes/feed.xml"
+    },
+    {
+      "id": 42,
+      "title": "E910.我在菲律宾被关押的 41 天",
+      "description": "<p>故事FM ❜ 第 910 期</p>\n\n\n\n<p>爱哲按：</p>\n\n\n\n<p>故事FM 的铁窗泪系列又回来了。在这个系列里，我们收集中国人在全世界各地因为各种奇奇怪怪的原因被关押的经历。</p>\n\n\n\n<p>前阵子，有好几位听众在小红书和网易云音乐给我发私信，推荐我们去采访浪人肥力的故事。今年六月肥力在菲律宾被移民局逮捕，在拘留中心总计关押了 41 天才被释放。在那里，他见到了一个野蛮生长的异世界。</p>\n\n\n\n<p>时间轴：</p>\n\n\n\n<p>02:50　出境时发现挂靠工签已失效</p>\n\n\n\n<p>04:00　移民局指定空壳公司办工签</p>\n\n\n\n<p>06:29　爱上冲浪：2015 年斯里兰卡初体验，从此四海为家</p>\n\n\n\n<p>08:35　2018 年辞职创业</p>\n\n\n\n<p>10:05　移民局人员开价 150 万比索（约 17 万元）可当场放人</p>\n\n\n\n<p>17:46　手钱被转走又在归还前夜转回</p>\n\n\n\n<p>20:55　拒绝交钱第 6 天被通知转移马尼拉</p>\n\n\n\n<p>24:14　凌晨 3 点抵达「新拘留中心」</p>\n\n\n\n<p>26:34　铁笼、大通铺、几百人围观新人</p>\n\n\n\n<p>29:18　印度小哥带参观监狱 有中餐厨房和中国超市</p>\n\n\n\n<p>33:14　「空调房」5 万比索 / 月</p>\n\n\n\n<p>34:30　中国帮派收保护费：&#8221;不花钱还想出去吗？&#8221;</p>\n\n\n\n<p>38:00　三大帮派</p>\n\n\n\n<p>43:46　云南男生求助，无法和家人联系。</p>\n\n\n\n<p>46:30　肥力帮他翻译信、引荐典狱长，移民局为此买了部老人机</p>\n\n\n\n<p>57:11　 菲律宾律师见是中国人当场涨价</p>\n\n\n\n<p>01:02:24　落地广州，41 天监狱生活结束</p>\n\n\n\n<p>/Staff/</p>\n\n\n\n<p>讲述者｜浪人肥力（各平台同名）</p>\n\n\n\n<p>主播 | @故事FM 爱哲</p>\n\n\n\n<p>采访 | @故事FM 爱哲</p>\n\n\n\n<p>制作人 | 晓橙</p>\n\n\n\n<p>文案整理 | 晓橙</p>\n\n\n\n<p>声音设计 | 晓橙</p>\n\n\n\n<p>运营 | 鸣鸣</p>\n\n\n\n<p>用你的声音，讲述你的故事。故事FM 是一档亲历者自述的声音节目。\\</p>\n\n\n\n<p>商务合作：bd@storyfm.cn</p>\n\n\n\n<p>微信公众号：故事FM (ID: story_fm)</p>\n\n\n\n<p>新浪微博：@故事FM_StoryFM</p>\n\n\n\n<p>个人微信号：gushi_fm02</p>",
+      "duration": 3888000,
+      "enclosureUrl": "https://tk.wavpub.com/WPTK_SkGhvd0RXWSWi2ER.mp3",
+      "pubDate": 1789648032000,
+      "imageUrl": "https://media-one.wavpub.com/covers/1ebcbf5d-9dd2-4b69-b681-b54c22541cf2/3fb52967d1fbe0a9.jpg",
+      "channelTitle": "故事FM",
+      "rssFeedUrl": "https://storyfm.cn/feed/episodes"
+    },
+    {
+      "id": 43,
+      "title": "Episode 124: 太医谈字",
+      "description": "<p>本期与<a href=\"https://www.thetype.com/typechat/\">《字谈字畅》</a>联播。《字谈字畅》关心字怎么写、怎么印、怎么排。关于怎么写，医生可是有秘不外传的独门超能力。田太医作为嘉宾，和 Eric 以及蒸鱼一起解读医生手迹，畅谈病历从墨水到电子化的变迁。</p>\n\n<p>《太医来了》网站：<a href=\"https://taiyilaile.com\" rel=\"nofollow\">https://taiyilaile.com</a></p>\n\n<h2>相关链接</h2>\n\n<ul>\n<li><a href=\"https://www.zhihu.com/question/29591013/answer/295053111\" rel=\"nofollow\">关于医生和药剂师的笑话</a></li>\n<li><a href=\"https://baike.baidu.com/item/%E7%97%85%E5%8E%86\" rel=\"nofollow\">病历</a></li>\n<li><a href=\"http://www.moh.gov.cn/mohyzs/s3585/201002/45871.shtml\" rel=\"nofollow\">《病历书写基本规范》</a>，中华人民共和国卫生部印发</li>\n<li><a href=\"https://baike.baidu.com/item/%E4%B8%AD%E5%8C%BB%E7%97%85%E5%8E%86%E4%B9%A6%E5%86%99%E5%9F%BA%E6%9C%AC%E8%A7%84%E8%8C%83\" rel=\"nofollow\">《中医病历书写基本规范》</a>，中华人民共和国卫生部、国家中医药管理局联合印发</li>\n<li><a href=\"https://en.wikipedia.org/wiki/Software_as_a_service\" rel=\"nofollow\">SaaS (Software as s Service)</a></li>\n<li>处方常用缩写及符号：\n\n<ul>\n<li>p.o. (<i>per os</i>)，口服</li>\n<li>q.d. (<i>quaque die</i>)，每日一次；b.i.d. (<i>bis in die</i>)，每日两次；t.i.d. (<i>ter in die</i>)，每日三次；q.i.d. (<i>quater in die</i>), 每日四次</li>\n<li><a href=\"https://en.wikipedia.org/wiki/Medical_prescription#Format_and_definition\" rel=\"nofollow\">℞ (U+211E)</a>，处方符号，有时也写作「Rx」</li>\n</ul></li>\n<li>麦氏点（<a href=\"https://en.wikipedia.org/wiki/McBurney%27s_point\" rel=\"nofollow\">McBurney’s point</a>）</li>\n<li>啰音（rales/<a href=\"https://en.wikipedia.org/wiki/Crackles\" rel=\"nofollow\">crackles</a>）</li>\n<li><a href=\"http://www.gov.cn/flfg/2007-03/13/content_549406.htm\" rel=\"nofollow\">《处方管理办法》</a>，中华人民共和国卫生部发布</li>\n<li><a href=\"https://baike.baidu.com/item/%E5%90%9B%E8%87%A3%E4%BD%90%E4%BD%BF\" rel=\"nofollow\">君臣佐使</a>，中药方剂术语</li>\n</ul>\n\n<h2>登场人物</h2>\n\n<ul>\n<li><a href=\"https://www.zhihu.com/people/tian-ji-shun\" rel=\"nofollow\">田吉顺</a>：妇产科主治医师，《行医者说——知乎田吉顺自选集》、《妇产科男医生告诉你》作者，《太医来了》主播</li>\n<li>Eric：字体排印研究者，译者，Type is Beautiful 编辑</li>\n<li>蒸鱼：设计师，Type is Beautiful 编辑</li>\n</ul><p>Special Guests: Eric and 蒸鱼.</p>",
+      "duration": 4080000,
+      "enclosureUrl": "https://r.typlog.com/eyJzIjoxNDE2LCJlIjozNDE0LCJ0IjoxfQ.wZMOikrFIBJFqszUivOub8omNzc/taiyilaile/z_0bf9daaec05646c17a35f37c8e939069.mp3",
+      "pubDate": 1517878800000,
+      "imageUrl": "https://i.typlog.com/taiyilaile/z_dd782eb667aefbbf36318e9bfa307eeb.png?x-oss-process=image/auto-orient,1/interlace,1/quality,q_90/resize,m_fill,w_1920,h_1920/format,jpg",
+      "channelTitle": "太医来了",
+      "rssFeedUrl": "https://taiyilaile.com/episodes/feed.xml"
+    },
+    {
+      "id": 44,
+      "title": "#405  从地理边界到思维边界：我们如何被「划界」塑造？",
+      "description": "<p>图们江边的一家交通旅社里，挂着一条双语横幅：「牲畜越境，请勿擅自处理。」在地图上，国界通常被画成一条清晰的线，而牲畜不懂国界，只认水草丰美的方向；可人呢？一个非此即彼、排他性的边界，真的存在吗？</p>\n\n<p>图们江作为边界已延续数百年，河流没有改变，人们认识边界的方式却不断变化。清朝与朝鲜都曾严禁越境，但当晚清面对俄罗斯扩张威胁时，清朝又开始将渡江垦荒的朝鲜人纳入「我民」。进入现代国家体系后，国籍、户籍和证件进一步明确了人的归属，却也把原本交错生活的人群划入不同的国家、民族与身份类别。而如巴以、印巴和卢旺达等地区，殖民时期划定的疆界或族群分类在解殖后仍然延续，至今仍是理解当地分治、对立与冲突不可绕开的历史背景。边界从来不只是一条静止的线，它会随着政治经济结构变化不断被解释和重划。</p>\n\n<p>这一期节目，我们邀请到清华大学人文与社会科学高等研究所教授宋念申，从中朝边境的历史和普通人的生活选择出发，聊聊边界如何在流动的现实中不断被划定和跨越，帝国主义、资本主义与殖民主义，又是如何让这条线越变越坚硬。</p>\n\n<p><strong>本期人物</strong></p>\n\n<p>宋念申，清华大学人文与社会科学高等研究所教授</p>\n\n<p>徐涛，声动活泼联合创始人</p>\n\n<p><strong>主要话题</strong></p>\n\n<p>[00:33]和宋老师一起Citywalk：西塔的边界在哪里？</p>\n\n<p>[08:50]五百年，图们江没变，但我们认识边界的方式变了</p>\n\n<p>[17:00]封禁江岸、严惩越境：清朝与朝鲜边界管控背后的内政考量</p>\n\n<p>[25:42]晚清的边界转向：越境垦荒的朝鲜人为何从「夷」变成「我民」</p>\n\n<p>[30:27]边境故事：是边界跨过人，也是人跨过边界</p>\n\n<p>[43:11]现代性的「铁三角」：帝国主义、资本主义与殖民主义让边界变硬</p>\n\n<p>[59:02]被继承的边界：解殖为何没有终结殖民秩序？</p>\n\n<p>[1:06:01]种族之外：政治经济结构与资本扩张如何制造新的边界</p>\n\n<p>[1:12:45]学科也在划界：真问题推动知识生产跨越边界</p>\n\n<p><strong>延伸阅读</strong></p>\n\n<p><a href=\"https://book.douban.com/subject/38067357/\" rel=\"nofollow noopener\">西塔:一个东北街区中的空间、国家与日常</a></p>\n\n<p><a href=\"https://book.douban.com/subject/38397003/\" rel=\"nofollow noopener\">劃界：在圖們江製造現代東亞（1881-1919）</a></p>\n\n<p>也可以在小红书账号<a href=\"https://xhslink.com/m/2tzsKmEPAoV\" rel=\"nofollow noopener\"><strong>「徐涛-声东击西」</strong></a>看到更多相关内容和幕后</p>\n\n<p><strong>给声东击西投稿</strong></p>\n\n<p>「声东击西」一直在寻找来自不同社会和群体的真实声音。我们曾经采访过为特朗普竞选生产 MAGA 帽子的中国制造商、记录过七位在美国大选中经历起伏的华人个体，也讲述了委内瑞拉青年的故事。</p>\n\n<p>如果你也有一些特别的经历、观察或想法，不论是亲身体验的故事，还是你在某个行业、社区中的所见所闻，都欢迎你向我们投稿。</p>\n\n<p>你的声音可能出现在未来的节目当中，我们非常期待你的分享！</p>\n\n<p><a href=\"https://eg76rdcl6g.feishu.cn/share/base/form/shrcne1CGVaSeJwtBriW6yNT2dg\" rel=\"nofollow noopener\">投稿入口</a></p>\n\n<p><strong>加入我们</strong></p>\n\n<p>声动活泼团队目前正在招聘内容监制、商业运营经理、商业发展经理和实习生，如果你也对播客行业的内容制作和商务运营感兴趣，欢迎投递！ 详情点击招聘入口：<a href=\"https://eg76rdcl6g.feishu.cn/docx/XO6bd12aGoI4j0xmAMoc4vS7nBh\" rel=\"nofollow noopener\">加入声动活泼（在招职位速览）</a></p>\n\n<p><img src=\"https://media24.fireside.fm/file/fireside-uploads-2024/images/8/8dd8a56f-9636-415a-8c00-f9ca6778e511/9KRzVACW.png\" alt=\"Untitled\"></p>\n\n<p><strong>幕后制作</strong></p>\n\n<p>后期：赛德</p>\n\n<p>运营：George</p>\n\n<p>设计：饭团</p>\n\n<p>实习编辑：翔宇、怡然</p>\n\n<p><strong>商务合作</strong></p>\n\n<p>声动活泼商业化小队，点击链接可直达<strong><a href=\"https://sourl.cn/QDhnEc\" rel=\"nofollow noopener\">商务会客厅</a></strong>，也可发送邮件至 <a href=\"mailto:business@shengfm.cn\" rel=\"nofollow noopener\">business@shengfm.cn</a> 联系我们。</p>\n\n<p><strong>关于声动活泼</strong></p>\n\n<p>「用声音碰撞世界」，声动活泼致力于为人们提供源源不断的思考养料。</p>\n\n<p>我们还有这些播客：<a href=\"https://etw.fm/episodes\" rel=\"nofollow noopener\">声东击西</a>、<a href=\"https://guiguzaozhidao.fireside.fm/episodes\" rel=\"nofollow noopener\">What's Next｜科技早知道</a>、<a href=\"https://www.xiaoyuzhoufm.com/podcast/61315abc73105e8f15080b8a\" rel=\"nofollow noopener\">商业WHY酱</a>、<a href=\"https://therabbithole.fireside.fm\" rel=\"nofollow noopener\">跳进兔子洞</a>&amp;<a href=\"https://www.xiaoyuzhoufm.com/podcast/666c0ad1c26e396a36c6ee2a\" rel=\"nofollow noopener\">跳进兔子洞第三季</a>、<a href=\"https://www.xiaoyuzhoufm.com/podcast/644b94c494d78eb3f7ae8640\" rel=\"nofollow noopener\">吃喝玩乐了不起</a>、<a href=\"https://www.xiaoyuzhoufm.com/podcast/65a625966d045a7f5e0b5640\" rel=\"nofollow noopener\">不止金钱</a>、<a href=\"https://www.xiaoyuzhoufm.com/podcast/5f445cdb9504bbdb77f092e9\" rel=\"nofollow noopener\">泡腾 VC</a>、<a href=\"https://www.xiaoyuzhoufm.com/podcast/5e284c37418a84a0462634a4\" rel=\"nofollow noopener\">反潮流俱乐部</a></p>\n\n<p>欢迎在<a href=\"https://okjk.co/Qd43ia\" rel=\"nofollow noopener\">即刻</a>、微博等社交媒体上与我们互动，搜索<strong>声动活泼</strong>即可找到我们。</p>\n\n<p>也欢迎你写邮件和我们联系，邮箱地址是：<a href=\"mailto:ting@sheng.fm\" rel=\"nofollow noopener\">ting@sheng.fm</a></p>\n\n<p>获取更多和声动活泼有关的讯息，你也可以扫码添加声小音，在节目之外和我们保持联系！</p>\n\n<p><img src=\"https://media24.fireside.fm/file/fireside-uploads-2024/images/8/8dd8a56f-9636-415a-8c00-f9ca6778e511/wEYE7jJa.jpg\" alt=\"声东击西\"></p>\n\n<hr><p>Special Guest: 宋念申.</p>",
+      "duration": 4509000,
+      "enclosureUrl": "https://aphid.fireside.fm/d/1437767933/8dd8a56f-9636-415a-8c00-f9ca6778e511/16a80abc-0826-4ec8-8c94-54ecb79161ef.mp3",
+      "pubDate": 1789643700000,
+      "imageUrl": "https://media24.fireside.fm/file/fireside-images-2024/podcasts/images/8/8dd8a56f-9636-415a-8c00-f9ca6778e511/cover.jpg?v=4",
+      "channelTitle": "声东击西",
+      "rssFeedUrl": "https://www.etw.fm/rss"
+    },
+    {
+      "id": 45,
+      "title": "#291：「感觉整个人都要变成一颗瓜了」",
+      "description": "<p>ATypI 2026 Stanford 系列访谈第七期，有幸邀请纽约城市大学副教授 Sherry Mu，围绕大会演讲主题和个人著作，与我们分享多种非拉丁文字的字体排印特征和文化背景，以及关于字体排印知识具象化的类比方式和独特的教学实践。</p> <h3>参考链接</h3> <ul> <li><a href=\"https://atypi.org/presentation/kerning-and-ligature-the-kneadable-inter-letter-spacing/\">“Kerning and Ligature: the Kneadable Inter-letter Spacing”</a>，Sherry 在 ATypI 2026 Stanford 的演讲</li> <li><a href=\"https://www.typotheque.com/research/malayalam-scripting-tradition-and-modernity\">“Malayalam: Scripting Tradition and Modernity”</a>，Karthik Malli 所撰关于马拉雅姆文的文章，刊于 Typotheque</li> <li>印度喀拉拉邦的<a href=\"https://zh.wikipedia.org/wiki/%E9%A6%AC%E6%8B%89%E9%9B%85%E6%8B%89%E5%A7%86%E6%96%87\">马拉雅拉姆文</a>（മലയാളലിപി/Malayāḷalipi, Malayalam）于 1971 年修改了正书法，u、ū、r̥ 不再使用复杂连写的元音符号</li> <li><a href=\"https://en.wikipedia.org/wiki/Alphabet\">Alphabet</a>（全音素文字）</li> <li><a href=\"https://en.wikipedia.org/wiki/Abjad\">Abjad</a>（辅音音素文字）</li> <li>中国有四种<a href=\"https://www.zgbk.com/ecph/words?SiteID=1&amp;ID=1ZCBgM\">傣文</a>（西双版纳的<a href=\"https://baike.baidu.com/item/%E5%82%A3%E4%BB%82%E6%96%87/54583312\">傣仂（lè）文</a>、德宏的傣哪文、瑞丽澜沧等地的傣绷文，金平的傣段文），而西双版纳傣族自治州目前新老傣仂文字并用：新傣仂文在基础教育中普及，老傣仂文作为文化遗产在宗教仪式和古籍研究中延续使用</li> <li><a href=\"https://zh.wikipedia.org/zh-cn/%E7%BC%85%E6%96%87\">缅文</a>（မြန်မာအက္ခရာ/mranma akkha.ra）属于元音附标文字，字母造型以圆形为主</li> <li><a href=\"https://en.wikipedia.org/wiki/Javanese_script\">爪哇文</a>（ꦲꦏ꧀ꦱꦫꦗꦮ/aksara Jawa）往往需要很大的行高以避免字母被切掉</li> <li>Sherry Muyuan He. <a href=\"https://www.bispublishers.com/typography-beyond-borders.html\"><i>Typography beyond borders: Design with multiscriptual typographic Elements</i></a>. BIS Publishers, 2025</li> <li>改革过的新<a href=\"https://en.wikipedia.org/wiki/Tifinagh\">提非纳文字</a>（ⵜⵉⴼⵉⵏⴰⵖ/Tifinaɣ, Tifinagh）已经变成全音素文字</li> </ul> <h3>嘉宾</h3> <ul> <li>何沐猿（<a href=\"https://www.instagram.com/a_serif_sheriff\">Sherry Muyuan He</a>）：非拉丁文字字形研究者，纽约城市大学电子设计与多媒体终身副教授</li> </ul> <h3>主播</h3> <ul> <li>Eric：字体排印研究者、译者，The Type 执行编辑</li> </ul> <p>欢迎与我们交流或反馈，来信请致 <a class=\"autolink\" href=\"mailto:podcast@thetype.com\">podcast@thetype.com</a>&#8203;。如果你喜爱本期节目，也欢迎用支付宝向我们捐赠：<a class=\"autolink\" href=\"mailto:hello@thetype.com\">hello@thetype.com</a>&#8203;。</p>",
+      "duration": 4888000,
+      "enclosureUrl": "https://static.thetype.cloud/typechat/typechat291.mp3",
+      "pubDate": 1790052102000,
+      "imageUrl": "https://www.thetype.com/wp-content/uploads/2026/09/TypeChat291-sq.png",
+      "channelTitle": "字谈字畅",
+      "rssFeedUrl": "https://www.thetype.com/typechat/feed/"
+    },
+    {
+      "id": 46,
+      "title": "全世界科技媒体都在开箱 iPhone，爱否在看全世界科技媒体开箱 iPhone",
+      "description": "<p style=\"color:#333333;font-weight:normal;font-size:16px;line-height:30px;font-family:Helvetica,Arial,sans-serif;hyphens:auto;text-align:justify;\" data-flag=\"normal\">本期嘉宾：彭林、森森、十天、蓝白、恺伦</p><span><br></span><p style=\"color:#333333;font-weight:normal;font-size:16px;line-height:30px;font-family:Helvetica,Arial,sans-serif;hyphens:auto;text-align:justify;\">说实话没法打时间点，聊的内容比较散碎<br>·&nbsp;DeepSeek V4.1 发布</p><p style=\"color:#333333;font-weight:normal;font-size:16px;line-height:30px;font-family:Helvetica, Arial, sans-serif;hyphens:auto;text-align:justify;\"><span>· 5999 元起，豆包手机努比亚 NaviX Ultra 正式发布</span></p><p style=\"color:#333333;font-weight:normal;font-size:16px;line-height:30px;font-family:Helvetica, Arial, sans-serif;hyphens:auto;text-align:justify;\"><span>· ColorOS 17 发布，新增小布紧急来电与记忆后台</span></p><p style=\"color:#333333;font-weight:normal;font-size:16px;line-height:30px;font-family:Helvetica, Arial, sans-serif;hyphens:auto;text-align:justify;\"><span>· iPhone 18 Pro 系列开始发货</span></p>",
+      "duration": 7891000,
+      "enclosureUrl": "https://jt.ximalaya.com//GKwRIRwOhBpeA864aATZ6jgR.m4a?channel=rss&album_id=41563226&track_id=1016628592&uid=88184324&jt=https://aod.cos.tx.xmcdn.com/storages/aad8-audiofreehighqps/C3/26/GKwRIRwOhBpeA864aATZ6jgR.m4a",
+      "pubDate": 1789810175000,
+      "imageUrl": "https://fdfs.xmcdn.com/storages/5c1e-audiofreehighqps/78/56/GAqh88AOhBj1AAE1tgTZ6aRr.jpeg",
+      "channelTitle": "FView Friday",
+      "rssFeedUrl": "https://www.ximalaya.com/album/41563226.xml"
+    },
+    {
+      "id": 47,
+      "title": "再见！",
+      "description": "<p style=\"color:#333333;font-weight:normal;font-size:16px;line-height:30px;font-family:Helvetica,Arial,sans-serif;hyphens:auto;text-align:justify;\" data-flag=\"normal\">迟到的封箱：），希望大家都开心快乐！</p>",
+      "duration": 362000,
+      "enclosureUrl": "https://jt.ximalaya.com//wKgLeFzzdP-RMVWEACzQ56pJxNE060.m4a?channel=rss&album_id=4867505&track_id=188230380&uid=51547393&jt=https://aod.cos.tx.xmcdn.com/group59/M0B/70/A2/wKgLeFzzdP-RMVWEACzQ56pJxNE060.m4a",
+      "pubDate": 1559459082000,
+      "imageUrl": "https://fdfs.xmcdn.com/group20/M0A/63/61/wKgJJ1eeB-PQdc6-AAIYz2ivNpY840.png",
+      "channelTitle": "代码时间",
+      "rssFeedUrl": "https://www.ximalaya.com/album/4867505.xml"
+    },
+    {
+      "id": 48,
+      "title": "EP90: Dynamicland 2024",
+      "description": "<h2>內容簡介</h2>\n<p>美國時間二零二四年九月四日，Dynamicland 網站大幅更新，Bret Victor 也放出了「Hypercard in the World」演示錄像。我們看到了什麼？</p>\n<h2>相關鏈接</h2>\n<ul>\n<li><a href=\"https://www.youtube.com/watch?v=uI7J3II59lc\">Hypercard in the World 演示錄像</a></li>\n<li><a href=\"https://dynamicland.org/\">Dynamicland.org</a></li>\n<li><a href=\"https://dynamicland.org/2024/FAQ/\">FAQ</a></li>\n<li><a href=\"https://dynamicland.org/2014/CDG_Research_Agenda.pdf\">Representations of Thought</a></li>\n<li><a href=\"https://academic.oup.com/california-scholarship-online/book/13177\">Alan Tansman: <em>The Aesthetics of Japanese Fascism</em></a></li>\n<li><a href=\"https://read.dukeupress.edu/books/book/1272/The-Culture-of-Japanese-Fascism\">Alan Tansman (ed.): <em>The Culture of Japanese Fascism</em></a></li>\n<li><a href=\"https://www.amazon.com/Technologies-21st-century-Martin-Greenberger/dp/1559401419\"><em>Technologies for the 21st Century: On Multimedia</em></a></li>\n<li><a href=\"https://en.wikipedia.org/wiki/Aaron_Cometbus#Cometbus_zine\"><em>Cometbus</em></a></li>\n</ul>\n<h2>登場人物</h2>\n<p>李如一：《<a href=\"https://yitianshijie.net\">一天世界</a>》《<a href=\"https://miechakucha.com\">滅茶苦茶</a>》《<a href=\"https://wcy.wtf\">無次元</a>》作者</p>",
+      "duration": 3979000,
+      "enclosureUrl": "https://r.typlog.com/eyJzIjo1NSwiZSI6Nzc3MjUsInQiOjF9.MColXKS1D3AYJYgRAv5F_r157Nw/yitianshijie/8274373507_570713.mp3",
+      "pubDate": 1725627753000,
+      "imageUrl": "https://i.typlog.com/yitianshijie/8274373681_889009.png?x-oss-process=image/auto-orient,1/interlace,1/quality,q_90/resize,m_fill,w_1920,h_1920/format,jpg",
+      "channelTitle": "一天世界",
+      "rssFeedUrl": "https://yitianshijie.net/episodes/feed.xml"
+    }
+  ],
+  "playlistEpisode": [
+    {
+      "id": 1,
+      "title": "中共还能撑多久？暴力革命的成本与忍耐极限！",
+      "description": "<p>由於中共政權與國家體系高度綁定，缺乏和平退場機制，其執政團隊的解散幾乎必然伴隨流血和暴力革命，這使得推翻政權的成本極高，普通民眾的忍耐程度也相對提高。目前尚未出現大規模生存威脅，糧食產量連年增長，民眾缺乏發起暴力革命的最強烈誘因。在外部壓力方面，美國將對華競爭定位為削弱而非旨在改變中國制度，行動保持克制，不會將中共逼入絕路。</p>",
+      "duration": 1598000,
+      "enclosureUrl": "https://anchor.fm/s/f2cbc0a8/podcast/play/108627905/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-8-22%2F407903299-44100-2-30668f64e8c05.m4a",
+      "pubDate": 1758507326000,
+      "imageUrl": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_episode/40634394/40634394-1758506825185-f2ff6fa2a3bd4.jpg",
+      "channelTitle": "小岛大浪吹",
+      "rssFeedUrl": "https://anchor.fm/s/f2cbc0a8/podcast/rss",
+      "playlistId": 1,
+      "position": 0.0,
+      "playedDuration": 0
+    },
+    {
+      "id": 2,
+      "title": "147 ✪ SHEIN回港上市、新拼姆开启自营",
+      "description": "<p>过去十年，中国跨境电商依靠强大的供应链能力和价格优势快速走向全球，SHEIN、Temu 等企业成为中国企业出海的代表。但随着这些企业在海外市场不断扩大影响力，也开始面对来自监管政策和贸易规则的全新挑战。</p>\n\n<p>SHEIN 凭借独创的“小单快返”模式，将中国制造的速度发挥到极致。上市地绕了地球一圈之后，终于成功在香港上市。在这一里程碑背后，SHEIN 商业模式的正在面临挑战：当关税、本地化要求成为新的竞争条件，SHEIN 最核心的“快”优势是否正在被削弱？从中国直邮到海外仓布局，跨境电商的供应链模式会发生怎样的变化？</p>\n\n<p>Temu 则试图走向另一条路径，加大对自营标准品的投入。为什么拼多多要推出“新拼姆”自营模式？从低价平台到品质平台，这场拼多多全力推动的升级迭代，能否改变海外消费者对 Temu 的认知？当 Temu 直接面对亚马逊这样的全球电商巨头，中国电商出海下一阶段的竞争核心究竟是什么？</p>\n\n<p>本期节目，我们从 SHEIN 与 Temu 的最新变化出发，拆解中国跨境电商从供应链红利走向全球化深水区后，正在面临的新机会与新挑战。</p>\n\n<h2>疯投圈会员社群</h2>\n\n<p>疯投圈开设有会员社群，在这里您可以结识志同道合的朋友、发现业务合作的伙伴。社群每年在北京、上海、杭州、广州、深圳、香港六个城市举办仅限会员参加的线下活动，其他城市也会不定期举行小型的会员聚会。通过面对面的交流，您可以与其他会员进一步加深了解、促成合作。</p>\n\n<p>会员还可以获得由疯投圈播客节目内容重新人工整理编辑而成的《疯投圈文字精选》，适合阅读习惯，方便查询检索节目中提到的图表、数据、观点、结论。</p>\n\n<p>微信搜索关注「疯投圈」服务号并发送关键词「会员」了解详情和加入社群。</p>\n\n<figure>\n<img src=https://rio.xyzcdn.net/assets/crazy-capital-community.png>\n</figure>\n\n<h2>黄海的的商业世界</h2>\n\n<p>微信搜索「疯投圈」的服务号，发送关键词「星球」加入「黄海的商业世界」。</p>\n\n<h2>黄海的新书《趋势红利》</h2>\n\n<p>微信搜索「疯投圈」的视频号，可以在「商品」分类置顶里面找到黄海的新书《趋势红利》。</p>\n\n<p>您也可以在里面购买其他我们筛选的商品来支持我们节目。</p>\n\n<h2>商务合作</h2>\n\n<p>商务合作请发送电子邮件至 <a href=mailto:biz@crazy.capital>biz@crazy.capital</a></p>",
+      "duration": 4203000,
+      "enclosureUrl": "https://rio.xyzcdn.net/crazycapital/ep147.mp3",
+      "pubDate": 1788861600000,
+      "imageUrl": "https://crazy.capital/assets/icon-square-normal-dark-cn@4x.png",
+      "channelTitle": "疯投圈",
+      "rssFeedUrl": "https://crazy.capital/feed",
+      "playlistId": 1,
+      "position": -0.0015,
+      "playedDuration": 0
+    },
+    {
+      "id": 3,
+      "title": "E63 从收租到收息：为什么这些年，大家越来越关注红利投资了？",
+      "description": "<p><strong>📙 </strong>欢迎来到《投资ABC》，这是一档由 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a> 出品的播客节目。在这里，我们会和陈鹏博士一起，和你分享那些投资中绕不开的知识，我是 Amiee。</p><p>前段时间，我听到一个有趣的说法：如果我们的生活是一座花园，那么现金流就是灌溉花草、让它们生长的水。无论是过好当下，还是为未来积累资产，它都是重要的基础。</p><p>这或许解释了为什么小时候，我常听大人们说，理想的生活，就是拥有几间位置不错的铺头：不仅每个月有租金到账，铺头本身还可能升值；租金收入有结余，就攒起来，再去买下一间。这个「鸡生蛋、蛋生鸡」的循环，构成了我最早对财富增长的想象。</p><p>所以，第一次听到「红利投资」时，我就有一种莫名的熟悉感：找到那些愿意持续分红的公司，长期持有，并定期获得现金流——听起来，就像是把铺头搬进了证券账户。</p><p>而且，相比市场中不断波动的价格和反复变化的故事，真正分到手里的钱，似乎格外踏实，看得见，摸得着。</p><p>我还经常听人说，市场下跌时，红利策略往往相对抗跌；而除了分红，它所持有的股票本身也可能升值。眼前有现金流，未来有上涨空间，似乎鱼与熊掌兼得。</p><p>直到有一天，我兴致勃勃地向本期节目的嘉宾 Jason 分享自己对红利投资的理解，他却告诉我：<strong>红利策略所呈现的许多特征，也会随着市场环境而变化</strong>。我这才意识到，红利投资或许并不是我想象中的「电子铺头」。</p><p>Jason 是标普道琼斯指数公司的产品经理，长期研究红利与因子类指数的设计，也积累了许多来自市场一线的观察。我很好奇：一个每天与红利指数打交道的人，究竟如何理解红利投资？</p><p>于是，我迫不及待地邀请他来做客，一起聊聊<strong>红利策略具有哪些特征，我们又该如何理解这些特征，从而对红利投资建立更合理的预期</strong>。</p><h2>🔗 官方地址</h2><p>欢迎<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/n/materials/2262\">点击这里</a>，查看我们在有知有行准备的全文逐字稿、图表以及重点总结。</p><h2>🎙️ 本期嘉宾</h2><p><strong>Jason：</strong> 标普道琼斯指数产品经理，曾任德明信基金研究员。</p><h2>⏳ 时间戳</h2><p><a class=\"timestamp\">03:46</a> 理想生活的底气：拥有持续产生现金流的资产，鸡生蛋，蛋生鸡</p><p><a class=\"timestamp\">07:39</a> 红利初代配方：十只被市场冷落的「落水狗」，竟在二十多年里跑赢道琼斯工业指数</p><p><a class=\"timestamp\">12:52</a> 「一笔好的交易，可能是一笔坏的长期投资」</p><p><a class=\"timestamp\">21:35</a> 抗跌，保守时代的「最大公约数」？</p><p><a class=\"timestamp\">26:12</a> <strong>全收益视角下，红利投资回报的三个组成部分 ——</strong></p><p><a class=\"timestamp\">35:49</a> 底层蓄水池丰盈时，分红的流向：公司 ➡️ 基金 ➡️ 投资人</p><p><a class=\"timestamp\">39:30</a> <strong>「别杀会下金蛋的鹅，但股价跌了怎么办」「知道未来会跌，你应该去做空，但问题是，你知道吗」</strong></p><p><a class=\"timestamp\">45:23</a> 红利低波、红利动量，这些陌生的复合名字，是什么意思？</p><p><a class=\"timestamp\">54:40</a> <strong>平衡与一致，红利投资的两个重要参数</strong></p><h2>🔍 相关内容</h2><p><a class=\"timestamp\">01:08</a> 分红（Dividend）：公司将可供分配利润的一部分，以现金等形式分配给股东，是股东获得投资回报的一种方式。</p><p><a class=\"timestamp\">10:27</a> 股息率：通常指一只股票的年化每股现金股息与当前股价之比，用来衡量以当前价格买入后所对应的分红收益水平。股息率不等于基金实际向投资者派发的分红比例。</p><p><a class=\"timestamp\">12:14</a> 此处提到的是肯尼斯·弗伦奇（Kenneth French）数据资料库中的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://mba.tuck.dartmouth.edu/pages/Faculty/ken.french/Data_Library/det_port_form_dp.html\">「按股息率构建的投资组合」（Portfolios Formed on Dividend Yield）数据集</a>。</p><p><a class=\"timestamp\">13:34</a> 此处提到阿斯沃斯·达摩达兰（Aswath Damodaran）教授于 2017 年撰写的文章<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.nasdaq.com/articles/bitcoin-boom-asset-currency-commodity-or-collectible-2017-10-25\">《The Bitcoin Boom: Asset, Currency, Commodity or Collectible?》（《比特币繁荣：资产、货币、商品，还是收藏品？》）。</a></p><p><a class=\"timestamp\">18:20</a> 估值变化：市场给予公司的估值倍数发生变化，例如市盈率上升或下降。</p><p><a class=\"timestamp\">19:53</a> 从截至 2023 年底的数据来看，A股是全球分红增长较快的市场之一。2023 年，A股上市公司的现金分红总额达到日本市场的两倍以上，相当于美国市场分红总额的 40% 以上。2013 - 2023 年，A股分红的年复合增长率为 10.6%，高于同期 4.7% 的全球平均水平。</p><img src=\"https://image.xyzcdn.net/Fp_GPzZq9m8ERfm7OwquEoQL1Sed.png\"><blockquote><p>图表来源：标普道琼斯指数有限公司，<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.spglobal.com/spdji/zh/documents/research/research-exploring-china-a-share-dividends-and-high-yield-strategy-performance-zh.pdf\">《分析 A 股红利市场与高股息率策略》</a></p></blockquote><p><a class=\"timestamp\">25:20</a> 此处提到的文章<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.spglobal.com/spdji/zh/documents/education/talking-points-finding-resilience-amid-uncertainty-zh.pdf\">《市场热话：在不确定环境中寻求稳定——中国 A 股市场的红利低波策略》</a>。</p><p><a class=\"timestamp\">26:34</a> 2005 - 2025 年，A股全收益指数的长期年化收益率约为 10.40%。按下图中的股息模型，股息及其再投资合计 1.56%，约占总收益的 15%。</p><img src=\"https://image.xyzcdn.net/FohIoKLOXv1o_MVirRY6DTKwGaG4.png\"><blockquote><p>图表来源：<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/sbbi2025/preface\">《中国大类资产投资 2025 年报》</a></p></blockquote><p><a class=\"timestamp\">26:36</a> 全收益指数：除了反映指数成分股价格的变化，还计入现金分红，并假设分红继续投入指数，因此能更完整地反映持有一组股票获得的整体收益。</p><p><a class=\"timestamp\">26:44</a> 此处提到的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/sbbi2025/preface\">《中国大类资产投资 2025 年报》</a></p><p><a class=\"timestamp\">27:20</a> 盈利增长（Earnings Growth）：公司或指数成分股的每股盈利随时间增长的部分。</p><p><a class=\"timestamp\">28:52</a> 价值因子：根据股票价格相对于盈利、账面价值、销售额等基本面指标的高低，识别估值相对较低股票的一类系统性选股特征。</p><p><a class=\"timestamp\">29:21</a> 成长因子：根据公司的盈利、收入等基本面指标及其增长情况，识别成长性相对较高股票的一类系统性选股特征。</p><p><a class=\"timestamp\">36:37</a> 派息型份额（Distribution Shares）：海外基金常见的一种份额类型，会按照基金的分配政策向投资者派息。</p><p><a class=\"timestamp\">36:40</a> 累积型份额（Accumulation Shares）：海外基金常见的一种份额类型，通常不向投资者派息，而是将相应资金留在基金中继续投资，并反映在基金份额净值中。</p><p><a class=\"timestamp\">44:24</a> 价格指数：反映指数成分股价格的变化，不计入成分股派发的常规现金分红。</p><p><strong>🎧 往期节目</strong></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/episode/6a49f7a92e335a35a80e3e55\">E58 指数编制：看似冰冷的规则机器，却在塑造你我眼中的市场</a></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/episode/6a12b7b38b5c94538e9fa0b8\">E55 都说 A 股全是情绪、没有价值，是真的吗？｜中国大类资产投资 2025 年报</a></p><h2>🎺 创作团队</h2><p><strong>制作｜</strong> 有知有行</p><p><strong>嘉宾</strong> <strong>｜</strong>Jason</p><p><strong>主持｜</strong> Amiee</p><p><strong>声音设计｜</strong> 甜食</p><p><strong>感谢志愿者步枫、饭粒、小马、小洲对本期节目的协助。</strong></p><p></p><p>💰<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a>「有知有行」成立于 2020 年，目前在陪伴投资者用正确的方式学习投资，下场实操。凭借在投资领域的良好口碑，有知有行在初创阶段已与一大批忠实用户同行。未来我们希望成为一家财富管理公司，不仅帮助投资者学习投资，也能让大家在有知有行安心交易，踏实赚钱。<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/s/f4C2nY7P\"> 欢迎在各大应用商店搜索「有知有行」下载我们的 App</a>。</p><p>🎈本播客所述投资相关内容皆以交流分享为目的，仅供参考，不构成任何市场预测、判断，或投资、咨询建议。市场有风险，投资需谨慎。主持人及嘉宾对投资相关内容的准确性、可靠性、时效性及完整性不作任何明示或暗示的保证，并提醒您对相关内容请结合自身情况进行独立评估，依据或使用相关内容所造成的后果由您独自承担。</p><p>感谢您对本播客原创内容的青睐。如需转载或引用本播客所述内容，请注明出处。转载前请与有知有行联系并取得同意。</p><br><a href=\"https://oia.xiaoyuzhoufm.com/player/6aa630e9492687f6aad90bfa?openTranscript=true&utm_source=rss&as=cHQ9MTIyNjE5MjQ3JmN0PXJzcyZtdD04&autoOpen=false\">在小宇宙查看该单集文稿</a>",
+      "duration": 3777000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/64b0bfde585daadfc82f3b12/6aa630e9492687f6aad90bfa/media.xyzcdn.net/64b0bfde585daadfc82f3b12/li5GZjW3QtYUlvvM5Rx1wnljeaiO.m4a",
+      "pubDate": 1789344000000,
+      "imageUrl": "https://image.xyzcdn.net/FoZpNQGSGjOnnYYSN0iIMW_9bLSj.jpeg",
+      "channelTitle": "投资ABC",
+      "rssFeedUrl": "https://feed.xyzfm.space/9bmupxfae9qd",
+      "playlistId": 1,
+      "position": -0.0015,
+      "playedDuration": 0
+    },
+    {
+      "id": 4,
+      "title": "153. 和曾鸣聊产业史观：残酷的真相、会消亡的公司、优秀≠卓越、“OAI、Anth大概率不是原生时代大赢家”",
+      "description": "<img src=\"https://image.xyzcdn.net/ltK0RxY6lnxA8-Eg0TfgpZzXZ93Q.png\"><p>今天的嘉宾是战略学家曾鸣教授。曾教授曾经是阿里巴巴集团总参谋长，也参与过两所商学院创建（长江商学院和湖畔），但他更令人熟悉的身份是：一名对企业战略有许多深度思考的研究者。不少创业者和企业家都受到过他的启发。</p><p>作为观察过互联网完整周期的研究者，今天我们聊了聊他对AI新时代、新范式的完整思考，并和历史上关键转折时期做了对照——聊完让我有了更全局的视角。</p><p>对AI的产业发展，<strong>曾教授提出了许多非共识判断，甚至是一些“暴论”。</strong></p><p>这里我先摘录15条：</p><blockquote><p>AI产业化会有三个阶段：1）第一个阶段，技术逐渐被社会接受，成为社会基础设施；2）第二个阶段，基于基础设施产生海量新应用，进入百花齐放的时代；3）第三个阶段，当这些海量应用出现，大家发现需要一些更底层的方法运行新的世界，我把它叫作“原生应用阶段”。</p><p>我只是研究商业世界的动力学规律，我能看到的理论框架告诉我：第一阶段的企业，很难活到第二阶段；第二阶段的企业，很难活到第三阶段。</p><p>对比互联网时代，我们现在刚刚走到浏览器阶段，甚至比Yahoo还要早。</p><p>模型公司怎么类比？它有点像另外一个已经消失了的公司——美国在线AOL，它是互联网基础接入服务商，让所有人都能够接到互联网上，这本身是个巨大的工程。今天，大模型则是让所有人都可以轻易接入智能的入口，它也是一个基础设施服务商。</p><p>直白一点说，模型公司就是未来的AI云公司。</p><p>公共基础设施的行业，只有一种商业模式是成立的，叫寡头垄断加政府强监管——我知道这个现实对很多现在创业的人很残酷。</p><p>Anthropic、OpenAI，大概率不是原生应用阶段的大玩家、大赢家。</p><p>因为经济学基本规律，只要有同质化的供给，你就不可能获取高额利润，你就是一家不怎么值钱的公司。</p><p>下个阶段就是看谁是Netscape、谁是Yahoo，谁把Agent的标准建立起来，谁抢住Agent的用户入口。未来三年是有可能开始出现Agent入口的。</p><p>新的平台大概率不诞生自旧的平台。因为旧平台做的是简单信息匹配，新平台要做的是能力跟需求的匹配，复杂度高了很多。</p><p>作为工业化革命的产物，科层制管理的公司制度会衰亡——就是说，“公司”会消亡。这没有什么可以遗憾的呀，将来有更好玩的——你说多少人现在去公司上班是开心的？</p><p>我从来觉得在巨浪面前没有人是安全的。谁觉得安全，谁就是最不安全的。</p><p>CEO不能有老板心态。谁还认你啊？——现在说我都不陪老登玩了，我还陪你老板玩？</p><p>张：这个时代的企业过渡到下一个时代的企业，还能做得非常好的，多不多？曾：不是多不多的问题，是有没有的问题。张：有没有？曾：基本没有。</p><p>这一点都不让人绝望啊，人有生老病死，公司也有生老病死，没有比这更正常的了。这样，新公司才有机会，年轻人才有梦想，这多好的一件事情啊！</p></blockquote><p>好了，更多内容还是收看我们的播客吧:)</p><p>接下来，就是我对曾教授的访谈。</p><p><strong>OUTLINE:</strong></p><p><a class=\"timestamp\">00:03:08</a> 来自商业规律的残酷真相</p><p><a class=\"timestamp\">00:39:53</a> 新平台不来自旧平台</p><p><a class=\"timestamp\">01:06:15</a> “公司”要被淘汰</p><p><a class=\"timestamp\">01:31:10</a> 优秀≠卓越</p><p><a class=\"timestamp\">01:38:17</a> 战略生成系统</p><p><a class=\"timestamp\">02:02:48</a> 没有巨头是安全的</p><p><a class=\"timestamp\">02:18:01</a> 创造就是“无中生有”</p><p><strong>LINKS：</strong></p><p>我们的播客在<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast/626b46ea9cbbf0451cf5a962\">小宇宙</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://podcasts.apple.com/cn/podcast/%E5%BC%A0%E5%B0%8F%E7%8F%BAj%C3%B9n-%E5%95%86%E4%B8%9A%E8%AE%BF%E8%B0%88%E5%BD%95/id1634356920\">Apple Podcast</a>、Spotify等全音频平台播出；</p><p>我们的视频播客在<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast/626b46ea9cbbf0451cf5a962\">小宇宙</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://b23.tv/FZ0s2Q1\">Bilibili</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://xhslink.com/m/4clvm6edHk1\">小红书</a>、视频号、抖音等全视频平台播出；</p><p>如果你想服用文字版，请搜索我们工作室的公众号：语言即世界language is world。</p><p><strong>DISCLAIMER: </strong>本内容不作为投资建议。</p><p><strong>CONTACT: </strong>xiaojunzhang@lisw.ai</p><p><strong>Jump into the new world-and explore with us!</strong>😉</p>",
+      "duration": 9258000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/626b46ea9cbbf0451cf5a962/6a97f287f03e74ee6b03ea5b/media.xyzcdn.net/626b46ea9cbbf0451cf5a962/luZvhPtdKotbkVR-SHFRKVVUiM2P.m4a",
+      "pubDate": 1788393600000,
+      "imageUrl": "https://image.xyzcdn.net/FsGPZo8RfYBhZ7boAgv0PtVf7zBE.png",
+      "channelTitle": "张小珺Jùn｜商业访谈录",
+      "rssFeedUrl": "https://feed.xyzfm.space/dk4yh3pkpjp3",
+      "playlistId": 1,
+      "position": -0.0015,
+      "playedDuration": 0
+    },
+    {
+      "id": 5,
+      "title": "冬日活泼特辑｜声动游乐场开园，请来一探究竟吧！",
+      "description": "<p>「声动活泼游乐场」开园啦！尖叫、欢笑，还有游戏？<br>想马上邀请你通过声音来一探究竟！<br><img src=\"https://files.fireside.fm/file/fireside-uploads/images/4/4931937e-0184-4c61-a658-6b03c254754d/xjglzH8u.png\" alt=\"poster\"></p><p>在这个小短剧中，我们埋了一些彩蛋，希望你能喜欢！</p><p>为了能和大家玩儿起来，我们也藏了一个小小的<strong>声音互动游戏</strong>。想要和我们一起玩耍，就请订阅我们的付费<a href=\"https://mp.weixin.qq.com/s/7wQXF9ycbj30nzRgLkc30w\" rel=\"nofollow\">newsletter</a>，获得一张解谜地图，好去寻找那些和声音有关的线索。至于详细的玩法儿，就请收好下面的独家攻略吧！ </p><p><strong>第一步：订阅newsletter</strong><br>成功订阅我们的newsletter后（订阅方法在最后），你会很快收到一封包含两份游戏道具的邮件回复。其中包含「声动游乐场导览图」高清大图版和「答题卡」各一张。拿到道具后，就可以准备解谜啦！</p><p><img src=\"https://files.fireside.fm/file/fireside-uploads/images/4/4931937e-0184-4c61-a658-6b03c254754d/qyhejtE3.jpg\" alt=\"ditu\"><br><em>「声动游乐场」电子包浆版示意图</em></p><p><strong>第二步：游戏玩法详情</strong><br>1 准备好本期节目和两个道具<br>2 收听「游乐场小短剧」，并根据剧情，在「声动游乐场导览图」中找出相应的线索；<br>3 将相应线索，填入答题卡，得到答案！    </p><p><strong>第三步：把答案发给我们</strong><br>将答案发送到邮箱 <a href=\"mailto:newsletter@shengfm.cn\" rel=\"nofollow\">newsletter@shengfm.cn</a>，至此就算结束游戏啦。<br>我们将于 12 月 14 日揭晓谜底，前 50 位回复邮件并回答正确的听众，将会获得我们为你准备的惊喜礼包。为了这份礼包，也请加油哦！<br>另外，特别感谢本次赞助惊喜大礼包奖品的好朋友品牌：永璞咖啡、吻吻鱼、新经典文化。 </p><p>期待收到大家的谜底，我们好早早给大家发出礼物。</p><p><strong>附：如何订阅newsletter</strong><br>关于付费 newsletter 后你能获得什么，请点击阅读 <a href=\"https://mp.weixin.qq.com/s/7wQXF9ycbj30nzRgLkc30w\" rel=\"nofollow\">一封来自胡同中的邀请</a> 来了解更多。</p><p>如果你是国内用户，请扫👇 <br><img src=\"https://files.fireside.fm/file/fireside-uploads/images/4/4931937e-0184-4c61-a658-6b03c254754d/SrswgRtk.png\" alt=\"guoneiqrcode\"></p><p>如果你是海外用户，请扫👇 <br><img src=\"https://files.fireside.fm/file/fireside-uploads/images/4/4931937e-0184-4c61-a658-6b03c254754d/bBxw4lBh.png\" alt=\"abroadqrcode\"></p><p>订阅前后如遇任何问题，请联系 <a href=\"mailto:newsletter@shengfm.cn\" rel=\"nofollow\">newsletter@shengfm.cn</a> 或 声小音（微信号：shengfm1）<br>最后也祝大家玩儿得开心，拿到礼物！</p><br><a href=\"https://oia.xiaoyuzhoufm.com/player/61a56abdcdbb278b1a0d19a0?openTranscript=true&utm_source=rss&as=cHQ9MTIyNjE5MjQ3JmN0PXJzcyZtdD04&autoOpen=false\">在小宇宙查看该单集文稿</a>",
+      "duration": 407000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/5e284c37418a84a0462634a4/61a56abdcdbb278b1a0d19a0/media.xyzcdn.net/lqT_8UuHrq10G7mOefIQUgiD39-6.m4a",
+      "pubDate": 1638230400000,
+      "imageUrl": "https://image.xyzcdn.net/Fj9COAxsW7-zNoCgVPo-USL7mzer",
+      "channelTitle": "反潮流俱乐部",
+      "rssFeedUrl": "https://feed.xyzfm.space/h4tfwertttht",
+      "playlistId": 1,
+      "position": -0.0015,
+      "playedDuration": 0
+    },
+    {
+      "id": 6,
+      "title": "E252 公积金新规来了，这笔钱该怎么用？这份行动清单供你参考",
+      "description": "<img src=\"https://image.xyzcdn.net/Fk5nraEU-OYEXsuDv6aDf1oHDEXM.jpg\"><p><strong>🏡 公积金该存，还是取？聊聊新规对我们可能的影响。</strong></p><p>欢迎来到知行小酒馆，这是一档由 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a> 出品的播客节目。我们关注投资，更关注怎样更好地生活，我是雨白。</p><p>三年前，五险一金研究小组也聊过一期公积金。当时我们给的建议很直接：应取尽取，应用尽用。</p><p>三年过去，公积金政策、房地产市场、就业环境，以及我们自己的生活都变了不少。今年 9 月 20 号，公积金新规就要正式实施了，借着这一契机，我们也想来重新聊聊这个话题：三年后的今天，我们对公积金的看法有改变吗？<strong>这次公积金的新规，对不同的人群到底有什么影响？</strong></p><p>这次我重新召集了五险一金研究小组，组员包括小酒馆的制作人周一，还有我们节目的老朋友，「面基」的主播老钱。我们会从各自的经验出发，聊聊这次新规可能产生的影响，也希望能帮你判断，<strong>公积金在你的生活里，到底能起什么作用。</strong></p><p>如果你也有一笔公积金，却不太确定这笔钱怎样才能发挥最大的效用，希望这期能对你有些帮助。</p><h2>🔗 官方地址</h2><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/n/materials/2266\">如果你所使用的客户端显示不全，请点此访问有知有行的官网查看全文</a></p><h2>🍻 本期嘉宾</h2><p><strong>老钱：</strong>小酒馆的老朋友，播客「<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast/6388760f22567e8ea6ad070f\">面基</a>」主播。公众号：老钱日日谈</p><h2>🪡 时间轴</h2><p><a class=\"timestamp\">02:35</a> 再聊公积金，研究小组成员各自的感受——</p><p><a class=\"timestamp\">07:47</a> <strong>什么是公积金？</strong></p><p><a class=\"timestamp\">13:14</a> 开通公积金自动提取半年后，我主动选择了暂停</p><p><a class=\"timestamp\">20:57</a> 小提示：公积金 ≠ 银行存款，虚假提取可能面临处罚</p><p><a class=\"timestamp\">23:43</a> <strong>公积金新规主要有哪些变化？直接看这里 👉</strong></p><p><a class=\"timestamp\">32:20</a> 如果你未来可能有买房的计划，请一定慎重提取公积金</p><p><a class=\"timestamp\">44:05</a> <strong>灵活就业者请看 👀 如果我想自行缴存公积金，该怎么算？</strong></p><p><a class=\"timestamp\">52:44</a> 是不是足额缴纳公积金，也许能成为观察一家公司的切片</p><p><a class=\"timestamp\">59:06</a> <strong>公积金存取行动清单 📋</strong></p><h2>🔍 猜你想看</h2><blockquote><p>由于平台字数限制，完整版公积金资料库，欢迎<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/n/materials/2266\">点此前往有知有行官网</a>查看。</p></blockquote><p><strong>🟤 关于公积金新规</strong></p><p>本次新规为 2026 年 7 月 31 日国务院第 93 次常务会议通过，将于&nbsp;<strong>2026 年 9 月 20 日起施行</strong>的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.gov.cn/gongbao/2026/issue_12946/202608/content_7079363.html\">《国务院关于修改〈住房公积金管理条例〉的决定》</a>。此次修订是 1999 年《条例》出台以来近 20 年幅度最大的一次系统性修订，《决定》共有 20 条。</p><p>在这期节目中，我们提到本次修订主要有以下重要变化：</p><ol><li><p><strong>拓宽账户余额的提取和使用范围</strong></p><ol><li><p>装修自住住房、支付自住住房物业费、国务院批准的其他住房消费情形首次纳入可提取情形；</p></li><li><p>对提取住房公积金支付房租的，不再设置「房租超过家庭工资收入规定比例」的门槛限制；</p></li></ol></li><li><p><strong>扩大制度覆盖面</strong>，灵活就业人员可自愿缴存住房公积金，并按规定享受相应政策支持；</p></li></ol><ul><li><p><strong>提升住房公积金管理服务效能</strong>，缩短住房公积金提取及贷款申请的受理时限；</p></li></ul><blockquote><p>职工申请提取住房公积金的，住房公积金管理中心应当自受理申请之日起 3 日内作出准予提取或者不准提取的决定，并通知申请人；</p><p>申请住房公积金贷款的，住房公积金管理中心应当自受理申请之日起 10 日内作出准予贷款或者不准贷款的决定，并通知申请人。</p></blockquote><ol><li><p><strong>推动住房公积金缴存记录等全国范围内互信互认。</strong></p></li></ol><p><strong>🟤 补充资料</strong></p><p><a class=\"timestamp\">00:05:01</a> 中国人民银行、国家金融监督管理总局于 2026 年 8 月 28 日联合印发<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.pbc.gov.cn/tiaofasi/144941/3581332/2026082817013334439/index.html\">《关于改革完善房地产信贷管理 推动加快构建房地产发展新模式的意见》</a>，<strong>将个人住房贷款最长期限由 30 年延长至 40 年。</strong></p><p><a class=\"timestamp\">00:11:36</a>&nbsp;<strong>转移支付</strong>：通过政府无偿支出实现社会收入和财富再分配的一种手段，该支出不涉及商品或服务的交换。社会保障、政府对特定企业的补贴等都属于转移支付的一种体现。</p><p><a class=\"timestamp\">00:11:36</a><strong>&nbsp;现收现付制</strong>：一种社会保障资金的运作方式，以横向平衡原则为依据，用同一时代工作者的缴费，来直接支付当下保险受益人的开支。</p><p><a class=\"timestamp\">00:11:58</a> 截至 2024 年末，住房公积金累计缴存总额 327941.35 亿元，缴存余额 109252.79 亿元、同比增长 8.61%。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.gov.cn/zhengce/zhengceku/202506/P020250601601759182303.pdf\">《全国住房公积金2024年年度报告》</a></p><blockquote><p>需要注意的是：这笔缴存余额中，约 8.07 万亿元已形成个人住房贷款，占缴存余额的 73.86%。个贷资产由于已经锁定在长期贷款合同中，因此不具备即时释放的条件，只能随借款人还本付息逐步回流。剩余非个贷资产约为 2.86 万亿元，但这只账面上限，不能作为可统一释放的「闲置资金」，因此无法据此给出具体「有几千亿能够释放」的结论。解读来自<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://mp.weixin.qq.com/s/yyv8YpQ1-Je3mxmHK1vpNg\">《招商宏观 | 住房公积金还能释放多少空间？》</a></p></blockquote><p><a class=\"timestamp\">00:12:06</a> 截至 2026 年 8 月，中国境内住户存款总额已达到约 172.89 万亿元。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.pbc.gov.cn/diaochatongjisi/attachDir/2026/09/2026091418214943327.pdf\">《金融机构人民币信贷收支表》</a></p><p><a class=\"timestamp\">00:12:53</a>&nbsp;<strong>社零总额：</strong>「社会消费品零售总额」的简称，指企业（单位、个体户）通过交易直接售给个人、社会集团非生产、非经营用的实物商品金额，以及提供餐饮服务所取得的收入金额。2025 年，全年社会消费品零售总额已超 50 亿元。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.stats.gov.cn/sj/zxfb/202602/t20260228_1962662.html\">《中华人民共和国2025年国民经济和社会发展统计公报》</a></p><p><a class=\"timestamp\">00:22:03</a> 详见《住房公积金管理条例》第四十一条规定。</p><blockquote><p><strong>第四十一条</strong>　以欺诈、伪造证明材料或者其他手段违法提取住房公积金的，由住房公积金管理中心责令限期退回违法提取的住房公积金，3年内不得提取住房公积金或者使用住房公积金贷款。</p></blockquote><p><a class=\"timestamp\">00:30:22</a> 2024 年，住房公积金缴存额 36317.83 亿元，发放住房公积金个人住房贷款 230.56 万笔，发放金额 13043.07 亿元；当年新发放贷款与当年缴存额的比率约为 35.91%。如果回顾过往数据，2016 年住房公积金缴存额 16562.88 亿元，发放住房公积金个人住房贷款 327.49 万笔、12701.71 亿元，当年新发放贷款与当年缴存额的比率约为 76.69%。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.gov.cn/zhengce/zhengceku/202506/P020250601601759182303.pdf\">《全国住房公积金2024年年度报告》</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"http://www.fangchan.com/policy/34/2017-06-01/6275875030002110515.html\">《全国住房公积金2016年年度报告》</a></p><p><a class=\"timestamp\">00:35:35</a> 一线城市二手房价格变化见下图。图片来源：嘉宾供图</p><img src=\"https://image.xyzcdn.net/Fj7m64vfizrV0PHG1ZmRJGj4CKyH.png\"><p><a class=\"timestamp\">00:38:53</a> 截至2025 年，中国灵活就业人员已达约 2.8 亿人。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.fxbaogao.com/view?id=5461464\">《2025 中国蓝领群体就业研究报告》</a></p><p><a class=\"timestamp\">00:39:32</a> 数据补充：2024 年，住房公积金实缴人数 17628.75 万人，其中北京实缴职工 939.75 万人，上海实缴职工 931.26 万人，广州 533.62 万人，深圳实缴职工 721.65 万人，非一线城市城镇缴存人数约 14502.47 万人，灵活就业人员实缴人数 218.82 万人。而 2024 年度城镇就业人员 47345 万人，全国参加城镇职工基本养老保险人数 53449 万人。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.gov.cn/zhengce/zhengceku/202506/P020250601601759182303.pdf\">《全国住房公积金2024年年度报告》</a>、<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.stats.gov.cn/sj/zxfb/202502/t20250228_1958817.html\">《中华人民共和国2024年国民经济和社会发展统计公报》</a></p><p><a class=\"timestamp\">00:39:18</a>&nbsp;<strong>LPR（贷款市场报价利率）</strong>：指由各报价行根据其对最优质客户执行的贷款利率，按照公开市场操作利率加点形成的方式报价，由中国人民银行授权全国银行间同业拆借中心计算得出并发布的利率。各银行实际发放的贷款利率可根据借款人的信用情况，考虑抵押、期限、利率浮动方式和类型等要素，在贷款市场报价利率基础上加减点确定。</p><p><a class=\"timestamp\">00:49:05</a> 更正，此处主要指<strong>职业年金</strong>：指机关事业单位及其工作人员在参加机关事业单位基本养老保险的基础上，建立的补充养老保险制度。</p><p><a class=\"timestamp\">00:50:33</a>&nbsp;<strong>个人养老金</strong>：一项由个人自愿参加，用于补充养老保障的制度。个人养老金每年缴纳上限为 12000 元，缴费完全由参加人个人承担，资金在专属账户中实行完全累积。缴费在个税前扣除，领取时按 3% 的税率单独计税。</p><p><a class=\"timestamp\">00:51:19</a> 2025年，全国城镇非私营单位就业人员年平均工资 129441 元，全国城镇私营单位就业人员年平均工资 71590 元。数据来源<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.stats.gov.cn/sj/zxfb/202605/t20260515_1963707.html\">《2025年城镇单位就业人员年平均工资情况》</a></p><p><a class=\"timestamp\">00:51:52</a> 见住房城乡建设部、自然资源部、金融监管总局于 2026 年 8 月 28 日联合印发的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.mohurd.gov.cn/gongkai/zc/wjk/art/2026/art_45644612a7064289bdc0d5b1427a25d8.html\">《关于完善商品住房销售制度的通知》</a>。</p><blockquote><p>通知提出，各地要完善商品住房预售管理。需规范商品住房预售条件，商品住房项目实行预售的，单体建筑应完成主体结构封顶；需加强预售资金监管，购房人支付的首付款、个人住房贷款等购房资金应全部存入资金监管账户。</p></blockquote><p><a class=\"timestamp\">01:01:01</a> 此处提及的<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.zzz.gov.cn/dkjsq/calculator.html#\">住房公积金贷款计算器</a></p><p><strong>往期节目</strong></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/episode/6438fc399361a4e7c3863b9a\">E83 我们对公积金的态度：应用尽用，能取就取</a></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast-topic/6543a79ce5f242983f76c231\">知行小酒馆｜五险一金系列</a></p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://www.xiaoyuzhoufm.com/podcast-topic/6543a57bde390991a499adac\">知行小酒馆｜房产万事屋系列</a></p><h2>🌐 知行小酒馆公告牌</h2><p><strong>✨ 有知有行 App 3.0 版本上线啦</strong></p><p>过去几年，不少同路人都在问我们：什么时候可以不用跳转，直接在有知有行买入长稳海？现在终于可以告诉大家，<strong>从这一版本起，「长钱账户」「稳钱账户」「海外长钱」都已经支持在</strong><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\"><strong>有知有行 App</strong></a><strong> 里直接买入。</strong></p><p>谢谢你陪我们走到这里，有知有行还在继续成长，也希望可以继续陪伴你通过安心投资，一步步接近更好的生活。</p><blockquote><p>长钱账户、稳钱账户和海外长钱的销售、投顾服务，分别由海南有知有行基金销售有限公司和嘉实财富提供。产品的过往业绩不预示其未来表现，为其他投资者创造的收益也不构成业绩表现的保证。请在全面了解产品的风险收益特征后独立作出投资决策。</p></blockquote><img src=\"https://image.xyzcdn.net/FjkPEsamj3dEI6owRy7KgQNVsu1r.png\"><p><strong>🍻 我们是谁？</strong>「知行小酒馆」是 <a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a> 出品的一档分享投资与生活的播客节目，每周五晚八点更新。我们关注投资理财，更关注怎样更好地生活。在我们看来，投资成功，是我们变成一个更好的人之后，自然的结果。</p><p><a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">有知有行</a> 成立于 2020 年，目前在陪伴投资者用正确的方式学习投资，下场实操。凭借在投资领域的良好口碑，有知有行在初创阶段已与一大批忠实用户同行。未来我们希望成为一家财富管理公司，不仅帮助投资者学习投资，也能让大家在有知有行安心交易，踏实赚钱。<a target=\"_blank\" rel=\"noopener noreferrer nofollow\" href=\"https://youzhiyouxing.cn/\">欢迎在「有知有行」社区 和我们互动交流</a>。</p><h2>🎺 创作团队</h2><p><strong>主持 </strong>雨白 周一｜<strong>嘉宾</strong> 老钱｜<strong>制作 </strong>周一｜<strong>后期</strong> 孙称｜<strong>单集封面 </strong>雨白供图（摄于阿那亚金山岭中心小镇）</p><p><strong>免责声明</strong></p><p>本播客所述投资相关内容皆以交流分享为目的，仅供参考，不构成任何市场预测、判断，或投资、咨询建议。市场有风险，投资需谨慎。主持人及嘉宾对投资相关内容的准确性、可靠性、时效性及完整性不作任何明示或暗示的保证，并提醒您对相关内容请结合自身情况进行独立评估，依据或使用相关内容所造成的后果由您独自承担。</p><p>感谢您对本播客原创内容的青睐。如转载或引用本播客所述内容，请注明出处。转载前请与有知有行联系并取得同意。</p>",
+      "duration": 3882000,
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/6013f9f58e2f7ee375cf4216/6aace1189d326477816b0a46/media.xyzcdn.net/6013f9f58e2f7ee375cf4216/lmju8EfE2LJPb5eO90bmgk8KrdQT.m4a",
+      "pubDate": 1789732800000,
+      "imageUrl": "https://image.xyzcdn.net/FgHMruqZPGrhCFyHomAt9Y9d6A8f.jpg",
+      "channelTitle": "知行小酒馆",
+      "rssFeedUrl": "https://feed.xyzfm.space/j8yp8gxkmgqr",
+      "playlistId": 1,
+      "position": -0.0015,
+      "playedDuration": 33876
+    }
+  ],
+  "historyEpisode": [
+    {
+      "id": 1,
+      "title": "中共还能撑多久？暴力革命的成本与忍耐极限！",
+      "description": "<p>由於中共政權與國家體系高度綁定，缺乏和平退場機制，其執政團隊的解散幾乎必然伴隨流血和暴力革命，這使得推翻政權的成本極高，普通民眾的忍耐程度也相對提高。目前尚未出現大規模生存威脅，糧食產量連年增長，民眾缺乏發起暴力革命的最強烈誘因。在外部壓力方面，美國將對華競爭定位為削弱而非旨在改變中國制度，行動保持克制，不會將中共逼入絕路。</p>",
+      "duration": 1598000,
+      "enclosureUrl": "https://anchor.fm/s/f2cbc0a8/podcast/play/108627905/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-8-22%2F407903299-44100-2-30668f64e8c05.m4a",
+      "pubDate": 1758507326000,
+      "imageUrl": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_episode/40634394/40634394-1758506825185-f2ff6fa2a3bd4.jpg",
+      "channelTitle": "小岛大浪吹",
+      "rssFeedUrl": "https://anchor.fm/s/f2cbc0a8/podcast/rss"
+    }
+  ],
+  "subtitle": [],
+  "translation": [],
+  "sqlite_sequence": [],
+  "anycast_episode": {
+    "user_version": 3,
+    "cacheObject": [
+      {
+        "_id": 1,
+        "url": "https://anchor.fm/s/f2cbc0a8/podcast/play/108627905/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-8-22%2F407903299-44100-2-30668f64e8c05.m4a",
+        "key": "https://anchor.fm/s/f2cbc0a8/podcast/play/108627905/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-8-22%2F407903299-44100-2-30668f64e8c05.m4a",
+        "relativePath": "29868140-b66c-11f1-a41d-d3a8a3f0833c.mp4",
+        "eTag": "\"941ee926a7e19154e9428ebd9696b335\"",
+        "validTill": 1790675909454,
+        "touched": 1790071112679,
+        "length": 25854032
+      }
+    ]
+  },
+  "libCachedImageData": {
+    "user_version": 3,
+    "cacheObject": [
+      {
+        "_id": 1,
+        "url": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_episode/40634394/40634394-1758506825185-f2ff6fa2a3bd4.jpg",
+        "key": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_episode/40634394/40634394-1758506825185-f2ff6fa2a3bd4.jpg",
+        "relativePath": "19df3de0-b66c-11f1-81a5-81e6a98fda11.jpg",
+        "eTag": "\"36f7a754919a5e79da79f90476835961\"",
+        "validTill": 1792663083194,
+        "touched": 1790071090601,
+        "length": 2021272
+      }
+    ]
+  }
+}

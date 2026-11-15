@@ -1,0 +1,10 @@
+HTTP/2 302 
+date: Tue, 22 Sep 2026 02:15:25 GMT
+content-type: text/html; charset=UTF-8
+location: https://feeds.megaphone.fm/FSI1483080183
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=iI1ybsa%2BbRd9lE7Rbkqw6a9yCCKxR96xBErdkcnewi8gsusYq5zEdcRHdrDaZ1CU3vnn5zLQ6kYNwY7TZZs54d3A67s0EckkLfCy0GR2e2UxIkG66kM655%2B7%2BWyS%2BLAvrQ%3D%3D"}]}
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+server: cloudflare
+cf-ray: a3edcd430d72b828-SJC
+alt-svc: h3=":443"; ma=86400
+

@@ -14,12 +14,18 @@ Future<void> historyEpisodeTableCreator(DatabaseExecutor db) {
       pubDate INTEGER,
       imageUrl TEXT,
       channelTitle TEXT,
-      rssFeedUrl TEXT
+      rssFeedUrl TEXT,
+      lastPlayedAt INTEGER
     )
   """);
 }
 
 class HistoryEpisodeModel extends Episode {
+  /// Unix milliseconds of the latest play. Null for a model that has not
+  /// been written yet, and for rows that predate the column (upgraded from
+  /// schema 4): their play time is unknown.
+  int? lastPlayedAt;
+
   Map<String, dynamic> toMap() {
     var map = <String, dynamic>{
       'channelTitle': channelTitle,
@@ -33,6 +39,9 @@ class HistoryEpisodeModel extends Episode {
     };
     if (id != null) {
       map['id'] = id;
+    }
+    if (lastPlayedAt != null) {
+      map['lastPlayedAt'] = lastPlayedAt;
     }
 
     return map;
@@ -48,11 +57,13 @@ class HistoryEpisodeModel extends Episode {
     enclosureUrl = map['enclosureUrl'];
     pubDate = map['pubDate'];
     imageUrl = map['imageUrl'];
+    lastPlayedAt = map['lastPlayedAt'];
   }
 
   static Future<List<HistoryEpisodeModel>> listAll(DatabaseExecutor db) async {
     return db
-        .rawQuery('SELECT * FROM $tableName ORDER BY id DESC')
+        .rawQuery(
+            'SELECT * FROM $tableName ORDER BY lastPlayedAt DESC, id DESC')
         .then((List<Map<String, dynamic>> maps) {
       return List.generate(maps.length, (i) {
         return HistoryEpisodeModel.fromMap(maps[i]);
@@ -72,19 +83,38 @@ class HistoryEpisodeModel extends Episode {
     );
   }
 
-  // delete first and then insert
+  /// Upsert by enclosure URL. The history primary key is independent of any
+  /// id the caller carries (playlist rowids used to be copied through and
+  /// could REPLACE a different history row). Re-listening bumps lastPlayedAt
+  /// and keeps the existing history id.
+  ///
+  /// UPDATE then INSERT rather than `ON CONFLICT DO UPDATE`: sqflite uses the
+  /// platform SQLite on Android, and releases before Android 11 ship a
+  /// version older than 3.24, which has no UPSERT syntax.
   static Future<void> insert(
       DatabaseExecutor db, HistoryEpisodeModel model) async {
-    await db.delete(
+    final values = <String, Object?>{
+      'title': model.title,
+      'description': model.description,
+      'duration': model.duration,
+      'pubDate': model.pubDate,
+      'imageUrl': model.imageUrl,
+      'channelTitle': model.channelTitle,
+      'rssFeedUrl': model.rssFeedUrl,
+      'lastPlayedAt': DateTime.now().millisecondsSinceEpoch,
+    };
+    final updated = await db.update(
       tableName,
+      values,
       where: 'enclosureUrl = ?',
       whereArgs: [model.enclosureUrl],
     );
-    await db.insert(
-      tableName,
-      model.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    if (updated == 0) {
+      await db.insert(
+        tableName,
+        {...values, 'enclosureUrl': model.enclosureUrl},
+      );
+    }
   }
 
   static Future<void> deleteMany(

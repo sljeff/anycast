@@ -1,0 +1,483 @@
+import UIKit
+import Kingfisher
+import AnycastKit
+
+/// Player page 1 (PlayerMain, player.dart:146-235, 03 §2.10) in the Anycast
+/// 2.0 now-playing form: the artwork just under the grabber, the episode
+/// title (wraps to two lines) over the show name (taps open the Channel
+/// sheet on top) with the share shortcut (shortlink → system share sheet)
+/// beside them, then — down by the page selector — the scrubber with the
+/// current chapter under it (taps open This episode), and the transport
+/// (−10 s / play-pause with the loading animation / +30 s, play centered —
+/// the shared `PlayerTransportView`) flanked by playback speed and the
+/// sleep timer, each a menu, in the slots the transcript page gives ••• and
+/// Ask AI; plus the K6 retry affordance. Slack goes between the title and
+/// the scrubber, so the controls stay in the thumb zone. Background belongs
+/// to the container.
+final class PlayerMainPageViewController: UIViewController {
+
+    private let context: UIContext
+    private let observation = ObservationLoop()
+    private let chapterObservation = ObservationLoop()
+
+    private let coverFrame = UIView()
+    private let coverView = UIImageView()
+    private let shareButton = AnycastIconButton(
+        style: .plain, icon: AppIcons.share, accessibilityLabel: "Share episode", glyphSize: 20
+    )
+    private let shareSpinner = UIActivityIndicatorView(style: .medium)
+    private let titleBlock = PlayerTitleBlockView()
+    private lazy var transport = PlayerTransportView(context: context)
+    private lazy var speedSleep = PlayerSpeedSleepControls(context: context)
+    private let chapterButton = UIButton(type: .system)
+    private var chapters: [EpisodeChapter] = []
+    private let retryRow = UIStackView()
+    private var bottomStack = UIStackView()
+
+    private enum Layout {
+        /// The page's one content column: the artwork, title row, scrubber
+        /// and transport all share these side insets.
+        static let columnInset = PlayerLayout.column
+        /// Frame-to-ink slack at the share button's trailing side (the
+        /// 20 pt `square.and.arrow.up` is ~22.5 pt of ink centered in the
+        /// 44 pt hit target, measured), hung outside the column so the
+        /// glyph's ink, not the frame, meets the column's trailing edge.
+        static let shareInkInset: CGFloat = 10.75
+        /// Title block → scrubber frame. The title belongs to the scrubber
+        /// ("what is playing, and where in it"), so the two sit close; the
+        /// scrubber frame hides ~20 pt of slack above its track.
+        static let titleToScrubber: CGFloat = -6
+        /// Least air between the artwork and the title block.
+        static let coverToTitle: CGFloat = Spacing.pageHeader
+        static let transportToSelector = PlayerTransportView.Layout.toSelector
+        /// Clears the sheet's system grabber; the artwork is centered in
+        /// what is left between here and the title.
+        static let contentTop: CGFloat = 20
+    }
+
+    init(context: UIContext) {
+        self.context = context
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    // MARK: - Lifecycle
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        build()
+        bind()
+        render()
+        observation.track(
+            read: { [weak self] in
+                guard let self else { return }
+                _ = self.context.playback.currentEpisodeContent
+                _ = self.context.playback.playbackError
+            },
+            onChange: { [weak self] in self?.render() }
+        )
+        chapterObservation.track(
+            read: { [weak self] in
+                _ = self?.context.playback.positionData
+            },
+            onChange: { [weak self] in self?.renderChapter() }
+        )
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        speedSleep.pageWillAppear()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        speedSleep.pageDidDisappear()
+    }
+
+    // MARK: - Build
+
+    private func build() {
+        coverView.contentMode = .scaleAspectFill
+        coverView.clipsToBounds = true
+        coverView.layer.cornerRadius = Radius.artwork
+        coverView.layer.cornerCurve = .continuous
+        coverView.backgroundColor = Theme.surfaceContainerHigh
+        coverView.isAccessibilityElement = true
+        coverView.accessibilityLabel = "Episode artwork"
+        coverView.translatesAutoresizingMaskIntoConstraints = false
+        coverFrame.addSubview(coverView)
+
+        shareButton.tintColor = Theme.playerSecondary
+        shareButton.configuration?.baseForegroundColor = Theme.playerSecondary
+        shareSpinner.color = Theme.playerText
+        shareSpinner.hidesWhenStopped = true
+        shareSpinner.translatesAutoresizingMaskIntoConstraints = false
+        shareButton.addSubview(shareSpinner)
+
+        let titleRow = UIStackView(arrangedSubviews: [titleBlock, shareButton])
+        titleRow.axis = .horizontal
+        titleRow.alignment = .top
+        titleRow.spacing = Spacing.gap
+
+        retryRow.axis = .vertical
+        retryRow.alignment = .center
+        retryRow.isHidden = true
+        let retryButton = AnycastButton.make(
+            .secondary, title: "Retry", image: AppIcons.retry
+        )
+        retryButton.accessibilityLabel = "Retry playback"
+        retryButton.addAction(
+            UIAction { [weak self] _ in
+                guard let self else { return }
+                Task { await self.context.playback.retry() }
+            },
+            for: .touchUpInside
+        )
+        retryRow.addArrangedSubview(retryButton)
+
+        buildTransportAccessories()
+        bottomStack = UIStackView(arrangedSubviews: [transport, retryRow])
+        bottomStack.axis = .vertical
+        bottomStack.setCustomSpacing(Spacing.pageH, after: transport)
+
+        for block in [coverFrame, titleRow, bottomStack] {
+            block.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(block)
+        }
+
+        // Square artwork at the column width, centered; on short windows
+        // (or under large Dynamic Type) the required top gap squeezes it
+        // smaller (07 §4 hard requirement: nothing is pushed off-screen).
+        let column = UILayoutGuide()
+        view.addLayoutGuide(column)
+        // Below the scrubber's compression resistance: when space runs out
+        // the artwork gives way first, not the title or the controls.
+        let coverWidth = coverFrame.widthAnchor.constraint(equalTo: column.widthAnchor)
+        coverWidth.priority = UILayoutPriority(700)
+        let aboveCover = UILayoutGuide()
+        let belowCover = UILayoutGuide()
+        view.addLayoutGuide(aboveCover)
+        view.addLayoutGuide(belowCover)
+        let balanced = aboveCover.heightAnchor.constraint(equalTo: belowCover.heightAnchor)
+        balanced.priority = UILayoutPriority(750)
+
+        NSLayoutConstraint.activate([
+            column.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Layout.columnInset),
+            column.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Layout.columnInset),
+
+            // The artwork floats centered between the grabber and the
+            // title: equal air above and below, so the page has one clear
+            // subject and no hole between the title and the controls.
+            aboveCover.topAnchor.constraint(equalTo: view.topAnchor, constant: Layout.contentTop),
+            aboveCover.bottomAnchor.constraint(equalTo: coverFrame.topAnchor),
+            belowCover.topAnchor.constraint(equalTo: coverFrame.bottomAnchor),
+            belowCover.bottomAnchor.constraint(equalTo: titleRow.topAnchor),
+            belowCover.heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.coverToTitle),
+            balanced,
+
+            coverFrame.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            coverWidth,
+            coverFrame.widthAnchor.constraint(lessThanOrEqualTo: column.widthAnchor),
+            coverFrame.heightAnchor.constraint(equalTo: coverFrame.widthAnchor),
+            coverView.topAnchor.constraint(equalTo: coverFrame.topAnchor),
+            coverView.bottomAnchor.constraint(equalTo: coverFrame.bottomAnchor),
+            coverView.leadingAnchor.constraint(equalTo: coverFrame.leadingAnchor),
+            coverView.trailingAnchor.constraint(equalTo: coverFrame.trailingAnchor),
+
+            titleRow.leadingAnchor.constraint(equalTo: column.leadingAnchor),
+            titleRow.trailingAnchor.constraint(equalTo: column.trailingAnchor, constant: Layout.shareInkInset),
+
+            // The title sits on the scrubber; the controls stay down by the
+            // selector, in the thumb zone.
+            bottomStack.topAnchor.constraint(equalTo: titleRow.bottomAnchor, constant: Layout.titleToScrubber),
+            bottomStack.leadingAnchor.constraint(equalTo: column.leadingAnchor),
+            bottomStack.trailingAnchor.constraint(equalTo: column.trailingAnchor),
+            bottomStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Layout.transportToSelector),
+
+            shareSpinner.centerXAnchor.constraint(equalTo: shareButton.centerXAnchor),
+            shareSpinner.centerYAnchor.constraint(equalTo: shareButton.centerYAnchor),
+        ])
+    }
+
+    /// Speed left and sleep timer right of the transport (shared with the
+    /// transcript page); the current chapter under the scrubber.
+    private func buildTransportAccessories() {
+        speedSleep.install(in: transport)
+
+        var chapterConfig = UIButton.Configuration.plain()
+        chapterConfig.baseForegroundColor = Theme.playerSecondary
+        chapterConfig.contentInsets = NSDirectionalEdgeInsets(
+            top: Spacing.md, leading: 0, bottom: Spacing.md, trailing: 0
+        )
+        chapterConfig.titleLineBreakMode = .byTruncatingTail
+        chapterConfig.image = AppIcons.disclosure
+        chapterConfig.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
+            textStyle: TypographyV2.meta.scalingTextStyle, scale: .small
+        )
+        chapterConfig.imagePlacement = .trailing
+        chapterConfig.imagePadding = Spacing.xs
+        chapterConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.meta.font()
+            return outgoing
+        }
+        chapterButton.configuration = chapterConfig
+        chapterButton.contentHorizontalAlignment = .leading
+        chapterButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        chapterButton.accessibilityIdentifier = "player-current-chapter"
+        // The label can stay meta-sized. The control itself is at least 44 pt.
+        chapterButton.heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit).isActive = true
+        chapterButton.addAction(UIAction { [weak self] _ in self?.openEpisodePage() }, for: .touchUpInside)
+    }
+
+    private func bind() {
+        shareButton.addAction(
+            UIAction { [weak self] _ in self?.shareTapped() },
+            for: .touchUpInside
+        )
+        titleBlock.onOpenChannel = { [weak self] in self?.openChannel() }
+    }
+
+    // MARK: - Rendering (ObservationLoop-driven)
+
+    /// Last URL handed to the cover view — see PlayerBarView.renderedCoverURL;
+    /// render() runs every position tick, so the cover load must be
+    /// change-driven, not unconditional.
+    private var renderedCoverURL: URL?
+
+    private func render() {
+        let episode = context.playback.currentEpisode
+        // A missing cover shows the shared local placeholder (no remote
+        // "No Episode" image request).
+        let coverURL = episode?.imageUrl.flatMap(URL.init(string:))
+        if coverURL != renderedCoverURL || coverURL == nil {
+            renderedCoverURL = coverURL
+            coverView.kf.cancelDownloadTask()
+            coverView.setArtwork(coverURL, title: episode?.channelTitle, side: ArtworkSizing.large)
+        }
+
+        titleBlock.update(
+            title: episode?.title ?? "",
+            channelTitle: episode?.channelTitle ?? "",
+            rssFeedURL: episode?.rssFeedUrl,
+            hasEpisode: episode != nil
+        ) { [weak self] rss in
+            guard let self else { return }
+            Task { await self.fetchChannel(rssFeedURL: rss) }
+        }
+
+        // K6: error surfaced by the shell toast; this is the manual retry.
+        retryRow.isHidden = context.playback.playbackError == nil
+
+        let shareEnabled = Self.shareAvailable(episode)
+        shareButton.isEnabled = shareEnabled
+        shareButton.alpha = shareEnabled ? 1 : 0.38
+
+        let parsed = EpisodeChapters.chapters(description: episode?.description, cacheKey: episode?.enclosureUrl)
+        if parsed != chapters {
+            chapters = parsed
+            transport.setChapterMarks(parsed.map { Int64($0.startMilliseconds) })
+            transport.setScrubberFooter(parsed.isEmpty ? nil : chapterButton)
+        }
+        renderChapter()
+    }
+
+    /// The playing chapter's title under the scrubber.
+    private func renderChapter() {
+        guard !chapters.isEmpty else { return }
+        let position = Int(context.playback.positionData.positionMilliseconds)
+        let index = EpisodeChapters.index(at: position, in: chapters) ?? 0
+        let title = chapters[index].title
+        guard chapterButton.configuration?.title != title else { return }
+        chapterButton.configuration?.title = title
+        chapterButton.accessibilityLabel = "Chapter: \(title)"
+        chapterButton.accessibilityHint = "Shows this episode's chapters and notes"
+    }
+
+    /// The share action needs the shortlink inputs — an episode with both
+    /// a feed URL and an enclosure URL. Everything else on the transport
+    /// dims to 38% with no episode; share matches that affordance (the
+    /// tap guard alone would leave it looking usable on a drained queue).
+    static func shareAvailable(_ episode: PlaylistEpisodeRow?) -> Bool {
+        guard let episode else { return false }
+        return !(episode.rssFeedUrl ?? "").isEmpty && !(episode.enclosureUrl ?? "").isEmpty
+    }
+
+    private func openEpisodePage() {
+        var ancestor = parent
+        while let controller = ancestor, !(controller is PlayerPageContainer) {
+            ancestor = controller.parent
+        }
+        (ancestor as? PlayerPageContainer)?.selectPage(0)
+    }
+
+    /// The Dart TitleBar reads the subscription row (controller.channel) for
+    /// the show's display name; the page owns the async hop off the main actor.
+    private func fetchChannel(rssFeedURL: String) async {
+        let subscription: SubscriptionRow?
+        do {
+            subscription = try await context.database.subscriptionRepository().get(byRSSFeedURL: rssFeedURL)
+        } catch {
+            // A failed DB read is NOT "no channel data": keep whatever the
+            // title bar already renders instead of clearing it to the
+            // placeholders. Clearing only happens for a genuinely different
+            // episode whose fetch SUCCEEDED and found no row.
+            return
+        }
+        // A fast episode switch can outpace this fetch; landing a stale
+        // response would paint the previous episode's channel title/image
+        // onto the new one (same identity guard as
+        // SubtitlesPageViewController.updateHeader).
+        guard rssFeedURL == titleBlock.channelURLString else { return }
+        // Unsubscribed shows have no row: keep the episode's own show name.
+        if let title = subscription?.title, !title.isEmpty {
+            titleBlock.setChannelTitle(title)
+        }
+    }
+
+    // MARK: - Actions
+
+    /// Dart jumpToChannel (player.dart:591-601): the sheet is configured with
+    /// the CURRENT episode's feed URL and presented as an expand sheet.
+    private func openChannel() {
+        guard let rss = context.playback.currentEpisode?.rssFeedUrl else { return }
+        let channel = ChannelViewController(context: context, rssFeedURL: rss)
+        AppSheets.presentExpand(channel, from: topMostPresented())
+    }
+
+    /// player.dart:175-224 — spinner → /api/shortlink → system share panel
+    /// with "title\n\nurl" (shortlink failure degrades to the full URL).
+    private func shareTapped() {
+        guard Self.shareAvailable(context.playback.currentEpisode),
+              let episode = context.playback.currentEpisode,
+              let rss = episode.rssFeedUrl, let enclosure = episode.enclosureUrl,
+              let url = URL(string: ShareURL.player(rssFeedURL: rss, enclosureURL: enclosure))
+        else { return }
+        shareSpinner.startAnimating()
+        let api = context.api
+        let title = episode.title ?? ""
+        Task { [weak self] in
+            let short = await api.getShortURL(for: url) ?? url
+            guard let self, self.shareSpinner.isAnimating else { return }
+            self.shareSpinner.stopAnimating()
+            let activity = UIActivityViewController(
+                activityItems: ["\(title)\n\n\(short.absoluteString)"],
+                applicationActivities: nil
+            )
+            self.topMostPresented().present(activity, animated: true)
+        }
+    }
+}
+
+// MARK: - Title block (player.dart:300-399)
+
+/// Episode title (wraps to two lines, then truncates) over the show name;
+/// the show name opens the Channel sheet (Dart TitleBar affordance).
+@MainActor
+private final class PlayerTitleBlockView: UIView {
+
+    var onOpenChannel: (() -> Void)?
+
+    private let titleLabel = UILabel()
+    private let channelButton = UIButton(type: .system)
+    private(set) var channelURLString = ""
+    /// The episode-side show name last pushed by `update`; render() runs
+    /// every position tick, so the push must be change-driven or it would
+    /// revert a display name already fetched from the subscription row.
+    private var lastEpisodeChannelTitle = ""
+
+    init() {
+        super.init(frame: .zero)
+
+        titleLabel.font = TypographyV2.headlineMedium.font()
+        titleLabel.textColor = Theme.playerText
+        titleLabel.numberOfLines = 2
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+
+        var channelConfig = UIButton.Configuration.plain()
+        channelConfig.baseForegroundColor = Theme.playerText.withAlphaComponent(0.7)
+        channelConfig.contentInsets = .zero
+        channelConfig.titleLineBreakMode = .byTruncatingTail
+        channelConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.meta.font()
+            return outgoing
+        }
+        channelButton.configuration = channelConfig
+        channelButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        channelButton.contentHorizontalAlignment = .leading
+        channelButton.accessibilityLabel = "Open channel"
+        channelButton.addAction(
+            UIAction { [weak self] _ in self?.onOpenChannel?() },
+            for: .touchUpInside
+        )
+
+        let stack = UIStackView(arrangedSubviews: [titleLabel, channelButton])
+        stack.axis = .vertical
+        stack.alignment = .leading
+        stack.spacing = Spacing.xs
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            channelButton.heightAnchor.constraint(greaterThanOrEqualToConstant: Spacing.pageHeader),
+            channelButton.widthAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.standardDiameter),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Pushes the current episode; `loadChannel` kicks the subscription
+    /// fetch (authoritative show name) once per rss URL. The fetch-sourced
+    /// name deliberately does NOT enter `lastEpisodeChannelTitle` — that
+    /// field mirrors the EPISODE-side name so the per-tick non-empty
+    /// branch cannot roll the fetched name back on every progress render.
+    /// Clearing is driven by `hasEpisode` instead.
+    func update(
+        title: String,
+        channelTitle: String,
+        rssFeedURL: String?,
+        hasEpisode: Bool,
+        loadChannel: @MainActor (String) -> Void
+    ) {
+        if titleLabel.text != title {
+            titleLabel.text = title
+        }
+        if !channelTitle.isEmpty, channelTitle != lastEpisodeChannelTitle {
+            lastEpisodeChannelTitle = channelTitle
+            setChannelTitle(channelTitle)
+        }
+        if let rssFeedURL {
+            guard rssFeedURL != channelURLString else { return }
+            channelURLString = rssFeedURL
+            loadChannel(rssFeedURL)
+        } else {
+            // No feed URL (no episode / a row without one): skip the fetch
+            // and clear the identity so an in-flight fetch for the previous
+            // episode cannot land on the current one.
+            channelURLString = ""
+        }
+        // The queue drained while the sheet is open: the previous episode's
+        // show name must not keep rendering under an empty title — whether
+        // it came from the row or from the channel fetch. A row that merely
+        // lacks a feed URL keeps its title (`hasEpisode` stays true).
+        if !hasEpisode {
+            lastEpisodeChannelTitle = ""
+            setChannelTitle("")
+        }
+    }
+
+    func setChannelTitle(_ title: String) {
+        channelButton.configuration?.title = title
+        channelButton.accessibilityLabel = "Open channel \(title)"
+    }
+}

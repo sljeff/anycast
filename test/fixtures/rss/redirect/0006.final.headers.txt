@@ -1,0 +1,14 @@
+HTTP/2 200 
+content-type: application/xml; charset=utf-8
+content-length: 455915
+x-acast-version: 1.2.0
+date: Tue, 22 Sep 2026 02:16:15 GMT
+cache-control: public, max-age=360, stale-if-error=1200
+etag: "djEuMi4wOjE3ODk0OTUyNzY4MzI="
+vary: Accept-Encoding
+x-cache: Hit from cloudfront
+via: 1.1 6b175795d4c4b1909e08459648cd6214.cloudfront.net (CloudFront)
+x-amz-cf-pop: SFO53-P7
+x-amz-cf-id: 4_LLPwDmr0s8ZQE9NKe5jFvsTVbL-cWlqPQM66cKmF2vfNIELp2BGQ==
+age: 81
+

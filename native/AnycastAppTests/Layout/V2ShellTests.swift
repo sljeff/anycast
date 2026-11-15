@@ -1,0 +1,228 @@
+import UIKit
+import Testing
+import AnycastKit
+@testable import Anycast
+
+/// The V2 shell pieces (09 §10 V2): the header component, the category
+/// projection, the mini player capsule chrome, and the Inbox status line.
+/// Color values are asserted with an explicit dark resolution
+/// (09 §9a).
+@MainActor
+struct V2ShellTests {
+
+    private let dark = UITraitCollection(userInterfaceStyle: .dark)
+
+    // MARK: - HeaderView (09 §3.8, Figma 624:30831)
+
+    @Test("Header paints the display title, Meta status and the settings action")
+    func headerBasics() {
+        let header = HeaderView()
+        header.configure(HeaderView.Configuration(
+            title: "Podcast", statusText: "updated just now · 100 unlistened"
+        ))
+        header.frame = CGRect(x: 0, y: 0, width: 440, height: 160)
+        header.layoutIfNeeded()
+
+        let title = header.subviews.compactMap { $0 as? UIStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? UILabel }
+            .first { $0.accessibilityIdentifier == "header-title" }
+        #expect(title?.text == "Podcast")
+        #expect(title?.font.pointSize == 48)
+
+        let status = header.subviews.compactMap { $0 as? UIStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? UILabel }
+            .first { $0.accessibilityIdentifier == "header-status" }
+        #expect(status?.text == "updated just now · 100 unlistened")
+        #expect(status?.isHidden == false)
+        #expect(
+            status?.textColor.resolvedColor(with: dark)
+                == Theme.onSurfaceVariant.resolvedColor(with: dark),
+            "status line paints the Meta color"
+        )
+        #expect(status?.font.pointSize == 15, "status line is Meta 15")
+
+        let buttons = header.subviews.compactMap { $0 as? AnycastIconButton }
+        #expect(buttons.map(\.accessibilityIdentifier) == ["header-settings"], "Settings is the only action")
+        let settings = buttons.first
+        #expect(settings?.isHidden == false)
+        #expect(header.subviews.contains { $0 is UITextField } == false, "no inline search field")
+        if let settings {
+            #expect(settings.frame.maxX == header.bounds.maxX - Spacing.pageH, "settings sits at the trailing margin")
+        }
+
+        var settingsTaps = 0
+        header.onSettings = { settingsTaps += 1 }
+        settings?.sendActions(for: .touchUpInside)
+        #expect(settingsTaps == 1)
+    }
+
+    @Test("Header scales for accessibility text and keeps actions clear")
+    func headerDynamicTypeLayout() {
+        let header = HeaderView()
+        let window = TraitHostWindow.attach(header)
+        defer { TraitHostWindow.detach(window) }
+        header.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraExtraLarge
+        header.configure(HeaderView.Configuration(title: "Discover", statusText: "Updated just now"))
+        header.frame = CGRect(x: 0, y: 0, width: 393, height: 180)
+        header.layoutIfNeeded()
+
+        let title = header.subviews.compactMap { $0 as? UIStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? UILabel }
+            .first { $0.accessibilityIdentifier == "header-title" }
+        let titleColumn = title?.superview
+        let actionLeft = header.subviews.compactMap { $0 as? AnycastIconButton }
+            .map(\.frame.minX).min() ?? 0
+        let titleRight = titleColumn?.frame.maxX ?? .infinity
+
+        #expect((title?.font.pointSize ?? 0) > 48)
+        #expect(titleRight <= actionLeft)
+    }
+
+    @Test("A nil status collapses the caption; settings can hide")
+    func headerCollapses() {
+        let header = HeaderView()
+        header.configure(HeaderView.Configuration(title: "queue", statusText: nil, showsSettings: false))
+        header.frame = CGRect(x: 0, y: 0, width: 440, height: 120)
+        header.layoutIfNeeded()
+
+        let status = header.subviews.compactMap { $0 as? UIStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? UILabel }
+            .first { $0.accessibilityIdentifier == "header-status" }
+        #expect(status?.isHidden == true)
+        let settings = header.subviews.compactMap { $0 as? AnycastIconButton }
+            .first { $0.accessibilityIdentifier == "header-settings" }
+        #expect(settings?.isHidden == true)
+    }
+
+    // MARK: - Inbox category projection (09 §3.2)
+
+    private func episode(_ url: String, feed: String?) -> FeedEpisodeRow {
+        var row = FeedEpisodeRow(enclosureUrl: url)
+        row.rssFeedUrl = feed
+        return row
+    }
+
+    @Test("Category map splits, trims, and lowercases; filtering is case-insensitive")
+    func categoryProjection() {
+        let subscriptions = [
+            SubscriptionRow(rssFeedUrl: "https://a.example/feed", categories: " Technology, business "),
+            SubscriptionRow(rssFeedUrl: "https://b.example/feed", categories: "arts"),
+            SubscriptionRow(rssFeedUrl: "https://c.example/feed", categories: nil),
+        ]
+        let map = InboxCategoryFilter.categoriesByFeed(from: subscriptions)
+        #expect(map["https://a.example/feed"] == ["technology", "business"])
+        #expect(map["https://b.example/feed"] == ["arts"])
+        #expect(map["https://c.example/feed"] == nil)
+
+        let episodes = [
+            episode("e1", feed: "https://a.example/feed"),
+            episode("e2", feed: "https://b.example/feed"),
+            episode("e3", feed: nil),
+        ]
+        #expect(InboxCategoryFilter.displayed(episodes: episodes, selected: nil, categoriesByFeed: map).count == 3)
+        #expect(
+            InboxCategoryFilter.displayed(episodes: episodes, selected: "TECHNOLOGY", categoriesByFeed: map)
+                .map(\.enclosureUrl) == ["e1"],
+            "selected filter keeps only matching feeds, case-insensitively"
+        )
+        #expect(
+            InboxCategoryFilter.displayed(episodes: episodes, selected: "missing", categoriesByFeed: map).isEmpty
+        )
+    }
+
+    // MARK: - Inbox status line (09 §3.8)
+
+    @Test("Inbox status line formats refresh time and unlistened count")
+    func inboxStatusText() {
+        let now = Date()
+        let justNow = now.addingTimeInterval(-5)
+        let text = InboxPageViewController.headerStatusText(
+            lastRefresh: justNow, episodeCount: 12, now: now
+        )
+        #expect(text == "updated just now · 12 unlistened", "got: \(text)")
+
+        let never = InboxPageViewController.headerStatusText(lastRefresh: nil, episodeCount: 0, now: now)
+        #expect(never == "updated — · 0 unlistened", "got: \(never)")
+    }
+
+    // MARK: - Mini player capsule chrome (09 §3.6 state c, Figma 83:2562)
+
+    @Test("Capsule mini player paints the v2 chrome and drops the time label")
+    func capsuleChrome() async {
+        guard let context = await Self.liveUIContext() else {
+            print("[v2shell] shell not ready; skipping capsule test"); return
+        }
+        let bar = context.makePlayerBar(style: .capsule)
+        bar.frame = CGRect(x: 0, y: 0, width: 408, height: PlayerBarView.barHeight)
+        bar.layoutIfNeeded()
+
+        let capsule = bar.subviews.first { $0 !== bar } ?? bar.subviews.first
+        // The v2 chrome family is STATIC light (09 §3.6: the dark design
+        // frame renders the capsule bright), opaque since the 2.0
+        // unification round so list content never shows through.
+        let light = capsule?.backgroundColor?.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        let dark = capsule?.backgroundColor?.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+        #expect(light == dark, "capsule surface must not follow the appearance")
+        var alpha: CGFloat = 0
+        light?.getWhite(nil, alpha: &alpha)
+        #expect(alpha == 1, "capsule surface must be opaque")
+        #expect(capsule?.layer.borderWidth == 1)
+        #expect(capsule?.layer.shadowOpacity == 0.08)
+        #expect(capsule?.layer.cornerRadius == PlayerBarView.barHeight / 2, "full capsule silhouette")
+
+        let labels = (capsule?.subviews.compactMap { $0 as? UILabel } ?? [])
+            .filter { !$0.isHidden }
+        #expect(labels.count == 1, "capsule carries only the title label (time label hidden)")
+        #expect(labels.first?.accessibilityIdentifier == "mini-player-title")
+    }
+
+    @Test("Mini player has no progress line in any hosting style and keeps its content centred")
+    func miniPlayerHasNoProgressLine() async {
+        guard let context = await Self.liveUIContext() else {
+            print("[v2shell] shell not ready; skipping mini player progress test"); return
+        }
+        for style in [PlayerBarView.HostingStyle.systemAccessory, .capsule] {
+            let bar = context.makePlayerBar(style: style)
+            bar.frame = CGRect(x: 0, y: 0, width: 408, height: PlayerBarView.barHeight)
+            bar.layoutIfNeeded()
+            #expect(!bar.containsView(ofType: EpisodeProgressBackdrop.self), "\(style): progress line present")
+
+            guard let capsule = bar.subviews.first else {
+                Issue.record("\(style): capsule container missing"); continue
+            }
+            for content in capsule.subviews {
+                #expect(
+                    abs(content.center.y - capsule.bounds.midY) < 0.5,
+                    "\(style): \(type(of: content)) is not vertically centred"
+                )
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    @MainActor
+    private static func liveUIContext() async -> UIContext? {
+        for _ in 0..<40 {
+            if let context = (UIApplication.shared.delegate as? AppDelegate)?.environment.uiContext {
+                return context
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        return nil
+    }
+}
+
+private extension UIView {
+    func containsView<T: UIView>(ofType type: T.Type) -> Bool {
+        self is T || subviews.contains { $0.containsView(ofType: type) }
+    }
+
+    func recursiveAccessibilityIdentifiers() -> [String] {
+        var found = accessibilityIdentifier.map { [$0] } ?? []
+        for subview in subviews {
+            found.append(contentsOf: subview.recursiveAccessibilityIdentifiers())
+        }
+        return found
+    }
+}

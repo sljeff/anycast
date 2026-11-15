@@ -1,0 +1,40 @@
+{
+  "source": "User.fromJson (api/user.dart:17-31), Jiffy pattern yyyy-MM-ddTHH:mm:ssZ",
+  "cases": {
+    "null": {
+      "uid": "u1",
+      "remaining": 10,
+      "plus": 0,
+      "expireAt_epoch_ms": null,
+      "expireAt_iso": null
+    },
+    "2027-03-15T09:30:00+00:00": {
+      "uid": "u2",
+      "remaining": 42,
+      "plus": 1,
+      "expireAt_epoch_ms": 1805074200000,
+      "expireAt_iso": "2027-03-15T01:30:00.000Z"
+    },
+    "2024-07-29T15:35:52+00:00": {
+      "uid": "u3",
+      "remaining": 0,
+      "plus": 1,
+      "expireAt_epoch_ms": 1722238552000,
+      "expireAt_iso": "2024-07-29T07:35:52.000Z"
+    },
+    "2027-03-15T04:30:00-05:00": {
+      "uid": "u4",
+      "remaining": 3,
+      "plus": 1,
+      "expireAt_epoch_ms": 1805056200000,
+      "expireAt_iso": "2027-03-14T20:30:00.000Z"
+    },
+    "2027-03-15T09:30:00Z": {
+      "uid": "u5",
+      "remaining": 1,
+      "plus": 0,
+      "expireAt_epoch_ms": 1805074200000,
+      "expireAt_iso": "2027-03-15T01:30:00.000Z"
+    }
+  }
+}

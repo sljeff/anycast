@@ -1,0 +1,16 @@
+HTTP/1.1 200 OK
+Server: nginx
+Content-Type: text/xml; charset=utf-8
+ETag: "6ab1e221-52669"
+Strict-Transport-Security: max-age=31536000
+Accept-Ranges: bytes
+Expires: Sun, 21 Mar 2027 02:19:24 GMT
+X-Frame-Options: SAMEORIGIN
+Last-Modified: Tue, 22 Sep 2026 02:04:17 GMT
+Cache-Control: max-age=15552000
+Content-Length: 337513
+Connection: keep-alive
+Date: Tue, 22 Sep 2026 02:19:23 GMT
+EO-LOG-UUID: 15659114025291510605
+EO-Cache-Status: MISS
+

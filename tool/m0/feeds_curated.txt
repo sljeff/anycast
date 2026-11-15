@@ -1,0 +1,21 @@
+# Curated real podcast RSS feeds (M0 corpus candidates).
+# Requirements: publicly reachable, no auth. Mixed EN/CJK, large item counts preferred.
+https://lexfridman.com/feed/podcast/
+https://atp.fm/episodes/feed.rss
+https://feed.syntax.fm/rss
+https://www.hardcorehistoryfeeds.com/feed
+https://feeds.simplecast.com/54nAGcIl
+https://feeds.fireside.fm/darknetdiaries/xml
+https://feeds.arstechnica.com/arstechnica/technology-lab
+https://feeds.bbci.co.uk/news/technology/rss.xml
+https://feeds.npr.org/510289/podcast.xml
+https://feeds.megaphone.fm/VOX2608667961
+https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae250086f4dc/aefc7c14-8a72-4cf3-905c-ae250086f5dc/4f9b93ba-9690-4fd4-9be0-ae250086f5dc/podcast.rss
+https://feeds.soundcloud.com/users/soundcloud:users:314032706/sounds.rss
+https://feeds.feedburner.com/TheRomanMilitary?format=xml
+# Chinese podcasts
+https://storyfm.cn/feed/
+https://justpodmedia.com/rss/huzuohuyou.xml
+https://justpodmedia.com/rss/panfinance.xml
+https://s1.proxy.wavpub.com/daoji.json
+https://feed.xyzfm.space/hwen8wf69c6g

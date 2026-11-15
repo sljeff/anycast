@@ -1207,26 +1207,40 @@ class _LyricsWithShareState extends State<LyricsWithShare>
 }
 
 // lrc format
-Future<void> exportSubtitles(String mainLyric, String? translationLyric) async {
-  var playerController = Get.find<PlayerController>();
-  var title = playerController.playlistEpisode.value.title ?? 'Subtitle';
-  var channelTitle = playerController.playlistEpisode.value.channelTitle ?? '';
-  var subject = '$title - $channelTitle';
-  if (channelTitle.isEmpty) {
-    subject = title;
-  }
+/// Export file name / share subject: 'title - channelTitle', plain 'title'
+/// when there is no channel title, 'Subtitle' when the episode is untitled.
+String deriveExportSubject(String? title, String? channelTitle) {
+  title = title ?? 'Subtitle';
+  channelTitle = channelTitle ?? '';
+  if (channelTitle.isEmpty) return title;
+  return '$title - $channelTitle';
+}
 
+/// Pure text assembly of the exported subtitle file (original inline logic of
+/// exportSubtitles, extracted for testability). Byte-identical output.
+String buildExportText(String? title, String? channelTitle, String mainLyric,
+    String? translationLyric) {
+  var subject = deriveExportSubject(title, channelTitle);
   var buffer = StringBuffer('# $subject\n\n---\n\n');
   buffer.writeln(mainLyric);
   if (translationLyric != null && translationLyric.isNotEmpty) {
     buffer.writeln('\n--- Translation ---\n');
     buffer.writeln(translationLyric);
   }
+  return buffer.toString();
+}
+
+Future<void> exportSubtitles(String mainLyric, String? translationLyric) async {
+  var playerController = Get.find<PlayerController>();
+  var episode = playerController.playlistEpisode.value;
+  var subject = deriveExportSubject(episode.title, episode.channelTitle);
+  var buffer = buildExportText(
+      episode.title, episode.channelTitle, mainLyric, translationLyric);
 
   var tempFile = await getTemporaryDirectory();
   var file = File('${tempFile.path}/$subject.txt');
 
-  await file.writeAsString(buffer.toString());
+  await file.writeAsString(buffer);
 
   SharePlus.instance.share(
     ShareParams(
