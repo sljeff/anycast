@@ -220,6 +220,15 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         )
     }
 
+    /// The top edge of the bottom chrome: a toast with an action anchors
+    /// above it so it never covers the tab bar or the mini player. iOS 26
+    /// follows the system's content layout guide (accessory, tab bar,
+    /// minimized bar); iOS 18 uses the floating capsule when it shows.
+    var bottomChromeTopAnchor: NSLayoutYAxisAnchor {
+        if #available(iOS 26.0, *) { return contentLayoutGuide.bottomAnchor }
+        return playerBar.isHidden ? tabBar.topAnchor : playerBar.topAnchor
+    }
+
     // MARK: - Bottom bar fade (iOS 26+)
 
     /// A page-background gradient behind the system bars and above the tab

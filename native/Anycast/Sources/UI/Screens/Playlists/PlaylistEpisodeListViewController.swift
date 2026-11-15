@@ -115,6 +115,12 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         Task { await reloadEpisodes() }
     }
 
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // The Undo capsule belongs to this list: leaving it commits.
+        Task { await binder.commitPendingRemoval() }
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         playEntranceIfNeeded()
@@ -410,8 +416,10 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     func reloadEpisodes() async {
         reloadGeneration += 1
         let generation = reloadGeneration
-        let rows = (try? await context.database.playlistRepository()
+        let stored = (try? await context.database.playlistRepository()
             .listEpisodes(playlistId: playlistId)) ?? []
+        // A removal waiting out its Undo window is still stored.
+        let rows = PlaylistRemovalLogic.displayed(stored, excluding: binder.hiddenEpisodeURL)
         guard generation == reloadGeneration else { return }
         // A read landing mid-drag would reset the collection view to the
         // pre-reorder database order and silently discard the drop's
@@ -628,6 +636,9 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         pendingReorderCount += 1
         reorderChain = Task { [weak self] in
             await predecessor?.value
+            // A pending removal commits before the move write: stored
+            // indexes must match the (already filtered) displayed ones.
+            await self?.binder.commitPendingRemoval()
             // Move-only, and atomic with its existence check: a completion
             // that cascaded this row away mid-drag must not be resurrected
             // by an INSERT branch with stale progress — drop the reorder
@@ -681,6 +692,17 @@ extension PlaylistEpisodeListViewController: PlaylistEpisodeDataSource {
     }
 
     var rowCount: Int { episodes.count }
+
+    func hideEpisode(byEnclosureURL url: String) {
+        guard episodes.contains(where: { $0.enclosureUrl == url }) else { return }
+        episodes.removeAll { $0.enclosureUrl == url }
+        rebuildEpisodeIndex()
+        // Positional strip state shifts with the removal (see reloadEpisodes).
+        let hadExpandedStrip = expandCoordinator.expandedIndexPath != nil
+        expandCoordinator.close()
+        applySnapshot()
+        if hadExpandedStrip { binder.refreshExpandedState(in: collectionView) }
+    }
 
     func visibleIndex(ofEnclosureURL url: String) -> Int? {
         episodes.compactMap(\.enclosureUrl).firstIndex(of: url)

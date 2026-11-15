@@ -95,10 +95,22 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// predates the new subscriptions, so one more pass must follow it.
     private var needsRefreshAfterImport = false
 
-    /// The category-filtered projection the list renders.
+    /// The one removal waiting out its Undo window. Its row stays in
+    /// `episodes` (and the DB) until the commit; every displayed list is the
+    /// source minus this URL.
+    private let pendingRemoval = PendingRemoval()
+    private var pendingRemovalURL: String?
+    /// A pending removal is hiding its card (or committing its write); a
+    /// second one waits so the single `pendingRemovalURL` is never replaced
+    /// while its card is still animating.
+    private var removalInFlight = false
+
+    /// The category-filtered projection the list renders, without the row
+    /// pending removal.
     private var displayedEpisodes: [FeedEpisodeRow] {
         InboxCategoryFilter.displayed(
-            episodes: episodes, selected: selectedCategory, categoriesByFeed: categoriesByFeed
+            episodes: episodes, selected: selectedCategory, categoriesByFeed: categoriesByFeed,
+            excluding: pendingRemovalURL
         )
     }
 
@@ -166,6 +178,12 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
     }
 
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // The Undo capsule belongs to this page: leaving it commits.
+        Task { await pendingRemoval.commitNow() }
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         playEntranceIfNeeded()
@@ -185,6 +203,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
         // The shell dispatches Tab0 re-taps through the context (03 §1.1).
         context.tabs.tabZeroTopRefresh = self
+
+        pendingRemoval.onCommit = { ToastPresenter.shared.dismissAction(capsuleIdentifier: "inbox-removal-capsule") }
 
         startAutoRefreshTimer()
         startTrimTimer()
@@ -255,7 +275,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             isUpdating: isSilentRefreshing,
             newCount: newRowCount,
             lastRefresh: gate.lastRefresh,
-            episodeCount: episodes.count
+            episodeCount: episodes.count - (pendingRemovalURL == nil ? 0 : 1)
         )
         // Nothing followed: there is nothing to be "updated" or "unlistened".
         let followsNothing = didLoadSubscriptions && shows.isEmpty
@@ -549,7 +569,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     ) {
         let displayed = incoming.map {
             InboxCategoryFilter.displayed(
-                episodes: $0, selected: selectedCategory, categoriesByFeed: categoriesByFeed
+                episodes: $0, selected: selectedCategory, categoriesByFeed: categoriesByFeed,
+                excluding: pendingRemovalURL
             )
         } ?? displayedEpisodes
         let signature = displayed.map(\.enclosureUrl)
@@ -904,11 +925,14 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             // or a reload shrank `episodes` in between (the index subrange
             // would trap). The array removal itself runs by URL so it stays
             // idempotent under interleaving.
-            let plan = InboxTrimPlanner.plan(count: self.episodes.count, keeping: settings.maxFeedEpisodes)
+            // The row pending removal is going away anyway: it neither counts
+            // toward the limit nor is a trim candidate.
+            let kept = self.episodes.filter { $0.enclosureUrl != self.pendingRemovalURL }
+            let plan = InboxTrimPlanner.plan(count: kept.count, keeping: settings.maxFeedEpisodes)
             // An import adds episodes the person has not seen the result of
             // yet: the Inbox waits until they tap Done.
             if plan.removesAnything, !InboxTrimHold.isHeld {
-                let urls = self.episodes[plan.removedIndices].compactMap(\.enclosureUrl)
+                let urls = kept[plan.removedIndices].compactMap(\.enclosureUrl)
                 try? await self.context.database.feedRepository().removeByEnclosureUrls(urls)
                 let remaining = self.episodes.filter { !($0.enclosureUrl.map(urls.contains) ?? false) }
                 self.renderList(allowsDiff: true, incoming: remaining) { self.episodes = remaining }
@@ -966,8 +990,12 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
                 case .skipInsertCurrentlyPlaying:
                     break
                 case .removeFromInbox:
-                    if steps == [.removeFromInbox] { Haptics.queueRemoved() }
-                    await self.removeFromInbox(urls: [enclosureURL])
+                    if Self.defersRemoval(steps) {
+                        Haptics.queueRemoved()
+                        await self.removeWithUndo(url: enclosureURL)
+                    } else {
+                        await self.removeFromInbox(urls: [enclosureURL])
+                    }
                 case .playInsertedEpisode:
                     await self.context.playback.playByEpisode(insertedRow)
                 case .reloadPlaybackQueue:
@@ -1064,6 +1092,70 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// CardExpandCoordinator index needs closing before the mutation.
     private func removeFromInbox(urls: [String]) async {
         try? await context.database.feedRepository().removeByEnclosureUrls(urls)
+        await animateOutOfInbox(urls: urls, hiding: false)
+    }
+
+    /// Only a pure Remove can be undone; Play and Add-to-playlist also end
+    /// by leaving the inbox, but their removal is part of a durable move.
+    static func defersRemoval(_ steps: [InboxActionStep]) -> Bool {
+        steps == [.removeFromInbox]
+    }
+
+    /// Remove with a 5 s Undo: the card animates out now, the DB row goes
+    /// when the window ends (see `PendingRemoval`).
+    private func removeWithUndo(url: String) async {
+        while removalInFlight {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        removalInFlight = true
+        defer { removalInFlight = false }
+        // A previous removal finishes its write (and settles) first.
+        await pendingRemoval.commitNow()
+        let repository = context.database.feedRepository()
+        pendingRemoval.begin(url) { [weak self] in
+            let deleted = (try? await repository.removeByEnclosureUrls([url])) != nil
+            self?.settleRemoval(url: url, deleted: deleted)
+        }
+        showRemovalCapsule()
+        await animateOutOfInbox(urls: [url], hiding: true)
+    }
+
+    /// The write finished: the row is gone from `episodes` too. A failed
+    /// write leaves the row in the DB, so it comes back.
+    private func settleRemoval(url: String, deleted: Bool) {
+        if deleted { episodes.removeAll { $0.enclosureUrl == url } }
+        if pendingRemovalURL == url { pendingRemovalURL = nil }
+        renderList(allowsDiff: true)
+    }
+
+    private func undoRemoval() {
+        guard pendingRemoval.undo() else { return }
+        pendingRemovalURL = nil
+        UIAccessibility.post(notification: .announcement, argument: "Restored")
+        renderList(allowsDiff: true)
+    }
+
+    private func showRemovalCapsule() {
+        guard let window = view.window else { return }
+        ToastPresenter.shared.showAction(
+            "Removed from Inbox",
+            actionTitle: "Undo",
+            in: window,
+            above: (tabBarController as? MainTabBarController)?.bottomChromeTopAnchor,
+            capsuleIdentifier: "inbox-removal-capsule",
+            actionIdentifier: "inbox-removal-undo",
+            onAction: { [weak self] in self?.undoRemoval() },
+            // Another toast replaced the capsule: Undo is out of reach.
+            onSuperseded: { [weak self] in
+                guard let self else { return }
+                Task { await self.pendingRemoval.commitNow() }
+            }
+        )
+    }
+
+    /// The card removal animation. `hiding` keeps the row in `episodes` and
+    /// only marks it as pending; otherwise it is dropped for good.
+    private func animateOutOfInbox(urls: [String], hiding: Bool) async {
         // One update at a time: wait out a diff or removal still animating.
         while updateGate.isBusy {
             try? await Task.sleep(nanoseconds: 50_000_000)
@@ -1074,6 +1166,12 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // makes its counts report post-removal numbers, and a layout pass
         // in between (rotation, sheet dismissal, a pending reload) then
         // trips UIKit's item-count consistency check.
+        // Undone, or committed, while waiting: nothing to hide; show what the
+        // list now says.
+        if hiding, !urls.allSatisfy(pendingRemoval.isPending) {
+            renderList(allowsDiff: true)
+            return
+        }
         let displayed = displayedEpisodes
         let cardsSection = cardsSectionIndex
         let removedPaths = displayed.indices.compactMap { index -> IndexPath? in
@@ -1098,6 +1196,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
                         self.removeLastInboxCards(
                             removedPaths,
                             urls: urls,
+                            hiding: hiding,
                             tailSection: tailSection,
                             completion: completion
                         )
@@ -1106,6 +1205,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
                     self.removeLastInboxCards(
                         removedPaths,
                         urls: urls,
+                        hiding: hiding,
                         tailSection: tailSection,
                         completion: completion
                     )
@@ -1132,13 +1232,15 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
         guard view.window != nil, !removedPaths.isEmpty, !displayedAfterRemoval.isEmpty else {
             let remaining = episodes.filter { !($0.enclosureUrl.map(urls.contains) ?? false) }
-            renderList(incoming: remaining) { self.episodes = remaining }
+            renderList(incoming: remaining) {
+                if hiding { self.pendingRemovalURL = urls.first } else { self.episodes = remaining }
+            }
             return
         }
         updateGate.begin()
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             collectionView.performBatchUpdates {
-                self.episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
+                self.dropFromMemory(urls: urls, hiding: hiding)
                 self.lastSignature = self.displayedEpisodes.map(\.enclosureUrl)
                 self.collectionView.deleteItems(at: removedPaths)
             } completion: { _ in
@@ -1160,15 +1262,12 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     private func removeLastInboxCards(
         _ removedPaths: [IndexPath],
         urls: [String],
+        hiding: Bool,
         tailSection: Int?,
         completion: @escaping (Bool) -> Void
     ) {
-        let removedURLs = Set(urls)
         collectionView.performBatchUpdates {
-            self.episodes.removeAll { episode in
-                guard let url = episode.enclosureUrl else { return false }
-                return removedURLs.contains(url)
-            }
+            self.dropFromMemory(urls: urls, hiding: hiding)
             self.sections = Self.sections(
                 hasShelf: !self.shows.isEmpty,
                 hasStrip: self.categoryStrip.hasFilters,
@@ -1180,6 +1279,14 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             }
         } completion: { finished in
             completion(finished)
+        }
+    }
+
+    private func dropFromMemory(urls: [String], hiding: Bool) {
+        if hiding {
+            pendingRemovalURL = urls.first
+        } else {
+            episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
         }
     }
 
@@ -1329,8 +1436,10 @@ nonisolated enum InboxCategoryFilter {
     static func displayed(
         episodes: [FeedEpisodeRow],
         selected: String?,
-        categoriesByFeed: [String: Set<String>]
+        categoriesByFeed: [String: Set<String>],
+        excluding pendingURL: String? = nil
     ) -> [FeedEpisodeRow] {
+        let episodes = pendingURL == nil ? episodes : episodes.filter { $0.enclosureUrl != pendingURL }
         guard let selected else { return episodes }
         let wanted = selected.lowercased()
         return episodes.filter { episode in

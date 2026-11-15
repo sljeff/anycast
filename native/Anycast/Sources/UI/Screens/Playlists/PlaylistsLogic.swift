@@ -286,3 +286,59 @@ enum AITranscriptAction: Equatable {
         }
     }
 }
+
+// MARK: - Remove with Undo
+
+/// The decisions and writes behind "Removed from Playlist · Undo". A removal
+/// is either DEFERRED (the row only leaves the displayed list; the delete
+/// runs when the Undo window ends) or EAGER (the row is deleted at once and
+/// Undo re-inserts it): the in-memory playback queue still holds every row
+/// it loaded, so a row the player may reach before the window ends cannot be
+/// left stored.
+enum PlaylistRemovalLogic {
+
+    /// Eager when the row is playing, or is the NEXT item of this playlist's
+    /// in-memory queue (a head completion would advance straight into it).
+    static func isEager(
+        url: String,
+        wasCurrent: Bool,
+        playlistId: Int64,
+        playingPlaylistId: Int64?,
+        queueURLs: [String]
+    ) -> Bool {
+        if wasCurrent { return true }
+        guard playingPlaylistId == playlistId, let index = queueURLs.firstIndex(of: url) else { return false }
+        return index <= 1
+    }
+
+    /// The list a screen renders: the stored rows without the one pending.
+    static func displayed(_ rows: [PlaylistEpisodeRow], excluding pendingURL: String?) -> [PlaylistEpisodeRow] {
+        guard let pendingURL else { return rows }
+        return rows.filter { $0.enclosureUrl != pendingURL }
+    }
+
+    /// A deferred removal waits only while the playing episode is the one it
+    /// was started under; any change commits it.
+    static func shouldCommitOnTrackChange(
+        pendingURL: String?, currentURLAtRemoval: String?, currentURL: String?
+    ) -> Bool {
+        pendingURL != nil && currentURL != currentURLAtRemoval
+    }
+
+    /// The stored row and its index, captured right before an eager delete.
+    static func snapshot(
+        url: String, playlistId: Int64, repository: PlaylistRepository
+    ) async -> (row: PlaylistEpisodeRow, index: Int)? {
+        let rows = (try? await repository.listEpisodes(playlistId: playlistId)) ?? []
+        guard let index = rows.firstIndex(where: { $0.enclosureUrl == url }) else { return nil }
+        return (rows[index], index)
+    }
+
+    /// Re-inserts an eagerly removed row at its original index; every column
+    /// (playedDuration included) comes from the captured row.
+    static func reinsert(
+        _ row: PlaylistEpisodeRow, at index: Int, playlistId: Int64, repository: PlaylistRepository
+    ) async {
+        try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: index)
+    }
+}
