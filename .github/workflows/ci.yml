@@ -57,11 +57,16 @@ jobs:
           fi
           export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
           echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
-          # Guard against a bundle whose directory name lies.
-          xcodebuild -version | head -1 | grep -q "^Xcode ${XCODE_VERSION}" || {
-            echo "::error::$XCODE_APP reports itself as $(xcodebuild -version | head -1)." >&2
+          # Guard against a bundle whose directory name lies. Capture the
+          # whole output first: piping into `head` closes the pipe early and
+          # xcodebuild aborts on the broken pipe (SIGPIPE), which failed this
+          # check intermittently under pipefail.
+          xcode_version_output="$(xcodebuild -version)"
+          xcode_version_line="${xcode_version_output%%$'\n'*}"
+          if [[ "${xcode_version_line}" != "Xcode ${XCODE_VERSION}"* ]]; then
+            echo "::error::$XCODE_APP reports itself as ${xcode_version_line}." >&2
             exit 1
-          }
+          fi
           SDK=$(xcrun --sdk iphonesimulator --show-sdk-version)
           case "$SDK" in
             "$SIM_OS"|"$SIM_OS."*) ;;
