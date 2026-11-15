@@ -39,7 +39,7 @@
 | 最低部署目标 | **iOS 18**（《06》§3；iOS 26/27 特性走 `#available` 降级；iOS 15–17 用户停留在 Flutter 最后一版，权衡已接受） |
 | UI 框架 | UIKit 为主 + `@Observable` + 局部 SwiftUI（《06》§2） |
 | UI 组件策略 | **原生优先**：系统组件（Liquid Glass 吃满）→ 成熟库 → 自绘仅 1 中型 + 10 小型；视觉适配边界 A1–A9（《07》） |
-| iPad 策略 | 首版 **iPhone-only**（TARGETED_DEVICE_FAMILY=1）；iPad 用户走系统 iPhone 兼容模式（≈现网形态），完整适配列 backlog（《05》§11） |
+| iPad 策略 | ~~首版 iPhone-only（TARGETED_DEVICE_FAMILY=1）；iPad 用户走系统 iPhone 兼容模式~~ **2026-11-15 修正**：App Store Connect 拒收减少设备族的更新（ITMS-90101，rc-2.0.0+41 实测），现网 1.2.1 声明了 iPad，故首版声明 **iPhone + iPad**（TARGETED_DEVICE_FAMILY=1,2，iPad 四方向，同旧 Runner）；iPad 跑同一套按 size class 自适应的布局（任意窗口尺寸由 `LayoutSanityTests` 覆盖），真机 iPad 随 TF 验收；完整 iPad 适配仍列 backlog（《05》§11） |
 | UA 策略 | 自家 API 用原生 UA（后端已核实无入站过滤，《02》§7）；RSS 直抓固定浏览器 UA |
 | 锁屏 ±10s（K1） | 复刻（有意设计，播客惯例） |
 | skip silence（K2） | 移除开关，`settings.skipSilence` 字段保留兼容读取 |
