@@ -1,0 +1,38 @@
+name: Store candidate rehearsal
+
+# Pre-flight for a store candidate: runs the real signed archive/export path
+# and asks App Store Connect to validate the IPA (`altool --validate-app`),
+# but never uploads a build or consumes a build number.
+#
+# Release secrets are scoped to `rc-*` tags, so a rehearsal needs explicit
+# maintainer authorization and two temporary admissions for the rehearsal
+# branch, both reverted afterwards:
+#   1. GitHub: add the branch to the `release` environment's deployment rules.
+#   2. Infisical: append the branch to the release identity's OIDC bound
+#      claims `ref` (refs/heads/<branch>) and `job_workflow_ref`
+#      (sljeff/anycast/.github/workflows/release-core.yml@refs/heads/<branch>).
+# Dispatch it on that branch (`gh workflow run release-rehearsal.yml --ref
+# <branch> -f build_number=<next build>`).
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: Build number to stamp (the next intended candidate)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: anycast-store-release
+  cancel-in-progress: false
+
+jobs:
+  rehearsal:
+    name: Rehearse candidate build
+    uses: ./.github/workflows/release-core.yml
+    with:
+      rehearsal: true
+      rehearsal_build_number: ${{ inputs.build_number }}

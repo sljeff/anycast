@@ -2,6 +2,19 @@ name: Store candidate core
 
 on:
   workflow_call:
+    inputs:
+      # A rehearsal runs the full signed archive/export path on a branch
+      # admitted to the `release` environment, then asks App Store Connect
+      # to validate the IPA (`altool --validate-app`) instead of uploading
+      # it. No build is uploaded and no build number is consumed.
+      rehearsal:
+        type: boolean
+        default: false
+      # Rehearsal only: build number to stamp (the next intended
+      # candidate), since project.yml may still carry an uploaded one.
+      rehearsal_build_number:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -26,10 +39,18 @@ jobs:
       - name: Verify tag, version, and main ancestry
         id: version
         shell: bash
+        env:
+          REHEARSAL: ${{ inputs.rehearsal }}
+          REHEARSAL_BUILD_NUMBER: ${{ inputs.rehearsal_build_number }}
         run: |
           set -euo pipefail
 
-          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+          if [[ "${REHEARSAL}" == "true" ]]; then
+            if [[ "${GITHUB_REF_TYPE}" != "branch" || "${GITHUB_REF_NAME}" == "main" ]]; then
+              echo "A rehearsal must run from a non-main branch." >&2
+              exit 1
+            fi
+          elif [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
             echo "Store candidate workflow must be called from a tag." >&2
             exit 1
           fi
@@ -61,19 +82,29 @@ jobs:
             exit 1
           fi
 
-          expected_tag="rc-${marketing_version}+${build_version}"
-          if [[ "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
-            echo "Expected tag ${expected_tag}, got ${GITHUB_REF_NAME}." >&2
-            exit 1
-          fi
+          if [[ "${REHEARSAL}" == "true" ]]; then
+            if [[ -n "${REHEARSAL_BUILD_NUMBER}" ]]; then
+              if [[ ! "${REHEARSAL_BUILD_NUMBER}" =~ ^[1-9][0-9]*$ ]]; then
+                echo "rehearsal_build_number must be a positive integer." >&2
+                exit 1
+              fi
+              build_version="${REHEARSAL_BUILD_NUMBER}"
+            fi
+          else
+            expected_tag="rc-${marketing_version}+${build_version}"
+            if [[ "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
+              echo "Expected tag ${expected_tag}, got ${GITHUB_REF_NAME}." >&2
+              exit 1
+            fi
 
-          git fetch --no-tags origin \
-            '+refs/heads/main:refs/remotes/origin/main'
-          tag_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
-          if ! git merge-base --is-ancestor \
-            "${tag_commit}" refs/remotes/origin/main; then
-            echo "Release tag commit is not contained in main." >&2
-            exit 1
+            git fetch --no-tags origin \
+              '+refs/heads/main:refs/remotes/origin/main'
+            tag_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+            if ! git merge-base --is-ancestor \
+              "${tag_commit}" refs/remotes/origin/main; then
+              echo "Release tag commit is not contained in main." >&2
+              exit 1
+            fi
           fi
 
           {
@@ -115,10 +146,15 @@ jobs:
           fi
           export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
           echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
-          xcodebuild -version | head -1 | grep -q "^Xcode ${XCODE_VERSION}" || {
-            echo "::error::$XCODE_APP reports itself as $(xcodebuild -version | head -1)." >&2
+          # Capture the whole output first: piping into `head` closes the
+          # pipe early and xcodebuild aborts on the broken pipe (SIGPIPE),
+          # which failed this check intermittently under pipefail.
+          xcode_version_output="$(xcodebuild -version)"
+          xcode_version_line="${xcode_version_output%%$'\n'*}"
+          if [[ "${xcode_version_line}" != "Xcode ${XCODE_VERSION}"* ]]; then
+            echo "::error::$XCODE_APP reports itself as ${xcode_version_line}." >&2
             exit 1
-          }
+          fi
 
       - name: Fetch reviewed app configuration
         uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
@@ -304,7 +340,25 @@ jobs:
             native/Anycast/Resources/GoogleService-Info.plist \
             native/Anycast/Resources/Secrets.plist
 
+      - name: Validate with App Store Connect (rehearsal, no upload)
+        if: ${{ inputs.rehearsal }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Server-side validation (device families, Info.plist, icons,
+          # entitlements, version ordering) without uploading a build.
+          (
+            cd "${IOS_SIGNING_DIR}"
+            xcrun altool \
+              --validate-app \
+              -f "${IOS_IPA_PATH}" \
+              -t ios \
+              --api-key "${APP_STORE_CONNECT_KEY_ID}" \
+              --api-issuer "${APP_STORE_CONNECT_ISSUER_ID}"
+          )
+
       - name: Upload to TestFlight
+        if: ${{ !inputs.rehearsal }}
         shell: bash
         run: |
           set -euo pipefail
