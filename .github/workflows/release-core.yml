@@ -215,7 +215,9 @@ jobs:
 
           app_path="${archive_path}/Products/Applications/Anycast.app"
           app_info="${app_path}/Info.plist"
-          share_app="${app_path}/PlugIns/Share Extension.appex"
+          # The native ShareExtension target's product is ShareExtension.appex
+          # (the Flutter Runner project named it "Share Extension.appex").
+          share_app="${app_path}/PlugIns/ShareExtension.appex"
           share_info="${share_app}/Info.plist"
           for info_path in "${app_info}" "${share_info}"; do
             test "$(plutil -extract CFBundleShortVersionString raw -o - "${info_path}")" \
@@ -287,7 +289,7 @@ jobs:
             8556542b-9ee1-4053-87f9-7a8a939124e5 \
             "Exported Anycast"
           verify_profile_uuid \
-            "${exported_app}/PlugIns/Share Extension.appex" \
+            "${exported_app}/PlugIns/ShareExtension.appex" \
             64282043-b776-4bbb-9f70-7b4bbc5a3a39 \
             "Exported Share Extension"
           codesign --verify --deep --strict "${exported_app}"
