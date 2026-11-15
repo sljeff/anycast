@@ -552,7 +552,7 @@ final class QACrawlUITests: XCTestCase {
     /// sheet cannot poison the rest of the tour.
     private func relaunchToShell() {
         app.terminate()
-        app.launch()
+        app.launchPastOnboarding()
         _ = app.buttons["tab-0"].waitForExistence(timeout: 15)
         _ = settle(timeout: 2)
     }
@@ -771,7 +771,7 @@ final class QACrawlUITests: XCTestCase {
 
     // swiftlint:disable:next function_body_length
     private func runCrawl() {
-        app.launch()
+        app.launchPastOnboarding()
         guard app.buttons["tab-0"].waitForExistence(timeout: 20) else {
             addFinding("nav", "nav-fail", "P0", "tab bar", "shell never installed")
             if audit { XCTFail("pill tab bar did not install — app did not reach the shell") }
@@ -1131,7 +1131,7 @@ final class QACrawlUITests: XCTestCase {
     /// the label populates, separating a real parity gap from a capture
     /// race.
     func testChannelDesc() throws {
-        app.launch()
+        app.launchPastOnboarding()
         // Podcasts tab → Subscriptions strip.
         let strip = app.staticTexts["Subscriptions"]
         guard strip.waitForExistence(timeout: 8) else {
@@ -1195,7 +1195,7 @@ final class QACrawlUITests: XCTestCase {
     func testFlutterShots() {
         audit = false
         probesEnabled = false
-        app.launch()
+        app.launchPastOnboarding()
 
         // Flutter semantics expose no frames worth tapping, so the remaining
         // taps use coordinates. The absolute points were recorded on the

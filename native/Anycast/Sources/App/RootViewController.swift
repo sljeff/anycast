@@ -48,6 +48,9 @@ final class RootViewController: UIViewController {
         for url in pending {
             deliverShareHandoff(url)
         }
+
+        // First launch only; never over a sheet that is already up.
+        OnboardingLauncher.presentIfNeeded(from: self, context: context)
     }
 
     // MARK: - URL routing (both arrival paths end here, SceneDelegate)

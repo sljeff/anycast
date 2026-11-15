@@ -11,7 +11,7 @@ final class SmokeUITests: XCTestCase {
 
     func testLaunchShowsWindow() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
     }
 }

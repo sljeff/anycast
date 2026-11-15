@@ -14,7 +14,7 @@ final class ShellNavigationUITests: XCTestCase {
 
     func testTabsSwitchAndMiniPlayerOpensPlayerSheet() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
 
         // The pill bar's three primary destinations install with startup.
         let inboxTab = app.buttons["tab-0"]
