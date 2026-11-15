@@ -77,7 +77,7 @@ final class OnboardingWelcomeStepView: OnboardingStepView {
 
         let title = OnboardingUI.label(OnboardingCopy.welcomeTitle, style: TypographyV2.displaySmall)
         title.accessibilityTraits = .header
-        let body = OnboardingUI.label(OnboardingCopy.welcomeBody, style: TypographyV2.emphasis, color: Theme.onSurfaceVariant)
+        let body = OnboardingUI.label(OnboardingCopy.welcomeBody, style: TypographyV2.meta, color: Theme.onSurfaceVariant)
 
         let column = UIStackView(arrangedSubviews: [mark, waveform, title, body])
         column.axis = .vertical
@@ -123,6 +123,7 @@ final class OnboardingWelcomeStepView: OnboardingStepView {
             column.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor, constant: Spacing.pageHeader),
             column.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -Spacing.pageHeader),
         ])
+        OnboardingUI.addEdgeFades(to: self)
     }
 
     @available(*, unavailable)
@@ -165,8 +166,7 @@ final class OnboardingSubscriptionsStepView: OnboardingThreadStepView {
     init(
         interests: [String],
         onImportFile: @escaping () -> Void,
-        onPasteFeed: @escaping () -> Void,
-        onStartFromPicks: @escaping () -> Void
+        onPasteFeed: @escaping () -> Void
     ) {
         super.init()
 
@@ -179,14 +179,15 @@ final class OnboardingSubscriptionsStepView: OnboardingThreadStepView {
         let options: [(String, String, () -> Void)] = [
             (OnboardingCopy.importFromApp, OnboardingCopy.importFromAppDetail, onImportFile),
             (OnboardingCopy.pasteFeed, OnboardingCopy.pasteFeedDetail, onPasteFeed),
-            (OnboardingCopy.startFromPicks, OnboardingCopy.startFromPicksDetail, onStartFromPicks),
         ]
-        for (index, option) in options.enumerated() {
+        let rows = options.map { option -> OnboardingOptionRow in
             let row = OnboardingOptionRow(title: option.0, detail: option.1)
             let handler = option.2
             row.addAction(UIAction { _ in handler() }, for: .touchUpInside)
-            thread.append(row, spacingBefore: index == 0 ? Spacing.cardInner : Spacing.md)
+            return row
         }
+        thread.append(OnboardingGroupedPlate(rows: rows, separatorInset: Spacing.pageH), spacingBefore: Spacing.cardInner)
+        thread.append(OnboardingUI.label(OnboardingCopy.importLaterNote, style: TypographyV2.meta), spacingBefore: Spacing.md)
     }
 
     @available(*, unavailable)
@@ -208,31 +209,36 @@ final class OnboardingImpressionStepView: OnboardingThreadStepView {
 
         let right = OnboardingChipButton(title: OnboardingCopy.impressionRight)
         let wrong = OnboardingChipButton(title: OnboardingCopy.impressionWrong)
-        let answers: [(OnboardingChipButton, String)] = [
-            (right, OnboardingCopy.impressionRightReply),
-            (wrong, OnboardingCopy.impressionWrongReply),
+        let chips = OnboardingFlowLayoutView(items: [right, wrong])
+        let answers: [(OnboardingChipButton, String, String)] = [
+            (right, OnboardingCopy.impressionRight, OnboardingCopy.impressionRightReply),
+            (wrong, OnboardingCopy.impressionWrong, OnboardingCopy.impressionWrongReply),
         ]
-        for (chip, reply) in answers {
-            chip.addAction(UIAction { [weak self, weak chip, weak right, weak wrong] _ in
-                guard let self, let chip else { return }
-                // One answer: the tapped chip stays lit, both stop responding.
+        for (chip, text, reply) in answers {
+            chip.addAction(UIAction { [weak self, weak chip, weak right, weak wrong, weak chips] _ in
+                guard let self, let chip, let chips else { return }
+                // One answer: both chips stop responding, then the row gives
+                // way to the answer as the listener's line.
                 chip.isSelected = true
                 right?.disableAnswering()
                 wrong?.disableAnswering()
                 Haptics.selection()
-                self.answer(chip.configuration?.title ?? "", reply: reply)
+                self.answer(text, reply: reply, replacing: chips)
             }, for: .touchUpInside)
         }
-        thread.append(OnboardingFlowLayoutView(items: [right, wrong]))
+        thread.append(chips)
     }
 
-    private func answer(_ text: String, reply: String) {
-        thread.append(OnboardingBubbleView(.listener, text: text))
-        replyTask?.cancel()
-        replyTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(350))
-            guard !Task.isCancelled, let self else { return }
-            self.thread.append(OnboardingBubbleView(.anycast, text: reply))
+    private func answer(_ text: String, reply: String, replacing chips: UIView) {
+        thread.collapse(chips) { [weak self] in
+            guard let self else { return }
+            self.thread.append(OnboardingBubbleView(.listener, text: text))
+            self.replyTask?.cancel()
+            self.replyTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(350))
+                guard !Task.isCancelled, let self else { return }
+                self.thread.append(OnboardingBubbleView(.anycast, text: reply))
+            }
         }
     }
 
@@ -243,7 +249,7 @@ final class OnboardingImpressionStepView: OnboardingThreadStepView {
         column.axis = .vertical
         column.spacing = Spacing.md
         for line in OnboardingCopy.helpLines {
-            let bullet = OnboardingUI.label("·", style: TypographyV2.body, color: Theme.onSurfaceVariant)
+            let bullet = OnboardingUI.label("\u{2022}", style: TypographyV2.body, color: TypographyV2.meta.color)
             bullet.isAccessibilityElement = false
             bullet.setContentHuggingPriority(.required, for: .horizontal)
             bullet.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -313,9 +319,11 @@ final class OnboardingQueueLessonStepView: OnboardingThreadStepView {
         thread.append(OnboardingUI.label(OnboardingCopy.queueHint, style: TypographyV2.meta), spacingBefore: Spacing.md)
         thread.append(OnboardingUI.label(OnboardingCopy.sampleCaption, style: TypographyV2.meta), spacingBefore: Spacing.cardInner)
 
-        for episode in episodes {
-            thread.append(makeRow(episode, isQueued: queued.contains(episode.id)), spacingBefore: Spacing.md)
-        }
+        let rows = episodes.map { makeRow($0, isQueued: queued.contains($0.id)) }
+        // The rows' text column starts after the page padding, the cover
+        // and the gap.
+        let textColumnInset = Spacing.pageH + Spacing.xxl + Spacing.gap
+        thread.append(OnboardingGroupedPlate(rows: rows, separatorInset: textColumnInset), spacingBefore: Spacing.md)
 
         tray.setEpisodes(queuedEpisodes(queued), animated: false)
         thread.append(tray, spacingBefore: Spacing.cardInner)
@@ -335,15 +343,19 @@ final class OnboardingQueueLessonStepView: OnboardingThreadStepView {
         artwork.translatesAutoresizingMaskIntoConstraints = false
 
         let title = OnboardingUI.label(episode.title, style: TypographyV2.emphasis)
+        title.numberOfLines = 2
+        title.lineBreakMode = .byTruncatingTail
         let meta = OnboardingUI.label(
             "\(episode.show) · \(OnboardingCopy.minutes(episode.minutes))", style: TypographyV2.meta
         )
+        meta.numberOfLines = 1
+        meta.lineBreakMode = .byTruncatingTail
         let texts = UIStackView(arrangedSubviews: [title, meta])
         texts.axis = .vertical
         texts.spacing = Spacing.xxs
 
         let button = AnycastIconButton(
-            style: .tonal,
+            style: isQueued ? .inverse : .tonal,
             icon: isQueued ? AppIcons.addedToList : AppIcons.addToList,
             accessibilityLabel: isQueued
                 ? OnboardingCopy.removeFromUpNext(episode.title)
@@ -360,20 +372,17 @@ final class OnboardingQueueLessonStepView: OnboardingThreadStepView {
         row.spacing = Spacing.gap
         row.translatesAutoresizingMaskIntoConstraints = false
 
-        let plate = UIView()
-        plate.backgroundColor = Theme.surface
-        plate.layer.cornerRadius = Radius.card
-        plate.layer.cornerCurve = .continuous
-        plate.addSubview(row)
+        let container = UIView()
+        container.addSubview(row)
         NSLayoutConstraint.activate([
             artwork.widthAnchor.constraint(equalToConstant: Spacing.xxl),
             artwork.heightAnchor.constraint(equalToConstant: Spacing.xxl),
-            row.leadingAnchor.constraint(equalTo: plate.leadingAnchor, constant: Spacing.gap),
-            row.trailingAnchor.constraint(equalTo: plate.trailingAnchor, constant: -Spacing.gap),
-            row.topAnchor.constraint(equalTo: plate.topAnchor, constant: Spacing.gap),
-            row.bottomAnchor.constraint(equalTo: plate.bottomAnchor, constant: -Spacing.gap),
+            row.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: Spacing.pageH),
+            row.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -Spacing.pageH),
+            row.topAnchor.constraint(equalTo: container.topAnchor, constant: Spacing.gap),
+            row.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Spacing.gap),
         ])
-        return plate
+        return container
     }
 
     private func toggle(_ episode: OnboardingSampleEpisode, button: AnycastIconButton) {
@@ -381,11 +390,13 @@ final class OnboardingQueueLessonStepView: OnboardingThreadStepView {
         let isQueued = queued.contains(episode.id)
         // Only the tapped row's button changes; the tray appends or drops
         // that one episode.
+        button.setStyle(isQueued ? .inverse : .tonal)
         button.setIcon(isQueued ? AppIcons.addedToList : AppIcons.addToList)
         button.accessibilityLabel = isQueued
             ? OnboardingCopy.removeFromUpNext(episode.title)
             : OnboardingCopy.addToUpNext(episode.title)
         tray.setEpisodes(queuedEpisodes(queued), animated: true)
+        if !isQueued { thread.scrollToShow(tray) }
 
         if isQueued {
             // The tray sits at the bottom of the scroll column and can be
@@ -416,7 +427,7 @@ final class OnboardingTranscriptLineControl: UIControl {
     private let lineDescription: String
 
     init(line: OnboardingSampleLine) {
-        originalLabel = OnboardingUI.label(line.original, style: TypographyV2.body)
+        originalLabel = OnboardingUI.label(line.original, style: TypographyV2.body, color: Theme.onSurface)
         lineDescription = "\(line.timestamp), \(line.original), \(line.translation)"
         super.init(frame: .zero)
 
@@ -445,10 +456,10 @@ final class OnboardingTranscriptLineControl: UIControl {
         row.translatesAutoresizingMaskIntoConstraints = false
         addSubview(row)
         NSLayoutConstraint.activate([
-            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.gap),
-            row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.gap),
-            row.topAnchor.constraint(equalTo: topAnchor, constant: Spacing.row),
-            row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Spacing.row),
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.md),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.md),
+            row.topAnchor.constraint(equalTo: topAnchor, constant: Spacing.md),
+            row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Spacing.md),
         ])
 
         isAccessibilityElement = true
@@ -465,7 +476,6 @@ final class OnboardingTranscriptLineControl: UIControl {
 
     private func applySelection() {
         backgroundColor = isSelected ? AnycastColor.sandAlpha4 : .clear
-        originalLabel.textColor = isSelected ? Theme.onSurface : Theme.onSurfaceVariant
         accessibilityTraits = isSelected ? [.button, .selected] : .button
     }
 }
@@ -473,9 +483,9 @@ final class OnboardingTranscriptLineControl: UIControl {
 final class OnboardingTranscriptLessonStepView: OnboardingThreadStepView {
 
     private let onAsk: () -> Void
-    private let progressView = UIProgressView(progressViewStyle: .bar)
     private var lineControls: [OnboardingTranscriptLineControl] = []
     private var selectedIndex: Int?
+    private var replyTask: Task<Void, Never>?
 
     /// `onAsk` records in the flow that the sample question was asked.
     init(lines: [OnboardingSampleLine], hasAsked: Bool, onAsk: @escaping () -> Void) {
@@ -488,38 +498,53 @@ final class OnboardingTranscriptLessonStepView: OnboardingThreadStepView {
         thread.append(OnboardingUI.label(OnboardingCopy.transcriptHint, style: TypographyV2.meta), spacingBefore: Spacing.md)
         thread.append(makeTranscriptCard(lines), spacingBefore: Spacing.cardInner)
 
+        if hasAsked {
+            thread.append(OnboardingBubbleView(.listener, text: OnboardingCopy.askEpisode))
+            thread.append(OnboardingBubbleView(.anycast, text: OnboardingCopy.askEpisodeAnswer))
+            return
+        }
+
         let ask = OnboardingChipButton(title: OnboardingCopy.askEpisode)
-        ask.addAction(UIAction { [weak self, weak ask] _ in
-            guard let self, let ask else { return }
-            // Asked once: the chip stays lit and the answer is appended.
+        let chips = OnboardingFlowLayoutView(items: [ask])
+        ask.addAction(UIAction { [weak self, weak ask, weak chips] _ in
+            guard let self, let ask, let chips else { return }
+            // Asked once: the chip gives way to the question as the
+            // listener's line, then the answer follows.
             ask.isSelected = true
             ask.disableAnswering()
             Haptics.selection()
             self.onAsk()
-            self.thread.append(OnboardingBubbleView(.anycast, text: OnboardingCopy.askEpisodeAnswer))
+            self.thread.collapse(chips) { [weak self] in
+                guard let self else { return }
+                self.thread.append(OnboardingBubbleView(.listener, text: OnboardingCopy.askEpisode))
+                self.replyTask?.cancel()
+                self.replyTask = Task { [weak self] in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    guard !Task.isCancelled, let self else { return }
+                    self.thread.append(OnboardingBubbleView(.anycast, text: OnboardingCopy.askEpisodeAnswer))
+                }
+            }
         }, for: .touchUpInside)
-        thread.append(OnboardingFlowLayoutView(items: [ask]))
-
-        if hasAsked {
-            ask.isSelected = true
-            ask.disableAnswering()
-            thread.append(OnboardingBubbleView(.anycast, text: OnboardingCopy.askEpisodeAnswer))
-        }
+        thread.append(chips)
     }
 
     private func makeTranscriptCard(_ lines: [OnboardingSampleLine]) -> UIView {
         let caption = OnboardingUI.label(OnboardingCopy.sampleTranscriptCaption, style: TypographyV2.meta)
+        // The lines carry their own padding, so the caption is inset to
+        // the same text edge.
+        let captionRow = UIView()
+        caption.translatesAutoresizingMaskIntoConstraints = false
+        captionRow.addSubview(caption)
+        NSLayoutConstraint.activate([
+            caption.leadingAnchor.constraint(equalTo: captionRow.leadingAnchor, constant: Spacing.md),
+            caption.trailingAnchor.constraint(equalTo: captionRow.trailingAnchor, constant: -Spacing.md),
+            caption.topAnchor.constraint(equalTo: captionRow.topAnchor),
+            caption.bottomAnchor.constraint(equalTo: captionRow.bottomAnchor),
+        ])
 
-        progressView.trackTintColor = AnycastColor.sandAlpha4
-        progressView.progressTintColor = Theme.onSurface
-        progressView.isAccessibilityElement = false
-        progressView.translatesAutoresizingMaskIntoConstraints = false
-        progressView.heightAnchor.constraint(equalToConstant: Spacing.compactProgress).isActive = true
-
-        let column = UIStackView(arrangedSubviews: [caption, progressView])
+        let column = UIStackView(arrangedSubviews: [captionRow])
         column.axis = .vertical
         column.spacing = Spacing.md
-        column.setCustomSpacing(Spacing.gap, after: progressView)
 
         for (index, line) in lines.enumerated() {
             let control = OnboardingTranscriptLineControl(line: line)
@@ -547,7 +572,6 @@ final class OnboardingTranscriptLessonStepView: OnboardingThreadStepView {
         lineControls[index].isSelected = true
         selectedIndex = index
         Haptics.selection()
-        progressView.setProgress(Float(index + 1) / Float(lineControls.count), animated: !Motion.reduceMotion)
     }
 
     @available(*, unavailable)

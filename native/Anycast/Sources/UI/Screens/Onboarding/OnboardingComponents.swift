@@ -14,6 +14,26 @@ enum OnboardingUI {
         label.numberOfLines = 0
         return label
     }
+
+    /// Pins a top and a bottom `ScrollEdgeFade` over `host`'s edges so
+    /// scrolled content melts into the page instead of being cut.
+    static func addEdgeFades(to host: UIView) {
+        let top = ScrollEdgeFade(edge: .top)
+        let bottom = ScrollEdgeFade(edge: .bottom)
+        host.addSubview(top)
+        host.addSubview(bottom)
+        NSLayoutConstraint.activate([
+            top.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+            top.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            top.topAnchor.constraint(equalTo: host.topAnchor),
+            top.heightAnchor.constraint(equalToConstant: ScrollEdgeFade.fadeLength),
+
+            bottom.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+            bottom.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            bottom.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+            bottom.heightAnchor.constraint(equalToConstant: ScrollEdgeFade.fadeLength),
+        ])
+    }
 }
 
 // MARK: - Thread
@@ -48,10 +68,13 @@ final class OnboardingThreadView: UIView {
 
             stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Spacing.md),
+            // The fades cover the first and last `fadeLength` points, so
+            // content at rest starts and ends clear of them.
+            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: ScrollEdgeFade.fadeLength),
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -Spacing.pageHeader),
             stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
         ])
+        OnboardingUI.addEdgeFades(to: self)
     }
 
     @available(*, unavailable)
@@ -96,6 +119,29 @@ final class OnboardingThreadView: UIView {
         }
     }
 
+    /// Fades `view` out and collapses it in the column, then calls
+    /// `completion`. Reduce Motion collapses it at once.
+    func collapse(_ view: UIView, then completion: @escaping () -> Void) {
+        guard !Motion.reduceMotion else {
+            view.isHidden = true
+            completion()
+            return
+        }
+        Motion.animate(Motion.quick, { view.alpha = 0 }, completion: {
+            view.isHidden = true
+            completion()
+        })
+    }
+
+    /// Scrolls just far enough that the bottom of `view` is visible above
+    /// the bottom fade; does nothing when it already is.
+    func scrollToShow(_ view: UIView) {
+        layoutIfNeeded()
+        let rect = scrollView.convert(view.bounds, from: view)
+            .insetBy(dx: 0, dy: -ScrollEdgeFade.fadeLength)
+        scrollView.scrollRectToVisible(rect, animated: !Motion.reduceMotion)
+    }
+
     private func animateEntrance(of view: UIView, delay: TimeInterval, completion: (() -> Void)? = nil) {
         guard !Motion.reduceMotion else {
             completion?()
@@ -132,8 +178,9 @@ final class OnboardingThreadView: UIView {
 
 // MARK: - Bubble
 
-/// A chat bubble: Anycast's on the leading side on a surface plate, the
-/// listener's on the trailing side in the inverse ink.
+/// The conversation's two voices, in the app's own chat language
+/// (`ChatBubbleView`): Anycast speaks plain text across the column, the
+/// listener answers in a quiet filled bubble on the trailing side.
 final class OnboardingBubbleView: UIView {
 
     enum Author {
@@ -141,46 +188,47 @@ final class OnboardingBubbleView: UIView {
         case listener
     }
 
-    private static let maxWidthFraction: CGFloat = 0.86
+    /// Cap on the listener's bubble as a fraction of the column.
+    private static let maxWidthFraction: CGFloat = 0.75
+    private static let horizontalPadding: CGFloat = 16
+    private static let verticalPadding: CGFloat = 10
 
     init(_ author: Author, text: String) {
         super.init(frame: .zero)
 
-        let plate = UIView()
-        plate.backgroundColor = author == .anycast ? Theme.surface : Theme.onSurface
-        plate.layer.cornerRadius = Radius.card
-        plate.layer.cornerCurve = .continuous
-        plate.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(plate)
-
-        let label = OnboardingUI.label(
-            text, style: TypographyV2.body, color: author == .anycast ? Theme.onSurface : Theme.surface
-        )
+        let label = OnboardingUI.label(text, style: TypographyV2.body, color: Theme.onSurface)
         label.translatesAutoresizingMaskIntoConstraints = false
-        plate.addSubview(label)
 
-        let side: NSLayoutConstraint
-        let slack: NSLayoutConstraint
         switch author {
         case .anycast:
-            side = plate.leadingAnchor.constraint(equalTo: leadingAnchor)
-            slack = plate.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor)
+            addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: leadingAnchor),
+                label.trailingAnchor.constraint(equalTo: trailingAnchor),
+                label.topAnchor.constraint(equalTo: topAnchor),
+                label.bottomAnchor.constraint(equalTo: bottomAnchor),
+            ])
         case .listener:
-            side = plate.trailingAnchor.constraint(equalTo: trailingAnchor)
-            slack = plate.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor)
-        }
-        NSLayoutConstraint.activate([
-            side,
-            slack,
-            plate.topAnchor.constraint(equalTo: topAnchor),
-            plate.bottomAnchor.constraint(equalTo: bottomAnchor),
-            plate.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: Self.maxWidthFraction),
+            let bubble = UIView()
+            bubble.backgroundColor = AnycastColor.sandAlpha4
+            bubble.layer.cornerRadius = Radius.md
+            bubble.layer.cornerCurve = .continuous
+            bubble.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(bubble)
+            bubble.addSubview(label)
+            NSLayoutConstraint.activate([
+                bubble.trailingAnchor.constraint(equalTo: trailingAnchor),
+                bubble.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
+                bubble.topAnchor.constraint(equalTo: topAnchor),
+                bubble.bottomAnchor.constraint(equalTo: bottomAnchor),
+                bubble.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: Self.maxWidthFraction),
 
-            label.leadingAnchor.constraint(equalTo: plate.leadingAnchor, constant: Spacing.pageH),
-            label.trailingAnchor.constraint(equalTo: plate.trailingAnchor, constant: -Spacing.pageH),
-            label.topAnchor.constraint(equalTo: plate.topAnchor, constant: Spacing.gap),
-            label.bottomAnchor.constraint(equalTo: plate.bottomAnchor, constant: -Spacing.gap),
-        ])
+                label.leadingAnchor.constraint(equalTo: bubble.leadingAnchor, constant: Self.horizontalPadding),
+                label.trailingAnchor.constraint(equalTo: bubble.trailingAnchor, constant: -Self.horizontalPadding),
+                label.topAnchor.constraint(equalTo: bubble.topAnchor, constant: Self.verticalPadding),
+                label.bottomAnchor.constraint(equalTo: bubble.bottomAnchor, constant: -Self.verticalPadding),
+            ])
+        }
     }
 
     @available(*, unavailable)
@@ -333,17 +381,72 @@ final class OnboardingFlowLayoutView: UIView {
     }
 }
 
+// MARK: - Grouped plate
+
+/// Rows on one plate, as in the Inbox's grouped list: `GroupedPlateView`'s
+/// fill, radius and hairline, and between rows the Inbox's separator (0.5 pt
+/// `Theme.outline`) from `separatorInset` to the trailing page edge. The
+/// plate clips, so a row's press fill follows its corners.
+final class OnboardingGroupedPlate: UIView {
+
+    private static let separatorHeight: CGFloat = 0.5
+
+    /// `separatorInset` is where the rows' text column starts.
+    init(rows: [UIView], separatorInset: CGFloat) {
+        super.init(frame: .zero)
+        backgroundColor = Theme.surface
+        layer.cornerRadius = Radius.card
+        layer.cornerCurve = .continuous
+        layer.borderWidth = Spacing.hairline
+        clipsToBounds = true
+        updateStroke()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: Self, _) in
+            self.updateStroke()
+        }
+
+        let column = UIStackView(arrangedSubviews: rows)
+        column.axis = .vertical
+        column.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(column)
+        NSLayoutConstraint.activate([
+            column.leadingAnchor.constraint(equalTo: leadingAnchor),
+            column.trailingAnchor.constraint(equalTo: trailingAnchor),
+            column.topAnchor.constraint(equalTo: topAnchor),
+            column.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+
+        // None above the first row, so none after the last.
+        for row in rows.dropFirst() {
+            let separator = UIView()
+            separator.backgroundColor = Theme.outline
+            separator.isUserInteractionEnabled = false
+            separator.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(separator)
+            NSLayoutConstraint.activate([
+                separator.topAnchor.constraint(equalTo: row.topAnchor),
+                separator.leadingAnchor.constraint(equalTo: leadingAnchor, constant: separatorInset),
+                separator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.pageH),
+                separator.heightAnchor.constraint(equalToConstant: Self.separatorHeight),
+            ])
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    private func updateStroke() {
+        layer.borderColor = AnycastColor.sandAlpha3.resolvedColor(with: traitCollection).cgColor
+    }
+}
+
 // MARK: - Option row
 
-/// A tappable row with a title, a line of detail and a disclosure chevron.
+/// A tappable row of a grouped plate: a title, a line of detail and a
+/// disclosure chevron. A touch fills the row, never scales it.
 final class OnboardingOptionRow: UIControl {
 
     init(title: String, detail: String) {
         super.init(frame: .zero)
-
-        backgroundColor = Theme.surface
-        layer.cornerRadius = Radius.card
-        layer.cornerCurve = .continuous
 
         let titleLabel = OnboardingUI.label(title, style: TypographyV2.emphasis)
         let detailLabel = OnboardingUI.label(detail, style: TypographyV2.meta)
@@ -376,11 +479,19 @@ final class OnboardingOptionRow: UIControl {
         isAccessibilityElement = true
         accessibilityLabel = "\(title), \(detail)"
         accessibilityTraits = .button
-        addPressFeedback(scale: Motion.pressScaleSubtle)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override var isHighlighted: Bool {
+        didSet {
+            let fill = isHighlighted ? AnycastColor.sandAlpha5 : .clear
+            UIView.animate(withDuration: isHighlighted ? Motion.pressIn : Motion.quick) {
+                self.backgroundColor = fill
+            }
+        }
+    }
 }
 
 // MARK: - Waveform
@@ -536,6 +647,9 @@ final class OnboardingUpNextTrayView: UIView {
 
     private static func makeRow(_ episode: OnboardingSampleEpisode) -> UIView {
         let title = OnboardingUI.label(episode.title, style: TypographyV2.body)
+        title.numberOfLines = 1
+        title.lineBreakMode = .byTruncatingTail
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         let minutes = OnboardingUI.label(OnboardingCopy.minutes(episode.minutes), style: TypographyV2.meta)
         minutes.numberOfLines = 1
         minutes.setContentHuggingPriority(.required, for: .horizontal)

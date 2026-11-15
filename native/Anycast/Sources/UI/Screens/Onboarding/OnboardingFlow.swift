@@ -33,9 +33,11 @@ nonisolated struct OnboardingFlow: Equatable {
 
     /// What the quiet button under the primary button does on this step.
     nonisolated enum SkipOption: Equatable {
-        /// No skip button (the last step).
+        /// No skip button: the step has nothing to skip, or its requirement
+        /// is already met and Continue is the way on.
         case none
-        /// "Skip this step": go to the next step.
+        /// "Skip this step": go to the next step. Offered only while the
+        /// step's requirement is unmet.
         case step
         /// "Skip, enter directly" on the first step: end the onboarding.
         case all
@@ -75,9 +77,12 @@ nonisolated struct OnboardingFlow: Equatable {
 
     var skipOption: SkipOption {
         switch step {
-        case .welcome: return .all
-        case .done: return .none
-        default: return .step
+        case .welcome:
+            return .all
+        case .interests, .queueLesson, .transcriptLesson:
+            return canContinue ? .none : .step
+        case .subscriptions, .impression, .done:
+            return .none
         }
     }
 
@@ -212,13 +217,11 @@ nonisolated enum OnboardingCopy {
     static let importFromAppDetail = "Choose an exported OPML file"
     static let pasteFeed = "Paste an RSS link"
     static let pasteFeedDetail = "Follow one show directly"
-    static let startFromPicks = "Start fresh"
-    static let startFromPicksDetail = "You can still import later in Settings"
+    static let importLaterNote = "You can still import later in Settings"
     static let pasteFeedPlaceholder = "https://"
     static let pasteFeedConfirm = "View show"
     static let cancel = "Cancel"
     static let notAFeedAddress = "That doesn't look like an RSS link"
-    static let feedSheetDone = "Done"
 
     // Step 4.
     static func impression(interests: [String]) -> String {
@@ -288,11 +291,6 @@ nonisolated enum OnboardingSamples {
             timestamp: "07:08",
             original: "Switching tasks costs far more than we assume.",
             translation: "切换任务的代价，比我们以为的高得多。"
-        ),
-        OnboardingSampleLine(
-            timestamp: "11:30",
-            original: "Rest is not a reward; it is part of the work.",
-            translation: "休息不是奖励，它本身就是工作的一部分。"
         ),
     ]
 }

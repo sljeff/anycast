@@ -84,17 +84,19 @@ final class OnboardingViewController: UIViewController {
         let safeArea = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
             progressView.topAnchor.constraint(equalTo: safeArea.topAnchor, constant: Spacing.gap),
-            progressView.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: Spacing.pageHeader),
-            progressView.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -Spacing.pageHeader),
+            progressView.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: Spacing.pageH),
+            progressView.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -Spacing.pageH),
             progressView.heightAnchor.constraint(equalToConstant: Spacing.compactProgress),
 
-            contentContainer.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: Spacing.pageHeader),
-            contentContainer.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: Spacing.pageHeader),
-            contentContainer.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -Spacing.pageHeader),
+            // The thread's own top inset (the fade length) makes up the rest
+            // of the 32 pt between the bar and the first item.
+            contentContainer.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: Spacing.pageH),
+            contentContainer.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: Spacing.pageH),
+            contentContainer.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -Spacing.pageH),
             contentContainer.bottomAnchor.constraint(equalTo: buttons.topAnchor, constant: -Spacing.gap),
 
-            buttons.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: Spacing.pageHeader),
-            buttons.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -Spacing.pageHeader),
+            buttons.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: Spacing.pageH),
+            buttons.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -Spacing.pageH),
             buttons.bottomAnchor.constraint(equalTo: safeArea.bottomAnchor, constant: -Spacing.md),
 
             primaryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: Self.primaryHeight),
@@ -119,8 +121,7 @@ final class OnboardingViewController: UIViewController {
             return OnboardingSubscriptionsStepView(
                 interests: flow.interests,
                 onImportFile: { [weak self] in self?.importFile() },
-                onPasteFeed: { [weak self] in self?.pasteFeedAddress() },
-                onStartFromPicks: { [weak self] in self?.primaryTapped() }
+                onPasteFeed: { [weak self] in self?.pasteFeedAddress() }
             )
         case .impression:
             return OnboardingImpressionStepView(interests: flow.interests)
@@ -207,16 +208,18 @@ final class OnboardingViewController: UIViewController {
         }
         primaryButton.isEnabled = flow.canContinue
 
-        switch flow.skipOption {
-        case .none:
-            skipButton.isHidden = true
-        case .step:
-            skipButton.isHidden = false
-            skipButton.configuration?.title = OnboardingCopy.skipStep
-        case .all:
-            skipButton.isHidden = false
-            skipButton.configuration?.title = OnboardingCopy.skipAll
+        // The skip row is always reserved, so the primary button never
+        // moves when the skip option comes or goes.
+        let option = flow.skipOption
+        switch option {
+        case .none: break
+        case .step: skipButton.configuration?.title = OnboardingCopy.skipStep
+        case .all: skipButton.configuration?.title = OnboardingCopy.skipAll
         }
+        let isSkipVisible = option != .none
+        skipButton.alpha = isSkipVisible ? 1 : 0
+        skipButton.isUserInteractionEnabled = isSkipVisible
+        skipButton.accessibilityElementsHidden = !isSkipVisible
     }
 
     // MARK: - Actions
@@ -311,29 +314,24 @@ final class OnboardingFeedAddressSheetViewController: UIViewController {
 
         let titleLabel = OnboardingUI.label(OnboardingCopy.pasteFeed, style: TypographyV2.emphasis)
         titleLabel.accessibilityTraits = .header
-        let doneButton = AnycastButton.make(.secondary, title: OnboardingCopy.feedSheetDone)
-        doneButton.addAction(UIAction { [weak self] _ in self?.dismiss(animated: true) }, for: .touchUpInside)
-        doneButton.setContentHuggingPriority(.required, for: .horizontal)
-        doneButton.setContentCompressionResistancePriority(.required, for: .horizontal)
-
-        let header = UIStackView(arrangedSubviews: [titleLabel, doneButton])
-        header.axis = .horizontal
-        header.alignment = .center
-        header.spacing = Spacing.gap
-        header.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(header)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(titleLabel)
 
         addChild(page)
         page.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(page.view)
         page.didMove(toParent: self)
 
+        // The grabber closes the sheet, so there is no Done button. The
+        // title sits on the sheet content edge, which is also the leading
+        // edge of the feed row's cover (page padding + row padding).
+        let titleLeading = Spacing.sheetContent
         NSLayoutConstraint.activate([
-            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Spacing.pageHeader),
-            header.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.sheetContent),
-            header.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
+            titleLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.sheetContent),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: titleLeading),
+            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Spacing.pageH),
 
-            page.view.topAnchor.constraint(equalTo: header.bottomAnchor),
+            page.view.topAnchor.constraint(equalTo: titleLabel.bottomAnchor),
             page.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             page.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             page.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),

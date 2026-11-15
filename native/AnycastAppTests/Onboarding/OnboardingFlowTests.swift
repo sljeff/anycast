@@ -53,11 +53,21 @@ struct OnboardingFlowTests {
         #expect(flow.step == .subscriptions)
     }
 
-    @Test("Skipping the interests step drops a half-made choice")
-    func skippingInterestsClearsThem() {
+    @Test("Skip is offered on the interests step only while nothing is chosen")
+    func interestsSkipFlipsOnceChosen() {
         var flow = OnboardingFlow()
         flow.advance()
+        #expect(flow.skipOption == .step)
+
         flow.toggleInterest("News")
+        #expect(flow.skipOption == .none)
+        // With no skip offered, skipping does nothing and keeps the choice.
+        flow.skipStep()
+        #expect(flow.step == .interests)
+        #expect(flow.interests == ["News"])
+
+        flow.toggleInterest("News")
+        #expect(flow.skipOption == .step)
         flow.skipStep()
         #expect(flow.step == .subscriptions)
         #expect(flow.interests.isEmpty)
@@ -65,47 +75,62 @@ struct OnboardingFlowTests {
 
     @Test("The queue lesson continues once two sample episodes are added")
     func queueLessonNeedsTwo() {
-        var flow = OnboardingFlow()
-        flow.advance()
-        flow.skipStep()
-        flow.advance()
-        flow.advance()
-        #expect(flow.step == .queueLesson)
+        var flow = flow(at: .queueLesson)
         #expect(!flow.canContinue)
+        #expect(flow.skipOption == .step)
 
         #expect(flow.toggleQueued("sample-2") == true)
         #expect(!flow.canContinue)
+        #expect(flow.skipOption == .step)
         #expect(flow.toggleQueued("sample-1") == true)
         #expect(flow.canContinue)
+        #expect(flow.skipOption == .none)
         #expect(flow.queuedEpisodeIDs == ["sample-2", "sample-1"])
         #expect(flow.toggleQueued("sample-2") == false)
         #expect(!flow.canContinue)
+        #expect(flow.skipOption == .step)
         #expect(flow.queuedEpisodeIDs == ["sample-1"])
     }
 
     @Test("The transcript lesson continues once the sample question is asked")
     func transcriptLessonNeedsTheQuestion() {
-        var flow = OnboardingFlow()
-        flow.advance()
-        for _ in 0..<4 { flow.skipStep() }
-        #expect(flow.step == .transcriptLesson)
+        var flow = flow(at: .transcriptLesson)
         #expect(!flow.canContinue)
+        #expect(flow.skipOption == .step)
         flow.markEpisodeAsked()
         #expect(flow.canContinue)
+        #expect(flow.skipOption == .none)
         #expect(flow.advance() == true)
         #expect(flow.step == .done)
     }
 
-    @Test("Every middle step can be skipped; the last step has no skip and finishes")
+    @Test("Steps without a requirement offer no skip")
+    func noSkipWithoutRequirement() {
+        for step in [OnboardingStep.subscriptions, .impression, .done] {
+            var flow = flow(at: step)
+            #expect(flow.skipOption == .none)
+            flow.skipStep()
+            #expect(flow.step == step)
+        }
+    }
+
+    @Test("An unmet step can be skipped; the last step has no skip and finishes")
     func skipThroughToTheEnd() {
         var flow = OnboardingFlow()
         flow.advance()
-        var visited: [OnboardingStep] = []
-        while flow.skipOption == .step {
-            visited.append(flow.step)
-            flow.skipStep()
+        var skipped: [OnboardingStep] = []
+        while true {
+            if flow.skipOption == .step {
+                skipped.append(flow.step)
+                flow.skipStep()
+            } else if flow.step != .done {
+                flow.advance()
+            } else {
+                break
+            }
         }
-        #expect(visited == [.interests, .subscriptions, .impression, .queueLesson, .transcriptLesson])
+        // Nothing was answered, so each requirement step is skipped.
+        #expect(skipped == [.interests, .queueLesson, .transcriptLesson])
         #expect(flow.step == .done)
         #expect(flow.skipOption == .none)
 
@@ -123,11 +148,10 @@ struct OnboardingFlowTests {
         var flow = OnboardingFlow()
         var previous = flow.progress
         #expect(previous > 0)
-        flow.advance()
-        while flow.skipOption == .step {
+        while flow.step != .done {
+            if flow.skipOption == .step { flow.skipStep() } else { flow.advance() }
             #expect(flow.progress > previous)
             previous = flow.progress
-            flow.skipStep()
         }
         #expect(flow.progress == 1)
     }
@@ -137,6 +161,26 @@ struct OnboardingFlowTests {
         #expect(OnboardingCopy.impression(interests: ["Tech", "Business", "Design"]).contains("You lean toward Tech and Business shows"))
         #expect(OnboardingCopy.impression(interests: ["Comedy"]).contains("You lean toward Comedy shows"))
         #expect(!OnboardingCopy.impression(interests: []).contains("You lean toward"))
+    }
+
+    /// A flow moved to `target` with every requirement met on the way.
+    private func flow(at target: OnboardingStep) -> OnboardingFlow {
+        var flow = OnboardingFlow()
+        while flow.step != target {
+            switch flow.step {
+            case .interests:
+                flow.toggleInterest("Tech")
+            case .queueLesson:
+                flow.toggleQueued("sample-1")
+                flow.toggleQueued("sample-2")
+            case .transcriptLesson:
+                flow.markEpisodeAsked()
+            default:
+                break
+            }
+            flow.advance()
+        }
+        return flow
     }
 
     // MARK: - Gate

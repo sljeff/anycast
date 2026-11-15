@@ -26,7 +26,7 @@ final class AnycastIconButton: UIButton {
     static let standardDiameter: CGFloat = 44
     static let largeDiameter: CGFloat = 48
 
-    private let style: Style
+    private var style: Style
     private let designDiameter: CGFloat
     private let designGlyphSize: CGFloat
     private let glyphWeight: UIImage.SymbolWeight
@@ -100,6 +100,18 @@ final class AnycastIconButton: UIButton {
 
     override var accessibilityLabel: String? {
         didSet { largeContentTitle = accessibilityLabel }
+    }
+
+    /// Re-colours the button for another style; size, glyph and press
+    /// feedback stay.
+    func setStyle(_ newStyle: Style) {
+        guard newStyle != style else { return }
+        style = newStyle
+        var configuration = Self.baseConfiguration(newStyle)
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = .zero
+        self.configuration = configuration
+        applyMetrics()
     }
 
     func setIcon(_ icon: UIImage?) {
