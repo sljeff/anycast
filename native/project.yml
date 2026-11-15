@@ -13,8 +13,9 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CUSTOM_GROUP_ID: group.com.kindjeff.ShareExtention
     ENABLE_USER_SCRIPT_SANDBOXING: "NO"
-    # The Flutter line's pubspec.yaml stays the version source of truth; these
-    # mirror it and are only bumped as an intentional release step (AGENTS.md).
+    # Since the Flutter app was removed (2026-11-15) these values, carried
+    # over from its pubspec.yaml (1.2.1+38), are the version source of
+    # truth; they are only bumped as an intentional release step (AGENTS.md).
     MARKETING_VERSION: "1.2.1"
     CURRENT_PROJECT_VERSION: "38"
 
@@ -183,6 +184,16 @@ targets:
         SWIFT_APPROACHABLE_CONCURRENCY: "YES"
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         INFOPLIST_KEY_CFBundleDisplayName: Anycast
+      # Store-candidate archives sign manually against the pinned App Store
+      # profiles (scripts/prepare_ios_signing.sh installs them); Debug and
+      # local device builds keep automatic signing. Mirrors the Release
+      # signing block the Flutter Runner project used.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          DEVELOPMENT_TEAM: 5TQ9AN87D8
+          PROVISIONING_PROFILE_SPECIFIER: "Anycast GitHub App Store"
 
   ShareExtension:
     type: app-extension
@@ -222,6 +233,12 @@ targets:
         # strict concurrency would require editing them. Swift 5 mode.
         SWIFT_VERSION: "5.0"
         SWIFT_APPROACHABLE_CONCURRENCY: "NO"
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          DEVELOPMENT_TEAM: 5TQ9AN87D8
+          PROVISIONING_PROFILE_SPECIFIER: "Anycast Share Extension GitHub App Store"
 
   AnycastTests:
     type: bundle.unit-test
@@ -307,6 +324,13 @@ schemes:
       config: Debug
     test:
       config: Debug
+      # Same TZ pin as the AnycastTests scheme below: G10/G11 goldens are
+      # zone-sensitive, and CI (UTC runners) executes its unit-test
+      # selection through this scheme's xctestrun.
+      environmentVariables:
+        - variable: TZ
+          value: Asia/Shanghai
+          isEnabled: true
       targets:
         - AnycastTests
         - AnycastAppTests

@@ -12,9 +12,9 @@
 *.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/*
 !*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
-# Secrets and SDK configuration, materialized like the Flutter line's .env:
-#   cp ../ios/Runner/GoogleService-Info.plist Anycast/Resources/
-#   (Secrets.plist is written from the repo-root .env — see README)
+# Secrets and SDK configuration, materialized from Infisical by
+# scripts/bootstrap.sh (local) or scripts/materialize_app_config.sh
+# (release CI) — see native/README.md for the by-hand fallback.
 Anycast/Resources/Secrets.plist
 Anycast/Resources/GoogleService-Info.plist
 

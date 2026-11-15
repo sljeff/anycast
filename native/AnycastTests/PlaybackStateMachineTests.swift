@@ -434,9 +434,18 @@ struct PlaybackStateMachineTests {
             default: break
             }
         }
-        engine.load(url: URL(string: "https://x.example/own.mp3")!, initialPositionMilliseconds: 0)
+        // Local file URLs keep this deterministic: a network URL races the
+        // assertions — its genuine DNS/load failure lands inside the same
+        // 150 ms window and pollutes the filtering expectations.
+        engine.load(url: URL(fileURLWithPath: "/nonexistent/anycast-engine-own.mp3"),
+                    initialPositionMilliseconds: 0)
         let own = try #require(engine.currentItemForTesting)
-        let foreign = AVPlayerItem(url: URL(string: "https://x.example/foreign.mp3")!)
+        let foreign = AVPlayerItem(url: URL(fileURLWithPath: "/nonexistent/anycast-engine-foreign.mp3"))
+
+        // Settle the own item's (immediate, offline) load failure and drain
+        // it — the assertions below must observe ONLY notification filtering.
+        try await Task.sleep(for: .milliseconds(300))
+        _ = events.with { $0.removeAll() }
 
         NotificationCenter.default.post(name: AVPlayerItem.didPlayToEndTimeNotification, object: foreign)
         NotificationCenter.default.post(name: .AVPlayerItemFailedToPlayToEndTime, object: foreign)

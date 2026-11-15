@@ -1114,9 +1114,9 @@ final class QACrawlUITests: XCTestCase {
     }
 
     /// Dump-only pass used for cross-app comparison (axdiff.py). Runs against
-    /// whatever is installed as com.kindjeff.anycast — install the Flutter
-    /// build first (tool/ui_qa/capture_flutter.sh), run this, then diff its
-    /// states against the native audit run.
+    /// whatever is installed as com.kindjeff.anycast — install the reference
+    /// build first, run this, then diff its states against the native audit
+    /// run.
     func testReferenceDump() {
         audit = false
         probesEnabled = false
@@ -1184,7 +1184,9 @@ final class QACrawlUITests: XCTestCase {
         if !descSeen { XCTFail("episode-card-description never populated within 30 s") }
     }
 
-    /// Screenshot-only tour for the Flutter reference build. Flutter's
+    /// Screenshot-only tour for the Flutter reference build (the shipped
+    /// Flutter app installed from the App Store; the Flutter source left
+    /// this repository on 2026-11-15). Flutter's
     /// semantics tree uses different element types than the audit crawl's
     /// UIKit queries (no tabBar/cells — nodes surface as other/staticText/
     /// button with merged multi-line labels), so navigation taps labels and

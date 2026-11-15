@@ -1,17 +1,26 @@
 #!/usr/bin/env bash
-# M0 one-click regeneration (DoD: goldens + provenance records in git;
-# payloads regenerable from their sources with one command).
+# M0 corpus regeneration AFTER the Flutter cutover (2026-11-15).
 #
-#   tool/m0/regen_all.sh          # offline: rebuild db fixtures + goldens from
-#                                 # the corpus materialized on this machine
-#   tool/m0/regen_all.sh --live   # ALSO re-collect live corpus (network!)
-#                                 #   (rss + api + media), then rebuild
+# The Flutter app was removed from this repository, so payloads that only
+# Flutter code could produce are FROZEN and tracked in git — never try to
+# regenerate them:
+#   - test/fixtures/db/**                  (the app's real table creators,
+#                                           models and insertion algorithms)
+#   - test/fixtures/opml/app_export.opml   (the app's real generateOPML)
+# They are pinned to the Flutter app 1.2.1+38; the last commit that could
+# rebuild them was a48c34d (branch `native`).
 #
-# Fixture payloads are gitignored; only capture records (manifests, headers)
-# and goldens are tracked, so a fresh clone bootstraps with --live.
-# The offline path is deterministic given the materialized corpus; the --live
-# path refreshes real-world content (feeds change daily) and therefore also
-# refreshes every golden derived from it.
+# What this script still regenerates is the live-collectable corpus and the
+# payloads derived from it by shell/python/ffmpeg alone:
+#   tool/m0/regen_all.sh          # offline: reconstruct buckets that are
+#                                 # deterministic given the materialized
+#                                 # corpus (constructed rss, audio, opml)
+#   tool/m0/regen_all.sh --live   # re-collect the live corpus first
+#                                 # (network: rss + api + covers), then
+#                                 # reconstruct
+#
+# Capture records (manifests, headers) and goldens stay tracked; the frozen
+# payloads above are tracked too (test/fixtures/README.md).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -30,13 +39,14 @@ if [[ "${1:-}" == "--live" ]]; then
   bash tool/m0/fetch_api.sh
   bash tool/m0/fetch_media.sh
 else
-  # offline: payloads are gitignored; --live must have run here once
+  # offline: live-collected payloads are gitignored; --live must have run
+  # here once
   if [[ ! -f test/fixtures/channels_index.json || -z "$(ls test/fixtures/rss/standard/*.xml 2>/dev/null)" ]]; then
-    echo "fixture payloads missing (git carries only provenance records)" >&2
+    echo "fixture payloads missing (git carries only capture records)" >&2
     echo "bootstrap once with: tool/m0/regen_all.sh --live" >&2
     exit 1
   fi
-  # db_user depends on the author's-subscription corpus
+  # user_subs payloads (author's-subscription corpus)
   if [[ -z "$(ls test/fixtures/rss/user_subs/*.xml 2>/dev/null)" ]]; then
     echo "user_subs payloads missing; collect once with: bash tool/m0/fetch_user_subs.sh" >&2
     exit 1
@@ -52,15 +62,5 @@ else
   fi
 fi
 
-echo "== db fixtures =="
-flutter test --no-pub --dart-define=m0-regen=true \
-  test/fixtures/generate_db_fixtures_test.dart
-
-echo "== goldens =="
-flutter test --no-pub --dart-define=m0-regen=true \
-  test/golden/export_golden_test.dart
-
-echo "== full test suite (gated tests must be skipped, rest green) =="
-flutter test --no-pub
-
-echo "done."
+echo "done. (db/** and opml/app_export.opml are frozen and tracked;"
+echo "native suites run via xcodebuild — see native/README.md)"

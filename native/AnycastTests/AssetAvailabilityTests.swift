@@ -9,10 +9,10 @@ struct AssetAvailabilityTests {
 
     @Test("Repo root and DB buckets resolve")
     func repoRootResolves() throws {
-        #expect(FileManager.default.fileExists(atPath: RepoAssets.repoRoot.appendingPathComponent("pubspec.yaml").path))
+        #expect(FileManager.default.fileExists(atPath: RepoAssets.repoRoot.appendingPathComponent("native/project.yml").path))
         for bucket in ["db_light", "db_heavy", "db_v3", "db_crashed"] {
             #expect(FileManager.default.fileExists(atPath: RepoAssets.fixture("db/\(bucket)/anycast.db").path),
-                    "missing fixture bucket \(bucket) — run tool/m0/regen_all.sh")
+                    "missing fixture bucket \(bucket) — the db payloads are frozen and tracked in git (test/fixtures/README.md)")
         }
     }
 

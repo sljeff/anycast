@@ -111,5 +111,7 @@
       "file": "G_palette_dominant.json",
       "bytes": 1173
     }
-  ]
+  ],
+  "frozen": true,
+  "note": "Goldens are FROZEN: the Flutter exporter (generator above) was removed with the Flutter app on 2026-11-15 and the payloads can no longer be regenerated. Last regenerable commit: a48c34d (branch native), Flutter app pinned to 1.2.1+38."
 }

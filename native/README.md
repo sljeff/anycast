@@ -1,9 +1,10 @@
 # Anycast native (iOS)
 
-The iOS-native rewrite of the Flutter app, per `docs/migration/00-execution-plan.md`.
-Same repository as the Flutter line on purpose: the M0 regression assets under
-`test/fixtures/` and `test/golden/` are read by the Swift test target via
-relative path.
+The native iOS app (Swift, UIKit, GRDB) — the rewrite of the original Flutter
+app per `docs/migration/00-execution-plan.md`. The Flutter app and the Android
+target were removed from this repository on 2026-11-15; the M0 regression
+assets under `test/fixtures/` and `test/golden/` stay in the same repository so
+the Swift test targets read them via relative path.
 
 ## Layout
 
@@ -24,22 +25,34 @@ relative path.
 
 ## One-time local setup
 
+The two gitignored resource files the app reads are
+`Anycast/Resources/GoogleService-Info.plist` (Firebase) and
+`Anycast/Resources/Secrets.plist` (`PURCHASES_IOS_API_KEY`). Maintainers with
+access to the Anycast Infisical project generate both from the repository root:
+
+```sh
+brew install infisical/get-cli/infisical
+infisical login
+./scripts/bootstrap.sh          # writes both files + native/.env, digest-verified
+```
+
+Without Infisical access, create them by hand: copy the iOS
+`GoogleService-Info.plist` from the Firebase console, and fill in
+`Anycast/Resources/Secrets.example.plist` with the RevenueCat public iOS key,
+saving it as `Secrets.plist`. The app degrades gracefully when either file is
+missing (no sign-in, no store), so a bare clone still builds and tests.
+
+Then generate the Xcode project:
+
 ```sh
 cd native
-cp ../ios/Runner/GoogleService-Info.plist Anycast/Resources/   # gitignored
-python3 - <<'EOF'   # writes Anycast/Resources/Secrets.plist from .env
-import re, plistlib
-env = open('../.env').read()
-plistlib.dump({'PURCHASES_IOS_API_KEY': re.search(r'PURCHASES_IOS_API_KEY=(\S+)', env).group(1)},
-              open('Anycast/Resources/Secrets.plist', 'wb'))
-EOF
 xcodegen generate
 ```
 
 ## Build & test
 
 ```sh
-xcodebuild -project Anycast.xcodeproj -scheme Anycast -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+xcodebuild -project Anycast.xcodeproj -scheme Anycast -destination 'platform=iOS Simulator,name=iPhone 18 Pro' build
 xcodebuild -project Anycast.xcodeproj -scheme AnycastTests \
   -destination 'id=<simulator-udid>' test -parallel-testing-enabled NO
 ```
@@ -47,25 +60,31 @@ xcodebuild -project Anycast.xcodeproj -scheme AnycastTests \
 `-parallel-testing-enabled NO` is recommended: the heavy suites (G7 corpus,
 palette rendering) are memory-hungry, and Swift Testing's parallel runner
 processes have shown to get jetsammed on the simulator when run concurrently.
+The L0 DB suites and the app tests are zone-sensitive; both schemes pin
+`TZ=Asia/Shanghai` in their test actions.
 
-The test suites require the M0 payloads (gitignored by design): run
-`tool/m0/regen_all.sh` from the repository root once on this machine.
+The frozen Flutter-generated payloads (`test/fixtures/db/**`,
+`test/fixtures/opml/app_export.opml`) are tracked in git, so the L0 suites and
+`AnycastAppTests` run on a bare clone. Only the L1/L2 suites that replay the
+live-collected corpus need the gitignored payloads: run
+`tool/m0/regen_all.sh --live` from the repository root once per machine
+(test/fixtures/README.md).
 
 ### Test bundles
 
 | Bundle | Covers | Needs M0 fixtures? |
 |---|---|---|
-| `AnycastTests` | L0–L2 parity: DB matrix, G1–G16 goldens, API contract replay | yes (TZ pinned to Asia/Shanghai) |
-| `AnycastAppTests` | App-layer units (design system, screen logic, layout sanity sweep) | only the live-shell specs |
-| `AnycastSnapshotTests` | Reference captures of the M3 screen states (05 §6.1) — gated behind `SNAPSHOT_CAPTURE=1` | content-bearing screens |
+| `AnycastTests` | L0–L2 parity: DB matrix, G1–G16 goldens, API contract replay | L0 suites: tracked frozen fixtures only. L1/L2: also the gitignored live corpus (TZ pinned to Asia/Shanghai) |
+| `AnycastAppTests` | App-layer units (design system, screen logic, layout sanity sweep) | only the tracked `opml/app_export.opml` |
+| `AnycastSnapshotTests` | Reference captures of the M3 screen states (05 §6.1) — gated behind `SNAPSHOT_CAPTURE=1` | content-bearing screens (tracked `db_smoke`) |
 | `AnycastUITests` | XCUITest smoke (05 §6.2); data-dependent steps skip when unseeded. `QACrawlUITests` is additionally gated behind `QA_CRAWL=1` (set by `tool/ui_qa/crawl.sh`) | no (skips) |
 
 Screen reference baselines live in
 `AnycastSnapshotTests/__Snapshots__/ScreenBaselineCaptureTests/iOS-<major>/`
 and are re-recorded against the seeded container below with
 `TEST_RUNNER_SNAPSHOT_CAPTURE=1 xcodebuild … test` (a plain `test` run skips
-the suite — the captures overwrite the committed references); M4 compares
-them with the Flutter build per OS — structural comparison, not pixel diffs.
+the suite — the captures overwrite the committed references); comparisons are
+structural, not pixel diffs.
 
 #### UI check
 
@@ -94,12 +113,11 @@ scripts/ui_check.sh [--os 27|18|both|auto] [--base <git-ref>] [--state <dir>] [-
 
 ### Manual runs in the simulator
 
-Seed the database with the generator's `db_smoke` bucket (player pointer set,
+Seed the database with the frozen `db_smoke` bucket (player pointer set,
 queue head cached with in-file progress, far-future `validTill` so the stale
-cleanup keeps the rows — `buildSmoke` in
-`test/fixtures/generate_db_fixtures_test.dart`). The same container drives the
-reference captures, the hosted screen searches and the data-dependent UI
-smoke flows:
+cleanup keeps the rows; generated by the retired Flutter generator — see
+`test/fixtures/README.md`). The same container drives the reference captures,
+the hosted screen searches and the data-dependent UI smoke flows:
 
 ```sh
 xcodebuild -project Anycast.xcodeproj -scheme Anycast \
@@ -137,5 +155,6 @@ unavailable, and it starts without the store app's data. It never touches
   - Composition root only (`AppEnvironment`); no service locator, no lazy
     registration.
   - No timer is scheduled before settings finish loading (startup DAG).
-- Version numbers mirror `pubspec.yaml`; a bump here is an intentional
-  release step (see AGENTS.md).
+- Version numbers live in `project.yml` (`MARKETING_VERSION` /
+  `CURRENT_PROJECT_VERSION`); a bump here is an intentional release step
+  (see AGENTS.md).
