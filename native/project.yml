@@ -17,7 +17,7 @@ settings:
     # over from its pubspec.yaml (1.2.1+38), are the version source of
     # truth; they are only bumped as an intentional release step (AGENTS.md).
     MARKETING_VERSION: "2.0.0"
-    CURRENT_PROJECT_VERSION: "41"
+    CURRENT_PROJECT_VERSION: "42"
 
 packages:
   GRDB:
