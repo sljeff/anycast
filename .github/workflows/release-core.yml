@@ -308,13 +308,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Xcode 27 no longer bundles iTMSTransporter (it ships with the
+          # separate Transporter app). altool uploads over HTTPS and finds
+          # AuthKey_<key id>.p8 in ./private_keys or $API_PRIVATE_KEYS_DIR.
           (
             cd "${IOS_SIGNING_DIR}"
-            xcrun iTMSTransporter \
-              -m upload \
-              -assetFile "${IOS_IPA_PATH}" \
-              -apiKey "${APP_STORE_CONNECT_KEY_ID}" \
-              -apiIssuer "${APP_STORE_CONNECT_ISSUER_ID}"
+            xcrun altool \
+              --upload-app \
+              -f "${IOS_IPA_PATH}" \
+              -t ios \
+              --api-key "${APP_STORE_CONNECT_KEY_ID}" \
+              --api-issuer "${APP_STORE_CONNECT_ISSUER_ID}"
           )
 
       - name: Remove iOS signing material and build
