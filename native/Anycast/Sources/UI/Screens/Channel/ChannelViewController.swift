@@ -837,8 +837,11 @@ final class ChannelHeaderView: UICollectionReusableView {
     private var didConfigure = false
     private let coverView = UIImageView()
     /// The URL the cover was last asked to load; a render with the same URL
-    /// must not cancel and reset the cover.
+    /// must not cancel and reset the cover. `didRenderCover` separates
+    /// "never loaded" from "loaded and had no URL" (nil URLs must still
+    /// install the shared placeholder on the first configure).
     private var renderedCoverURL: URL?
+    private var didRenderCover = false
     private let titleBlock = UIStackView()
     private let titleLabel = UILabel()
     private let authorLabel = UILabel()
@@ -958,11 +961,18 @@ final class ChannelHeaderView: UICollectionReusableView {
 
     func configure(channel: SubscriptionRow, dominant: UIColor) {
         let imageURL = channel.imageUrl.flatMap(URL.init(string:))
-            ?? URL(string: "https://placeholder.co/120.png?text=Waiting")
-        if imageURL != renderedCoverURL {
+        if !didRenderCover || imageURL != renderedCoverURL {
+            didRenderCover = true
             renderedCoverURL = imageURL
+            // The shared artwork treatment: the show's initial on a sand
+            // tile while the cover loads and when it fails. (The Dart page
+            // fell back to a remote placeholder.co image here; every other
+            // native cover already uses the local placeholder, so the
+            // header joins them rather than keeping a third-party request.)
             coverView.kf.cancelDownloadTask()
-            coverView.kf.setImage(with: imageURL, placeholder: nil, options: [.transition(.none)])
+            coverView.setArtwork(
+                imageURL, title: channel.title, side: ChannelFoldGeometry.expandedCoverSize
+            )
         }
 
         titleLabel.text = channel.title ?? ""
@@ -1218,16 +1228,23 @@ final class ChannelEpisodeRowCell: UICollectionViewCell {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        // A reused row must never inherit an entrance pose — the skeleton
+        // fade animates the cell itself and the staggered arrival the
+        // content view, so both reset.
+        layer.removeAllAnimations()
+        alpha = 1
+        contentView.layer.removeAllAnimations()
+        contentView.alpha = 1
+        contentView.transform = .identity
+    }
+
     /// A static placeholder row at the row's resting height (one title line
     /// and the meta line): the loading rule's skeleton, no shimmer.
     func configureSkeleton() {
-        func bar(_ text: String, _ font: UIFont) -> NSAttributedString {
-            NSAttributedString(string: text, attributes: [
-                .font: font, .foregroundColor: UIColor.clear, .backgroundColor: AnycastColor.sandAlpha4,
-            ])
-        }
-        titleLabel.attributedText = bar("Placeholder episode title text", titleLabel.font)
-        metaLabel.attributedText = bar("Placeholder meta", metaLabel.font)
+        titleLabel.setSkeletonBar("Placeholder episode title text")
+        metaLabel.setSkeletonBar("Placeholder meta")
         contentView.isUserInteractionEnabled = false
         contentView.isAccessibilityElement = false
     }
@@ -1235,8 +1252,8 @@ final class ChannelEpisodeRowCell: UICollectionViewCell {
     func configure(title: String, meta: String) {
         contentView.isUserInteractionEnabled = true
         contentView.isAccessibilityElement = true
-        titleLabel.text = title
-        metaLabel.text = meta
+        titleLabel.setRealText(title)
+        metaLabel.setRealText(meta)
         contentView.accessibilityLabel = title
         contentView.accessibilityValue = meta
     }

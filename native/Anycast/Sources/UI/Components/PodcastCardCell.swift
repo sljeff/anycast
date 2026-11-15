@@ -48,6 +48,10 @@ final class PodcastCardCell: UICollectionViewCell {
         onTap = nil
         setPosition(isFirst: false, isLast: false)
         coverView.kf.cancelDownloadTask()
+        // A reused cell must never inherit a card-entrance pose.
+        contentView.layer.removeAllAnimations()
+        contentView.alpha = 1
+        contentView.transform = .identity
     }
 
     /// A static placeholder row at the real row height (title on one line,
@@ -56,13 +60,8 @@ final class PodcastCardCell: UICollectionViewCell {
         content = nil
         coverView.kf.cancelDownloadTask()
         coverView.image = nil
-        func bar(_ text: String, _ font: UIFont) -> NSAttributedString {
-            NSAttributedString(string: text, attributes: [
-                .font: font, .foregroundColor: UIColor.clear, .backgroundColor: AnycastColor.sandAlpha4,
-            ])
-        }
-        titleLabel.attributedText = bar("Placeholder channel title", titleLabel.font)
-        descriptionLabel.attributedText = bar("Placeholder description that runs long\nand a second line", descriptionLabel.font)
+        titleLabel.setSkeletonBar("Placeholder channel title")
+        descriptionLabel.setSkeletonBar("Placeholder description that runs long\nand a second line")
         contentView.isUserInteractionEnabled = false
         contentView.isAccessibilityElement = false
     }
@@ -73,8 +72,8 @@ final class PodcastCardCell: UICollectionViewCell {
         contentView.isAccessibilityElement = true
         contentView.accessibilityLabel = content.title
 
-        titleLabel.text = content.title
-        descriptionLabel.text = content.description
+        titleLabel.setRealText(content.title)
+        descriptionLabel.setRealText(content.description)
 
         coverView.setArtwork(content.imageURL.flatMap(URL.init(string:)), title: content.title, side: Self.coverSide)
     }
