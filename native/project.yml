@@ -158,6 +158,15 @@ targets:
               - ShareMedia-$(PRODUCT_BUNDLE_IDENTIFIER)
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # iPad: the shipped Flutter app supported iPad, and App Store Connect
+        # rejects an update that drops a device family (ITMS-90101). iPad runs
+        # the same size-class-driven layout in resizable windows, so it
+        # declares every orientation, as the Flutter Runner did.
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UILaunchScreen:
           UIColorName: Background
         AppGroupId: $(CUSTOM_GROUP_ID)
@@ -180,7 +189,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.kindjeff.anycast
-        TARGETED_DEVICE_FAMILY: "1"
+        # iPhone + iPad: required to keep the shipped app's device families.
+        TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_APPROACHABLE_CONCURRENCY: "YES"
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         INFOPLIST_KEY_CFBundleDisplayName: Anycast
@@ -226,7 +236,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.kindjeff.anycast.Share-Extension
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: "YES"
         # Vendored sources are kept byte-compatible with the shipped
         # extension ("保留原样", 05 §11); compiling them under Swift 6
