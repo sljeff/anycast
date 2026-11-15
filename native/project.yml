@@ -16,8 +16,8 @@ settings:
     # Since the Flutter app was removed (2026-11-15) these values, carried
     # over from its pubspec.yaml (1.2.1+38), are the version source of
     # truth; they are only bumped as an intentional release step (AGENTS.md).
-    MARKETING_VERSION: "1.2.1"
-    CURRENT_PROJECT_VERSION: "38"
+    MARKETING_VERSION: "2.0.0"
+    CURRENT_PROJECT_VERSION: "39"
 
 packages:
   GRDB:
