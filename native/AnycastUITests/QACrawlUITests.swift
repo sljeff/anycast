@@ -850,7 +850,7 @@ final class QACrawlUITests: XCTestCase {
                            s.currentTab = "tab-0"
                            guard s.tap(s.app.buttons["tab-0"], "Podcast chip") else { return false }
                            guard s.tap(s.app.buttons["shows-shelf-all"], "All shows button") else { return false }
-                           return s.app.staticTexts["shows-sheet-title"].waitForExistence(timeout: 4)
+                           return s.app.staticTexts["library-sheet-title"].waitForExistence(timeout: 4)
                        },
                        required: [],
                        probe: true, settle: 3),

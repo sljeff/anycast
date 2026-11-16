@@ -151,6 +151,40 @@ struct PlaylistBatchRemoveTests {
         #expect(host.list.episodes.compactMap(\.enclosureUrl) == original)
     }
 
+    @Test("removing the open current head via its own group, then Undo: the card returns to the list")
+    func openHeadRemoveThenUndoShowsCard() async throws {
+        let host = try await Host.make(count: 12)
+        defer { host.close() }
+        let original = (0..<12).map(host.url)
+        let repository = host.context.database.playlistRepository()
+        let playback = host.context.playback
+        let head = try #require(try await repository.episode(byEnclosureURL: host.url(0)))
+        await playback.setByEpisode(head)
+        await playback.reloadQueue()
+        try host.cell(0).onCardTap?()
+        try await host.settle()
+        host.group.button(for: "remove")?.sendActions(for: .touchUpInside)
+        await Self.waitUntil { playback.currentEpisode?.enclosureUrl == host.url(1) }
+        await host.list.binder.settleEagerRemovals()
+        #expect(host.list.visibleCount == 11)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(host.list.visibleCount == 11)
+
+        Self.undoButton(in: host.window)?.sendActions(for: .touchUpInside)
+        await Self.waitUntil { host.list.visibleCount == 12 }
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(await Self.storedURLs(host) == original)
+        #expect(playback.currentEpisode?.enclosureUrl == host.url(0))
+        #expect(host.list.binder.hiddenEpisodeURLs.isEmpty)
+        #expect(host.list.episodes.compactMap(\.enclosureUrl) == original)
+        // The restored card must be on screen, not parked above the viewport.
+        let cv = try #require(host.list.edgeScrollView as? UICollectionView)
+        cv.layoutIfNeeded()
+        let frame = try #require(cv.layoutAttributesForItem(at: IndexPath(item: 0, section: 0))?.frame)
+        let visibleTop = cv.contentOffset.y + cv.adjustedContentInset.top
+        #expect(frame.minY >= visibleTop - 1, "restored head card is scrolled out above the viewport: minY \(frame.minY) top \(visibleTop) offset \(cv.contentOffset.y) inset \(cv.adjustedContentInset.top)")
+    }
+
     @Test("a committed batch deletes the deferred rows once and drops the capsule")
     func commitDeletesDeferred() async throws {
         let host = try await Host.make(count: 8)

@@ -624,7 +624,17 @@ final class PlaylistEpisodeListBinder: NSObject {
                   playback.currentPlaylistId == playlistId {
             await playback.reloadQueue()
         }
-        onListContentChanged?()
+        // The group stays anchored while rows return above it, so the
+        // restored card would park above the viewport: reveal the topmost one.
+        let restored = items.compactMap { item -> (url: String, index: Int)? in
+            if case .deleted(_, let index) = item.storage { return (item.url, index) }
+            return nil
+        }
+        if let first = restored.min(by: { $0.index < $1.index }), let episodeSource {
+            await episodeSource.reloadAndReveal(byEnclosureURL: first.url)
+        } else {
+            onListContentChanged?()
+        }
     }
 
     private func showRemovalCapsule() {
@@ -869,6 +879,9 @@ protocol PlaylistEpisodeDataSource: AnyObject {
     /// Drops the card of a deferred removal from the list (animated like any
     /// removed row); the stored row stays.
     func hideEpisode(byEnclosureURL url: String)
+    /// Reloads the rows, then scrolls the card into view when it sits outside
+    /// the viewport (an Undo that returned it above the open group).
+    func reloadAndReveal(byEnclosureURL url: String) async
     /// The URL's position among the VISIBLE rows (non-nil enclosure URLs —
     /// the same space the diffable snapshot and reorder coordinates use).
     /// Legacy rows with a NULL enclosureUrl are invisible to the snapshot;

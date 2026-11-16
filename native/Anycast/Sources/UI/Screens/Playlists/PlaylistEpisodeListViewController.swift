@@ -442,6 +442,9 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     /// reload's rows.
     private var reloadGeneration = 0
 
+    /// A row an Undo returned: the next applied reload scrolls it into view.
+    private var pendingRevealURL: String?
+
     /// Chained reorder persistence: consecutive drops run their write +
     /// playback + reload steps strictly in commit order.
     private var reorderChain: Task<Void, Never>?
@@ -514,6 +517,10 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             episodes = rows
             rebuildEpisodeIndex()
             applySnapshot(animatingDifferences: animatesSnapshot)
+        }
+        if let url = pendingRevealURL {
+            pendingRevealURL = nil
+            revealIfOffscreen(url)
         }
         binder.refreshGroup()
         await refreshDiskCacheState()
@@ -853,6 +860,27 @@ extension PlaylistEpisodeListViewController: PlaylistEpisodeDataSource {
             rebuildEpisodeIndex()
             applySnapshot(animatingDifferences: false)
         }
+    }
+
+    func reloadAndReveal(byEnclosureURL url: String) async {
+        pendingRevealURL = url
+        await reloadEpisodes()
+    }
+
+    /// Scrolls the row into view when it sits outside the viewport. Runs from
+    /// the reload that applies it: a superseded reload never reaches here.
+    private func revealIfOffscreen(_ url: String) {
+        guard let item = visibleIndex(ofEnclosureURL: url) else { return }
+        collectionView.layoutIfNeeded()
+        guard let frame = collectionView.layoutAttributesForItem(at: IndexPath(item: item, section: 0))?.frame
+        else { return }
+        let inset = collectionView.adjustedContentInset
+        let top = collectionView.contentOffset.y + inset.top
+        let bottom = collectionView.contentOffset.y + collectionView.bounds.height - inset.bottom
+        guard frame.minY < top || frame.maxY > bottom else { return }
+        let target = max(frame.minY - inset.top - 16, -inset.top)
+        collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: target),
+                                        animated: !Motion.reduceMotion)
     }
 
     func visibleIndex(ofEnclosureURL url: String) -> Int? {

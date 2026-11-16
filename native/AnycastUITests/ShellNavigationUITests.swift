@@ -30,7 +30,7 @@ final class ShellNavigationUITests: XCTestCase {
         if allShows.waitForExistence(timeout: 8) {
             allShows.tap()
             XCTAssertTrue(
-                app.staticTexts["shows-sheet-title"].waitForExistence(timeout: 4),
+                app.staticTexts["library-sheet-title"].waitForExistence(timeout: 4),
                 "All shows did not open the Shows sheet"
             )
             app.swipeDown()
