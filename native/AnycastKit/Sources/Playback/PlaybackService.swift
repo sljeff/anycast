@@ -597,6 +597,45 @@ public final class PlaybackService {
         await clearPlaybackState()
     }
 
+    /// Manual removal of the playing episode while the queue goes on: stop
+    /// the audio and make the NEXT queue episode the current one, loaded but
+    /// PAUSED — the mini player shows it, and only the user starts it. The
+    /// removed row must already be deleted. Without a next episode this is
+    /// `clear()`.
+    public func replaceCurrentWithNext() async {
+        pauseEngineOnly()
+        guard let playlistId = currentPlaylistId else {
+            await clearPlaybackState()
+            return
+        }
+        let remaining = (try? await store.episodes(playlistId: playlistId)) ?? []
+        guard let next = remaining.first else {
+            await clearPlaybackState()
+            return
+        }
+        queue = remaining
+        resetLoading()
+        await setByEpisode(next)
+        setPlaying(false)
+    }
+
+    /// Undo of a removed playing episode: stored again at the queue head, it
+    /// becomes the current episode once more, PAUSED, at its stored
+    /// progress. A row that did not come back at the head is only a queue
+    /// change (the queue's head must stay what is current).
+    public func restoreCurrentPaused(enclosureURL: String, playlistId: Int64) async {
+        let stored = (try? await store.episodes(playlistId: playlistId)) ?? []
+        guard let episode = stored.first, episode.enclosureUrl == enclosureURL else {
+            if currentPlaylistId == playlistId { queue = stored }
+            return
+        }
+        pauseEngineOnly()
+        queue = stored
+        resetLoading()
+        await setByEpisode(episode)
+        setPlaying(false)
+    }
+
     private func clearPlaybackState() async {
         currentEpisode = nil
         positionData = .zero

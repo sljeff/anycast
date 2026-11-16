@@ -4,8 +4,8 @@ import AnycastKit
 @testable import Anycast
 
 /// Playlist Remove defers its DB delete for the Undo window (or, for a row
-/// the player may reach, deletes at once and re-inserts on Undo). Real SQLite
-/// in a temporary file.
+/// the player may reach, deletes at once and re-inserts on Undo); removals
+/// merge into one batch. Real SQLite in a temporary file.
 @MainActor
 struct PlaylistRemovalUndoTests {
 
@@ -37,42 +37,72 @@ struct PlaylistRemovalUndoTests {
         return Fixture(database: database, url: url)
     }
 
-    @Test("a deferred remove leaves the stored row until the commit, which deletes once")
-    func rowSurvivesUntilCommit() async throws {
+    private enum Kind { case remove }
+
+    @Test("deferred removes merge; the rows stay stored until the one commit, which deletes once")
+    func rowsSurviveUntilCommit() async throws {
         let fixture = try await Self.makeFixture()
         defer { fixture.cleanUp() }
         let repository = fixture.database.playlistRepository()
-        let target = Self.urls[2]
-        let removal = PendingRemoval(window: .seconds(60), center: NotificationCenter())
+        let targets = [Self.urls[2], Self.urls[3]]
+        let batch = PendingBatch<Kind, String>(window: .seconds(60), center: NotificationCenter())
         var commits = 0
 
-        removal.begin(target) {
-            commits += 1
-            try? await repository.removeEpisode(byEnclosureURL: target)
+        for target in targets {
+            batch.add(target, kind: .remove) { urls in
+                commits += 1
+                for url in urls { try? await repository.removeEpisode(byEnclosureURL: url) }
+            }
         }
         let stored = (try await repository.listEpisodes(playlistId: 1))
         #expect(stored.compactMap(\.enclosureUrl) == Self.urls)
-        #expect(PlaylistRemovalLogic.displayed(stored, excluding: target).compactMap(\.enclosureUrl)
-            == [Self.urls[0], Self.urls[1], Self.urls[3]])
+        #expect(PlaylistRemovalLogic.displayed(stored, excluding: Set(targets)).compactMap(\.enclosureUrl)
+            == [Self.urls[0], Self.urls[1]])
 
-        await removal.commitNow()
-        await removal.commitNow()
+        await batch.commitNow()
+        await batch.commitNow()
         #expect(commits == 1)
-        #expect(await fixture.storedURLs() == [Self.urls[0], Self.urls[1], Self.urls[3]])
+        #expect(await fixture.storedURLs() == [Self.urls[0], Self.urls[1]])
     }
 
-    @Test("undoing a deferred remove writes nothing and keeps the row's index")
+    @Test("undoing deferred removes writes nothing and keeps every index")
     func undoKeepsIndex() async throws {
         let fixture = try await Self.makeFixture()
         defer { fixture.cleanUp() }
         let repository = fixture.database.playlistRepository()
-        let target = Self.urls[2]
-        let removal = PendingRemoval(window: .milliseconds(80), center: NotificationCenter())
-        removal.begin(target) { try? await repository.removeEpisode(byEnclosureURL: target) }
+        let batch = PendingBatch<Kind, String>(window: .milliseconds(80), center: NotificationCenter())
+        for target in [Self.urls[2], Self.urls[1]] {
+            batch.add(target, kind: .remove) { urls in
+                for url in urls { try? await repository.removeEpisode(byEnclosureURL: url) }
+            }
+        }
 
-        #expect(removal.undo())
+        #expect(batch.undo()?.items == [Self.urls[1], Self.urls[2]])
         try await Task.sleep(for: .milliseconds(250))
         #expect(await fixture.storedURLs() == Self.urls)
+    }
+
+    @Test("eager rows deleted in order come back in reverse: the head and a mid row restore the exact queue")
+    func eagerBatchUndoRestoresOrder() async throws {
+        let fixture = try await Self.makeFixture()
+        defer { fixture.cleanUp() }
+        let repository = fixture.database.playlistRepository()
+        var snapshots: [(row: PlaylistEpisodeRow, index: Int)] = []
+        // Delete order: a mid row, then the head, then the new head.
+        for url in [Self.urls[2], Self.urls[0], Self.urls[1]] {
+            snapshots.append(try #require(await PlaylistRemovalLogic.snapshot(
+                url: url, playlistId: 1, repository: repository
+            )))
+            try await repository.removeEpisode(byEnclosureURL: url)
+        }
+        #expect(await fixture.storedURLs() == [Self.urls[3]])
+
+        for snapshot in snapshots.reversed() {
+            await PlaylistRemovalLogic.reinsert(snapshot.row, at: snapshot.index, playlistId: 1, repository: repository)
+        }
+        let rows = try await repository.listEpisodes(playlistId: 1)
+        #expect(rows.compactMap(\.enclosureUrl) == Self.urls)
+        #expect(rows.map(\.playedDuration) == [10_000, 20_000, 30_000, 40_000])
     }
 
     @Test("undoing an eager remove re-inserts the row at its index with its columns")
@@ -124,12 +154,12 @@ struct PlaylistRemovalUndoTests {
         #expect(!eager(queue[1], playing: 2))
     }
 
-    @Test("a change of the playing episode commits a pending removal")
+    @Test("a change of the playing episode commits pending deferred removals")
     func trackChangeCommits() {
         let commit = PlaylistRemovalLogic.shouldCommitOnTrackChange
-        #expect(commit("a", "x", "y"))
-        #expect(commit("a", "x", nil))
-        #expect(!commit("a", "x", "x"))
-        #expect(!commit(nil, "x", "y"))
+        #expect(commit(["a"], "x", "y"))
+        #expect(commit(["a", "b"], "x", nil))
+        #expect(!commit(["a"], "x", "x"))
+        #expect(!commit([], "x", "y"))
     }
 }

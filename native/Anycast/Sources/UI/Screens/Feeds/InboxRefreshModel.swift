@@ -256,3 +256,54 @@ enum InboxActionPlanner {
         }
     }
 }
+
+// MARK: - Merged Undo batches
+
+/// The two kinds of Inbox action that share one Undo window.
+enum InboxBatchKind: Hashable {
+    case remove
+    case add
+}
+
+/// One action in a batch. A Remove needs only the URL (its row stays stored
+/// until the commit). An Add keeps the FULL feed row it took out of the
+/// Inbox, and the playlist row it created, so Undo can put both back.
+struct InboxBatchItem {
+    let url: String
+    var feedRow: FeedEpisodeRow?
+    /// Nil when the Add created no playlist row (the episode was playing, or
+    /// already queued): Undo then leaves the playlist alone.
+    var createdPlaylistRow: PlaylistEpisodeRow?
+
+    init(url: String, feedRow: FeedEpisodeRow? = nil, createdPlaylistRow: PlaylistEpisodeRow? = nil) {
+        self.url = url
+        self.feedRow = feedRow
+        self.createdPlaylistRow = createdPlaylistRow
+    }
+}
+
+enum InboxBatchLogic {
+
+    /// The capsule text: one action reads plainly, several carry the count.
+    static func message(kind: InboxBatchKind, count: Int) -> String {
+        switch kind {
+        case .remove: return count > 1 ? "Removed \(count) episodes" : "Removed"
+        case .add: return count > 1 ? "Added \(count) to Playlist" : "Added to Playlist"
+        }
+    }
+
+    /// Undoes an Add batch: the playlist rows the Adds created go, and every
+    /// feed row comes back exactly as it was (id included). A created row
+    /// that has since become the current episode stays, as the player owns it.
+    static func undoAdd(
+        _ items: [InboxBatchItem],
+        currentEnclosureURL: String?,
+        feedRepository: FeedRepository,
+        playlistRepository: PlaylistRepository
+    ) async {
+        for item in items where item.createdPlaylistRow != nil && item.url != currentEnclosureURL {
+            try? await playlistRepository.removeEpisode(byEnclosureURL: item.url)
+        }
+        try? await feedRepository.insertMany(items.compactMap(\.feedRow))
+    }
+}

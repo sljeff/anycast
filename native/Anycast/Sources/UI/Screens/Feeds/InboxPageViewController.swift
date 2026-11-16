@@ -82,22 +82,22 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// predates the new subscriptions, so one more pass must follow it.
     private var needsRefreshAfterImport = false
 
-    /// The one removal waiting out its Undo window. Its row stays in
-    /// `episodes` (and the DB) until the commit; every displayed list is the
-    /// source minus this URL.
-    private let pendingRemoval = PendingRemoval()
-    private var pendingRemovalURL: String?
-    /// Earlier removals stay hidden while their commits finish. Only the
-    /// latest PendingRemoval can be undone; this is not merged undo.
+    /// The actions waiting out one shared Undo window: Removes (rows stay in
+    /// `episodes` and the DB until the commit) or Adds (already durable;
+    /// Undo moves the rows back). One kind at a time; the other kind commits
+    /// the pending batch first.
+    private let batch = PendingBatch<InboxBatchKind, InboxBatchItem>()
+    /// Rows of a Remove batch, and of committed removals whose write is still
+    /// running: every displayed list is the source minus these URLs.
     private var hiddenRemovalURLs: Set<String> = []
 
-    /// The category-filtered projection the list renders, without the row
+    /// The category-filtered projection the list renders, without the rows
     /// pending removal.
     private var displayedEpisodes: [FeedEpisodeRow] {
         InboxCategoryFilter.displayed(
             episodes: episodes, selected: selectedCategory, categoriesByFeed: categoriesByFeed,
-            excluding: pendingRemovalURL
-        ).filter { !($0.enclosureUrl.map(hiddenRemovalURLs.contains) ?? false) }
+            excluding: hiddenRemovalURLs
+        )
     }
 
     // MARK: - Init (the shell constructs `init(context:)`)
@@ -164,7 +164,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         // The Undo capsule belongs to this page: leaving it commits.
-        Task { await pendingRemoval.commitNow() }
+        Task { await batch.commitNow() }
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -187,7 +187,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // The shell dispatches Tab0 re-taps through the context (03 §1.1).
         context.tabs.tabZeroTopRefresh = self
 
-        pendingRemoval.onCommit = { ToastPresenter.shared.dismissAction(capsuleIdentifier: "inbox-removal-capsule") }
+        batch.onCommit = { ToastPresenter.shared.dismissAction(capsuleIdentifier: "inbox-removal-capsule") }
 
         startAutoRefreshTimer()
         startTrimTimer()
@@ -535,8 +535,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         let displayed = incoming.map {
             InboxCategoryFilter.displayed(
                 episodes: $0, selected: selectedCategory, categoriesByFeed: categoriesByFeed,
-                excluding: pendingRemovalURL
-            ).filter { !($0.enclosureUrl.map(hiddenRemovalURLs.contains) ?? false) }
+                excluding: hiddenRemovalURLs
+            )
         } ?? displayedEpisodes
         let signature = displayed.map(\.enclosureUrl)
         let newSections = Self.sections(hasShelf: !shows.isEmpty, hasStrip: categoryStrip.hasFilters, hasCards: !displayed.isEmpty)
@@ -911,6 +911,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
         let playlistId = ChannelPlaylistLogic.defaultPlaylistID
         let row = ChannelPlaylistLogic.playlistRow(from: episode, playlistId: playlistId)
+        // The full stored row, taken before the Add removes it: Undo restores
+        // it field for field.
+        let feedSnapshot = episodes.first { $0.enclosureUrl == enclosureURL } ?? episode
         let steps = InboxActionPlanner.steps(
             for: action,
             currentPlaylistId: context.playback.currentPlaylistId,
@@ -931,20 +934,31 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             guard let self else { return }
             defer { self.actionsInFlight.remove(enclosureURL) }
             var insertedRow = row
+            var createdRow: PlaylistEpisodeRow?
             for step in steps {
                 switch step {
                 case .flyInAnimation:
                     await self.runFlyIn(from: flyInStart)
                 case .insertIntoPlaylist(let index):
                     let repository = self.context.database.playlistRepository()
+                    // Undo deletes only a row this Add created.
+                    let existed = (try? await repository.episode(byEnclosureURL: enclosureURL)) != nil
                     try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: index)
                     if let stored = try? await repository.episode(byEnclosureURL: enclosureURL) {
                         insertedRow = stored
+                        if !existed { createdRow = stored }
                     }
                 case .skipInsertCurrentlyPlaying:
                     break
                 case .removeFromInbox:
-                    await self.removeFromInbox(urls: [enclosureURL], keepsGroup: action != .play)
+                    let created = createdRow
+                    await self.removeFromInbox(urls: [enclosureURL], keepsGroup: action != .play) {
+                        // Play never enters a batch; an Add does.
+                        guard action == .addToPlaylist else { return }
+                        self.recordAdd(InboxBatchItem(
+                            url: enclosureURL, feedRow: feedSnapshot, createdPlaylistRow: created
+                        ))
+                    }
                 case .playInsertedEpisode:
                     await self.context.playback.playByEpisode(insertedRow)
                 case .reloadPlaybackQueue:
@@ -1033,69 +1047,93 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     }
 
     /// Durable moves use the same synchronous visual leave as Remove.
-    private func removeFromInbox(urls: [String], keepsGroup: Bool = true) async {
+    private func removeFromInbox(
+        urls: [String], keepsGroup: Bool = true, afterLeave: (() -> Void)? = nil
+    ) async {
         try? await context.database.feedRepository().removeByEnclosureUrls(urls)
         while updateGate.isBusy { try? await Task.sleep(nanoseconds: 10_000_000) }
         leaveInbox(urls: urls, hiding: false, keepsGroup: keepsGroup)
+        afterLeave?()
         // The fly-in follows the leaving snapshot's travel, without locking
         // the group: the next circle tap can already act on the filler.
         try? await Task.sleep(for: .seconds(ListActionMotion.duration))
     }
 
-    /// Only a pure Remove can be undone; Play and Add-to-playlist also end
-    /// by leaving the inbox, but their removal is part of a durable move.
-    static func defersRemoval(_ steps: [InboxActionStep]) -> Bool {
-        steps == [.removeFromInbox]
-    }
-
-    /// Remove with a 5 s Undo: the card animates out now, the DB row goes
-    /// when the window ends (see `PendingRemoval`).
+    /// Remove with a 5 s Undo, merged with the Removes before it: the card
+    /// animates out now, the DB rows go when the window ends (see
+    /// `PendingBatch`).
     private func removeWithUndo(url: String) {
         updateGate.submitOrDefer { [weak self] in
             guard let self, self.currentIndexPath(for: url) != nil else { return }
             let repository = self.context.database.feedRepository()
-            self.pendingRemoval.begin(url) { [weak self] in
-                let deleted = (try? await repository.removeByEnclosureUrls([url])) != nil
-                self?.settleRemoval(url: url, deleted: deleted)
+            self.batch.add(InboxBatchItem(url: url), kind: .remove) { [weak self] items in
+                let urls = items.map(\.url)
+                let deleted = (try? await repository.removeByEnclosureUrls(urls)) != nil
+                self?.settleRemoval(urls: urls, deleted: deleted)
             }
             self.leaveInbox(urls: [url], hiding: true)
-            self.showRemovalCapsule()
+            self.showBatchCapsule()
         }
     }
 
-    /// The write finished: the row is gone from `episodes` too. A failed
-    /// write leaves the row in the DB, so it comes back.
-    private func settleRemoval(url: String, deleted: Bool) {
-        // A read begun before this write must not resurrect the committed row.
+    /// An Add already moved its row (the playlist insert and the inbox
+    /// delete are durable); the batch only keeps what Undo needs.
+    private func recordAdd(_ item: InboxBatchItem) {
+        batch.add(item, kind: .add) { _ in }
+        showBatchCapsule()
+    }
+
+    /// The write finished: the rows are gone from `episodes` too. A failed
+    /// write leaves the rows in the DB, so they come back.
+    private func settleRemoval(urls: [String], deleted: Bool) {
+        // A read begun before this write must not resurrect the committed rows.
         reloadGeneration += 1
-        if deleted { episodes.removeAll { $0.enclosureUrl == url } }
-        hiddenRemovalURLs.remove(url)
-        if pendingRemovalURL == url { pendingRemovalURL = nil }
+        if deleted { episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false } }
+        hiddenRemovalURLs.subtract(urls)
         renderList(allowsDiff: true)
     }
 
-    private func undoRemoval() {
-        guard pendingRemoval.undo() else { return }
-        if let pendingRemovalURL { hiddenRemovalURLs.remove(pendingRemovalURL) }
-        pendingRemovalURL = nil
+    private func undoBatch() {
+        guard let undone = batch.undo() else { return }
         UIAccessibility.post(notification: .announcement, argument: "Restored")
-        renderList(allowsDiff: true)
+        switch undone.kind {
+        case .remove:
+            hiddenRemovalURLs.subtract(undone.items.map(\.url))
+            renderList(allowsDiff: true)
+        case .add:
+            let context = context
+            Task { [weak self] in
+                await InboxBatchLogic.undoAdd(
+                    undone.items,
+                    currentEnclosureURL: context.playback.currentEpisode?.enclosureUrl,
+                    feedRepository: context.database.feedRepository(),
+                    playlistRepository: context.database.playlistRepository()
+                )
+                if context.playback.currentPlaylistId == ChannelPlaylistLogic.defaultPlaylistID {
+                    await context.playback.reloadQueue()
+                }
+                await self?.reload()
+            }
+        }
     }
 
-    private func showRemovalCapsule() {
+    private func showBatchCapsule() {
+        guard let kind = batch.kind else { return }
+        let message = InboxBatchLogic.message(kind: kind, count: batch.count)
+        if ToastPresenter.shared.updateAction(message, capsuleIdentifier: "inbox-removal-capsule") { return }
         guard let window = view.window else { return }
         ToastPresenter.shared.showAction(
-            "Removed from Inbox",
+            message,
             actionTitle: "Undo",
             in: window,
             above: (tabBarController as? MainTabBarController)?.bottomChromeTopAnchor,
             capsuleIdentifier: "inbox-removal-capsule",
             actionIdentifier: "inbox-removal-undo",
-            onAction: { [weak self] in self?.undoRemoval() },
+            onAction: { [weak self] in self?.undoBatch() },
             // Another toast replaced the capsule: Undo is out of reach.
             onSuperseded: { [weak self] in
                 guard let self else { return }
-                Task { await self.pendingRemoval.commitNow() }
+                Task { await self.batch.commitNow() }
             }
         )
     }
@@ -1103,7 +1141,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// The model and the snapshot change synchronously once. FLIP owns all
     /// motion; rapid subsequent actions can use the filler immediately.
     private func leaveInbox(urls: [String], hiding: Bool, keepsGroup: Bool = true) {
-        if hiding, !urls.allSatisfy(pendingRemoval.isPending) { return }
+        if hiding, !urls.allSatisfy({ url in batch.items.contains { $0.url == url } }) { return }
         let id = urls.first(where: { dataSource.indexPath(for: .episode($0)) != nil })
         let hadCards = !displayedEpisodes.isEmpty
         reloadGeneration += 1
@@ -1131,7 +1169,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     private func dropFromMemory(urls: [String], hiding: Bool) {
         if hiding {
-            pendingRemovalURL = urls.first
             hiddenRemovalURLs.formUnion(urls)
         } else {
             episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
@@ -1285,9 +1322,10 @@ nonisolated enum InboxCategoryFilter {
         episodes: [FeedEpisodeRow],
         selected: String?,
         categoriesByFeed: [String: Set<String>],
-        excluding pendingURL: String? = nil
+        excluding hiddenURLs: Set<String> = []
     ) -> [FeedEpisodeRow] {
-        let episodes = pendingURL == nil ? episodes : episodes.filter { $0.enclosureUrl != pendingURL }
+        let episodes = hiddenURLs.isEmpty
+            ? episodes : episodes.filter { !($0.enclosureUrl.map(hiddenURLs.contains) ?? false) }
         guard let selected else { return episodes }
         let wanted = selected.lowercased()
         return episodes.filter { episode in

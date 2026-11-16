@@ -84,7 +84,7 @@ struct PlaylistActionGroupTests {
             host.expectUnconfigured(survivors)
         }
         #expect(host.list.snapshotApplyCount == originalCount + 3)
-        // Commit callbacks can resync later (single PendingRemoval is batch 2).
+        // Commit callbacks can resync later (one merged batch).
         // The count above covers each synchronous visual removal transaction.
         await host.list.binder.commitPendingRemoval()
     }
@@ -194,7 +194,7 @@ struct PlaylistActionGroupTests {
         }
         await host.list.reloadEpisodes()
         try await host.settle()
-        // Not a user Remove (no consumeUserLeave): the group closes instead of
+        // Not a user Remove (not a user Remove): the group closes instead of
         // handing itself to a filler.
         #expect(host.controller.selectedID == nil)
         #expect(host.group.isHidden)
@@ -301,7 +301,7 @@ struct PlaylistActionGroupTests {
     }
 
     @MainActor
-    private final class Host {
+    final class Host {
         let context: UIContext
         let list: PlaylistEpisodeListViewController
         let window: UIWindow

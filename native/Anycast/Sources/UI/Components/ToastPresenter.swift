@@ -15,6 +15,7 @@ final class ToastPresenter {
     private var supersededHandler: (() -> Void)?
     private var isActionToast = false
     private var actionCapsuleIdentifier: String?
+    private weak var actionLabel: UILabel?
 
     /// Shows `message` near the bottom of `window`, auto-dismissing after
     /// `duration` (1 s matches the Dart snackbar for "Copied").
@@ -98,6 +99,7 @@ final class ToastPresenter {
         label.textColor = Theme.surface
         label.numberOfLines = 1
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        actionLabel = label
 
         var configuration = UIButton.Configuration.plain()
         configuration.title = actionTitle
@@ -152,6 +154,29 @@ final class ToastPresenter {
         supersededHandler = onSuperseded
         UIAccessibility.post(notification: .announcement, argument: message)
 
+        scheduleActionDismissal(after: duration)
+    }
+
+    /// Changes the text of the action capsule `capsuleIdentifier` in place
+    /// and restarts its display window; the handlers stay as they were (a
+    /// re-present would run `onSuperseded`). False when that capsule is not
+    /// on screen, so the caller presents it instead.
+    @discardableResult
+    func updateAction(
+        _ message: String,
+        capsuleIdentifier: String,
+        duration: TimeInterval = 5.0
+    ) -> Bool {
+        guard isActionToast, actionCapsuleIdentifier == capsuleIdentifier,
+              toastView != nil, let actionLabel else { return false }
+        actionLabel.text = message
+        UIAccessibility.post(notification: .announcement, argument: message)
+        scheduleActionDismissal(after: duration)
+        return true
+    }
+
+    private func scheduleActionDismissal(after duration: TimeInterval) {
+        dismissalTask?.cancel()
         dismissalTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
             guard !Task.isCancelled else { return }

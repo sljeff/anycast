@@ -492,8 +492,9 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         let generation = reloadGeneration
         let stored = (try? await context.database.playlistRepository()
             .listEpisodes(playlistId: playlistId)) ?? []
-        // A removal waiting out its Undo window is still stored.
-        let rows = PlaylistRemovalLogic.displayed(stored, excluding: binder.hiddenEpisodeURL)
+        // Removals waiting out their Undo window (or whose delete has not
+        // settled) may still be stored.
+        let rows = PlaylistRemovalLogic.displayed(stored, excluding: binder.hiddenEpisodeURLs)
         guard generation == reloadGeneration else { return }
         // A read landing mid-drag would reset the collection view to the
         // pre-reorder database order and silently discard the drop's
@@ -521,11 +522,9 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             self.rebuildEpisodeIndex()
             self.applySnapshot(animatingDifferences: false)
         }
-        if reshaped, let selected = actionController.selectedID, !nextURLs.contains(selected),
-           binder.consumeUserLeave(selected) {
-            // The user's own Remove (eager path): the next card fills.
-            actionController.performLeave(id: selected, apply: assign)
-        } else if reshaped {
+        if reshaped {
+            // A user's own Remove already left through performLeave at tap
+            // time; a selection that vanishes here is external and closes.
             actionController.itemsDidChange(apply: assign)
         } else {
             episodes = rows

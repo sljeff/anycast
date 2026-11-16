@@ -216,21 +216,24 @@ final class PlaylistEpisodeListBinder: NSObject {
             read: { _ = playback.positionData },
             onChange: { [weak self] in self?.pushLiveProgress() }
         )
-        // A deferred removal commits once the playing episode changes: the
-        // in-memory queue still holds its row and could advance into it.
-        pendingRemoval.onCommit = {
+        // Deferred removals commit once the playing episode changes: the
+        // in-memory queue still holds their rows and could advance into one.
+        batch.onCommit = {
             ToastPresenter.shared.dismissAction(capsuleIdentifier: Self.capsuleIdentifier)
         }
         trackObservation.track(
             read: { _ = playback.currentEpisodeContent },
             onChange: { [weak self] in
-                guard let self else { return }
+                guard let self, self.ownTrackChanges == 0 else { return }
+                let deferred = Set(self.batch.items.filter {
+                    if case .stored = $0.storage { true } else { false }
+                }.map(\.url))
                 if PlaylistRemovalLogic.shouldCommitOnTrackChange(
-                    pendingURL: self.hiddenEpisodeURL,
+                    pendingURLs: deferred,
                     currentURLAtRemoval: self.currentURLAtRemoval,
                     currentURL: playback.currentEpisode?.enclosureUrl
                 ) {
-                    Task { await self.pendingRemoval.commitNow() }
+                    Task { await self.batch.commitNow() }
                 }
             }
         )
@@ -405,30 +408,68 @@ final class PlaylistEpisodeListBinder: NSObject {
 
     // MARK: - Remove with Undo
 
-    /// The one removal waiting out its Undo window. Deferred: the card is
-    /// hidden and the row stays stored until the commit. Eager (playing or
-    /// next-in-queue row): the row is already deleted and Undo re-inserts it.
-    private let pendingRemoval = PendingRemoval()
-    /// Row hidden by a deferred removal; the list filters it out of every
-    /// reload.
-    private(set) var hiddenEpisodeURL: String?
+    /// One removed row of the batch. A class: the eager work and the commit
+    /// both settle its state after the batch value has been handed around.
+    @MainActor
+    final class RemovedEpisode {
+        enum Storage {
+            /// The row is still stored; the commit deletes it.
+            case stored
+            /// Deleted already (eager); Undo re-inserts it at `index`.
+            case deleted(row: PlaylistEpisodeRow, index: Int)
+            /// Nothing to delete or restore (the row was already gone).
+            case gone
+        }
+
+        let url: String
+        let wasCurrent: Bool
+        /// The live position at tap time; the stored progress is up to 2 s
+        /// behind.
+        let livePosition: Int64
+        var storage: Storage = .stored
+
+        init(url: String, wasCurrent: Bool, livePosition: Int64) {
+            self.url = url
+            self.wasCurrent = wasCurrent
+            self.livePosition = livePosition
+        }
+    }
+
+    private enum BatchKind { case remove }
+
+    /// The serialized DB/playback work of eager removals, shared with the
+    /// commit closure so a commit finishes after it.
+    @MainActor
+    private final class EagerWork {
+        var chain: Task<Void, Never>?
+        func settle() async { await chain?.value }
+    }
+
+    /// Every removal inside one Undo window. A deferred row (later in the
+    /// queue) is only hidden and stays stored until the commit. An eager row
+    /// (playing, or next in the in-memory queue, which could advance into
+    /// it) leaves the card list at tap time like any other row, then its
+    /// delete and the playback change run on `eagerWork`.
+    private let batch = PendingBatch<BatchKind, RemovedEpisode>()
+    private let eagerWork = EagerWork()
+    /// Rows the list filters out of every reload: removed in this batch, or
+    /// committed with their write still running.
+    private(set) var hiddenEpisodeURLs: Set<String> = []
     private var currentURLAtRemoval: String?
-    private var pendingUndo: PendingUndo?
+    /// Playback changes this screen causes itself (stop-and-load-next, an
+    /// Undo that restores the current episode) never commit the batch.
+    private var ownTrackChanges = 0
     private let trackObservation = ObservationLoop()
     private static let capsuleIdentifier = "playlist-removal-capsule"
 
-    private enum PendingUndo {
-        case unhide
-        case reinsert(PlaylistEpisodeRow, index: Int)
-    }
-
-    /// Remove (playlists.dart:182-190), undoable for 5 s. Removing the
-    /// playing episode also stops playback and clears the player state. The
-    /// current-track check is BY IDENTITY, captured before the first await (a
-    /// reload landing mid-task would reshuffle indexes; a positional check
-    /// can also misfire across playlists).
+    /// Remove (playlists.dart:182-190), undoable for 5 s, merged with the
+    /// removals before it. The card leaves at once. Removing the playing
+    /// episode stops it and loads the next one paused. The current-track
+    /// check is BY IDENTITY, captured before the first await (a reload
+    /// landing mid-task would reshuffle indexes).
     func removeTapped(_ episode: PlaylistEpisodeRow) {
-        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return }
+        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty,
+              !hiddenEpisodeURLs.contains(enclosureURL) else { return }
         Haptics.queueRemoved()
         let playback = context.playback
         let wasCurrent = playback.currentEpisode?.enclosureUrl == enclosureURL
@@ -436,130 +477,163 @@ final class PlaylistEpisodeListBinder: NSObject {
             url: enclosureURL, wasCurrent: wasCurrent, playlistId: playlistId,
             playingPlaylistId: playback.currentPlaylistId, queueURLs: playback.queueEnclosureURLs
         )
-        guard eager else {
-            removeDeferred(enclosureURL)
-            return
-        }
-        // The row leaves on the reload after the DB write; only this
-        // user-initiated leave hands the group to a filler.
-        userLeaveURL = enclosureURL
-        Task { [weak self] in
-            await self?.removeEagerly(url: enclosureURL, wasCurrent: wasCurrent)
-        }
+        let item = RemovedEpisode(
+            url: enclosureURL, wasCurrent: wasCurrent,
+            livePosition: wasCurrent ? playback.positionData.positionMilliseconds : 0
+        )
+        hiddenEpisodeURLs.insert(enclosureURL)
+        batch.add(item, kind: .remove, commit: makeCommit())
+        if !eager { currentURLAtRemoval = playback.currentEpisode?.enclosureUrl }
+        // UI first: the card leaves now, the work follows.
+        episodeSource?.hideEpisode(byEnclosureURL: enclosureURL)
+        showRemovalCapsule()
+        if eager { enqueueEagerRemoval(item) }
     }
 
-    /// URL of the row an eager Remove is taking out; the reload that drops
-    /// it fills the group. Anything else that vanishes (an episode that
-    /// finished, a removal from another screen) closes the group instead.
-    private var userLeaveURL: String?
-
-    /// True once for the row an eager Remove took out.
-    func consumeUserLeave(_ url: String) -> Bool {
-        guard userLeaveURL == url else { return false }
-        userLeaveURL = nil
-        return true
-    }
-
-    /// Commits the pending removal now (the list is leaving, or a drag
-    /// reorder is about to write); resolves once its write finished.
+    /// Commits the pending batch now (the list is leaving, or a drag reorder
+    /// is about to write); resolves once every write finished.
     func commitPendingRemoval() async {
-        await pendingRemoval.commitNow()
+        await batch.commitNow()
+        await eagerWork.settle()
     }
 
-    private func removeDeferred(_ url: String) {
+    /// Waits for the eager removals' delete and playback work to finish.
+    func settleEagerRemovals() async {
+        await eagerWork.settle()
+    }
+
+    private func makeCommit() -> @MainActor ([RemovedEpisode]) async -> Void {
         let repository = context.database.playlistRepository()
         let cacheStore = context.cacheStore
         let playback = context.playback
         let playlistId = playlistId
-        pendingRemoval.begin(url) { [weak self] in
-            let deleted = (try? await repository.removeEpisode(byEnclosureURL: url)) != nil
+        let work = eagerWork
+        return { [weak self] items in
+            await work.settle()
             // Only the queue row and cached audio go. Transcripts and their
             // in-flight polling stay (the Dart K3 cascade is dropped).
-            if deleted { await cacheStore.remove(url: url) }
-            if self?.hiddenEpisodeURL == url { self?.hiddenEpisodeURL = nil }
-            if playback.currentPlaylistId == playlistId {
-                // The in-memory queue must lose the row too, or a head
-                // completion later pulls the dead row back out of it.
+            var deletedDeferred = false
+            for item in items {
+                guard case .stored = item.storage else { continue }
+                if (try? await repository.removeEpisode(byEnclosureURL: item.url)) != nil {
+                    item.storage = .gone
+                    deletedDeferred = true
+                }
+            }
+            // The audio file is kept until the window ends, so Undo never
+            // forces a re-download.
+            for item in items { await cacheStore.remove(url: item.url) }
+            self?.hiddenEpisodeURLs.subtract(items.map(\.url))
+            if deletedDeferred, playback.currentPlaylistId == playlistId {
+                // The in-memory queue must lose the rows too, or a head
+                // completion later pulls a dead row back out of it.
                 await playback.reloadQueue()
             }
             self?.onListContentChanged?()
         }
-        hiddenEpisodeURL = url
-        pendingUndo = .unhide
-        currentURLAtRemoval = context.playback.currentEpisode?.enclosureUrl
-        episodeSource?.hideEpisode(byEnclosureURL: url)
-        showRemovalCapsule()
     }
 
-    private func removeEagerly(url: String, wasCurrent: Bool) async {
-        // A previous removal settles first, so stored order == shown order.
-        await pendingRemoval.commitNow()
+    private func enqueueEagerRemoval(_ item: RemovedEpisode) {
+        let predecessor = eagerWork.chain
+        eagerWork.chain = Task { [weak self] in
+            await predecessor?.value
+            await self?.performEagerRemoval(item)
+        }
+    }
+
+    /// Deletes the row and applies the playback change. Rows hidden by
+    /// earlier deferred removals are deleted first, so the in-memory queue
+    /// can reach none of them once the head moves; their stored indexes are
+    /// taken in this same order, which Undo reverses.
+    private func performEagerRemoval(_ item: RemovedEpisode) async {
+        ownTrackChanges += 1
+        defer {
+            currentURLAtRemoval = context.playback.currentEpisode?.enclosureUrl
+            ownTrackChanges -= 1
+        }
         let repository = context.database.playlistRepository()
-        guard let stored = await PlaylistRemovalLogic.snapshot(
-            url: url, playlistId: playlistId, repository: repository
-        ) else {
-            onListContentChanged?()
-            return
-        }
-        guard (try? await repository.removeEpisode(byEnclosureURL: url)) != nil else {
-            onListContentChanged?()
-            return
-        }
         let playback = context.playback
-        if wasCurrent {
-            // The episode may have completed and advanced the queue on its
-            // own while the awaits above ran — only clear when THIS row is
-            // still what is playing (a positional recheck here would stop
-            // the newly-started head instead).
-            let stillCurrent = playback.currentEpisode?.enclosureUrl == url
-            if stillCurrent {
-                await playback.clear()
-            } else {
-                await playback.reloadQueue()
-            }
+        // Every row still stored goes first, in batch order: the player must
+        // never load a hidden row as the next episode. Undo reverses exactly
+        // this order.
+        let pending = batch.items.contains { $0 === item } ? batch.items : [item]
+        for removed in pending { await delete(removed, repository: repository) }
+        // Decided now, by identity, not at tap time: an earlier removal of
+        // this batch may have made this row current, and the episode may have
+        // completed and advanced the queue while the awaits above ran.
+        if playback.currentEpisode?.enclosureUrl == item.url {
+            await playback.replaceCurrentWithNext()
         } else if playback.currentPlaylistId == playlistId {
             await playback.reloadQueue()
         }
-        // The audio file is kept until the window ends, so Undo never forces
-        // a re-download.
-        let cacheStore = context.cacheStore
-        pendingRemoval.begin(url) { [weak self] in
-            await cacheStore.remove(url: url)
-            self?.pendingUndo = nil
-        }
-        pendingUndo = .reinsert(stored.row, index: stored.index)
-        showRemovalCapsule()
         onListContentChanged?()
     }
 
+    /// Deletes the row of an item that is still stored; any other state is
+    /// final.
+    private func delete(_ item: RemovedEpisode, repository: PlaylistRepository) async {
+        guard case .stored = item.storage else { return }
+        guard var stored = await PlaylistRemovalLogic.snapshot(
+            url: item.url, playlistId: playlistId, repository: repository
+        ) else {
+            item.storage = .gone
+            return
+        }
+        // The stored progress is up to 2 s behind the player.
+        if item.wasCurrent, item.livePosition > 0 { stored.row.playedDuration = item.livePosition }
+        guard (try? await repository.removeEpisode(byEnclosureURL: item.url)) != nil else { return }
+        item.storage = .deleted(row: stored.row, index: stored.index)
+    }
+
     private func undoRemoval() {
-        guard pendingRemoval.undo() else { return }
-        let action = pendingUndo
-        pendingUndo = nil
+        guard let undone = batch.undo() else { return }
         UIAccessibility.post(notification: .announcement, argument: "Restored")
-        switch action {
-        case .unhide, nil:
-            // Nothing was written: the stored order brings the card back.
-            hiddenEpisodeURL = nil
-            onListContentChanged?()
-        case .reinsert(let row, let index):
-            let repository = context.database.playlistRepository()
-            let playback = context.playback
-            let playlistId = playlistId
-            Task { [weak self] in
-                await PlaylistRemovalLogic.reinsert(row, at: index, playlistId: playlistId, repository: repository)
-                // The player stays stopped; only a still-loaded queue needs
-                // the row back.
-                if playback.currentPlaylistId == playlistId { await playback.reloadQueue() }
-                self?.onListContentChanged?()
-            }
+        ownTrackChanges += 1
+        Task { [weak self] in
+            guard let self else { return }
+            // Eager work settles first, so every item's storage is final.
+            await self.eagerWork.settle()
+            await self.restore(undone.items)
+            self.currentURLAtRemoval = self.context.playback.currentEpisode?.enclosureUrl
+            self.ownTrackChanges -= 1
         }
     }
 
+    /// `items` come newest first: each stored index is only valid right
+    /// before its own removal, so re-inserting last-to-first rebuilds the
+    /// original order. Rows that were only hidden need nothing.
+    private func restore(_ items: [RemovedEpisode]) async {
+        let repository = context.database.playlistRepository()
+        let playback = context.playback
+        let playlistId = playlistId
+        // Pressing Play on the episode that took over during the window is
+        // the user's choice; the restored one then queues behind it.
+        let playbackMoved = playback.isPlaying
+        let formerCurrent = items.last { $0.wasCurrent }
+        for item in items {
+            guard case .deleted(let row, let index) = item.storage else { continue }
+            let target = item === formerCurrent && playbackMoved ? max(index, 1) : index
+            await PlaylistRemovalLogic.reinsert(row, at: target, playlistId: playlistId, repository: repository)
+        }
+        hiddenEpisodeURLs.subtract(items.map(\.url))
+        if let formerCurrent, case .deleted = formerCurrent.storage, !playbackMoved {
+            // The queue head is the current episode again, paused, at its
+            // original progress.
+            await playback.restoreCurrentPaused(enclosureURL: formerCurrent.url, playlistId: playlistId)
+        } else if items.contains(where: { if case .deleted = $0.storage { true } else { false } }),
+                  playback.currentPlaylistId == playlistId {
+            await playback.reloadQueue()
+        }
+        onListContentChanged?()
+    }
+
     private func showRemovalCapsule() {
+        let count = batch.count
+        let message = count > 1 ? "Removed \(count) episodes" : "Removed"
+        if ToastPresenter.shared.updateAction(message, capsuleIdentifier: Self.capsuleIdentifier) { return }
         guard let window = owner.view?.window else { return }
         ToastPresenter.shared.showAction(
-            "Removed from Playlist",
+            message,
             actionTitle: "Undo",
             in: window,
             above: (owner.tabBarController as? MainTabBarController)?.bottomChromeTopAnchor,
@@ -569,7 +643,7 @@ final class PlaylistEpisodeListBinder: NSObject {
             // Another toast replaced the capsule: Undo is out of reach.
             onSuperseded: { [weak self] in
                 guard let self else { return }
-                Task { await self.pendingRemoval.commitNow() }
+                Task { await self.batch.commitNow() }
             }
         )
     }

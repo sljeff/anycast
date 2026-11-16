@@ -4,8 +4,9 @@ import AnycastKit
 @testable import Anycast
 
 /// Inbox Remove defers its DB delete for the Undo window: the displayed
-/// list drops the pending row while the stored row stays until the commit.
-/// Real SQLite in a temporary file.
+/// list drops the pending rows while the stored rows stay until the commit.
+/// An Add is durable at once; Undo moves its rows back. Real SQLite in a
+/// temporary file.
 @MainActor
 struct InboxRemovalUndoTests {
 
@@ -37,63 +38,147 @@ struct InboxRemovalUndoTests {
         return Fixture(database: database, url: url)
     }
 
-    private static func displayed(_ rows: [FeedEpisodeRow], excluding pending: String?) -> [String] {
+    private static func displayed(_ rows: [FeedEpisodeRow], excluding hidden: Set<String>) -> [String] {
         InboxCategoryFilter.displayed(
-            episodes: rows, selected: nil, categoriesByFeed: [:], excluding: pending
+            episodes: rows, selected: nil, categoriesByFeed: [:], excluding: hidden
         ).compactMap(\.enclosureUrl)
     }
 
-    @Test("a pure remove leaves the stored row until the commit")
-    func rowSurvivesUntilCommit() async throws {
+    @Test("merged removes leave the stored rows until the commit, which deletes them together")
+    func rowsSurviveUntilCommit() async throws {
         let fixture = try await Self.makeFixture()
         defer { fixture.cleanUp() }
         let repository = fixture.database.feedRepository()
-        let target = Self.urls[1]
-        let removal = PendingRemoval(window: .seconds(60), center: NotificationCenter())
+        let batch = PendingBatch<InboxBatchKind, InboxBatchItem>(window: .seconds(60), center: NotificationCenter())
+        var commits = 0
 
-        removal.begin(target) { try? await repository.removeByEnclosureUrls([target]) }
-        #expect(await fixture.storedURLs().contains(target))
+        for target in [Self.urls[1], Self.urls[0]] {
+            batch.add(InboxBatchItem(url: target), kind: .remove) { items in
+                commits += 1
+                try? await repository.removeByEnclosureUrls(items.map(\.url))
+            }
+        }
+        #expect(await fixture.storedURLs().contains(Self.urls[1]))
 
-        await removal.commitNow()
-        #expect(await fixture.storedURLs() == [Self.urls[2], Self.urls[0]])
+        await batch.commitNow()
+        #expect(commits == 1)
+        #expect(await fixture.storedURLs() == [Self.urls[2]])
     }
 
-    @Test("the displayed list excludes the pending URL after a reload")
+    @Test("the displayed list excludes every pending URL after a reload")
     func displayedExcludesPending() async throws {
         let fixture = try await Self.makeFixture()
         defer { fixture.cleanUp() }
         let rows = try await fixture.database.feedRepository().listAll()
 
-        #expect(Self.displayed(rows, excluding: Self.urls[1]) == [Self.urls[2], Self.urls[0]])
-        #expect(Self.displayed(rows, excluding: nil).count == 3)
+        #expect(Self.displayed(rows, excluding: [Self.urls[1], Self.urls[2]]) == [Self.urls[0]])
+        #expect(Self.displayed(rows, excluding: []).count == 3)
     }
 
-    @Test("undo restores the row at its original index without a DB write")
+    @Test("undo of removes restores the rows at their original index without a DB write")
     func undoRestoresPosition() async throws {
         let fixture = try await Self.makeFixture()
         defer { fixture.cleanUp() }
         let repository = fixture.database.feedRepository()
-        let target = Self.urls[1]
-        let removal = PendingRemoval(window: .milliseconds(80), center: NotificationCenter())
-        removal.begin(target) { try? await repository.removeByEnclosureUrls([target]) }
+        let batch = PendingBatch<InboxBatchKind, InboxBatchItem>(window: .milliseconds(80), center: NotificationCenter())
+        for target in [Self.urls[1], Self.urls[2]] {
+            batch.add(InboxBatchItem(url: target), kind: .remove) { items in
+                try? await repository.removeByEnclosureUrls(items.map(\.url))
+            }
+        }
 
-        #expect(removal.undo())
+        #expect(batch.undo()?.items.map(\.url) == [Self.urls[2], Self.urls[1]])
         try await Task.sleep(for: .milliseconds(250))
 
         let rows = try await repository.listAll()
-        #expect(Self.displayed(rows, excluding: nil) == [Self.urls[2], Self.urls[1], Self.urls[0]])
+        #expect(Self.displayed(rows, excluding: []) == [Self.urls[2], Self.urls[1], Self.urls[0]])
     }
 
-    @Test("only a pure remove is deferred; Play and Add keep their immediate removal")
-    func onlyPureRemoveDefers() {
-        func steps(_ action: InboxEpisodeAction) -> [InboxActionStep] {
-            InboxActionPlanner.steps(
-                for: action, currentPlaylistId: nil, currentEnclosureURL: nil,
-                episodeEnclosureURL: Self.urls[0]
-            )
+    /// What an Add does durably, for the fixture: the playlist insert, then the
+    /// inbox delete. Returns the batch item the screen would record.
+    private static func add(
+        _ url: String, fixture: Fixture, playlistIndex: Int
+    ) async throws -> InboxBatchItem {
+        let feed = fixture.database.feedRepository()
+        let playlist = fixture.database.playlistRepository()
+        let feedRow = try #require(try await feed.listAll().first { $0.enclosureUrl == url })
+        try await playlist.insertOrUpdateByIndex(
+            ChannelPlaylistLogic.playlistRow(from: feedRow, playlistId: 1), playlistId: 1, index: playlistIndex
+        )
+        let created = try await playlist.episode(byEnclosureURL: url)
+        try await feed.removeByEnclosureUrls([url])
+        return InboxBatchItem(url: url, feedRow: feedRow, createdPlaylistRow: created)
+    }
+
+    @Test("rapid Add x3 then Undo restores every feed row field for field and empties the playlist")
+    func undoMergedAdds() async throws {
+        let fixture = try await Self.makeFixture()
+        defer { fixture.cleanUp() }
+        let feed = fixture.database.feedRepository()
+        let playlist = fixture.database.playlistRepository()
+        let before = try await feed.listAll()
+        let batch = PendingBatch<InboxBatchKind, InboxBatchItem>(window: .seconds(60), center: NotificationCenter())
+
+        for (index, url) in Self.urls.reversed().enumerated() {
+            let item = try await Self.add(url, fixture: fixture, playlistIndex: index)
+            batch.add(item, kind: .add) { _ in }
         }
-        #expect(InboxPageViewController.defersRemoval(steps(.remove)))
-        #expect(!InboxPageViewController.defersRemoval(steps(.play)))
-        #expect(!InboxPageViewController.defersRemoval(steps(.addToPlaylist)))
+        #expect(try await feed.listAll().isEmpty)
+        #expect(try await playlist.listEpisodes(playlistId: 1).count == 3)
+        #expect(InboxBatchLogic.message(kind: .add, count: batch.count) == "Added 3 to Playlist")
+
+        let undone = try #require(batch.undo())
+        await InboxBatchLogic.undoAdd(
+            undone.items, currentEnclosureURL: nil, feedRepository: feed, playlistRepository: playlist
+        )
+        #expect(try await feed.listAll() == before, "ids and every column survive the round trip")
+        #expect(try await playlist.listEpisodes(playlistId: 1).isEmpty)
+    }
+
+    @Test("undoing an Add leaves a playlist row it did not create, and the one now playing")
+    func undoAddSparesOtherPlaylistRows() async throws {
+        let fixture = try await Self.makeFixture()
+        defer { fixture.cleanUp() }
+        let feed = fixture.database.feedRepository()
+        let playlist = fixture.database.playlistRepository()
+        let created = try await Self.add(Self.urls[0], fixture: fixture, playlistIndex: 0)
+        let playing = try await Self.add(Self.urls[1], fixture: fixture, playlistIndex: 1)
+        // An Add that created nothing (the episode was already queued).
+        let feedRow = try #require(try await feed.listAll().first { $0.enclosureUrl == Self.urls[2] })
+        let noRow = InboxBatchItem(url: Self.urls[2], feedRow: feedRow, createdPlaylistRow: nil)
+        try await playlist.insertOrUpdateByIndex(
+            ChannelPlaylistLogic.playlistRow(from: feedRow, playlistId: 1), playlistId: 1, index: 2
+        )
+        try await feed.removeByEnclosureUrls([Self.urls[2]])
+
+        await InboxBatchLogic.undoAdd(
+            [noRow, playing, created], currentEnclosureURL: Self.urls[1],
+            feedRepository: feed, playlistRepository: playlist
+        )
+        #expect(try await playlist.listEpisodes(playlistId: 1).compactMap(\.enclosureUrl)
+            == [Self.urls[1], Self.urls[2]])
+        #expect(try await feed.listAll().count == 3)
+    }
+
+    @Test("the capsule text counts a merged batch")
+    func batchMessages() {
+        #expect(InboxBatchLogic.message(kind: .remove, count: 1) == "Removed")
+        #expect(InboxBatchLogic.message(kind: .remove, count: 3) == "Removed 3 episodes")
+        #expect(InboxBatchLogic.message(kind: .add, count: 1) == "Added to Playlist")
+        #expect(InboxBatchLogic.message(kind: .add, count: 3) == "Added 3 to Playlist")
+    }
+
+    @Test("Add then Remove commits the Add batch at once; Remove then Add commits the Remove")
+    func kindSwitchCommits() async throws {
+        let batch = PendingBatch<InboxBatchKind, InboxBatchItem>(window: .seconds(60), center: NotificationCenter())
+        var commits: [[String]] = []
+        batch.add(InboxBatchItem(url: "a"), kind: .add) { commits.append($0.map(\.url)) }
+        batch.add(InboxBatchItem(url: "b"), kind: .remove) { commits.append($0.map(\.url)) }
+        try await Task.sleep(for: .milliseconds(60))
+        #expect(commits == [["a"]])
+        batch.add(InboxBatchItem(url: "c"), kind: .add) { commits.append($0.map(\.url)) }
+        try await Task.sleep(for: .milliseconds(60))
+        #expect(commits == [["a"], ["b"]])
+        #expect(batch.undo()?.items.map(\.url) == ["c"])
     }
 }

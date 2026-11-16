@@ -310,18 +310,19 @@ enum PlaylistRemovalLogic {
         return index <= 1
     }
 
-    /// The list a screen renders: the stored rows without the one pending.
-    static func displayed(_ rows: [PlaylistEpisodeRow], excluding pendingURL: String?) -> [PlaylistEpisodeRow] {
-        guard let pendingURL else { return rows }
-        return rows.filter { $0.enclosureUrl != pendingURL }
+    /// The list a screen renders: the stored rows without the ones removed
+    /// (pending, or whose delete has not settled yet).
+    static func displayed(_ rows: [PlaylistEpisodeRow], excluding hiddenURLs: Set<String>) -> [PlaylistEpisodeRow] {
+        guard !hiddenURLs.isEmpty else { return rows }
+        return rows.filter { !($0.enclosureUrl.map(hiddenURLs.contains) ?? false) }
     }
 
-    /// A deferred removal waits only while the playing episode is the one it
-    /// was started under; any change commits it.
+    /// Deferred removals (rows still stored) wait only while the playing
+    /// episode is the one they were started under; any change commits them.
     static func shouldCommitOnTrackChange(
-        pendingURL: String?, currentURLAtRemoval: String?, currentURL: String?
+        pendingURLs: Set<String>, currentURLAtRemoval: String?, currentURL: String?
     ) -> Bool {
-        pendingURL != nil && currentURL != currentURLAtRemoval
+        !pendingURLs.isEmpty && currentURL != currentURLAtRemoval
     }
 
     /// The stored row and its index, captured right before an eager delete.

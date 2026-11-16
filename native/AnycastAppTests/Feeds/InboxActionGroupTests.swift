@@ -89,9 +89,58 @@ struct InboxActionGroupTests {
         #expect(!stored.contains { $0.enclosureUrl == host.url(5) })
         let queued = try await host.context.database.playlistRepository().episode(byEnclosureURL: host.url(5))
         #expect(queued != nil)
-        #expect(!descendants(host.window).contains { $0.accessibilityIdentifier == "inbox-removal-undo" })
+        // An Add is undoable now: its capsule shows.
+        #expect(capsuleText(host) == "Added to Playlist")
         try await host.settle()
         #expect(host.page.snapshotApplyCount == applies + 1)
+    }
+
+    @Test("Rapid Add x3 merges into one capsule; Undo restores the rows field for field and empties the playlist")
+    func mergedAddUndo() async throws {
+        let host = try await Host.make(count: 12)
+        defer { host.close() }
+        let before = try await host.context.database.feedRepository().listAll()
+        try host.cell(2).onCardTap?()
+        try await host.settle()
+        for step in 0..<3 {
+            host.group.button(for: "add")?.sendActions(for: .touchUpInside)
+            try await host.waitUntil { host.controller.selectedID == host.url(3 + step) }
+        }
+        try await host.waitUntil { capsuleText(host) == "Added 3 to Playlist" }
+        #expect(descendants(host.window).filter { $0.accessibilityIdentifier == "inbox-removal-capsule" }.count == 1)
+        let queued = try await host.context.database.playlistRepository().listEpisodes(playlistId: 1)
+        #expect(Set(queued.compactMap(\.enclosureUrl)) == [host.url(2), host.url(3), host.url(4)])
+
+        let undo = try #require(descendants(host.window).first { $0.accessibilityIdentifier == "inbox-removal-undo" } as? UIControl)
+        undo.sendActions(for: .touchUpInside)
+        try await host.waitUntil { host.collection.numberOfItems(inSection: host.cardSection) == 12 }
+        #expect(try await host.context.database.feedRepository().listAll() == before)
+        #expect(try await host.context.database.playlistRepository().listEpisodes(playlistId: 1).isEmpty)
+    }
+
+    @Test("Add then Remove commits the Add at once; Undo then restores only the Remove")
+    func addThenRemove() async throws {
+        let host = try await Host.make(count: 12)
+        defer { host.close() }
+        try host.cell(2).onCardTap?()
+        try await host.settle()
+        host.group.button(for: "add")?.sendActions(for: .touchUpInside)
+        try await host.waitUntil { host.controller.selectedID == host.url(3) }
+        try await host.waitUntil { capsuleText(host) == "Added to Playlist" }
+        host.group.button(for: "remove")?.sendActions(for: .touchUpInside)
+        try await host.waitUntil { capsuleText(host) == "Removed" }
+        #expect(host.collection.numberOfItems(inSection: host.cardSection) == 10)
+
+        let undo = try #require(descendants(host.window).first { $0.accessibilityIdentifier == "inbox-removal-undo" } as? UIControl)
+        undo.sendActions(for: .touchUpInside)
+        try await host.waitUntil { host.collection.numberOfItems(inSection: host.cardSection) == 11 }
+        let queued = try await host.context.database.playlistRepository().listEpisodes(playlistId: 1)
+        #expect(queued.compactMap(\.enclosureUrl) == [host.url(2)], "the committed Add stays")
+    }
+
+    private func capsuleText(_ host: Host) -> String? {
+        descendants(host.window).first { $0.accessibilityIdentifier == "inbox-removal-capsule" }
+            .flatMap { descendants($0).compactMap { ($0 as? UILabel)?.text }.first }
     }
 
     @Test("Play leaves once and closes instead of handing the group to a filler")
