@@ -412,7 +412,7 @@ final class PlaylistEpisodeListBinder: NSObject {
     /// both settle its state after the batch value has been handed around.
     @MainActor
     final class RemovedEpisode {
-        enum Storage {
+        enum Storage: Equatable {
             /// The row is still stored; the commit deletes it.
             case stored
             /// Deleted already (eager); Undo re-inserts it at `index`.
@@ -521,8 +521,12 @@ final class PlaylistEpisodeListBinder: NSObject {
                 }
             }
             // The audio file is kept until the window ends, so Undo never
-            // forces a re-download.
-            for item in items { await cacheStore.remove(url: item.url) }
+            // forces a re-download — and only rows whose delete actually
+            // landed lose it. A failed delete leaves the row stored, and
+            // its cache must survive with it.
+            for item in items where item.storage != .stored {
+                await cacheStore.remove(url: item.url)
+            }
             self?.hiddenEpisodeURLs.subtract(items.map(\.url))
             if deletedDeferred, playback.currentPlaylistId == playlistId {
                 // The in-memory queue must lose the rows too, or a head
@@ -587,13 +591,33 @@ final class PlaylistEpisodeListBinder: NSObject {
 
     private func undoRemoval() {
         guard let undone = batch.undo() else { return }
-        UIAccessibility.post(notification: .announcement, argument: "Restored")
         ownTrackChanges += 1
         Task { [weak self] in
             guard let self else { return }
             // Eager work settles first, so every item's storage is final.
             await self.eagerWork.settle()
-            await self.restore(undone.items)
+            do {
+                try await self.restore(undone.items)
+                UIAccessibility.post(notification: .announcement, argument: "Restored")
+            } catch {
+                // Rows that failed to come back are gone from the database
+                // and stay hidden so the list matches it; rows that made it
+                // back (marked .stored by restore) reappear. Either way the
+                // listener hears what happened instead of a false "Restored".
+                if let window = self.owner.view?.window {
+                    ToastPresenter.shared.show(
+                        "Couldn't restore the episode", in: window, duration: 3
+                    )
+                }
+                self.hiddenEpisodeURLs.subtract(
+                    undone.items.filter { if case .stored = $0.storage { true } else { false } }
+                        .map(\.url)
+                )
+                if self.context.playback.currentPlaylistId == self.playlistId {
+                    await self.context.playback.reloadQueue()
+                }
+                self.onListContentChanged?()
+            }
             self.currentURLAtRemoval = self.context.playback.currentEpisode?.enclosureUrl
             self.ownTrackChanges -= 1
         }
@@ -601,35 +625,46 @@ final class PlaylistEpisodeListBinder: NSObject {
 
     /// `items` come newest first: each stored index is only valid right
     /// before its own removal, so re-inserting last-to-first rebuilds the
-    /// original order. Rows that were only hidden need nothing.
-    private func restore(_ items: [RemovedEpisode]) async {
+    /// original order. Rows that were only hidden need nothing. Throws on
+    /// the first failed re-insert: rows before it are back (their storage
+    /// marked .stored again), rows after it stay out.
+    private func restore(_ items: [RemovedEpisode]) async throws {
         let repository = context.database.playlistRepository()
         let playback = context.playback
         let playlistId = playlistId
         // Pressing Play on the episode that took over during the window is
-        // the user's choice; the restored one then queues behind it.
+        // the user's choice; the restored ones then queue behind it.
         let playbackMoved = playback.isPlaying
         let formerCurrent = items.last { $0.wasCurrent }
+        let formerCurrentWasDeleted = formerCurrent.map {
+            if case .deleted = $0.storage { true } else { false }
+        } ?? false
+        let hadDeletedRows = items.contains {
+            if case .deleted = $0.storage { true } else { false }
+        }
+        var restored: [(url: String, index: Int)] = []
         for item in items {
             guard case .deleted(let row, let index) = item.storage else { continue }
-            let target = item === formerCurrent && playbackMoved ? max(index, 1) : index
-            await PlaylistRemovalLogic.reinsert(row, at: target, playlistId: playlistId, repository: repository)
+            // Every restored row — not just the former current — lands
+            // after the head while playback moved elsewhere: eager removals
+            // store index 0 too, and any row re-inserted at 0 would push
+            // the playing episode out of the queue head.
+            let target = PlaylistRemovalLogic.restoreTargetIndex(storedIndex: index, playbackMoved: playbackMoved)
+            try await PlaylistRemovalLogic.reinsert(row, at: target, playlistId: playlistId, repository: repository)
+            item.storage = .stored
+            restored.append((item.url, index))
+            hiddenEpisodeURLs.remove(item.url)
         }
-        hiddenEpisodeURLs.subtract(items.map(\.url))
-        if let formerCurrent, case .deleted = formerCurrent.storage, !playbackMoved {
+        hiddenEpisodeURLs.subtract(items.filter { if case .stored = $0.storage { true } else { false } }.map(\.url))
+        if let formerCurrent, formerCurrentWasDeleted, !playbackMoved {
             // The queue head is the current episode again, paused, at its
             // original progress.
             await playback.restoreCurrentPaused(enclosureURL: formerCurrent.url, playlistId: playlistId)
-        } else if items.contains(where: { if case .deleted = $0.storage { true } else { false } }),
-                  playback.currentPlaylistId == playlistId {
+        } else if hadDeletedRows, playback.currentPlaylistId == playlistId {
             await playback.reloadQueue()
         }
         // The group stays anchored while rows return above it, so the
         // restored card would park above the viewport: reveal the topmost one.
-        let restored = items.compactMap { item -> (url: String, index: Int)? in
-            if case .deleted(_, let index) = item.storage { return (item.url, index) }
-            return nil
-        }
         if let first = restored.min(by: { $0.index < $1.index }), let episodeSource {
             await episodeSource.reloadAndReveal(byEnclosureURL: first.url)
         } else {
@@ -872,10 +907,6 @@ final class PlaylistEpisodeListBinder: NSObject {
 @MainActor
 protocol PlaylistEpisodeDataSource: AnyObject {
     func episode(at indexPath: IndexPath) -> PlaylistEpisodeRow?
-    /// The row's CURRENT position — closures captured at configure time go
-    /// stale after a drag reorder (moved cells are not reconfigured).
-    func index(of episode: PlaylistEpisodeRow) -> IndexPath?
-    var rowCount: Int { get }
     /// Drops the card of a deferred removal from the list (animated like any
     /// removed row); the stored row stays.
     func hideEpisode(byEnclosureURL url: String)

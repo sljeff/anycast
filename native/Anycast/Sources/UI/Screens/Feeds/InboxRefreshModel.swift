@@ -292,18 +292,22 @@ enum InboxBatchLogic {
         }
     }
 
-    /// Undoes an Add batch: the playlist rows the Adds created go, and every
-    /// feed row comes back exactly as it was (id included). A created row
-    /// that has since become the current episode stays, as the player owns it.
+    /// Undoes an Add batch. The feed rows come back first — without their
+    /// original ids and never over a same-URL row a refresh landed inside
+    /// the window (see `reinsertIgnoringConflicts`) — and only when that
+    /// whole write succeeded do the created playlist rows go. A failure
+    /// throws before any playlist deletion, so an episode can end up in
+    /// both places (recoverable) but never in neither. A created row that
+    /// has since become the current episode stays, as the player owns it.
     static func undoAdd(
         _ items: [InboxBatchItem],
         currentEnclosureURL: String?,
         feedRepository: FeedRepository,
         playlistRepository: PlaylistRepository
-    ) async {
+    ) async throws {
+        try await feedRepository.reinsertIgnoringConflicts(items.compactMap(\.feedRow))
         for item in items where item.createdPlaylistRow != nil && item.url != currentEnclosureURL {
-            try? await playlistRepository.removeEpisode(byEnclosureURL: item.url)
+            try await playlistRepository.removeEpisode(byEnclosureURL: item.url)
         }
-        try? await feedRepository.insertMany(items.compactMap(\.feedRow))
     }
 }

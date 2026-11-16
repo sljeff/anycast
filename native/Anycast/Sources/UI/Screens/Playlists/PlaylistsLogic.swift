@@ -335,11 +335,22 @@ enum PlaylistRemovalLogic {
     }
 
     /// Re-inserts an eagerly removed row at its original index; every column
-    /// (playedDuration included) comes from the captured row.
+    /// (playedDuration included) comes from the captured row. Throws so a
+    /// failed restore is reported instead of silently dropping the row.
     static func reinsert(
         _ row: PlaylistEpisodeRow, at index: Int, playlistId: Int64, repository: PlaylistRepository
-    ) async {
-        try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: index)
+    ) async throws {
+        try await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: index)
+    }
+
+    /// The index a restored row goes back to. While the episode kept
+    /// playing elsewhere (another row took over the head), EVERY restored
+    /// row lands after the current head — the playing episode must stay at
+    /// index 0 or the queue's head completion stalls — with the caller's
+    /// newest-first re-insertion keeping the rows' original relative
+    /// order behind it.
+    static func restoreTargetIndex(storedIndex: Int, playbackMoved: Bool) -> Int {
+        playbackMoved ? max(storedIndex, 1) : storedIndex
     }
 }
 

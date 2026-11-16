@@ -55,9 +55,12 @@ final class SearchEpisodeBinder {
         )
     }
 
+    /// `actionID` is the row's list-action identity — nil for a duplicate
+    /// enclosure URL, whose row then toggles nothing and carries no gap.
     func configure(
         cell: EpisodeCardCell,
         item: APIClient.EpisodeWithChannel,
+        actionID: String?,
         at indexPath: IndexPath,
         in collectionView: UICollectionView
     ) {
@@ -76,11 +79,11 @@ final class SearchEpisodeBinder {
         )
         cell.configure(content, actions: detailActions(for: item))
         cell.onCardTap = { [weak self] in
-            guard !enclosureURL.isEmpty else { return }
-            self?.actionController?.toggle(id: enclosureURL)
+            guard let actionID else { return }
+            self?.actionController?.toggle(id: actionID)
         }
         cell.onCoverTap = { [weak self] in self?.presentDetail(item: item) }
-        actionController?.reapplyGap(to: cell, id: enclosureURL)
+        actionController?.reapplyGap(to: cell, id: actionID ?? "")
     }
 
     func groupItems(for item: APIClient.EpisodeWithChannel) -> [ListActionItem] {
@@ -152,9 +155,10 @@ final class SearchEpisodeBinder {
     }
 
     /// addToPlaylist(1, ep) (states/feed_episode.dart:80-100): the index
-    /// rule sends the row to the top (or slot 1 under the playing head),
-    /// and `insertOrUpdateByIndex` MOVES an existing row there — the K14
-    /// move semantics the unguarded tap relies on.
+    /// rule sends the row to the top (or slot 1 under the playing head).
+    /// Members never reach here — the tap is gated by
+    /// `ChannelPlaylistGate` and the Add circle is disabled — so this
+    /// write only ever inserts a row that is not in a playlist yet.
     private func insertIntoPlaylist(_ episode: FeedEpisodeRow) async {
         guard let enclosureURL = episode.enclosureUrl else { return }
         let row = ChannelPlaylistLogic.playlistRow(

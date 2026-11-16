@@ -9,8 +9,6 @@ nonisolated enum ListActionPlanner {
         case none
     }
 
-    enum DirectionRule: Equatable { case oneDirection }
-
     struct Insets {
         var top: CGFloat = 0
         var bottom: CGFloat = 0
@@ -28,8 +26,7 @@ nonisolated enum ListActionPlanner {
         bottomSafe: CGFloat,
         contentHeight: CGFloat,
         adjustedContentInset: Insets = Insets(),
-        opening: Bool,
-        directionRule: DirectionRule = .oneDirection
+        opening: Bool
     ) -> CGFloat {
         var target = currentOffset
         switch anchor {
@@ -50,7 +47,7 @@ nonisolated enum ListActionPlanner {
             let titleTop = card.minY - topSafe
             if target < bottom {
                 target = bottom
-                if opening, directionRule == .oneDirection {
+                if opening {
                     target = max(target, currentOffset + ListActionMetrics.gap)
                 }
             }

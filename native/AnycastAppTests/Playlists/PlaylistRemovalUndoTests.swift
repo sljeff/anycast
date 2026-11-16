@@ -98,7 +98,7 @@ struct PlaylistRemovalUndoTests {
         #expect(await fixture.storedURLs() == [Self.urls[3]])
 
         for snapshot in snapshots.reversed() {
-            await PlaylistRemovalLogic.reinsert(snapshot.row, at: snapshot.index, playlistId: 1, repository: repository)
+            try await PlaylistRemovalLogic.reinsert(snapshot.row, at: snapshot.index, playlistId: 1, repository: repository)
         }
         let rows = try await repository.listEpisodes(playlistId: 1)
         #expect(rows.compactMap(\.enclosureUrl) == Self.urls)
@@ -119,7 +119,7 @@ struct PlaylistRemovalUndoTests {
         try await repository.removeEpisode(byEnclosureURL: target)
         #expect(await fixture.storedURLs() == Array(Self.urls.dropFirst()))
 
-        await PlaylistRemovalLogic.reinsert(snapshot.row, at: snapshot.index, playlistId: 1, repository: repository)
+        try await PlaylistRemovalLogic.reinsert(snapshot.row, at: snapshot.index, playlistId: 1, repository: repository)
         let rows = try await repository.listEpisodes(playlistId: 1)
         #expect(rows.compactMap(\.enclosureUrl) == Self.urls)
         #expect(rows[0].playedDuration == 10_000)
@@ -135,7 +135,7 @@ struct PlaylistRemovalUndoTests {
             url: Self.urls[1], playlistId: 1, repository: repository
         ))
         try await repository.removeEpisode(byEnclosureURL: Self.urls[1])
-        await PlaylistRemovalLogic.reinsert(snapshot.row, at: snapshot.index, playlistId: 1, repository: repository)
+        try await PlaylistRemovalLogic.reinsert(snapshot.row, at: snapshot.index, playlistId: 1, repository: repository)
         #expect(await fixture.storedURLs() == Self.urls)
     }
 
@@ -161,5 +161,52 @@ struct PlaylistRemovalUndoTests {
         #expect(commit(["a", "b"], "x", nil))
         #expect(!commit(["a"], "x", "x"))
         #expect(!commit([], "x", "y"))
+    }
+
+    // MARK: - Restore targets while playback moved
+
+    @Test("the restore target keeps index 0 only when playback never moved")
+    func restoreTargetIndexRule() {
+        #expect(PlaylistRemovalLogic.restoreTargetIndex(storedIndex: 0, playbackMoved: false) == 0)
+        #expect(PlaylistRemovalLogic.restoreTargetIndex(storedIndex: 2, playbackMoved: false) == 2)
+        #expect(PlaylistRemovalLogic.restoreTargetIndex(storedIndex: 0, playbackMoved: true) == 1)
+        #expect(PlaylistRemovalLogic.restoreTargetIndex(storedIndex: 2, playbackMoved: true) == 2)
+    }
+
+    /// The two-heads scenario: queue [A, B, C], A playing. Remove A (B
+    /// takes over), remove B (C takes over), then play C from the mini
+    /// player. Undo restores A and B behind the playing C, keeping their
+    /// original relative order — C stays the queue head, so a head
+    /// completion still finds `currentEpisode == queue.first`.
+    @Test("undo after two head removals keeps the playing episode at the head")
+    func undoKeepsPlayingHead() async throws {
+        let fixture = try await Self.makeFixture()
+        defer { fixture.cleanUp() }
+        let repository = fixture.database.playlistRepository()
+
+        // Remove A, then B, snapshotting each right before its delete
+        // (both store index 0 — the eager-removal convention).
+        var snapshots: [(row: PlaylistEpisodeRow, index: Int)] = []
+        for url in [Self.urls[0], Self.urls[1]] {
+            snapshots.append(try #require(await PlaylistRemovalLogic.snapshot(
+                url: url, playlistId: 1, repository: repository
+            )))
+            try await repository.removeEpisode(byEnclosureURL: url)
+        }
+        #expect(await fixture.storedURLs() == [Self.urls[2], Self.urls[3]])
+
+        // Playback moved (C is playing): the binder re-inserts newest
+        // first, each at the restore target.
+        let playbackMoved = true
+        for snapshot in snapshots.reversed() {
+            let target = PlaylistRemovalLogic.restoreTargetIndex(
+                storedIndex: snapshot.index, playbackMoved: playbackMoved
+            )
+            try await PlaylistRemovalLogic.reinsert(
+                snapshot.row, at: target, playlistId: 1, repository: repository
+            )
+        }
+        let rows = try await repository.listEpisodes(playlistId: 1)
+        #expect(rows.compactMap(\.enclosureUrl) == [Self.urls[2], Self.urls[0], Self.urls[1], Self.urls[3]])
     }
 }

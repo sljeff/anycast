@@ -114,7 +114,12 @@ struct InboxActionGroupTests {
         let undo = try #require(descendants(host.window).first { $0.accessibilityIdentifier == "inbox-removal-undo" } as? UIControl)
         undo.sendActions(for: .touchUpInside)
         try await host.waitUntil { host.collection.numberOfItems(inSection: host.cardSection) == 12 }
-        #expect(try await host.context.database.feedRepository().listAll() == before)
+        // Content columns come back field for field; ids are re-assigned by
+        // SQLite (undo never writes an original id back).
+        let restored = try await host.context.database.feedRepository().listAll()
+        #expect(restored.map(\.enclosureUrl) == before.map(\.enclosureUrl))
+        #expect(restored.map(\.title) == before.map(\.title))
+        #expect(restored.map(\.pubDate) == before.map(\.pubDate))
         #expect(try await host.context.database.playlistRepository().listEpisodes(playlistId: 1).isEmpty)
     }
 

@@ -16,7 +16,10 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     }
     private var dataSource: UICollectionViewDiffableDataSource<Section, Item>!
     private var renderedRows: [Item: FeedEpisodeRow] = [:]
-    private var plainDescriptions: [String: String] = [:]
+    /// enclosureUrl → (source HTML, resolved plain text). Keyed by URL so a
+    /// reload reuses the previous parse for unchanged rows instead of
+    /// round-tripping every description through the HTML actor again.
+    private var plainDescriptions: [String: (html: String, plain: String)] = [:]
     private(set) var actionController: ListActionController!
     /// Counts actual snapshot applications, including user leaves (review/test hook).
     private(set) var snapshotApplyCount = 0
@@ -459,11 +462,19 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // and rendering them, or a layout pass could see the new rows
         // before the diff that announces them.
         await reloadCategories()
-        // Resolve every description before exposing rows to the cell provider.
-        var descriptions: [String: String] = [:]
+        // Resolve every description before exposing rows to the cell
+        // provider. Keyed by enclosure URL; an unchanged description reuses
+        // the previous parse, only new or changed HTML reaches the actor.
+        var descriptions: [String: (html: String, plain: String)] = [:]
+        descriptions.reserveCapacity(rows.count)
         for row in rows {
+            guard let url = row.enclosureUrl else { continue }
             let html = row.description ?? ""
-            descriptions[html] = await PlainTextHTMLCache.shared.plainText(for: html)
+            if let cached = plainDescriptions[url], cached.html == html {
+                descriptions[url] = cached
+            } else {
+                descriptions[url] = (html, await PlainTextHTMLCache.shared.plainText(for: html))
+            }
         }
         guard generation == reloadGeneration else { return }
         // The model and its text commit together inside the snapshot transaction.
@@ -1095,20 +1106,32 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     private func undoBatch() {
         guard let undone = batch.undo() else { return }
-        UIAccessibility.post(notification: .announcement, argument: "Restored")
         switch undone.kind {
         case .remove:
+            UIAccessibility.post(notification: .announcement, argument: "Restored")
             hiddenRemovalURLs.subtract(undone.items.map(\.url))
             renderList(allowsDiff: true)
         case .add:
             let context = context
             Task { [weak self] in
-                await InboxBatchLogic.undoAdd(
-                    undone.items,
-                    currentEnclosureURL: context.playback.currentEpisode?.enclosureUrl,
-                    feedRepository: context.database.feedRepository(),
-                    playlistRepository: context.database.playlistRepository()
-                )
+                do {
+                    try await InboxBatchLogic.undoAdd(
+                        undone.items,
+                        currentEnclosureURL: context.playback.currentEpisode?.enclosureUrl,
+                        feedRepository: context.database.feedRepository(),
+                        playlistRepository: context.database.playlistRepository()
+                    )
+                    UIAccessibility.post(notification: .announcement, argument: "Restored")
+                } catch {
+                    // The episode stays in the playlist (and, if the write
+                    // half-failed, in the inbox too) — say so instead of
+                    // announcing a restore that did not happen.
+                    if let window = self?.view.window {
+                        ToastPresenter.shared.show(
+                            "Couldn't undo — episodes stayed in your Playlist", in: window, duration: 3
+                        )
+                    }
+                }
                 if context.playback.currentPlaylistId == ChannelPlaylistLogic.defaultPlaylistID {
                     await context.playback.reloadQueue()
                 }
@@ -1364,7 +1387,7 @@ extension InboxPageViewController {
             durationText: Self.durationText(for: episode),
             imageURL: episode.imageUrl,
             status: status(for: episode),
-            descriptionText: plainDescriptions[episode.description ?? ""] ?? ""
+            descriptionText: episode.enclosureUrl.flatMap { plainDescriptions[$0]?.plain } ?? ""
         )
         card.configure(content)
         // The same payload feeds the long-press context menu and the

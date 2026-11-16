@@ -91,7 +91,15 @@ final class ChannelEpisodeListBinder {
         collectionView.register(EpisodeCardCell.self, forCellWithReuseIdentifier: EpisodeCardCell.reuseIdentifier)
     }
 
-    func configure(cell: EpisodeCardCell, episode: FeedEpisodeRow, at indexPath: IndexPath, in collectionView: UICollectionView) {
+    /// `actionID` is the row's list-action identity — nil for a duplicate
+    /// enclosure URL, whose row then toggles nothing and carries no gap.
+    func configure(
+        cell: EpisodeCardCell,
+        episode: FeedEpisodeRow,
+        actionID: String?,
+        at indexPath: IndexPath,
+        in collectionView: UICollectionView
+    ) {
         let enclosureURL = episode.enclosureUrl ?? ""
         let inPlaylist = playlistMembers.contains(enclosureURL)
 
@@ -107,11 +115,11 @@ final class ChannelEpisodeListBinder {
         )
         cell.configure(content, actions: detailActions(for: episode))
         cell.onCardTap = { [weak self] in
-            guard !enclosureURL.isEmpty else { return }
-            self?.actionController?.toggle(id: enclosureURL)
+            guard let actionID else { return }
+            self?.actionController?.toggle(id: actionID)
         }
         cell.onCoverTap = { [weak self] in self?.presentDetail(episode: episode) }
-        actionController?.reapplyGap(to: cell, id: enclosureURL)
+        actionController?.reapplyGap(to: cell, id: actionID ?? "")
     }
 
     func groupItems(for episode: FeedEpisodeRow) -> [ListActionItem] {

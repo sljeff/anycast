@@ -193,26 +193,6 @@ enum DiscoverCountryReload {
     static func reloadTargets(aliveIndices: Set<Int>) -> Set<Int> { aliveIndices }
 }
 
-// MARK: - SearchPage add button (03 §2.6, 2026-09-22 correction)
-
-/// SearchPage's add-to-playlist button (discover.dart:276-286): the icon
-/// reflects playlist membership, but the tap is NOT gated — this page has no
-/// `if (inPlaylist) return` guard (that guard exists ONLY on Channel /
-/// ChannelSearch, channel.dart:152-155 / 831-834). Every tap fires the
-/// fly-in animation and then inserts/moves via addToPlaylist (contrast
-/// `ChannelPlaylistGate.action(inPlaylist:)`, which returns `.blocked` for
-/// members).
-enum SearchPageAddButton {
-
-    enum Icon: Equatable {
-        case add
-        /// Ic.round_playlist_add_check — the already-in-playlist variant.
-        case added
-    }
-
-    static func icon(inPlaylist: Bool) -> Icon { inPlaylist ? .added : .add }
-}
-
 // MARK: - View models
 
 /// One category's channel list — the per-page FutureBuilder

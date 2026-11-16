@@ -408,7 +408,6 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         // Every change of the queue (reload, reorder, hide) lands here.
         refreshFooterText()
         renderLoadingState()
-        playEntranceIfNeeded()
     }
 
     /// Plays the entrance right after the list was applied. The first load
@@ -518,6 +517,9 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             rebuildEpisodeIndex()
             applySnapshot(animatingDifferences: animatesSnapshot)
         }
+        // Outside the controller transition: its performWithoutAnimation
+        // block would apply the entrance instantly and burn its one shot.
+        playEntranceIfNeeded()
         if let url = pendingRevealURL {
             pendingRevealURL = nil
             revealIfOffscreen(url)
@@ -845,13 +847,6 @@ extension PlaylistEpisodeListViewController: PlaylistEpisodeDataSource {
         guard indexPath.section == 0, episodes.indices.contains(indexPath.item) else { return nil }
         return episodes[indexPath.item]
     }
-
-    func index(of episode: PlaylistEpisodeRow) -> IndexPath? {
-        episodes.firstIndex { $0.enclosureUrl == episode.enclosureUrl }
-            .map { IndexPath(item: $0, section: 0) }
-    }
-
-    var rowCount: Int { episodes.count }
 
     func hideEpisode(byEnclosureURL url: String) {
         guard episodes.contains(where: { $0.enclosureUrl == url }) else { return }

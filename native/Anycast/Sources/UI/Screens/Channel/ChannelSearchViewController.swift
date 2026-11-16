@@ -24,8 +24,10 @@ final class ChannelSearchViewController: UIViewController {
     /// The list-owned Play · Add · Details group, as on the Channel page.
     private(set) var actionController: ListActionController!
     /// The filtered rows the collection view currently shows (see
-    /// ChannelViewController.displayedEpisodes).
+    /// ChannelViewController.displayedEpisodes), plus their action-group
+    /// ids — nil for a repeated enclosure URL, which gets no group.
     private(set) var displayedEpisodes: [FeedEpisodeRow] = []
+    private var actionIDs: [String?] = []
     private let htmlRenderer = HTMLContentRenderer()
 
     private let modelObservation = ObservationLoop()
@@ -280,12 +282,11 @@ final class ChannelSearchViewController: UIViewController {
                 return binder.groupItems(for: episode)
             },
             idAt: { [weak self] path in
-                guard let self, path.section == 0, self.displayedEpisodes.indices.contains(path.item),
-                      let url = self.displayedEpisodes[path.item].enclosureUrl, !url.isEmpty else { return nil }
-                return url
+                guard let self, path.section == 0, self.actionIDs.indices.contains(path.item) else { return nil }
+                return self.actionIDs[path.item]
             },
             indexPathFor: { [weak self] id in
-                guard let index = self?.displayedEpisodes.firstIndex(where: { $0.enclosureUrl == id }) else { return nil }
+                guard let index = self?.actionIDs.firstIndex(where: { $0 == id }) else { return nil }
                 return IndexPath(item: index, section: 0)
             },
             safeArea: { [weak self] in self?.actionSafeLines() ?? (0, 0) }
@@ -317,8 +318,10 @@ final class ChannelSearchViewController: UIViewController {
         let signature = filtered.map(\.enclosureUrl)
         if signature != lastFilteredSignature {
             lastFilteredSignature = signature
+            let ids = ListActionIdentity.ids(for: filtered.map(\.enclosureUrl))
             let apply = {
                 self.displayedEpisodes = filtered
+                self.actionIDs = ids
                 self.collectionView.reloadData()
             }
             if let actionController, actionController.selectedID != nil {
@@ -351,7 +354,13 @@ final class ChannelSearchViewController: UIViewController {
             guard displayedEpisodes.indices.contains(path.item),
                   let cell = collectionView.cellForItem(at: path) as? EpisodeCardCell
             else { continue }
-            binder?.configure(cell: cell, episode: displayedEpisodes[path.item], at: path, in: collectionView)
+            binder?.configure(
+                cell: cell,
+                episode: displayedEpisodes[path.item],
+                actionID: actionIDs.indices.contains(path.item) ? actionIDs[path.item] : nil,
+                at: path,
+                in: collectionView
+            )
         }
     }
 }
@@ -371,7 +380,13 @@ extension ChannelSearchViewController: UICollectionViewDataSource, UICollectionV
             withReuseIdentifier: EpisodeCardCell.reuseIdentifier, for: indexPath
         ) as! EpisodeCardCell
         if displayedEpisodes.indices.contains(indexPath.item) {
-            binder?.configure(cell: cell, episode: displayedEpisodes[indexPath.item], at: indexPath, in: collectionView)
+            binder?.configure(
+                cell: cell,
+                episode: displayedEpisodes[indexPath.item],
+                actionID: actionIDs.indices.contains(indexPath.item) ? actionIDs[indexPath.item] : nil,
+                at: indexPath,
+                in: collectionView
+            )
         }
         return cell
     }

@@ -110,7 +110,7 @@ struct InboxRemovalUndoTests {
         return InboxBatchItem(url: url, feedRow: feedRow, createdPlaylistRow: created)
     }
 
-    @Test("rapid Add x3 then Undo restores every feed row field for field and empties the playlist")
+    @Test("rapid Add x3 then Undo restores every content column and empties the playlist")
     func undoMergedAdds() async throws {
         let fixture = try await Self.makeFixture()
         defer { fixture.cleanUp() }
@@ -128,10 +128,16 @@ struct InboxRemovalUndoTests {
         #expect(InboxBatchLogic.message(kind: .add, count: batch.count) == "Added 3 to Playlist")
 
         let undone = try #require(batch.undo())
-        await InboxBatchLogic.undoAdd(
+        try await InboxBatchLogic.undoAdd(
             undone.items, currentEnclosureURL: nil, feedRepository: feed, playlistRepository: playlist
         )
-        #expect(try await feed.listAll() == before, "ids and every column survive the round trip")
+        // Every content column survives; the row ids are DELIBERATELY not
+        // preserved (a restored id could collide with one a refresh
+        // recycled — covered by the window tests below).
+        let after = try await feed.listAll()
+        #expect(after.map(\.enclosureUrl) == before.map(\.enclosureUrl))
+        #expect(after.map(\.title) == before.map(\.title))
+        #expect(after.map(\.pubDate) == before.map(\.pubDate))
         #expect(try await playlist.listEpisodes(playlistId: 1).isEmpty)
     }
 
@@ -151,13 +157,78 @@ struct InboxRemovalUndoTests {
         )
         try await feed.removeByEnclosureUrls([Self.urls[2]])
 
-        await InboxBatchLogic.undoAdd(
+        try await InboxBatchLogic.undoAdd(
             [noRow, playing, created], currentEnclosureURL: Self.urls[1],
             feedRepository: feed, playlistRepository: playlist
         )
         #expect(try await playlist.listEpisodes(playlistId: 1).compactMap(\.enclosureUrl)
             == [Self.urls[1], Self.urls[2]])
         #expect(try await feed.listAll().count == 3)
+    }
+
+    // MARK: - Undo vs rows that arrived inside the window
+
+    /// `feedEpisode.id` is not AUTOINCREMENT: after the Add deleted the
+    /// highest id, a refresh inside the undo window reuses that id. Undo
+    /// must not REPLACE on it — the new row would vanish.
+    @Test("undo of an Add never deletes a row that recycled the deleted id")
+    func undoAddKeepsRecycledIdRow() async throws {
+        let fixture = try await Self.makeFixture()
+        defer { fixture.cleanUp() }
+        let feed = fixture.database.feedRepository()
+        let playlist = fixture.database.playlistRepository()
+
+        // Add the row carrying the HIGHEST id (urls[2] was inserted last).
+        let item = try await Self.add(Self.urls[2], fixture: fixture, playlistIndex: 0)
+        // A refresh lands a brand-new episode inside the window; SQLite
+        // assigns it the recycled id.
+        try await feed.insertMany([
+            FeedEpisodeRow(
+                title: "Fresh episode", enclosureUrl: "https://example.test/fresh.mp3",
+                pubDate: 9_999, rssFeedUrl: "https://example.test/feed"
+            )
+        ])
+        let fresh = try #require(try await feed.listAll().first { $0.title == "Fresh episode" })
+        #expect(item.feedRow?.id != nil)
+        #expect(fresh.id == item.feedRow?.id, "the new row recycled the deleted id")
+
+        try await InboxBatchLogic.undoAdd(
+            [item], currentEnclosureURL: nil, feedRepository: feed, playlistRepository: playlist
+        )
+
+        let after = try await feed.listAll()
+        #expect(after.count == 4, "both the restored row and the recycled-id row survive")
+        #expect(after.contains { $0.title == "Fresh episode" })
+        #expect(after.contains { $0.enclosureUrl == Self.urls[2] })
+    }
+
+    /// A refresh can re-land the SAME url with newer data inside the undo
+    /// window; Undo keeps that row as-is instead of overwriting it with
+    /// the stale copy the Add took out.
+    @Test("undo of an Add keeps a same-URL row a refresh re-landed in the window")
+    func undoAddKeepsRefreshedSameURLRow() async throws {
+        let fixture = try await Self.makeFixture()
+        defer { fixture.cleanUp() }
+        let feed = fixture.database.feedRepository()
+        let playlist = fixture.database.playlistRepository()
+
+        let item = try await Self.add(Self.urls[0], fixture: fixture, playlistIndex: 0)
+        // The refresh's copy: same url, newer title.
+        try await feed.insertMany([
+            FeedEpisodeRow(
+                title: "Refreshed title", enclosureUrl: Self.urls[0],
+                pubDate: 9_999, rssFeedUrl: "https://example.test/feed"
+            )
+        ])
+
+        try await InboxBatchLogic.undoAdd(
+            [item], currentEnclosureURL: nil, feedRepository: feed, playlistRepository: playlist
+        )
+
+        let after = try await feed.listAll()
+        #expect(after.count == 3, "no duplicate and no replacement")
+        #expect(try await feed.listAll().first { $0.enclosureUrl == Self.urls[0] }?.title == "Refreshed title")
+        #expect(try await playlist.listEpisodes(playlistId: 1).isEmpty)
     }
 
     @Test("the capsule text counts a merged batch")

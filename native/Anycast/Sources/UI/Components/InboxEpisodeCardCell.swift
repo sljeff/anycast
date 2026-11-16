@@ -75,6 +75,9 @@ final class InboxEpisodeCardCell: UICollectionViewCell, ListActionGapHosting, UI
         onCoverTap = nil
         menuActions = []
         setActionGap(0)
+        // The FLIP position translation rides on the cell's own layer; a
+        // reused cell must not carry it into its next position.
+        layer.removeAnimation(forKey: ListActionMotion.translationKey)
         contentView.layer.removeAllAnimations()
         contentView.alpha = 1
         contentView.transform = .identity

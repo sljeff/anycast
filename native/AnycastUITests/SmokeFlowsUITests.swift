@@ -75,6 +75,23 @@ final class SmokeFlowsUITests: XCTestCase {
                 let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
                 lower.press(forDuration: 0.05, thenDragTo: upper)   // scroll down
                 upper.press(forDuration: 0.05, thenDragTo: lower)   // scroll back
+                // The Playlist pulls up to History past its list end; a
+                // short seeded list bottoms out inside this drag band, and
+                // the release at full pull opens the History sheet over
+                // the tab bar. Close it so the next chip tap reaches the
+                // bar: the sheet opens at its medium detent, so drag its
+                // top area down (a plain swipeDown lands on the list and
+                // scrolls it instead).
+                let clearHistory = app.buttons["Hold to Clear History"]
+                if clearHistory.waitForExistence(timeout: 1) {
+                    let grab = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.53))
+                    let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
+                    grab.press(forDuration: 0.05, thenDragTo: bottom)
+                    XCTAssertFalse(
+                        clearHistory.waitForExistence(timeout: 3),
+                        "History sheet stayed open over the tab bar"
+                    )
+                }
             }
         }
     }

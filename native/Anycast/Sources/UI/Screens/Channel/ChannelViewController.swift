@@ -46,6 +46,10 @@ final class ChannelViewController: UIViewController {
     /// action controller's identity lookups and the context menu read this —
     /// never the live view model, which can change before the reload runs.
     private(set) var displayedEpisodes: [FeedEpisodeRow] = []
+    /// Per-row action-group ids, aligned with `displayedEpisodes`. A
+    /// repeated enclosure URL keeps only its FIRST row addressable — a
+    /// shared id would open the group at the wrong row and gap both cells.
+    private var actionIDs: [String?] = []
     private let htmlRenderer = HTMLContentRenderer()
 
     private var headerView: ChannelHeaderView?
@@ -428,9 +432,11 @@ final class ChannelViewController: UIViewController {
             let startsSkeleton = skeleton && !showsSkeleton
             lastEpisodeSignature = signature
             let episodes = viewModel.showEpisodes
+            let ids = ListActionIdentity.ids(for: episodes.map(\.enclosureUrl))
             let apply = {
                 self.showsSkeleton = skeleton
                 self.displayedEpisodes = episodes
+                self.actionIDs = ids
                 self.collectionView.reloadData()
             }
             if let actionController, actionController.selectedID != nil {
@@ -453,6 +459,13 @@ final class ChannelViewController: UIViewController {
                 let rows = collectionView.visibleCells.filter { $0 is EpisodeCardCell }
                 MotionArrival.reveal(in: collectionView, cells: rows, staggered: true)
             }
+        } else {
+            // Same URLs, fresh content: a refetch can change a title,
+            // duration or artwork without touching the identity the diff
+            // above keys on. The rows cells read must not stay stale.
+            displayedEpisodes = viewModel.showEpisodes
+            actionIDs = ListActionIdentity.ids(for: viewModel.showEpisodes.map(\.enclosureUrl))
+            refreshVisibleCards()
         }
 
         renderBodyState(viewModel)
@@ -556,12 +569,12 @@ final class ChannelViewController: UIViewController {
         actionController.onGroupUpdate = { [weak self] in self?.binder?.refreshGroup() }
     }
 
-    /// Item 0 (the order row) and skeleton rows carry no action identity.
+    /// Item 0 (the order row) and skeleton rows carry no action identity;
+    /// neither does a duplicate enclosure URL (see `actionIDs`).
     private func episodeID(at path: IndexPath) -> String? {
         guard path.section == 0, path.item > 0, !showsSkeleton,
-              displayedEpisodes.indices.contains(path.item - 1),
-              let url = displayedEpisodes[path.item - 1].enclosureUrl, !url.isEmpty else { return nil }
-        return url
+              actionIDs.indices.contains(path.item - 1) else { return nil }
+        return actionIDs[path.item - 1]
     }
 
     /// Top: under the pinned header at its current fold height. Bottom: the
@@ -844,7 +857,11 @@ extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDel
     private func configureCard(_ cell: EpisodeCardCell, at path: IndexPath) {
         guard displayedEpisodes.indices.contains(path.item - 1) else { return }
         binder?.configure(
-            cell: cell, episode: displayedEpisodes[path.item - 1], at: path, in: collectionView
+            cell: cell,
+            episode: displayedEpisodes[path.item - 1],
+            actionID: actionIDs.indices.contains(path.item - 1) ? actionIDs[path.item - 1] : nil,
+            at: path,
+            in: collectionView
         )
     }
 
@@ -853,12 +870,14 @@ extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDel
     }
 
     /// Long press: Play / Add to playlist (the Inbox native-first pattern).
+    /// Duplicate-URL rows have no group identity but keep their menu.
     func collectionView(
         _ collectionView: UICollectionView,
         contextMenuConfigurationForItemsAt indexPaths: [IndexPath],
         point: CGPoint
     ) -> UIContextMenuConfiguration? {
-        guard let path = indexPaths.first, episodeID(at: path) != nil,
+        guard let path = indexPaths.first, path.section == 0, path.item > 0, !showsSkeleton,
+              displayedEpisodes.indices.contains(path.item - 1),
               let binder else { return nil }
         let episode = displayedEpisodes[path.item - 1]
         return UIContextMenuConfiguration(actionProvider: { _ in binder.menu(for: episode) })

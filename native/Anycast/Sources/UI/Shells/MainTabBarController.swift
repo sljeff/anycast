@@ -232,9 +232,15 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
     /// The `bottomChromeTopAnchor` line as a y in `target`'s coordinates,
     /// read from frames (no constraint across hierarchies); nil when
     /// `target` is not in this shell's window.
+    ///
+    /// No forced layout here: this runs several times per group
+    /// open/close/switch, and `view` contains the whole tab content — a
+    /// forced pass would lay out every visible list each time. The chrome
+    /// geometry only changes outside those transitions (bar minimize,
+    /// player insertion — both of which run their own layout), so the
+    /// current frames are what the caller sees on screen.
     func bottomChromeTopY(in target: UIView) -> CGFloat? {
         guard let window = view.window, target.window === window else { return nil }
-        view.layoutIfNeeded()
         if #available(iOS 26.0, *) {
             guard let owner = contentLayoutGuide.owningView ?? view else { return nil }
             return owner.convert(CGPoint(x: 0, y: contentLayoutGuide.layoutFrame.maxY), to: target).y

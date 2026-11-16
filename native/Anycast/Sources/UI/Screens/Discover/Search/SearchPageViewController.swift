@@ -797,7 +797,10 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     private(set) var actionController: ListActionController!
     /// The results the collection view currently shows; the data source and
     /// the action controller's identity lookups read this, not the model.
+    /// `actionIDs` holds their group ids — nil for a repeated enclosure
+    /// URL, which gets no group of its own.
     private(set) var displayedEpisodes: [APIClient.EpisodeWithChannel] = []
+    private var actionIDs: [String?] = []
     private let playbackObservation = ObservationLoop()
     private let modelObservation = ObservationLoop()
     private var lastEpisodeSignature: [String?] = []
@@ -920,13 +923,12 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
                 return self.binder.groupItems(for: item)
             },
             idAt: { [weak self] path in
-                guard let self, path.section == 0, self.displayedEpisodes.indices.contains(path.item),
-                      let url = self.displayedEpisodes[path.item].episode.enclosureUrl, !url.isEmpty
+                guard let self, path.section == 0, self.actionIDs.indices.contains(path.item)
                 else { return nil }
-                return url
+                return self.actionIDs[path.item]
             },
             indexPathFor: { [weak self] id in
-                guard let index = self?.displayedEpisodes.firstIndex(where: { $0.episode.enclosureUrl == id })
+                guard let index = self?.actionIDs.firstIndex(where: { $0 == id })
                 else { return nil }
                 return IndexPath(item: index, section: 0)
             },
@@ -959,9 +961,11 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             // Skeleton cards are not episodes: nothing for the action
             // controller to find behind them.
             let episodes = skeleton ? [] : viewModel.episodes
+            let ids = ListActionIdentity.ids(for: episodes.map(\.episode.enclosureUrl))
             let apply = {
                 self.showsSkeleton = skeleton
                 self.displayedEpisodes = episodes
+                self.actionIDs = ids
                 self.collectionView.reloadData()
             }
             var keptGroup = false
@@ -1022,6 +1026,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             binder.configure(
                 cell: cell,
                 item: displayedEpisodes[path.item],
+                actionID: actionIDs.indices.contains(path.item) ? actionIDs[path.item] : nil,
                 at: path,
                 in: collectionView
             )
@@ -1048,6 +1053,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             binder.configure(
                 cell: cell,
                 item: displayedEpisodes[indexPath.item],
+                actionID: actionIDs.indices.contains(indexPath.item) ? actionIDs[indexPath.item] : nil,
                 at: indexPath,
                 in: collectionView
             )

@@ -184,16 +184,13 @@ struct DiscoverLogicTests {
         #expect(viewModel.episodes.isEmpty)
     }
 
-    // MARK: - Unguarded add semantics (03 §2.6 2026-09-22 correction)
+    // MARK: - Add gating (list-owned action groups)
 
-    @Test("SearchPage add button: icon reflects membership, action is never gated")
+    @Test("An episode already in a playlist is blocked from re-add on every episode row")
     func searchAddButtonSemantics() {
-        // Icon variant (Ic.round_playlist_add_check when in a playlist).
-        #expect(SearchPageAddButton.icon(inPlaylist: false) == .add)
-        #expect(SearchPageAddButton.icon(inPlaylist: true) == .added)
-        // The tap is ungated by design — there is no action predicate on
-        // this page (contrast the Channel pages, whose gate blocks members:
-        // channel.dart:152-155 / 831-834).
+        // The Add circle's icon reflects membership and the tap is gated
+        // through the same predicate everywhere it appears (Channel,
+        // in-show search, global episode search).
         #expect(ChannelPlaylistGate.action(inPlaylist: true) == .blocked)
         #expect(ChannelPlaylistGate.action(inPlaylist: false) == .flyInAndInsert)
     }
