@@ -151,7 +151,6 @@ nonisolated enum AppIcons {
     static let appleLogo = symbol("apple.logo")
     static let email = symbol("envelope")
     static let addCircle = symbol("plus.circle")
-    static let add = symbol("plus")
     static let checkCircle = symbol("checkmark.circle.fill")
     static let smsFailed = symbol("exclamationmark.bubble.fill")
     static let photo = symbol("photo")
@@ -183,7 +182,7 @@ nonisolated enum AppIcons {
         "doc.on.doc", "safari.fill", "safari", "arrow.up.doc", "apple.logo",
         "envelope", "plus.circle", "exclamationmark.bubble.fill", "photo",
         "arrow.turn.down.right", "text.alignleft", "exclamationmark.triangle",
-        "bubble.left", "text.quote", "arrow.up.right", "plus",
+        "bubble.left", "text.quote", "arrow.up.right",
     ]
 
     private static func symbol(_ name: String) -> UIImage {

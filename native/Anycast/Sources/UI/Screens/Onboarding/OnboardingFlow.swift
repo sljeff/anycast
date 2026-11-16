@@ -152,8 +152,8 @@ struct OnboardingGate {
     nonisolated enum Decision: Equatable {
         /// Show the onboarding.
         case present
-        /// Someone who already follows shows (an upgrade from an earlier
-        /// version): do not show it, and remember that.
+        /// Someone who already has data of their own — an upgrade from an
+        /// earlier version: do not show it, and remember that.
         case markCompleted
         /// Do not show it this launch; decide again next launch.
         case skip
@@ -173,11 +173,13 @@ struct OnboardingGate {
         defaults.set(true, forKey: Self.key)
     }
 
-    /// `subscriptionCount` is nil when the subscriptions could not be read.
-    static func decision(hasCompleted: Bool, subscriptionCount: Int?) -> Decision {
+    /// `hasExistingData` covers every store a listener can already have
+    /// rows in — subscriptions, playlist episodes, history, inbox episodes.
+    /// It is nil when one of them could not be read.
+    static func decision(hasCompleted: Bool, hasExistingData: Bool?) -> Decision {
         if hasCompleted { return .skip }
-        guard let subscriptionCount else { return .skip }
-        return subscriptionCount > 0 ? .markCompleted : .present
+        guard let hasExistingData else { return .skip }
+        return hasExistingData ? .markCompleted : .present
     }
 }
 
@@ -201,7 +203,7 @@ nonisolated enum OnboardingCopy {
 
     // Step 2.
     static let interestsQuestion = "Let's start with you. What do you usually listen to?"
-    static let interestsHint = "Pick as many as you like. You can change them later."
+    static let interestsHint = "Pick as many as you like."
     static let interests = ["Tech", "Business", "Design", "History", "Languages", "Comedy", "News", "Psychology"]
 
     // Step 3.
@@ -224,15 +226,15 @@ nonisolated enum OnboardingCopy {
         let taste = leading.isEmpty
             ? "You haven't told me what you like yet, but you probably"
             : "You lean toward \(leading) shows, you"
-        return "Here's my first impression from your interests and subscriptions. \(taste) like episodes that teach you something, and you likely listen on the commute or while getting things done."
+        return "Here's my first impression from your interests. \(taste) like episodes that teach you something, and you likely listen on the commute or while getting things done."
     }
     static let helpTitle = "How I'll help"
     static let helpLines = [
-        "New episodes go straight into your queue, no hunting",
+        "New episodes from your shows land in the Inbox, ready to play",
         "Long episodes get a text summary first, so you can decide",
         "Bilingual subtitles cover hard accents and jargon",
     ]
-    static let impressionFeedback = "If anything sounds off, tell me and I'll remember."
+    static let impressionFeedback = "If anything sounds off, tell me."
     static let impressionRight = "Sounds right"
     static let impressionWrong = "Something's off"
     static let impressionRightReply = "Great, I'll go with that."
@@ -240,7 +242,7 @@ nonisolated enum OnboardingCopy {
 
     // Step 5.
     static let queueTitle = "Your queue decides what plays next"
-    static let queueHint = "Tap + to add two episodes to Up Next. When one ends, the next starts on its own."
+    static let queueHint = "Add two episodes to Up Next. When one ends, the next starts on its own."
     static let sampleCaption = "Sample episodes"
     static let upNext = "Up Next"
     static let upNextEmpty = "Nothing here yet"

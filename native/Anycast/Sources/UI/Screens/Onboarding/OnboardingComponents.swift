@@ -72,18 +72,35 @@ final class OnboardingThreadView: UIView {
     }
 
     /// Plays the staggered entrance of the items built before the step was
-    /// shown. Only the first call does anything.
-    func playEntranceIfNeeded() {
-        guard !hasPlayedEntrance else { return }
+    /// shown. Only the first call does anything. `onSettled` runs when the
+    /// last item's animation has finished — immediately when the entrance
+    /// is skipped (already played, or Reduce Motion).
+    func playEntranceIfNeeded(onSettled: (() -> Void)? = nil) {
+        guard !hasPlayedEntrance else {
+            onSettled?()
+            return
+        }
         hasPlayedEntrance = true
-        for (index, view) in stack.arrangedSubviews.enumerated() {
+        let items = stack.arrangedSubviews
+        guard !Motion.reduceMotion, !items.isEmpty else {
+            onSettled?()
+            return
+        }
+        for (index, view) in items.enumerated() {
             let position = min(index, Motion.cardEntranceMaxStaggered)
-            animateEntrance(of: view, delay: Double(position) * Motion.cardEntranceStagger * 2)
+            let delay = Double(position) * Motion.cardEntranceStagger * 2
+            let isLast = index == items.indices.last
+            animateEntrance(of: view, delay: delay) {
+                if isLast { onSettled?() }
+            }
         }
     }
 
-    private func animateEntrance(of view: UIView, delay: TimeInterval) {
-        guard !Motion.reduceMotion else { return }
+    private func animateEntrance(of view: UIView, delay: TimeInterval, completion: (() -> Void)? = nil) {
+        guard !Motion.reduceMotion else {
+            completion?()
+            return
+        }
         view.alpha = 0
         view.transform = CGAffineTransform(translationX: 0, y: Motion.cardEntranceOffset)
         UIView.animate(
@@ -93,8 +110,17 @@ final class OnboardingThreadView: UIView {
             animations: {
                 view.alpha = 1
                 view.transform = .identity
-            }
+            },
+            completion: { _ in completion?() }
         )
+    }
+
+    /// Scrolls so `view` is visible, without animation. Used before the
+    /// queue lesson's fly-in: its endpoint is sampled from the tray's
+    /// position at animation start, so the tray must already be on screen.
+    func reveal(_ view: UIView) {
+        let rect = view.convert(view.bounds, to: scrollView)
+        scrollView.scrollRectToVisible(rect, animated: false)
     }
 
     private func scrollToBottom() {
@@ -175,6 +201,9 @@ final class OnboardingChipButton: UIButton {
         var configuration = UIButton.Configuration.filled()
         configuration.title = title
         configuration.cornerStyle = .capsule
+        // A chip wider than its row wraps instead of truncating, so the
+        // flow layout can give it a taller frame at large text sizes.
+        configuration.titleLineBreakMode = .byWordWrapping
         configuration.contentInsets = NSDirectionalEdgeInsets(
             top: Spacing.row, leading: Spacing.pageH, bottom: Spacing.row, trailing: Spacing.pageH
         )
@@ -194,6 +223,47 @@ final class OnboardingChipButton: UIButton {
         accessibilityLabel = title
         heightAnchor.constraint(greaterThanOrEqualToConstant: Self.minimumHeight).isActive = true
         addPressFeedback(scale: Motion.pressScaleSubtle)
+    }
+
+    /// Stops the chip from answering again after a one-shot answer. The
+    /// `.notEnabled` trait keeps VoiceOver from announcing a dead control
+    /// as tappable.
+    func disableAnswering() {
+        isUserInteractionEnabled = false
+        accessibilityTraits.insert(.notEnabled)
+    }
+
+    /// Self-sizing against a constrained width. A configured button's
+    /// standard measurement keeps its title on one line even when
+    /// `titleLineBreakMode` says wrap — measure the wrapped title
+    /// directly, honoring the configuration's insets, so a chip wider
+    /// than its row reports a narrower, taller size instead of
+    /// overflowing its capsule.
+    override func systemLayoutSizeFitting(
+        _ targetSize: CGSize,
+        withHorizontalFittingPriority horizontalFittingPriority: UILayoutPriority,
+        verticalFittingPriority: UILayoutPriority
+    ) -> CGSize {
+        let singleLine = super.systemLayoutSizeFitting(
+            targetSize,
+            withHorizontalFittingPriority: horizontalFittingPriority,
+            verticalFittingPriority: verticalFittingPriority
+        )
+        guard singleLine.width > targetSize.width, let title = configuration?.title else {
+            return singleLine
+        }
+        let insets = configuration?.contentInsets ?? NSDirectionalEdgeInsets()
+        let maxWidth = targetSize.width - insets.leading - insets.trailing
+        guard maxWidth > 0 else { return singleLine }
+
+        let text = NSAttributedString(string: title, attributes: [.font: TypographyV2.body.font()])
+        let textBounds = text.boundingRect(
+            with: CGSize(width: maxWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            context: nil
+        )
+        let height = max(Self.minimumHeight, ceil(textBounds.height) + insets.top + insets.bottom)
+        return CGSize(width: targetSize.width, height: height)
     }
 
     @available(*, unavailable)
@@ -232,7 +302,16 @@ final class OnboardingFlowLayoutView: UIView {
         var rowHeight: CGFloat = 0
         for item in subviews where !item.isHidden {
             var size = item.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
-            size.width = min(size.width, width)
+            if size.width > width {
+                // Wider than the whole row: it wraps onto its own line.
+                // Remeasure at the constrained width so wrapped text gets
+                // a taller frame instead of overflowing the capsule.
+                size = item.systemLayoutSizeFitting(
+                    CGSize(width: width, height: UIView.layoutFittingExpandedSize.height),
+                    withHorizontalFittingPriority: .required,
+                    verticalFittingPriority: .fittingSizeLevel
+                )
+            }
             if x > 0, x + size.width > width {
                 x = 0
                 y += rowHeight + spacing

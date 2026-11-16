@@ -21,6 +21,10 @@ final class OnboardingViewController: UIViewController {
     private let primaryButton = AnycastButton.make(.primary, title: OnboardingCopy.start)
     private let skipButton = UIButton(type: .system)
     private var stepView: OnboardingStepView?
+    /// True while a step change is animating. A double tap on the primary
+    /// or skip button during that window would otherwise race the swap and
+    /// advance a second step (or finish) off one gesture.
+    private var isChangingStep = false
 
     private static let primaryHeight: CGFloat = 52
     private static let skipHeight: CGFloat = 44
@@ -165,8 +169,12 @@ final class OnboardingViewController: UIViewController {
             return
         }
         contentContainer.layoutIfNeeded()
-        incoming.stepDidAppear()
-        UIAccessibility.post(notification: .screenChanged, argument: incoming)
+        // VoiceOver focus moves once the incoming step's entrance has
+        // settled: posting during the fade lands the focus on views that
+        // are still alpha 0. Reduce Motion settles immediately.
+        incoming.stepDidAppear(onSettled: { [weak incoming] in
+            UIAccessibility.post(notification: .screenChanged, argument: incoming)
+        })
 
         guard let outgoing else { return }
         guard !Motion.reduceMotion else {
@@ -174,7 +182,15 @@ final class OnboardingViewController: UIViewController {
             return
         }
         outgoing.isUserInteractionEnabled = false
-        Motion.animate(Motion.quick, { outgoing.alpha = 0 }, completion: { outgoing.removeFromSuperview() })
+        isChangingStep = true
+        Motion.animate(
+            Motion.quick,
+            { outgoing.alpha = 0 },
+            completion: { [weak self] in
+                self?.isChangingStep = false
+                outgoing.removeFromSuperview()
+            }
+        )
     }
 
     /// Updates the two buttons from the flow. Called on every answer.
@@ -206,11 +222,12 @@ final class OnboardingViewController: UIViewController {
     // MARK: - Actions
 
     private func primaryTapped() {
-        guard flow.advance() else { return }
+        guard !isChangingStep, flow.advance() else { return }
         stepChanged()
     }
 
     private func skipTapped() {
+        guard !isChangingStep else { return }
         switch flow.skipOption {
         case .none: return
         case .step: flow.skipStep()
@@ -336,8 +353,9 @@ enum OnboardingLauncher {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
-    /// Presents the onboarding over `root` on a first launch. Someone who
-    /// already follows shows came from an earlier version and is marked as
+    /// Presents the onboarding over `root` on a first launch. Someone with
+    /// any existing data — subscriptions, playlist episodes, history or
+    /// inbox episodes — upgraded from an earlier version and is marked as
     /// done instead. If something else is already presented (a login sheet,
     /// a share handoff), it waits for the next launch.
     static func presentIfNeeded(
@@ -345,8 +363,8 @@ enum OnboardingLauncher {
     ) {
         guard !gate.hasCompleted, !isRunningTests else { return }
         Task { [weak root] in
-            let subscriptions = try? await context.database.subscriptionRepository().listAll()
-            switch OnboardingGate.decision(hasCompleted: gate.hasCompleted, subscriptionCount: subscriptions?.count) {
+            let hasExistingData = try? await Self.listenerHasExistingData(context.database)
+            switch OnboardingGate.decision(hasCompleted: gate.hasCompleted, hasExistingData: hasExistingData) {
             case .skip:
                 return
             case .markCompleted:
@@ -359,5 +377,15 @@ enum OnboardingLauncher {
                 root.present(controller, animated: true)
             }
         }
+    }
+
+    /// Whether the listener already has data of their own in any store.
+    /// COUNT probes only — nothing is decoded just to be counted. A throw
+    /// from any store reads as "could not decide", handled by the gate.
+    static func listenerHasExistingData(_ database: AppDatabase) async throws -> Bool {
+        if try await database.subscriptionRepository().count() > 0 { return true }
+        if try await database.playlistRepository().episodeCount() > 0 { return true }
+        if try await database.historyRepository().count() > 0 { return true }
+        return try await database.feedRepository().count() > 0
     }
 }

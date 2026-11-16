@@ -12,8 +12,13 @@ class OnboardingStepView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    /// Called once the step is on screen.
-    func stepDidAppear() {}
+    /// Called once the step is on screen. `onSettled` runs when any
+    /// entrance animation has finished (immediately when there is none) —
+    /// the container posts the VoiceOver screen change there, so focus
+    /// lands on visible content.
+    func stepDidAppear(onSettled: (() -> Void)? = nil) {
+        onSettled?()
+    }
 }
 
 /// A step whose content is a thread: a scrolling column that only grows.
@@ -33,8 +38,8 @@ class OnboardingThreadStepView: OnboardingStepView {
         ])
     }
 
-    override func stepDidAppear() {
-        thread.playEntranceIfNeeded()
+    override func stepDidAppear(onSettled: (() -> Void)? = nil) {
+        thread.playEntranceIfNeeded(onSettled: onSettled)
     }
 
     @available(*, unavailable)
@@ -48,7 +53,10 @@ final class OnboardingWelcomeStepView: OnboardingStepView {
     override init() {
         super.init()
 
-        // The brand mark again, large and faint, behind the copy.
+        // The brand mark again, large and faint, behind the copy. Not
+        // clipped to this (inset) step view: a clip here cuts the glyph
+        // with a straight edge mid-stroke. It bleeds to the screen edge,
+        // where the window clips it naturally.
         let watermark = UILabel()
         watermark.text = OnboardingCopy.brandMark
         watermark.font = .systemFont(ofSize: 300, weight: .ultraLight)
@@ -57,7 +65,6 @@ final class OnboardingWelcomeStepView: OnboardingStepView {
         watermark.isAccessibilityElement = false
         watermark.translatesAutoresizingMaskIntoConstraints = false
         addSubview(watermark)
-        clipsToBounds = true
 
         let mark = UILabel()
         mark.text = OnboardingCopy.brandMark
@@ -210,8 +217,8 @@ final class OnboardingImpressionStepView: OnboardingThreadStepView {
                 guard let self, let chip else { return }
                 // One answer: the tapped chip stays lit, both stop responding.
                 chip.isSelected = true
-                right?.isUserInteractionEnabled = false
-                wrong?.isUserInteractionEnabled = false
+                right?.disableAnswering()
+                wrong?.disableAnswering()
                 Haptics.selection()
                 self.answer(chip.configuration?.title ?? "", reply: reply)
             }, for: .touchUpInside)
@@ -337,7 +344,7 @@ final class OnboardingQueueLessonStepView: OnboardingThreadStepView {
 
         let button = AnycastIconButton(
             style: .tonal,
-            icon: isQueued ? AppIcons.check : AppIcons.add,
+            icon: isQueued ? AppIcons.addedToList : AppIcons.addToList,
             accessibilityLabel: isQueued
                 ? OnboardingCopy.removeFromUpNext(episode.title)
                 : OnboardingCopy.addToUpNext(episode.title)
@@ -374,13 +381,17 @@ final class OnboardingQueueLessonStepView: OnboardingThreadStepView {
         let isQueued = queued.contains(episode.id)
         // Only the tapped row's button changes; the tray appends or drops
         // that one episode.
-        button.setIcon(isQueued ? AppIcons.check : AppIcons.add)
+        button.setIcon(isQueued ? AppIcons.addedToList : AppIcons.addToList)
         button.accessibilityLabel = isQueued
             ? OnboardingCopy.removeFromUpNext(episode.title)
             : OnboardingCopy.addToUpNext(episode.title)
         tray.setEpisodes(queuedEpisodes(queued), animated: true)
 
         if isQueued {
+            // The tray sits at the bottom of the scroll column and can be
+            // off screen; the fly-in lands on it, so bring it into view
+            // first (the endpoint is sampled at animation start).
+            thread.reveal(tray)
             if let window = self.window {
                 // The animator plays the add haptic itself.
                 flyInAnimator.fly(from: button.convert(CGPoint(x: button.bounds.midX, y: button.bounds.midY), to: nil), in: window)
@@ -413,7 +424,9 @@ final class OnboardingTranscriptLineControl: UIControl {
         layer.cornerCurve = .continuous
 
         let time = OnboardingUI.label(line.timestamp, style: TypographyV2.meta)
-        time.font = TypographyV2.meta.font().monospacedDigits()
+        // Tabular digits via the style helper, so the label keeps following
+        // Dynamic Type (a plain monospacedDigits() rebuild loses it).
+        time.font = TypographyV2.meta.monospacedDigitFont()
         time.numberOfLines = 1
         time.setContentHuggingPriority(.required, for: .horizontal)
         time.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -480,7 +493,7 @@ final class OnboardingTranscriptLessonStepView: OnboardingThreadStepView {
             guard let self, let ask else { return }
             // Asked once: the chip stays lit and the answer is appended.
             ask.isSelected = true
-            ask.isUserInteractionEnabled = false
+            ask.disableAnswering()
             Haptics.selection()
             self.onAsk()
             self.thread.append(OnboardingBubbleView(.anycast, text: OnboardingCopy.askEpisodeAnswer))
@@ -489,7 +502,7 @@ final class OnboardingTranscriptLessonStepView: OnboardingThreadStepView {
 
         if hasAsked {
             ask.isSelected = true
-            ask.isUserInteractionEnabled = false
+            ask.disableAnswering()
             thread.append(OnboardingBubbleView(.anycast, text: OnboardingCopy.askEpisodeAnswer))
         }
     }
