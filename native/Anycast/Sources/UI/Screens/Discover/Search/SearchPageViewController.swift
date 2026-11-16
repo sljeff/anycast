@@ -11,7 +11,7 @@ import AnycastKit
 /// runs a fresh search. A query is saved to Recent only once a segment
 /// returns at least one row. Each segment is fetched the first time it is
 /// shown in that search; a segment that already loaded (including zero
-/// rows) is shown again with no spinner and no request, and a segment that
+/// rows) is shown again with no skeleton and no request, and a segment that
 /// failed is fetched again on the next visit. The Episodes page renders
 /// covered episode cards whose list-owned group offers Play · Add · Details.
 /// The mini player comes from the shell, as on every tab.
@@ -562,11 +562,14 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
     private let viewModel: SearchPageViewModel
 
     private let collectionView: UICollectionView
-    private let spinner = UIActivityIndicatorView(style: .large)
     private let statusView = SearchSegmentStatusView()
     private var statusTop: NSLayoutConstraint?
     private let observation = ObservationLoop()
     private var lastChannelSignature: [String?] = []
+    /// The loading rule: skeleton rows only once the wait passes 300 ms.
+    private let skeletonDelay = LoadingDelay()
+    private(set) var showsSkeleton = false
+    static let skeletonRowCount = 7
     private var renderedPresentation: SearchResultPresentation?
 
     var resultFocusTarget: UIView { statusView.focusTarget }
@@ -655,11 +658,6 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         )
         view.addSubview(collectionView)
 
-        spinner.color = Theme.primary
-        spinner.hidesWhenStopped = true
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(spinner)
-
         statusView.onAction = { [weak self] action in
             switch action {
             case .showOtherSegment: self?.onSwitchTab?()
@@ -674,18 +672,20 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
     }
 
     private func render() {
-        renderStatus()
+        let skeleton = skeletonDelay.update(isLoading: viewModel.channelsPhase == .loading) { [weak self] in
+            self?.render()
+        }
+        renderStatus(skeleton: skeleton)
 
         let signature = viewModel.channels.map(\.rssFeedUrl)
         let hadContent = !lastChannelSignature.isEmpty
-        if signature != lastChannelSignature {
+        if signature != lastChannelSignature || skeleton != showsSkeleton {
             lastChannelSignature = signature
+            showsSkeleton = skeleton
             UIView.performWithoutAnimation {
                 collectionView.reloadData()
             }
@@ -698,16 +698,12 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         }
     }
 
-    private func renderStatus() {
+    private func renderStatus(skeleton: Bool) {
         let phase = viewModel.channelsPhase
-        if phase == .loading {
-            spinner.startAnimating()
-            spinner.isAccessibilityElement = true
-            spinner.accessibilityLabel = SearchResultState.searchingAnnouncement(query: viewModel.searchText)
-            view.bringSubviewToFront(spinner)
-        } else {
-            spinner.stopAnimating()
-            spinner.isAccessibilityElement = false
+        collectionView.isAccessibilityElement = skeleton
+        collectionView.accessibilityLabel = skeleton
+            ? SearchResultState.searchingAnnouncement(query: viewModel.searchText) : nil
+        if phase != .loading {
             view.bringSubviewToFront(statusView)
         }
         if case .loaded = phase {
@@ -729,7 +725,7 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
     func collectionView(
         _ collectionView: UICollectionView, numberOfItemsInSection section: Int
     ) -> Int {
-        viewModel.channels.count
+        showsSkeleton ? Self.skeletonRowCount : viewModel.channels.count
     }
 
     func collectionView(
@@ -738,6 +734,11 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: PodcastCardCell.reuseIdentifier, for: indexPath
         ) as! PodcastCardCell
+        if showsSkeleton {
+            cell.setPosition(isFirst: indexPath.item == 0, isLast: indexPath.item == Self.skeletonRowCount - 1)
+            cell.configureSkeleton()
+            return cell
+        }
         if viewModel.channels.indices.contains(indexPath.item) {
             let channel = viewModel.channels[indexPath.item]
             cell.setPosition(
@@ -785,7 +786,6 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     private let viewModel: SearchPageViewModel
 
     private let collectionView: ListActionCollectionView
-    private let spinner = UIActivityIndicatorView(style: .large)
     private let statusView = SearchSegmentStatusView()
     private var statusTop: NSLayoutConstraint?
     /// Needs `self` as owner — created lazily (post-super.init).
@@ -802,6 +802,10 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     private let modelObservation = ObservationLoop()
     private var lastEpisodeSignature: [String?] = []
     private var renderedPresentation: SearchResultPresentation?
+    /// The loading rule: skeleton cards only once the wait passes 300 ms.
+    private let skeletonDelay = LoadingDelay()
+    private(set) var showsSkeleton = false
+    static let skeletonRowCount = 6
     /// Set when a new result list replaces the old one; the entrance plays
     /// once it can (`CardEntranceAnimator`). Pagination is not a new list.
     private var needsEntrance = false
@@ -890,11 +894,6 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         binder.register(in: collectionView)
         view.addSubview(collectionView)
 
-        spinner.color = Theme.primary
-        spinner.hidesWhenStopped = true
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(spinner)
-
         statusView.onAction = { [weak self] action in
             switch action {
             case .showOtherSegment: self?.onSwitchTab?()
@@ -909,8 +908,6 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
 
         binder.onListContentChanged = { [weak self] in self?.refreshVisibleCards() }
@@ -951,13 +948,19 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     }
 
     private func render() {
-        renderStatus()
+        let skeleton = skeletonDelay.update(isLoading: viewModel.episodesPhase == .loading) { [weak self] in
+            self?.render()
+        }
+        renderStatus(skeleton: skeleton)
 
         let signature = viewModel.episodes.map(\.episode.enclosureUrl)
-        if signature != lastEpisodeSignature {
+        if signature != lastEpisodeSignature || skeleton != showsSkeleton {
             lastEpisodeSignature = signature
-            let episodes = viewModel.episodes
+            // Skeleton cards are not episodes: nothing for the action
+            // controller to find behind them.
+            let episodes = skeleton ? [] : viewModel.episodes
             let apply = {
+                self.showsSkeleton = skeleton
                 self.displayedEpisodes = episodes
                 self.collectionView.reloadData()
             }
@@ -973,21 +976,17 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
             refreshMembership()
             // A kept group means the same result list grew or reordered;
             // replaying the entrance would fade the cards under it.
-            needsEntrance = !signature.isEmpty && !keptGroup
+            needsEntrance = !skeleton && !signature.isEmpty && !keptGroup
             playEntranceIfNeeded()
         }
     }
 
-    private func renderStatus() {
+    private func renderStatus(skeleton: Bool) {
         let phase = viewModel.episodesPhase
-        if phase == .loading {
-            spinner.startAnimating()
-            spinner.isAccessibilityElement = true
-            spinner.accessibilityLabel = SearchResultState.searchingAnnouncement(query: viewModel.searchText)
-            view.bringSubviewToFront(spinner)
-        } else {
-            spinner.stopAnimating()
-            spinner.isAccessibilityElement = false
+        collectionView.isAccessibilityElement = skeleton
+        collectionView.accessibilityLabel = skeleton
+            ? SearchResultState.searchingAnnouncement(query: viewModel.searchText) : nil
+        if phase != .loading {
             view.bringSubviewToFront(statusView)
         }
         if case .loaded = phase {
@@ -1032,7 +1031,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     func collectionView(
         _ collectionView: UICollectionView, numberOfItemsInSection section: Int
     ) -> Int {
-        displayedEpisodes.count
+        showsSkeleton ? Self.skeletonRowCount : displayedEpisodes.count
     }
 
     func collectionView(
@@ -1041,6 +1040,10 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: EpisodeCardCell.reuseIdentifier, for: indexPath
         ) as! EpisodeCardCell
+        if showsSkeleton {
+            cell.configureSkeleton()
+            return cell
+        }
         if displayedEpisodes.indices.contains(indexPath.item) {
             binder.configure(
                 cell: cell,

@@ -34,6 +34,8 @@ final class PodcastCardCell: UICollectionViewCell {
     private let titleLabel = UILabel()
     private let descriptionLabel = UILabel()
     private let separator = UIView()
+    /// Created on the first skeleton; loaded rows never carry it.
+    private var skeletonView: SkeletonBlocksView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -46,6 +48,7 @@ final class PodcastCardCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         onTap = nil
+        skeletonView?.isHidden = true
         setPosition(isFirst: false, isLast: false)
         coverView.kf.cancelDownloadTask()
         // A reused cell must never inherit a card-entrance pose.
@@ -54,16 +57,31 @@ final class PodcastCardCell: UICollectionViewCell {
         contentView.transform = .identity
     }
 
-    /// A static placeholder row at the real row height (title on one line,
-    /// description on two): the loading rule's skeleton, no shimmer.
+    /// The loading row: the real row configured with placeholder text that
+    /// is never drawn (title on one line, description on two), under the
+    /// shared skeleton drawn from the real cover and label frames.
     func configureSkeleton() {
         content = nil
         coverView.kf.cancelDownloadTask()
         coverView.image = nil
-        titleLabel.setSkeletonBar("Placeholder channel title")
-        descriptionLabel.setSkeletonBar("Placeholder description that runs long\nand a second line")
+        titleLabel.text = "Placeholder channel title"
+        descriptionLabel.text = "Placeholder description that runs long\nand a second line"
+        for view in [coverView, titleLabel, descriptionLabel] { view.alpha = 0 }
+        let overlay = skeletonView ?? contentView.installSkeletonOverlay()
+        skeletonView = overlay
+        overlay.shapes = [.cover(coverView), .lines(titleLabel, [0.55]), .lines(descriptionLabel, [1, 0.7])]
+        overlay.isHidden = false
+        overlay.setNeedsLayout()
         contentView.isUserInteractionEnabled = false
         contentView.isAccessibilityElement = false
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if let skeletonView, !skeletonView.isHidden {
+            contentView.layoutIfNeeded()
+            skeletonView.refreshBlocks()
+        }
     }
 
     func configure(_ content: PodcastCardContent) {
@@ -72,8 +90,10 @@ final class PodcastCardCell: UICollectionViewCell {
         contentView.isAccessibilityElement = true
         contentView.accessibilityLabel = content.title
 
-        titleLabel.setRealText(content.title)
-        descriptionLabel.setRealText(content.description)
+        skeletonView?.isHidden = true
+        for view in [coverView, titleLabel, descriptionLabel] { view.alpha = 1 }
+        titleLabel.text = content.title
+        descriptionLabel.text = content.description
 
         coverView.setArtwork(content.imageURL.flatMap(URL.init(string:)), title: content.title, side: Self.coverSide)
     }

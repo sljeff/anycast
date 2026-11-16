@@ -411,15 +411,11 @@ final class ChannelViewController: UIViewController {
         headerView?.configure(channel: viewModel.channel, dominant: viewModel.dominantColor)
         renderActionRow()
 
-        // The loading rule: with a title and no rows yet, static skeleton
-        // rows appear only after 300 ms; rows already on hand (the inbox's
-        // own, or a finished fetch) show at once. No list spinner.
+        // The loading rule: with a title and no rows yet, the shared
+        // skeleton appears only after 300 ms; rows already on hand (the
+        // inbox's own, or a finished fetch) show at once. No list spinner.
         let waitingEmpty = viewModel.episodes.isEmpty && viewModel.isLoading && viewModel.hasTitle
-        if waitingEmpty {
-            skeletonDelay.start { [weak self] in self?.render() }
-        } else {
-            skeletonDelay.cancel()
-        }
+        skeletonDelay.update(isLoading: waitingEmpty) { [weak self] in self?.render() }
         let skeleton = ChannelBodyReducer.display(
             hasEpisodes: !viewModel.episodes.isEmpty, isLoading: viewModel.isLoading,
             hasTitle: viewModel.hasTitle, skeletonDue: skeletonDelay.isDue

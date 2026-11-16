@@ -296,6 +296,26 @@ struct PlaylistActionGroupTests {
         #expect(host.list.presentedViewController == nil)
     }
 
+    @Test("Playlist is local: no loading state, and the empty state waits for the first read")
+    func noLoadingState() async throws {
+        let host = try await Host.make(count: 0)
+        defer { host.close() }
+        let fresh = PlaylistEpisodeListViewController(context: host.context, playlistId: 1)
+        fresh.loadViewIfNeeded()
+        // The first read has not resolved yet.
+        #expect(!descendants(fresh.view).contains { $0 is UIActivityIndicatorView }, "no spinner while loading")
+        #expect(!descendants(fresh.view).contains { $0 is SkeletonBlocksView }, "no skeleton while loading")
+        let empties = descendants(fresh.view).compactMap { $0 as? EmptyStateView }
+        #expect(!empties.isEmpty && empties.allSatisfy(\.isHidden), "no empty state before the read resolves")
+
+        // The view's own first read lands; nothing is shown while it waits.
+        for _ in 0..<100 where empties.allSatisfy(\.isHidden) {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(!descendants(fresh.view).contains { $0 is UIActivityIndicatorView })
+        #expect(empties.contains { !$0.isHidden }, "the empty state appears once the read says empty")
+    }
+
     private func descendants(_ view: UIView) -> [UIView] {
         view.subviews.flatMap { [$0] + descendants($0) }
     }

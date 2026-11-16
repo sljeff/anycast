@@ -50,7 +50,6 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
 
     private let collectionView = ListActionCollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
     var edgeScrollView: UIScrollView { collectionView }
-    private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyState = EmptyStateView()
     private let emptyExploreButton = UIButton(type: .system)
     /// Weak "Listening history" link under the empty state; shown only when
@@ -71,11 +70,10 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     private var draggedPull: CGFloat = 0
     private var firedPullHaptic = false
     private var emptyTopConstraint: NSLayoutConstraint?
-    private var spinnerCenterConstraint: NSLayoutConstraint?
 
     /// Height of the pinned chrome this list runs under (set by the host;
-    /// 0 when nothing overlaps). It pushes the first row, the empty state
-    /// and the spinner back below the chrome, so the resting layout is the
+    /// 0 when nothing overlaps). It pushes the first row, and the empty
+    /// state back below the chrome, so the resting layout is the
     /// one the list had when it started under the chrome.
     var topChromeInset: CGFloat = 0 {
         didSet { applyTopChromeInset(from: oldValue) }
@@ -116,7 +114,6 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
 
         buildCollectionView()
         buildEmptyState()
-        buildSpinner()
         configureDataSource()
         configureActionController()
 
@@ -187,19 +184,6 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         collectionView.contentInset.top = topChromeInset
     }
 
-    private func buildSpinner() {
-        spinner.color = Theme.primary
-        spinner.hidesWhenStopped = true
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(spinner)
-        let centerY = spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: topChromeInset / 2)
-        spinnerCenterConstraint = centerY
-        NSLayoutConstraint.activate([
-            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            centerY,
-        ])
-    }
-
     private func applyTopChromeInset(from previous: CGFloat) {
         guard isViewLoaded else { return }
         let wasAtTop = collectionView.contentOffset.y <= -collectionView.adjustedContentInset.top + 0.5
@@ -208,7 +192,6 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             collectionView.contentOffset.y = -collectionView.adjustedContentInset.top
         }
         emptyTopConstraint?.constant = topChromeInset
-        spinnerCenterConstraint?.constant = topChromeInset / 2
     }
 
     /// "Nothing queued." The queue is filled from the Inbox, so the action
@@ -443,9 +426,10 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         collectionView.alpha = 1
     }
 
+    /// The playlist is local: it shows no loading state at all. Until the
+    /// first read resolves, the page is blank; the empty state appears only
+    /// once the read says there is nothing.
     private func renderLoadingState() {
-        spinner.isHidden = !isLoading
-        if isLoading { spinner.startAnimating() } else { spinner.stopAnimating() }
         emptyState.isHidden = isLoading || !episodes.isEmpty
         if !emptyState.isHidden { refreshEmptyAction() }
         emptyHistoryLink.refresh(pageIsEmpty: !isLoading && episodes.isEmpty, database: context.database)

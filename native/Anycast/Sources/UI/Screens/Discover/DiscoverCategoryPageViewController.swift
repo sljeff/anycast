@@ -2,7 +2,7 @@ import UIKit
 import AnycastKit
 
 /// One Discover category page (discover.dart:56-103): the per-category
-/// `listChannelsByCategoryId` PodcastCard list with a loading spinner and
+/// `listChannelsByCategoryId` PodcastCard list with the shared loading skeleton and
 /// the centered empty / failed state. No pull-to-refresh (03 §3.3).
 @MainActor
 final class DiscoverCategoryPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
@@ -177,11 +177,7 @@ final class DiscoverCategoryPageViewController: UIViewController, UICollectionVi
         // The skeleton clock runs only while there is nothing to show and a
         // fetch is in flight.
         let waitingEmpty = model.isFetching && model.channels.isEmpty
-        if waitingEmpty {
-            skeletonDelay.start { [weak self] in self?.render() }
-        } else {
-            skeletonDelay.cancel()
-        }
+        skeletonDelay.update(isLoading: waitingEmpty) { [weak self] in self?.render() }
         let display = model.display(skeletonDue: skeletonDelay.isDue)
 
         errorState.isHidden = display != .emptyError

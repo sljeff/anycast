@@ -129,7 +129,6 @@ final class HistoryDialogViewController: UIViewController {
 
     private let titleLabel = UILabel()
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
-    private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyView = EmptyStateView()
     private let bottomFade = ScrollEdgeFade(edge: .bottom, color: Theme.background)
     private let footerStack = UIStackView()
@@ -207,11 +206,6 @@ final class HistoryDialogViewController: UIViewController {
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(titleLabel)
 
-        spinner.color = Theme.primary
-        spinner.hidesWhenStopped = true
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(spinner)
-
         emptyView.isHidden = true
         emptyView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyView)
@@ -244,9 +238,6 @@ final class HistoryDialogViewController: UIViewController {
             emptyView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             emptyView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             emptyView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-
-            spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
 
             // 28 from the view's bottom edge, but never closer than md to the
             // safe-area bottom (home-indicator devices keep the 28).
@@ -484,8 +475,6 @@ final class HistoryDialogViewController: UIViewController {
         emptyView.isHidden = false
         UIView.performWithoutAnimation {
             self.collectionView.isHidden = true
-            self.spinner.stopAnimating()
-            self.spinner.isHidden = true
         }
         UIView.animate(
             withDuration: Motion.quick,
@@ -502,9 +491,9 @@ final class HistoryDialogViewController: UIViewController {
         }
     }
 
+    /// History is local: no loading state. The page stays blank until the
+    /// read resolves; the empty state appears only after it says empty.
     private func renderStates() {
-        spinner.isHidden = !isLoading
-        if isLoading { spinner.startAnimating() } else { spinner.stopAnimating() }
         let isEmpty = !isLoading && episodes.isEmpty
         renderEmptyState()
         emptyView.isHidden = !isEmpty

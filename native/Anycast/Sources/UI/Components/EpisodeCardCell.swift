@@ -179,6 +179,8 @@ final class EpisodeCardCell: UICollectionViewCell, ListActionGapHosting {
     /// restart an in-flight cover download from zero each time.
     private var renderedCoverURL: URL?
     private var showsProgress = false
+    /// Created on the first skeleton; loaded cards never carry it.
+    private var skeletonView: SkeletonBlocksView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -199,6 +201,7 @@ final class EpisodeCardCell: UICollectionViewCell, ListActionGapHosting {
         onCardTap = nil
         onDownloadTap = nil
         menuActions = []
+        skeletonView?.isHidden = true
         layer.removeAllAnimations()
         alpha = 1
         // A reused cell must never inherit a card-entrance pose.
@@ -226,11 +229,9 @@ final class EpisodeCardCell: UICollectionViewCell, ListActionGapHosting {
         menuActions = actions
         contentView.isUserInteractionEnabled = true
         contentView.accessibilityElementsHidden = false
-        titleLabel.setRealText(content.title)
-        rightTextLabel.setRealText(content.rightText)
+        endSkeleton()
         titleLabel.textColor = TypographyV2.emphasis.color
         rightTextLabel.textColor = TypographyV2.meta.color
-        coverView.alpha = 1
         applyLayout(content.layout)
 
         titleText = content.title
@@ -463,21 +464,47 @@ final class EpisodeCardCell: UICollectionViewCell, ListActionGapHosting {
         configureDownload(display)
     }
 
-    /// The same plate, cover and text constraints as loaded Show cards.
+    /// The loading card: the Show card itself, configured with placeholder
+    /// text that is never drawn, under the shared skeleton. The cover, the
+    /// two title lines and the meta line are blocks drawn from the real
+    /// views' frames, so the card is the loaded card's size and shape.
     func configureSkeleton() {
         configure(EpisodeCardContent(
-            title: "Placeholder episode title text", channelTitle: "", rightText: "Placeholder meta",
+            title: Self.skeletonTitle, channelTitle: "", rightText: "Placeholder meta",
             descriptionHTML: nil, imageURL: nil, showsChannel: false, layout: .show
         ), actions: [])
-        titleLabel.setSkeletonBar("Placeholder episode title text")
-        rightTextLabel.setSkeletonBar("Placeholder meta")
         coverView.kf.cancelDownloadTask()
         coverView.image = nil
         renderedCoverURL = nil
+        for view in [coverView, titleLabel, rightTextLabel] { view.alpha = 0 }
+        let overlay = skeletonView ?? cardContainer.installSkeletonOverlay()
+        skeletonView = overlay
+        overlay.shapes = [.cover(coverView), .lines(titleLabel, [1, 0.6]), .lines(rightTextLabel, [1])]
+        overlay.isHidden = false
+        overlay.setNeedsLayout()
         contentView.isUserInteractionEnabled = false
         contentView.accessibilityElementsHidden = true
         onCardTap = nil
         onCoverTap = nil
+    }
+
+    /// Long enough to fill the two title lines at any phone width.
+    private static let skeletonTitle = String(repeating: "Placeholder episode title ", count: 5)
+
+    /// Real content takes the card back from the skeleton.
+    private func endSkeleton() {
+        skeletonView?.isHidden = true
+        for view in [coverView, titleLabel, rightTextLabel] { view.alpha = 1 }
+    }
+
+    /// The skeleton's blocks follow the real views' frames, so they refresh
+    /// after this card's own layout.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if let skeletonView, !skeletonView.isHidden {
+            contentView.layoutIfNeeded()
+            skeletonView.refreshBlocks()
+        }
     }
 
     // MARK: - Build
