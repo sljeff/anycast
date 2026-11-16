@@ -119,9 +119,9 @@ struct ReuseStateResetTests {
         podcast.prepareForReuse()
         expectPoseReset(podcast)
 
-        // The Channel row's skeleton fade animates the cell itself and the
+        // The Channel card's skeleton fade animates the cell itself and the
         // staggered arrival the content view — both must reset.
-        let row = ChannelEpisodeRowCell(frame: CGRect(x: 0, y: 0, width: 358, height: 70))
+        let row = EpisodeCardCell(frame: CGRect(x: 0, y: 0, width: 358, height: EpisodeCardCell.showRowHeight))
         taint(row, includeSelf: true)
         row.prepareForReuse()
         expectPoseReset(row, includeSelf: true)

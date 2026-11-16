@@ -66,7 +66,7 @@ nonisolated enum Typography {
     /// HTML render error text — 12pt roboto mono, red (formatters renderHtml).
     static let htmlError = Style(
         postScriptName: "RobotoMono-Regular", size: 12, kern: 0,
-        color: .systemRed, scalingTextStyle: .caption1
+        color: Theme.error, scalingTextStyle: .caption1
     )
 
     /// All semantic styles, for tests and enumerations.

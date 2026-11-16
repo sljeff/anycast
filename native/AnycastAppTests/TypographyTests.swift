@@ -89,15 +89,6 @@ struct TypographyTests {
         #expect(IconMetrics.diameter(44, style: TypographyV2.body, compatibleWith: accessibility) > 44)
     }
 
-    @Test("Brand SVG imagesets are present as template images")
-    func brandAssetsResolve() {
-        for name in ["BrandaiChat", "BrandaiTranscript"] {
-            let image = UIImage(named: name)
-            #expect(image != nil, "\(name) missing from asset catalog")
-            #expect(image?.renderingMode == .alwaysTemplate || image?.renderingMode == .automatic)
-        }
-    }
-
     @Test("v2 semantic tokens resolve both appearances exactly")
     func v2SemanticTokensResolveDualAppearance() {
         let light = UITraitCollection(userInterfaceStyle: .light)
@@ -121,7 +112,6 @@ struct TypographyTests {
         assertEqual(Theme.outline, light: f(0xDAD9D6), dark: f(0x3B3A37), "outline")
         assertEqual(Theme.tertiary, light: f(0xEF5F00), dark: f(0xFF8B3E), "tertiary")
         assertEqual(Theme.error, light: f(0xBA1A1A), dark: f(0xFF8B8B), "error")
-        assertEqual(AnycastColor.grass9, light: f(0x46A758), dark: f(0x63C174), "grass9")
         assertEqual(Theme.playerWarm, light: f(0x867D75), dark: f(0x867D75), "playerWarm (fixed)")
     }
 

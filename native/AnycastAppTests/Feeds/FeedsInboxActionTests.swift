@@ -213,105 +213,51 @@ struct FeedsInboxActionTests {
         #expect(row.playedDuration == 0)
     }
 
-    // MARK: - Fly-in origin (swipe displacement)
-
-    /// The full leading swipe displaces the row toward the trailing edge,
-    /// and on device BOTH the cell and its layout attributes report the
-    /// displaced position at action time — the ball visibly launched from
-    /// the screen's right edge across two fix attempts. The origin's X
-    /// must therefore never come from the item: it is the collection
-    /// view's horizontal center BY CONSTRUCTION, with only the row's Y
-    /// taken from the item (list swipes translate horizontally only).
-    /// The hosted layout (`DisplacingFlowLayout`) shifts every item's
-    /// attributes horizontally to simulate the device behavior, and the
-    /// live cell is transformed on top of it; the list is scrolled to a
-    /// non-zero offset so the collectionView→window conversion is
-    /// load-bearing. Also pins `perform`'s decision at its own entry: the
-    /// Detail sheet (nil action path) never flies, and a list action
-    /// whose row already left the list drops the flight.
-    @Test("Fly-in origin X is the collection's center regardless of swipe displacement")
-    func flyInOriginIgnoresSwipeDisplacement() throws {
-        // Never shown or made key: layout and coordinate conversion are pure
-        // geometry, and parallel live-shell suites own the key window.
+    @Test("Fly-in starts at the Add circle in window coordinates; Detail and vanished rows never fly")
+    func flyInOriginUsesAddCircle() throws {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
         let host = UIViewController()
         window.rootViewController = host
-
-        let layout = DisplacingFlowLayout()
-        layout.itemSize = CGSize(width: 402, height: 112)
+        let layout = UICollectionViewFlowLayout()
+        layout.itemSize = CGSize(width: 370, height: 112)
         layout.minimumLineSpacing = 12
-        let collectionView = UICollectionView(
-            frame: CGRect(x: 0, y: 0, width: 402, height: 874), collectionViewLayout: layout
-        )
-        // Enough rows that a contentOffset actually sticks.
-        let dataSource = SimpleCollectionDataSource(count: 10)
-        collectionView.dataSource = dataSource
-        collectionView.register(
-            UICollectionViewCell.self, forCellWithReuseIdentifier: "cell"
-        )
-        host.view.addSubview(collectionView)
+        let collection = UICollectionView(frame: window.bounds, collectionViewLayout: layout)
+        let source = SimpleCollectionDataSource(count: 10)
+        collection.dataSource = source
+        collection.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
+        host.view.addSubview(collection)
         window.layoutIfNeeded()
-        collectionView.layoutIfNeeded()
-        // Scroll the list: from here on, collection coordinates and window
-        // coordinates differ by a real offset.
-        collectionView.contentOffset = CGPoint(x: 0, y: 120)
-        collectionView.layoutIfNeeded()
-
+        collection.layoutIfNeeded()
+        collection.contentOffset.y = 120
+        let group = ListActionGroupView(items: [
+            ListActionItem(id: "play", content: .icon(AppIcons.play), accessibilityLabel: "Play", handler: {}),
+            ListActionItem(id: "add", content: .icon(AppIcons.addToList), accessibilityLabel: "Add", handler: {}),
+            ListActionItem(id: "remove", content: .icon(AppIcons.remove), accessibilityLabel: "Remove", handler: {}),
+            ListActionItem(id: "details", content: .title("Details"), accessibilityLabel: "Details", handler: {}),
+        ])
+        group.frame = CGRect(x: 16, y: 300, width: 370, height: 56)
+        collection.addSubview(group)
+        group.layoutIfNeeded()
+        let add = try #require(group.button(for: "add"))
+        let expected = add.convert(CGPoint(x: add.bounds.midX, y: add.bounds.midY), to: window)
         let path = IndexPath(item: 1, section: 0)
-        guard let attributes = collectionView.layoutAttributesForItem(at: path),
-              let cell = collectionView.cellForItem(at: path) else {
-            Issue.record("hosted list did not materialize its cells"); return
-        }
-        let collectionCenterX = collectionView.convert(collectionView.bounds, to: window).midX
-        // The displacing layout must actually be displacing: the item's
-        // attributes sit far from the full-width row's resting center.
-        #expect(abs(attributes.frame.midX - collectionCenterX) > 200,
-                "displacing layout setup is degenerate (attributes midX \(attributes.frame.midX), center \(collectionCenterX))")
-        // The row's Y in window coordinates (the displacing layout only
-        // shifts X, matching a horizontal swipe).
-        let rowMidY = collectionView.convert(CGPoint(x: 0, y: attributes.frame.midY), to: window).y
-        #expect(collectionView.contentOffset.y > 0,
-                "contentOffset did not stick (\(collectionView.contentOffset)) — the conversion probe is vacuous")
-
-        // The displacing layout displaces BOTH layers — the cells' frames
-        // come from the same shifted attributes — so neither the queried
-        // attributes nor the live cell marks the row's X.
-        let displacedCellCenter = cell.convert(
-            CGPoint(x: cell.bounds.midX, y: cell.bounds.midY), to: window
-        )
-        #expect(abs(displacedCellCenter.x - collectionCenterX) > 200,
-                "displacement setup is degenerate (displaced cell \(displacedCellCenter.x), center \(collectionCenterX))")
-
-        let origin = InboxPageViewController.flyInOrigin(
-            in: collectionView, at: path, window: window
-        )
-        #expect(origin != nil, "fly-in origin resolved to nil for a visible item")
-        guard let origin else { return }
-        #expect(abs(origin.x - collectionCenterX) < 0.5 && abs(origin.y - rowMidY) < 0.5,
-                "fly-in origin \(origin) is not (collection center X \(collectionCenterX), row Y \(rowMidY))")
-
-        // perform()'s own decision (resolvedFlyInStart): the Detail sheet
-        // passes a nil action path and must NEVER fly — even though the
-        // episode is still resolvable in the list behind the sheet (the
-        // regression this pins: a Detail add ran the whole ball flight
-        // over the dismissing sheet).
+        let origin = try #require(InboxPageViewController.resolvedFlyInStart(
+            actionPath: path, identityPath: path, in: collection, window: window, addCircle: add
+        ))
+        #expect(abs(origin.x - expected.x) <= 0.5 && abs(origin.y - expected.y) <= 0.5)
+        #expect(abs(origin.x - window.bounds.midX) > 20, "circle origin must not fall back to row center")
+        #expect(collection.contentOffset.y > 0, "coordinate conversion must include scrolling")
         #expect(InboxPageViewController.resolvedFlyInStart(
-            actionPath: nil, identityPath: path, in: collectionView, window: window
-        ) == nil, "a Detail-sheet action (nil action path) resolved a fly-in start")
-        // A list action whose row already left the list (nil identity path
-        // — trim/refresh raced the menu) drops the flight instead of
-        // resolving a stale, possibly out-of-range path.
+            actionPath: nil, identityPath: path, in: collection, window: window, addCircle: add
+        ) == nil)
         #expect(InboxPageViewController.resolvedFlyInStart(
-            actionPath: path, identityPath: nil, in: collectionView, window: window
-        ) == nil, "a vanished row (nil identity path) resolved a fly-in start")
-        // The healthy list path resolves to the same displacement-proof point.
-        let resolved = InboxPageViewController.resolvedFlyInStart(
-            actionPath: path, identityPath: path, in: collectionView, window: window
-        )
-        #expect(resolved != nil
-                && abs(resolved!.x - collectionCenterX) < 0.5
-                && abs(resolved!.y - rowMidY) < 0.5,
-                "the list-path resolution \(String(describing: resolved)) is not (collection center X \(collectionCenterX), row Y \(rowMidY))")
+            actionPath: path, identityPath: nil, in: collection, window: window, addCircle: add
+        ) == nil)
+        // A context-menu/VoiceOver action without an open group retains the
+        // existing row-origin flight; only Detail suppresses it completely.
+        #expect(InboxPageViewController.resolvedFlyInStart(
+            actionPath: path, identityPath: path, in: collection, window: window
+        ) != nil)
     }
 }
 
@@ -331,41 +277,5 @@ private final class SimpleCollectionDataSource: NSObject, UICollectionViewDataSo
         _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
         collectionView.dequeueReusableCell(withReuseIdentifier: "cell", for: indexPath)
-    }
-}
-
-/// Flow layout whose item attributes are shifted horizontally — the hosted
-/// stand-in for the device behavior where a full swipe displaces BOTH the
-/// cell and its layout attributes toward the trailing edge. The shift must
-/// live in `layoutAttributesForElements` too: `UICollectionView`'s public
-/// single-item query reads its internal attributes cache, which is filled
-/// from the elements pass — an `layoutAttributesForItem`-only override is
-/// invisible to that query (verified empirically). Every attribute is
-/// copied before mutation; flow layout hands out cached instances.
-@MainActor
-private final class DisplacingFlowLayout: UICollectionViewFlowLayout {
-
-    private static func displaced(
-        _ attributes: UICollectionViewLayoutAttributes
-    ) -> UICollectionViewLayoutAttributes {
-        attributes.frame.origin.x += 300
-        return attributes
-    }
-
-    private static func displacedCopy(
-        of attributes: UICollectionViewLayoutAttributes
-    ) -> UICollectionViewLayoutAttributes {
-        guard let copy = attributes.copy() as? UICollectionViewLayoutAttributes else {
-            return attributes
-        }
-        return displaced(copy)
-    }
-
-    override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
-        super.layoutAttributesForElements(in: rect)?.map(Self.displacedCopy)
-    }
-
-    override func layoutAttributesForItem(at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
-        super.layoutAttributesForItem(at: indexPath).map(Self.displacedCopy)
     }
 }

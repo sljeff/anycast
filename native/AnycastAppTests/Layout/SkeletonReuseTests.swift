@@ -55,32 +55,35 @@ struct SkeletonReuseTests {
         )
     }
 
-    // MARK: - ChannelEpisodeRowCell (Channel page)
+    // MARK: - EpisodeCardCell .show (Channel page skeleton rows)
 
-    @Test("A channel episode row reused from a skeleton shows the real title and meta")
-    func channelEpisodeRow() {
-        let cell = ChannelEpisodeRowCell(frame: CGRect(x: 0, y: 0, width: 358, height: ChannelEpisodeRowCell.minimumHeight))
+    @Test("A Show card reused from a skeleton shows the real title and meta like a fresh card")
+    func showEpisodeCard() throws {
+        let content = EpisodeCardContent(
+            title: "A real episode title", channelTitle: "Show", rightText: "Nov 14 · 42 min",
+            descriptionHTML: nil, imageURL: nil, showsChannel: false, layout: .show
+        )
+        let frame = CGRect(x: 0, y: 0, width: 358, height: EpisodeCardCell.showRowHeight)
+        let cell = EpisodeCardCell(frame: frame)
         cell.configureSkeleton()
 
-        let cellLabels = labels(in: cell.contentView)
-        #expect(cellLabels.count == 2, "title + meta")
-        let title = cellLabels.first { Self.sameFace($0.font, TypographyV2.emphasis.font()) }
-        let meta = cellLabels.last { Self.sameFace($0.font, TypographyV2.meta.font().monospacedDigits()) }
-        #expect(title != nil)
-        #expect(meta != nil)
-        #expect(title?.textColor == UIColor.clear)
-        #expect(meta?.textColor == UIColor.clear)
+        let skeletonLabels = labels(in: cell.contentView)
+        let barTitle = skeletonLabels.first { $0.text == "Placeholder episode title text" }
+        let barMeta = skeletonLabels.first { $0.text == "Placeholder meta" }
+        #expect(barTitle != nil)
+        #expect(barMeta != nil)
+        // The skeleton really painted bars (the taint this file pins).
+        #expect(barTitle?.textColor == UIColor.clear)
+        #expect(barMeta?.textColor == UIColor.clear)
 
-        cell.configure(title: "A real episode title", meta: "Nov 14 · 42 min")
-
-        expectRealText(
-            title.unsafelyUnwrapped, "A real episode title",
-            baseFont: TypographyV2.emphasis.font(), baseColor: TypographyV2.emphasis.color
-        )
-        expectRealText(
-            meta.unsafelyUnwrapped, "Nov 14 · 42 min",
-            baseFont: TypographyV2.meta.font().monospacedDigits(), baseColor: TypographyV2.meta.color
-        )
+        cell.configure(content, actions: [])
+        let fresh = EpisodeCardCell(frame: frame)
+        fresh.configure(content, actions: [])
+        for text in ["A real episode title", "Nov 14 · 42 min"] {
+            let reused = try #require(labels(in: cell.contentView).first { $0.text == text })
+            let base = try #require(labels(in: fresh.contentView).first { $0.text == text })
+            expectRealText(reused, text, baseFont: base.font, baseColor: base.textColor)
+        }
     }
 
     // MARK: - SearchFeedAddressViewController (pasted address row)

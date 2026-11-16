@@ -79,36 +79,20 @@ enum InboxHeaderStatus {
     }
 }
 
-/// How the inbox card list moves from one render to the next, pure. A list
-/// whose rows only appeared or left (everything else in the same order) is
-/// applied as inserts and removes so unchanged cards stay put; anything else
-/// falls back to a plain `reloadData`.
+/// Identity/section changes need one diffable snapshot. Equal, unambiguous
+/// identities need none, including the database settle after a visual leave.
+/// Diffable owns inserts, deletes and moves; there is no manual batch plan.
 nonisolated enum InboxListDiff {
-
-    enum Plan: Equatable {
-        /// Same rows in the same order: nothing to apply.
-        case unchanged
-        /// Rebuild the whole list.
-        case reload
-        /// Indices in the OLD list to remove and in the NEW list to insert.
-        case batch(removes: [Int], inserts: [Int])
-    }
+    enum Plan: Equatable { case unchanged, applySnapshot }
 
     static func plan(old: [String?], new: [String?], sectionsUnchanged: Bool) -> Plan {
-        guard sectionsUnchanged, !old.isEmpty, !new.isEmpty else { return .reload }
+        guard sectionsUnchanged else { return .applySnapshot }
         let oldURLs = old.compactMap { $0 }
         let newURLs = new.compactMap { $0 }
-        // A nil URL has no identity, a duplicate has an ambiguous one.
         guard oldURLs.count == old.count, newURLs.count == new.count,
               Set(oldURLs).count == oldURLs.count, Set(newURLs).count == newURLs.count
-        else { return .reload }
-        if oldURLs == newURLs { return .unchanged }
-        let oldSet = Set(oldURLs), newSet = Set(newURLs)
-        // Rows that stayed must keep their relative order, else a row moved.
-        guard oldURLs.filter(newSet.contains) == newURLs.filter(oldSet.contains) else { return .reload }
-        let removes = oldURLs.indices.filter { !newSet.contains(oldURLs[$0]) }
-        let inserts = newURLs.indices.filter { !oldSet.contains(newURLs[$0]) }
-        return .batch(removes: removes, inserts: inserts)
+        else { return .applySnapshot }
+        return oldURLs == newURLs ? .unchanged : .applySnapshot
     }
 }
 

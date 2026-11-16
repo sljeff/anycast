@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import AnycastKit
 @testable import Anycast
@@ -120,5 +121,129 @@ struct PlaylistCardDisplayTests {
             played: 25 * 60_000, duration: 100 * 60_000
         )) == 0.25)
         #expect(PlaylistCardDisplay.progressFraction(input(played: nil, duration: nil)) == 0)
+    }
+}
+
+// MARK: - Queue summary footer
+
+@MainActor
+struct PlaylistQueueSummaryTests {
+
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    /// A fixed locale and zone, so the expectation is built from the same
+    /// formatter the production code receives (device short styles differ).
+    private func formatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_GB")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }
+
+    private func row(_ durationMinutes: Int64?, played: Int64? = nil) -> PlaylistQueueSummary.Row {
+        PlaylistQueueSummary.Row(
+            durationMilliseconds: durationMinutes.map { $0 * 60_000 },
+            playedMilliseconds: played.map { $0 * 60_000 }
+        )
+    }
+
+    private func expectedRest(after minutes: Double, speedText: String) -> String {
+        let finish = now.addingTimeInterval(minutes * 60)
+        return " left · done around \(formatter().string(from: finish)) at \(speedText)"
+    }
+
+    @Test("Under an hour reads minutes alone")
+    func underAnHour() throws {
+        let text = try #require(PlaylistQueueSummary.text(
+            rows: [row(60, played: 18)], speed: 1, now: now, timeFormatter: formatter()
+        ))
+        #expect(text.emphasis == "42 m")
+        #expect(text.rest == expectedRest(after: 42, speedText: "1×"))
+        #expect(text.plain == "42 m" + expectedRest(after: 42, speedText: "1×"))
+    }
+
+    @Test("An hour or more reads hours and minutes, summed over the queue")
+    func overAnHour() throws {
+        let text = try #require(PlaylistQueueSummary.text(
+            rows: [row(90), row(45, played: 15)], speed: 1, now: now, timeFormatter: formatter()
+        ))
+        #expect(text.emphasis == "2 h 0 m")
+        #expect(text.rest == expectedRest(after: 120, speedText: "1×"))
+    }
+
+    @Test("Speed shortens the finish time and is named in the line")
+    func speed() throws {
+        let text = try #require(PlaylistQueueSummary.text(
+            rows: [row(90)], speed: 1.5, now: now, timeFormatter: formatter()
+        ))
+        #expect(text.emphasis == "1 h 30 m", "the amount left is wall-clock independent")
+        #expect(text.rest == expectedRest(after: 60, speedText: "1.5×"))
+        // A nonsensical speed falls back to 1×.
+        let fallback = try #require(PlaylistQueueSummary.text(
+            rows: [row(30)], speed: 0, now: now, timeFormatter: formatter()
+        ))
+        #expect(fallback.rest == expectedRest(after: 30, speedText: "1×"))
+    }
+
+    @Test("Over-played and unknown rows contribute nothing")
+    func clamping() throws {
+        let rows = [row(10, played: 30), row(nil, played: 5), row(20)]
+        #expect(PlaylistQueueSummary.remainingMilliseconds(rows: rows) == 20 * 60_000)
+        let text = try #require(PlaylistQueueSummary.text(
+            rows: rows, speed: 1, now: now, timeFormatter: formatter()
+        ))
+        #expect(text.emphasis == "20 m")
+    }
+
+    @Test("Empty and finished queues have no line")
+    func hidden() {
+        #expect(PlaylistQueueSummary.text(rows: [], speed: 1, now: now, timeFormatter: formatter()) == nil)
+        #expect(PlaylistQueueSummary.text(
+            rows: [row(10, played: 10), row(nil)], speed: 1, now: now, timeFormatter: formatter()
+        ) == nil)
+    }
+}
+
+// MARK: - Pull-up to History
+
+@MainActor
+struct PlaylistHistoryPullTests {
+
+    @Test("Overscroll is measured from the real maximum offset")
+    func overscroll() {
+        // Content 1000, viewport 800, adjusted insets 100 top / 34 bottom:
+        // the maximum offset is 1000 - 800 + 34 = 234.
+        func over(_ offsetY: CGFloat, bottom: CGFloat = 34, content: CGFloat = 1000) -> CGFloat {
+            PlaylistHistoryPull.overscroll(
+                offsetY: offsetY, contentHeight: content, viewportHeight: 800,
+                adjustedInsetTop: 100, adjustedInsetBottom: bottom
+            )
+        }
+        #expect(over(0) == 0)
+        #expect(over(234) == 0)
+        #expect(over(270) == 36)
+        // An open action group extends the bottom inset: the same offset is
+        // then inside the content, not a pull.
+        #expect(over(270, bottom: 154) == 0)
+        #expect(over(354, bottom: 154) == 0)
+        #expect(over(426, bottom: 154) == 72)
+        // A short list rests at its minimum offset (-top), so any drag up
+        // past it is a pull.
+        #expect(over(-100, content: 300) == 0)
+        #expect(over(-28, content: 300) == 72)
+    }
+
+    @Test("Progress runs 0…1 over 72 pt and a release opens only at full pull")
+    func progressAndRelease() {
+        #expect(PlaylistHistoryPull.progress(overscroll: 0) == 0)
+        #expect(PlaylistHistoryPull.progress(overscroll: -20) == 0)
+        #expect(PlaylistHistoryPull.progress(overscroll: 36) == 0.5)
+        #expect(PlaylistHistoryPull.progress(overscroll: 72) == 1)
+        #expect(PlaylistHistoryPull.progress(overscroll: 500) == 1)
+        #expect(PlaylistHistoryPull.progress(overscroll: .infinity) == 0)
+        #expect(!PlaylistHistoryPull.opensOnRelease(progress: 0.99))
+        #expect(PlaylistHistoryPull.opensOnRelease(progress: 1))
     }
 }

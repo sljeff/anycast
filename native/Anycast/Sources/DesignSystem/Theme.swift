@@ -116,7 +116,6 @@ nonisolated enum AnycastColor {
     static let goldDark10 = UIColor(named: "GoldDark10")!
     static let goldSoft = UIColor(named: "GoldSoft")!
     static let orange10 = UIColor(named: "Orange10")!
-    static let grass9 = UIColor(named: "Grass9")!
 
     static let sandAlpha2 = UIColor(named: "SandAlpha2")!
     static let sandAlpha3 = UIColor(named: "SandAlpha3")!

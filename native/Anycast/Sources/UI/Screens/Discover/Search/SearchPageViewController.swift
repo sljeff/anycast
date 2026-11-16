@@ -13,9 +13,8 @@ import AnycastKit
 /// shown in that search; a segment that already loaded (including zero
 /// rows) is shown again with no spinner and no request, and a segment that
 /// failed is fetched again on the next visit. The Episodes page renders
-/// episode cards with play / add-to-playlist (UNGATED add — the SearchPage
-/// correction) through a fresh CardExpandCoordinator per search. The mini
-/// player comes from the shell, as on every tab.
+/// covered episode cards whose list-owned group offers Play · Add · Details.
+/// The mini player comes from the shell, as on every tab.
 @MainActor
 final class SearchPageViewController: UIViewController, UISearchBarDelegate {
 
@@ -774,8 +773,7 @@ final class SearchChannelsPageViewController: UIViewController, UICollectionView
 
 // MARK: - Episodes page (discover.dart:204-293)
 
-/// Episode cards with the play / unguarded add-to-playlist actions; one
-/// fresh CardExpandCoordinator per SearchPage (Get.put per build).
+/// Covered episode cards with the list-owned Play · Add · Details group.
 @MainActor
 final class SearchEpisodesPageViewController: UIViewController, UICollectionViewDataSource, ScrollEdgePage {
 
@@ -786,18 +784,20 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     private let context: UIContext
     private let viewModel: SearchPageViewModel
 
-    private let collectionView: UICollectionView
+    private let collectionView: ListActionCollectionView
     private let spinner = UIActivityIndicatorView(style: .large)
     private let statusView = SearchSegmentStatusView()
     private var statusTop: NSLayoutConstraint?
-    private let expandCoordinator = CardExpandCoordinator()
     /// Needs `self` as owner — created lazily (post-super.init).
     private lazy var binder = SearchEpisodeBinder(
         owner: self,
         context: context,
-        htmlRenderer: HTMLContentRenderer(),
-        expandCoordinator: expandCoordinator
+        htmlRenderer: HTMLContentRenderer()
     )
+    private(set) var actionController: ListActionController!
+    /// The results the collection view currently shows; the data source and
+    /// the action controller's identity lookups read this, not the model.
+    private(set) var displayedEpisodes: [APIClient.EpisodeWithChannel] = []
     private let playbackObservation = ObservationLoop()
     private let modelObservation = ObservationLoop()
     private var lastEpisodeSignature: [String?] = []
@@ -809,7 +809,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     init(context: UIContext, viewModel: SearchPageViewModel) {
         self.context = context
         self.viewModel = viewModel
-        collectionView = UICollectionView(
+        collectionView = ListActionCollectionView(
             frame: .zero,
             collectionViewLayout: SearchChannelsPageViewController.makeEpisodeListLayout()
         )
@@ -914,6 +914,40 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         ])
 
         binder.onListContentChanged = { [weak self] in self?.refreshVisibleCards() }
+
+        actionController = ListActionController(
+            collectionView: collectionView,
+            itemsProvider: { [weak self] id in
+                guard let self, let item = self.displayedEpisodes.first(where: { $0.episode.enclosureUrl == id })
+                else { return [] }
+                return self.binder.groupItems(for: item)
+            },
+            idAt: { [weak self] path in
+                guard let self, path.section == 0, self.displayedEpisodes.indices.contains(path.item),
+                      let url = self.displayedEpisodes[path.item].episode.enclosureUrl, !url.isEmpty
+                else { return nil }
+                return url
+            },
+            indexPathFor: { [weak self] id in
+                guard let index = self?.displayedEpisodes.firstIndex(where: { $0.episode.enclosureUrl == id })
+                else { return nil }
+                return IndexPath(item: index, section: 0)
+            },
+            safeArea: { [weak self] in self?.actionSafeLines() ?? (0, 0) }
+        )
+        binder.actionController = actionController
+        actionController.onGroupUpdate = { [weak self] in self?.binder.refreshGroup() }
+    }
+
+    /// Top: under the header chrome. Bottom: the shell's bottom chrome when
+    /// in it, else the safe-area bottom — minus the 52 pt toast slot.
+    private func actionSafeLines() -> (top: CGFloat, bottom: CGFloat) {
+        var bottom = collectionView.bounds.height - collectionView.safeAreaInsets.bottom
+        if let shell = tabBarController as? MainTabBarController,
+           let line = shell.bottomChromeTopY(in: collectionView) {
+            bottom = line - collectionView.bounds.minY
+        }
+        return (collectionView.adjustedContentInset.top, bottom - 52)
     }
 
     private func render() {
@@ -922,11 +956,24 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         let signature = viewModel.episodes.map(\.episode.enclosureUrl)
         if signature != lastEpisodeSignature {
             lastEpisodeSignature = signature
-            UIView.performWithoutAnimation {
-                collectionView.reloadData()
+            let episodes = viewModel.episodes
+            let apply = {
+                self.displayedEpisodes = episodes
+                self.collectionView.reloadData()
+            }
+            var keptGroup = false
+            if actionController.selectedID != nil {
+                // The open group stays with its episode while the reload
+                // still contains it, and closes when it does not.
+                actionController.itemsDidChange(apply: apply)
+                keptGroup = actionController.selectedID != nil
+            } else {
+                UIView.performWithoutAnimation(apply)
             }
             refreshMembership()
-            needsEntrance = !signature.isEmpty
+            // A kept group means the same result list grew or reordered;
+            // replaying the entrance would fade the cards under it.
+            needsEntrance = !signature.isEmpty && !keptGroup
             playEntranceIfNeeded()
         }
     }
@@ -970,12 +1017,12 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
 
     private func refreshVisibleCards() {
         for path in collectionView.indexPathsForVisibleItems {
-            guard viewModel.episodes.indices.contains(path.item),
+            guard displayedEpisodes.indices.contains(path.item),
                   let cell = collectionView.cellForItem(at: path) as? EpisodeCardCell
             else { continue }
             binder.configure(
                 cell: cell,
-                item: viewModel.episodes[path.item],
+                item: displayedEpisodes[path.item],
                 at: path,
                 in: collectionView
             )
@@ -985,7 +1032,7 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
     func collectionView(
         _ collectionView: UICollectionView, numberOfItemsInSection section: Int
     ) -> Int {
-        viewModel.episodes.count
+        displayedEpisodes.count
     }
 
     func collectionView(
@@ -994,10 +1041,10 @@ final class SearchEpisodesPageViewController: UIViewController, UICollectionView
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: EpisodeCardCell.reuseIdentifier, for: indexPath
         ) as! EpisodeCardCell
-        if viewModel.episodes.indices.contains(indexPath.item) {
+        if displayedEpisodes.indices.contains(indexPath.item) {
             binder.configure(
                 cell: cell,
-                item: viewModel.episodes[indexPath.item],
+                item: displayedEpisodes[indexPath.item],
                 at: indexPath,
                 in: collectionView
             )

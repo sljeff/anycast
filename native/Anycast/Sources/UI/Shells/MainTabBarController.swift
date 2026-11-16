@@ -229,6 +229,20 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         return playerBar.isHidden ? tabBar.topAnchor : playerBar.topAnchor
     }
 
+    /// The `bottomChromeTopAnchor` line as a y in `target`'s coordinates,
+    /// read from frames (no constraint across hierarchies); nil when
+    /// `target` is not in this shell's window.
+    func bottomChromeTopY(in target: UIView) -> CGFloat? {
+        guard let window = view.window, target.window === window else { return nil }
+        view.layoutIfNeeded()
+        if #available(iOS 26.0, *) {
+            guard let owner = contentLayoutGuide.owningView ?? view else { return nil }
+            return owner.convert(CGPoint(x: 0, y: contentLayoutGuide.layoutFrame.maxY), to: target).y
+        }
+        let bar: UIView = playerBar.isHidden ? tabBar : playerBar
+        return bar.convert(CGPoint.zero, to: target).y
+    }
+
     // MARK: - Bottom bar fade (iOS 26+)
 
     /// A page-background gradient behind the system bars and above the tab

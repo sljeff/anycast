@@ -142,11 +142,11 @@ struct ShowsShelfTests {
     func shelfHiddenWithoutSubscriptions() {
         #expect(
             InboxPageViewController.sections(hasShelf: false, hasStrip: false, hasCards: true)
-                == [.cards, .tail]
+                == [.cards]
         )
         #expect(
             InboxPageViewController.sections(hasShelf: true, hasStrip: false, hasCards: true)
-                == [.shelf, .cards, .tail]
+                == [.shelf, .cards]
         )
     }
 

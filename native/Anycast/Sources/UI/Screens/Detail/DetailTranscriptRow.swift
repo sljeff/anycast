@@ -409,10 +409,8 @@ final class DetailTranscriptRow: UIView {
     private static func image(for symbol: DetailTranscriptContent.Symbol, reduceMotion: Bool) -> UIImage? {
         let image: UIImage?
         switch symbol {
-        case .sparkle:
+        case .sparkle, .lines:
             image = AppIcons.aiTranscript
-        case .lines:
-            image = AppIcons.transcriptLines
         case .warning:
             image = AppIcons.transcriptFailed
         case .spinner:

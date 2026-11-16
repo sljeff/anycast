@@ -83,11 +83,11 @@ nonisolated enum IconMetrics {
         )
     }
 
-    /// Settings disclosure. Footnote is 13 pt semibold at the default size
+    /// Settings disclosure. Footnote is 13 pt medium at the default size
     /// and tracks Dynamic Type when assigned as `preferredSymbolConfiguration`.
     static func disclosureConfiguration() -> UIImage.SymbolConfiguration {
         UIImage.SymbolConfiguration(textStyle: .footnote)
-            .applying(UIImage.SymbolConfiguration(weight: .semibold))
+            .applying(UIImage.SymbolConfiguration(weight: .medium))
     }
 
     /// Settings avatar glyph. Title2 is 22 pt at the default size.
@@ -120,42 +120,16 @@ final class MinimumHitAreaView: UIView {
 
 extension UIImage {
 
-    /// Symbol images take `pointSize` / `weight`. Brand imagesets ignore
-    /// `SymbolConfiguration`, so they are redrawn into a `pointSize` box
-    /// (template) and tinted by the host. Empty images pass through.
+    /// Applies `pointSize` / `weight` to a symbol image. Non-symbol and
+    /// empty images pass through.
     func withIconMetrics(
         pointSize: CGFloat,
         weight: UIImage.SymbolWeight,
         compatibleWith traits: UITraitCollection
     ) -> UIImage {
-        guard pointSize > 0 else { return self }
-        if isSymbolImage {
-            let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
-            return applyingSymbolConfiguration(configuration) ?? self
-        }
-        guard size.width > 0, size.height > 0 else { return self }
-        let format = UIGraphicsImageRendererFormat(for: traits)
-        let renderer = UIGraphicsImageRenderer(
-            size: CGSize(width: pointSize, height: pointSize),
-            format: format
-        )
-        let rendered = renderer.image { _ in
-            withTintColor(.black, renderingMode: .alwaysOriginal)
-                .draw(in: CGRect(x: 0, y: 0, width: pointSize, height: pointSize))
-        }
-        return rendered.withRenderingMode(.alwaysTemplate)
-    }
-
-    /// Strip glyph: symbols stay symbols (the button's symbol configuration
-    /// sizes them); brand imagesets are drawn at the scaled 16 pt box.
-    func preparedStripIcon(compatibleWith traits: UITraitCollection) -> UIImage {
-        if isSymbolImage || size == .zero { return self }
-        let point = IconMetrics.scaledUp(
-            IconMetrics.stripPointSize,
-            style: TypographyV2.body,
-            compatibleWith: traits
-        )
-        return withIconMetrics(pointSize: point, weight: .medium, compatibleWith: traits)
+        guard pointSize > 0, isSymbolImage else { return self }
+        let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+        return applyingSymbolConfiguration(configuration) ?? self
     }
 }
 

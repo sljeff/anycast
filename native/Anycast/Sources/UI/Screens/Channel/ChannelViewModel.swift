@@ -425,6 +425,18 @@ final class ChannelViewModel {
     }
 }
 
+#if DEBUG
+extension ChannelViewModel {
+    /// Installs a loaded feed without the network (hosted list tests).
+    func loadForTests(episodes: [FeedEpisodeRow]) {
+        self.episodes = episodes
+        isLoading = false
+        fetchFailed = false
+        subscriptionChecked = true
+    }
+}
+#endif
+
 // MARK: - Session store (K34)
 
 /// rssFeedURL-keyed cache of channel view models, kept across sheet closes

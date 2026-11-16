@@ -246,16 +246,15 @@ enum AITranscriptDisplay: Equatable {
         case .failed:
             return AppIcons.transcriptFailed
         case .default, .processing, .unknown:
-            return AppIcons.aiTranscript ?? UIImage()
+            return AppIcons.aiTranscript
         }
     }
 
-    /// Succeeded/failed tint (grass9 dark 0x63C174 — the same green the
-    /// download-done check uses — / the dark error red) — the processing
+    /// Succeeded tints in ink, failed in the error role — the processing
     /// state renders the robot lottie, not a tinted icon.
     var tintColor: UIColor {
         switch self {
-        case .succeeded: return AnycastColor.grass9
+        case .succeeded: return Theme.onSurface
         case .failed: return Theme.error
         default: return Theme.onSurface
         }
@@ -340,5 +339,106 @@ enum PlaylistRemovalLogic {
         _ row: PlaylistEpisodeRow, at index: Int, playlistId: Int64, repository: PlaylistRepository
     ) async {
         try? await repository.insertOrUpdateByIndex(row, playlistId: playlistId, index: index)
+    }
+}
+
+// MARK: - Queue summary (list-end footer)
+
+/// The line that closes the Playlist list: how much is left to hear and when
+/// the queue would end at the current speed. Pure, so it can be recomputed
+/// on list and speed changes only and tested without a list.
+enum PlaylistQueueSummary {
+
+    /// One queued episode: its duration and how much of it has been played.
+    /// Unknown (nil) values contribute nothing.
+    struct Row: Equatable {
+        var durationMilliseconds: Int64?
+        var playedMilliseconds: Int64?
+    }
+
+    /// The footer copy in two runs: the emphasised amount and the rest.
+    struct Text: Equatable {
+        /// "2 h 14 m" / "42 m" (ink, semibold).
+        var emphasis: String
+        /// " left · done around 9:41 PM at 1.5×" (sand).
+        var rest: String
+        var plain: String { emphasis + rest }
+    }
+
+    /// Σ max(0, duration − played) over the queue.
+    static func remainingMilliseconds(rows: [Row]) -> Int64 {
+        rows.reduce(0) { total, row in
+            total + max(0, (row.durationMilliseconds ?? 0) - (row.playedMilliseconds ?? 0))
+        }
+    }
+
+    /// Whole minutes (rounded, at least 1): "42 m", "2 h 14 m".
+    static func amountText(milliseconds: Int64) -> String {
+        let minutes = max(1, Int((Double(milliseconds) / 60_000).rounded()))
+        guard minutes >= 60 else { return "\(minutes) m" }
+        return "\(minutes / 60) h \(minutes % 60) m"
+    }
+
+    /// The device's short time style ("9:41 PM" / "21:41").
+    static func makeTimeFormatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }
+
+    /// nil when nothing is left to say: an empty queue, or one whose
+    /// durations are unknown or fully played.
+    static func text(
+        rows: [Row],
+        speed: Double,
+        now: Date,
+        timeFormatter: DateFormatter = makeTimeFormatter()
+    ) -> Text? {
+        let remaining = remainingMilliseconds(rows: rows)
+        guard !rows.isEmpty, remaining > 0 else { return nil }
+        let effectiveSpeed = speed.isFinite && speed > 0 ? speed : 1
+        let finish = now.addingTimeInterval(Double(remaining) / 1000 / effectiveSpeed)
+        return Text(
+            emphasis: amountText(milliseconds: remaining),
+            rest: " left · done around \(timeFormatter.string(from: finish)) at \(PlayerSliderMath.speedText(effectiveSpeed))"
+        )
+    }
+}
+
+// MARK: - Pull-up to History (list end)
+
+/// Pull-up-past-the-end math. The distance is measured against the REAL
+/// maximum offset, which already contains `contentInset.bottom` extensions
+/// (the action group adds one while it is open): callers pass the adjusted
+/// insets, never a fixed constant.
+enum PlaylistHistoryPull {
+
+    /// Overscroll at which the orb is full and a release opens History.
+    static let fullDistance: CGFloat = 72
+
+    /// Points dragged past the maximum offset (0 inside the content).
+    static func overscroll(
+        offsetY: CGFloat,
+        contentHeight: CGFloat,
+        viewportHeight: CGFloat,
+        adjustedInsetTop: CGFloat,
+        adjustedInsetBottom: CGFloat
+    ) -> CGFloat {
+        let minimum = -adjustedInsetTop
+        // A list shorter than the viewport rests at its minimum offset.
+        let maximum = max(minimum, contentHeight - viewportHeight + adjustedInsetBottom)
+        return max(0, offsetY - maximum)
+    }
+
+    /// 0…1 over `fullDistance`.
+    static func progress(overscroll: CGFloat) -> CGFloat {
+        guard overscroll.isFinite else { return 0 }
+        return min(max(overscroll / fullDistance, 0), 1)
+    }
+
+    /// Releasing at full pull opens History; anything less springs back.
+    static func opensOnRelease(progress: CGFloat) -> Bool {
+        progress >= 1
     }
 }

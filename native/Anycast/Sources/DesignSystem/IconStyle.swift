@@ -12,7 +12,7 @@ nonisolated struct IconStyle: Sendable {
     }
 
     /// − / + inside a stepper capsule.
-    static let stepperControl = IconStyle(pointSize: 16, weight: .light)
+    static let stepperControl = IconStyle(pointSize: 16, weight: .medium)
     /// Secondary actions in a button group (player pager, toolbars).
     static let groupAction = IconStyle(pointSize: 20, weight: .regular)
     /// Player skip back / forward.

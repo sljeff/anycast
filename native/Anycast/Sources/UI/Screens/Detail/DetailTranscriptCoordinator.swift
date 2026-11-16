@@ -159,12 +159,10 @@ enum TranscriptRequests {
 enum DetailTranscriptMenuImages {
     static func image(for action: DetailTranscriptAction) -> UIImage? {
         switch action {
-        case .generate, .getPlus:
+        case .generate, .getPlus, .read:
             return AppIcons.aiTranscript
-        case .read:
-            return AppIcons.transcriptLines
         case .askAI:
-            return AppIcons.chatBubble
+            return AppIcons.aiChat
         }
     }
 }

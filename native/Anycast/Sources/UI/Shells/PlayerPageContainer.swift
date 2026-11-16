@@ -61,8 +61,6 @@ final class PlayerPageTabView: UIView {
 
         for (index, item) in items.enumerated() {
             let button = UIButton(type: .custom)
-            // Brand imagesets ignore symbol configuration, so the glyph box
-            // is explicit. SF Symbols use the same box plus a point size.
             let iconView = UIImageView(image: item.icon.withRenderingMode(.alwaysTemplate))
             iconView.contentMode = .scaleAspectFit
             iconView.isUserInteractionEnabled = false
@@ -119,8 +117,6 @@ final class PlayerPageTabView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     /// Page-tab glyphs track body metrics from the 20 pt group-action size.
-    /// The brand transcript mark is imageset artwork, so its box is what
-    /// scales; SF Symbols also take the point size.
     private func applyIconMetrics() {
         let glyph = IconMetrics.scaledUp(
             IconStyle.groupAction.pointSize,
@@ -142,14 +138,6 @@ final class PlayerPageTabView: UIView {
         for constraint in buttonSizeConstraints { constraint.constant = side }
         for (index, iconView) in iconViews.enumerated() {
             iconView.preferredSymbolConfiguration = symbol
-            let source = items[index].icon
-            if source.isSymbolImage == false, source.size != .zero {
-                iconView.image = source.withIconMetrics(
-                    pointSize: box,
-                    weight: IconStyle.groupAction.weight,
-                    compatibleWith: traitCollection
-                )
-            }
             buttons[index].layer.cornerRadius = side / 2
             buttons[index].largeContentImage = iconView.image
         }
@@ -259,7 +247,7 @@ final class PlayerPageContainer: UIViewController, UIPageViewControllerDataSourc
         self.pageTab = PlayerPageTabView(items: [
             .init(icon: AppIcons.playerEpisode, accessibilityLabel: "This episode"),
             .init(icon: AppIcons.playerMain, accessibilityLabel: "Player main"),
-            .init(icon: AppIcons.aiTranscript ?? UIImage(), accessibilityLabel: "Player AI transcript"),
+            .init(icon: AppIcons.aiTranscript, accessibilityLabel: "Player AI transcript"),
         ])
         super.init(nibName: nil, bundle: nil)
         if let browse, let subtitles = pages[Self.transcriptPageIndex] as? SubtitlesPageViewController {

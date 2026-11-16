@@ -125,11 +125,11 @@ struct ChannelLogicTests {
     @Test("Subscribe toggle icon and label per display state")
     func subscribeToggle() {
         #expect(ChannelSubscriptionDisplay.subscribe.toggleIcon === AppIcons.subscribe)
-        #expect(ChannelSubscriptionDisplay.subscribe.toggleAccessibilityLabel == "Subscribe")
+        #expect(ChannelSubscriptionDisplay.subscribe.toggleAccessibilityLabel == "Follow")
         #expect(ChannelSubscriptionDisplay.unsubscribe.toggleIcon === AppIcons.subscribed)
-        #expect(ChannelSubscriptionDisplay.unsubscribe.toggleAccessibilityLabel == "Unsubscribe")
+        #expect(ChannelSubscriptionDisplay.unsubscribe.toggleAccessibilityLabel == "Following")
         #expect(ChannelSubscriptionDisplay.loading.toggleIcon === AppIcons.subscribe)
-        #expect(ChannelSubscriptionDisplay.loading.toggleAccessibilityLabel == "Subscribing")
+        #expect(ChannelSubscriptionDisplay.loading.toggleAccessibilityLabel == "Checking follow status")
     }
 
     @Test("Gradient top color: dominant at 30% over 0xFF111316")

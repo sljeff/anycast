@@ -17,7 +17,7 @@ import AnycastKit
 ///   session hijacked ≥ 0.5 s holds and dropped the reorder);
 /// - reorder transactions land in the diffable `reorderingHandlers`
 ///   (`didReorder`, never `moveItemAt`);
-/// - drag start collapses any expanded strip; edge auto-scroll is system;
+/// - drag start closes the list action group; edge auto-scroll is system;
 /// - index-0-involving moves pause and swap the player source to the
 ///   post-reorder head (states/playlist_episode.dart:93-122; the 100 ms
 ///   blocking sleep is not ported, 08 §11.4);
@@ -40,10 +40,15 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
 
     private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
     private(set) var binder: PlaylistEpisodeListBinder!
-    private let expandCoordinator = CardExpandCoordinator()
+    private(set) var actionController: ListActionController!
+
+    #if DEBUG
+    private(set) var snapshotApplyCount = 0
+    private(set) var cellProviderCalls: [String: Int] = [:]
+    #endif
     private let queueObservation = ObservationLoop()
 
-    private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
+    private let collectionView = ListActionCollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
     var edgeScrollView: UIScrollView { collectionView }
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let emptyState = EmptyStateView()
@@ -51,8 +56,20 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     /// Weak "Listening history" link under the empty state; shown only when
     /// History has rows.
     private let emptyHistoryLink = HistoryLinkButton(accessibilityIdentifier: "playlist-listening-history")
-    /// Element kind of the trailing "history ›" capsule after the last card.
-    private static let historyTailKind = "playlist-history-tail"
+    /// Element kind of the list-end footer: the queue summary, with the
+    /// pull-up orb beneath it.
+    static let endFooterKind = "playlist-end-footer"
+    /// The footer copy for the current list and speed; nil hides the line.
+    /// Recomputed on list and speed changes only, never on a position tick.
+    private(set) var footerText: PlaylistQueueSummary.Text?
+    private let speedObservation = ObservationLoop()
+    /// Pull-up-to-History state. `displayedPull` drives the orb;
+    /// `draggedPull` is only written while a finger is dragging, so the
+    /// release decision reads the pull the user actually let go at, not the
+    /// spring-back that follows it.
+    private var displayedPull: CGFloat = 0
+    private var draggedPull: CGFloat = 0
+    private var firedPullHaptic = false
     private var emptyTopConstraint: NSLayoutConstraint?
     private var spinnerCenterConstraint: NSLayoutConstraint?
 
@@ -87,7 +104,7 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         super.viewDidLoad()
         Theme.installPageBase(on: view)
         binder = PlaylistEpisodeListBinder(
-            owner: self, context: context, playlistId: playlistId, expandCoordinator: expandCoordinator
+            owner: self, context: context, playlistId: playlistId
         )
         binder.episodeSource = self
         binder.onListContentChanged = { [weak self] in
@@ -101,9 +118,11 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         buildEmptyState()
         buildSpinner()
         configureDataSource()
+        configureActionController()
 
         binder.startObservingLiveState()
         observeQueueChanges()
+        observeSpeed()
         Task { await reloadEpisodes() }
     }
 
@@ -152,6 +171,11 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         // real cell carrying the 1.1x transform.
         collectionView.dragInteractionEnabled = false
         collectionView.addGestureRecognizer(dragGesture)
+        // The pull-up to History must work on a list shorter than the
+        // viewport too, so the list always bounces.
+        collectionView.alwaysBounceVertical = true
+        collectionView.onContentOffsetChange = { [weak self] in self?.contentOffsetDidChange() }
+        collectionView.panGestureRecognizer.addTarget(self, action: #selector(scrollPanChanged(_:)))
         view.addSubview(collectionView)
         NSLayoutConstraint.activate([
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -252,14 +276,14 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         }
     }
 
-    // MARK: - Layout (ReorderableListView padding: top 12 / bottom 64)
+    // MARK: - Layout (ReorderableListView padding: top 12)
 
     private func makeLayout() -> UICollectionViewCompositionalLayout {
         UICollectionViewCompositionalLayout { _, _ in
             let item = NSCollectionLayoutItem(
                 layoutSize: NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1),
-                    heightDimension: .estimated(EpisodeCardCell.cardRowHeight)
+                    heightDimension: .estimated(EpisodeCardCell.playlistRowHeight)
                 )
             )
             item.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
@@ -268,18 +292,22 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             )
             let section = NSCollectionLayoutSection(group: group)
             section.interGroupSpacing = EpisodeCardCell.spacing
-            section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 64, trailing: 0)
-            // The "history ›" capsule closes the list, like the Inbox tail.
-            // A boundary item, not a second section: the reorder gesture and
-            // the expand animator keep a one-section index space.
-            let tail = NSCollectionLayoutBoundarySupplementaryItem(
+            // The end footer carries the room below the last card (its own top
+            // padding, the summary line and the pull-up orb), so no section
+            // inset is added under it.
+            section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 0, bottom: 0, trailing: 0)
+            // The queue summary closes the list. A boundary item, not a
+            // second section: the reorder gesture and the action controller
+            // keep a one-section index space.
+            let footer = NSCollectionLayoutBoundarySupplementaryItem(
                 layoutSize: NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(1), heightDimension: .estimated(IconMetrics.minimumHit)
+                    widthDimension: .fractionalWidth(1),
+                    heightDimension: .estimated(PlaylistEndFooterView.minimumHeight)
                 ),
-                elementKind: Self.historyTailKind,
+                elementKind: Self.endFooterKind,
                 alignment: .bottom
             )
-            section.boundarySupplementaryItems = [tail]
+            section.boundarySupplementaryItems = [footer]
             return section
         }
     }
@@ -289,9 +317,9 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
     private func configureDataSource() {
         collectionView.setCollectionViewLayout(makeLayout(), animated: false)
         collectionView.register(
-            HistoryTailCell.self,
-            forSupplementaryViewOfKind: Self.historyTailKind,
-            withReuseIdentifier: HistoryTailCell.reuseIdentifier
+            PlaylistEndFooterView.self,
+            forSupplementaryViewOfKind: Self.endFooterKind,
+            withReuseIdentifier: PlaylistEndFooterView.reuseIdentifier
         )
         let binder = self.binder!
         dataSource = UICollectionViewDiffableDataSource<Int, String>(
@@ -306,14 +334,21 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
                   let episode = self.episodeByURL[enclosureURL] else {
                 return EpisodeCardCell()
             }
+            #if DEBUG
+            self.cellProviderCalls[enclosureURL, default: 0] += 1
+            #endif
             binder.configure(cell: cell, episode: episode, at: indexPath, in: collectionView)
+            self.actionController.reapplyGap(to: cell, id: enclosureURL)
             return cell
         }
         dataSource.supplementaryViewProvider = { [weak self] collectionView, kind, indexPath in
             let view = collectionView.dequeueReusableSupplementaryView(
-                ofKind: kind, withReuseIdentifier: HistoryTailCell.reuseIdentifier, for: indexPath
+                ofKind: kind, withReuseIdentifier: PlaylistEndFooterView.reuseIdentifier, for: indexPath
             )
-            (view as? HistoryTailCell)?.onOpenHistory = { [weak self] in self?.presentHistory() }
+            if let footer = view as? PlaylistEndFooterView, let self {
+                footer.setText(self.footerText)
+                footer.setPull(self.displayedPull, animated: false)
+            }
             return view
         }
         // Route a: drag-driven reorder commits through the diffable
@@ -334,7 +369,45 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         }
     }
 
-    private func applySnapshot() {
+    private func configureActionController() {
+        actionController = ListActionController(
+            collectionView: collectionView,
+            itemsProvider: { [weak self] id in
+                guard let self, let episode = self.episodeByURL[id] else { return [] }
+                return self.binder.groupItems(for: episode)
+            },
+            idAt: { [weak self] path in self?.dataSource.itemIdentifier(for: path) },
+            indexPathFor: { [weak self] id in self?.dataSource.indexPath(for: id) },
+            safeArea: { [weak self] in self?.actionSafeLines() ?? (0, 0) }
+        )
+        binder.actionController = actionController
+        actionController.onGroupUpdate = { [weak self] in self?.binder.refreshGroup() }
+        // PlaylistsPageViewController.focusScrollView only retargets edge
+        // effects. Its HeaderView is fixed, with no offset-driven collapsed
+        // title to defer through onMotionStateChange.
+    }
+
+    private func actionSafeLines() -> (top: CGFloat, bottom: CGFloat) {
+        // The page starts under the status bar. topChromeInset is the pinned
+        // HeaderView height + Spacing.xs; automatic adjustment adds safeArea.top.
+        // Thus adjustedContentInset.top is the viewport-y line below BOTH.
+        let top = collectionView.adjustedContentInset.top
+        var bottom = collectionView.bounds.height - collectionView.safeAreaInsets.bottom
+        // Frame-based on every plan (the mini player can come and go); a
+        // constraint to the shell's guide cannot be activated while this
+        // list is outside the shell's hierarchy (tests, page transitions).
+        if let shell = tabBarController as? MainTabBarController,
+           let line = shell.bottomChromeTopY(in: collectionView) {
+            bottom = line - collectionView.bounds.minY
+        }
+        return (top, bottom - 52)
+    }
+
+    private var animatesSnapshot: Bool {
+        !Motion.reduceMotion && didPlayEntrance && liftedCell == nil && pendingReorderCount == 0
+    }
+
+    private func applySnapshot(animatingDifferences: Bool) {
         var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
         snapshot.appendSections([0])
         snapshot.appendItems(episodes.compactMap(\.enclosureUrl))
@@ -343,13 +416,14 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
             collectionView.alpha = 0
             holdingEntrance = true
         }
-        // Reorders keep their interactive movement. Later inserts and
-        // deletes animate; Reduce Motion updates instantly.
-        let animateDiff = !Motion.reduceMotion
-            && didPlayEntrance
-            && liftedCell == nil
-            && pendingReorderCount == 0
-        dataSource.apply(snapshot, animatingDifferences: animateDiff)
+        // The end footer remains in contentSize.
+        // Only ListActionController extends contentInset.bottom for its floor.
+        #if DEBUG
+        snapshotApplyCount += 1
+        #endif
+        dataSource.apply(snapshot, animatingDifferences: animatingDifferences)
+        // Every change of the queue (reload, reorder, hide) lands here.
+        refreshFooterText()
         renderLoadingState()
         playEntranceIfNeeded()
     }
@@ -439,26 +513,26 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         // as the assignment — a reorder landing mid-read must not make the
         // reshape comparison run against a stale sequence.
         let previousURLs = episodes.compactMap(\.enclosureUrl)
-        episodes = rows
-        rebuildEpisodeIndex()
+        let nextURLs = rows.compactMap(\.enclosureUrl)
+        let reshaped = nextURLs != previousURLs
         isLoading = false
-        // The expanded strip's IndexPath is a POSITION, not an identity
-        // (CardExpandCoordinator contract): any reshape — a K3 completion
-        // emptying the head, a removal, a cross-screen add — shifts it
-        // onto the wrong card. Collapse whenever the row sequence changed;
-        // an unchanged sequence (the viewWillAppear resync) keeps the
-        // user's strip open.
-        let reshaped = rows.compactMap(\.enclosureUrl) != previousURLs
-        let hadExpandedStrip = expandCoordinator.expandedIndexPath != nil
-        if reshaped, hadExpandedStrip {
-            expandCoordinator.close()
+        let assign = {
+            self.episodes = rows
+            self.rebuildEpisodeIndex()
+            self.applySnapshot(animatingDifferences: false)
         }
-        applySnapshot()
-        if reshaped, hadExpandedStrip {
-            // Cells the snapshot kept by identity still render their old
-            // strip state; the animator collapses whatever is stale.
-            binder.refreshExpandedState(in: collectionView)
+        if reshaped, let selected = actionController.selectedID, !nextURLs.contains(selected),
+           binder.consumeUserLeave(selected) {
+            // The user's own Remove (eager path): the next card fills.
+            actionController.performLeave(id: selected, apply: assign)
+        } else if reshaped {
+            actionController.itemsDidChange(apply: assign)
+        } else {
+            episodes = rows
+            rebuildEpisodeIndex()
+            applySnapshot(animatingDifferences: animatesSnapshot)
         }
+        binder.refreshGroup()
         await refreshDiskCacheState()
     }
 
@@ -497,6 +571,112 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         )
     }
 
+    // MARK: - Queue summary footer
+
+    /// The footer view while it is on screen (it is a boundary supplementary
+    /// of the one section, so it is a direct subview of the collection view).
+    private var visibleFooter: PlaylistEndFooterView? {
+        collectionView.subviews.lazy.compactMap { $0 as? PlaylistEndFooterView }.first
+    }
+
+    private func observeSpeed() {
+        let playback = context.playback
+        speedObservation.track(
+            read: { _ = playback.speed },
+            onChange: { [weak self] in self?.refreshFooterText() }
+        )
+    }
+
+    /// Recomputes "X h Y m left · done around H:MM at N×". Called from the
+    /// snapshot apply and the speed observation only — never per position
+    /// tick; the playing episode reads its live position once, here.
+    private func refreshFooterText() {
+        let playback = context.playback
+        let currentURL = playback.currentEpisode?.enclosureUrl
+        let live = playback.positionData
+        let rows = episodes.map { episode -> PlaylistQueueSummary.Row in
+            if let url = episode.enclosureUrl, url == currentURL, live.durationMilliseconds > 0 {
+                return PlaylistQueueSummary.Row(
+                    durationMilliseconds: live.durationMilliseconds,
+                    playedMilliseconds: live.positionMilliseconds
+                )
+            }
+            return PlaylistQueueSummary.Row(
+                durationMilliseconds: episode.duration, playedMilliseconds: episode.playedDuration
+            )
+        }
+        let text = PlaylistQueueSummary.text(rows: rows, speed: Double(playback.speed), now: Date())
+        guard text != footerText else { return }
+        footerText = text
+        guard let footer = visibleFooter else { return }
+        let before = footer.bounds.height
+        footer.setText(text)
+        let fitting = footer.systemLayoutSizeFitting(
+            CGSize(width: collectionView.bounds.width, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
+        // The line wraps at large text sizes; only a real height change
+        // asks the layout to measure the footer again.
+        if abs(fitting - before) > 0.5 { collectionView.collectionViewLayout.invalidateLayout() }
+    }
+
+    // MARK: - Pull-up to History
+
+    /// Measures the drag past the end against the real maximum offset (the
+    /// adjusted inset carries the action group's bottom extension) and
+    /// drives the orb. Only a finger drag counts: a fling's rubber-band and
+    /// programmatic offsets never show the orb or fire the haptic.
+    private func contentOffsetDidChange() {
+        guard collectionView.isDragging, !episodes.isEmpty, liftedCell == nil else {
+            setDisplayedPull(0, animated: true)
+            return
+        }
+        let inset = collectionView.adjustedContentInset
+        let progress = PlaylistHistoryPull.progress(overscroll: PlaylistHistoryPull.overscroll(
+            offsetY: collectionView.contentOffset.y,
+            contentHeight: collectionView.contentSize.height,
+            viewportHeight: collectionView.bounds.height,
+            adjustedInsetTop: inset.top,
+            adjustedInsetBottom: inset.bottom
+        ))
+        draggedPull = progress
+        if PlaylistHistoryPull.opensOnRelease(progress: progress) {
+            if !firedPullHaptic {
+                firedPullHaptic = true
+                Haptics.tap()
+            }
+        } else {
+            firedPullHaptic = false
+        }
+        setDisplayedPull(progress, animated: false)
+    }
+
+    private func setDisplayedPull(_ progress: CGFloat, animated: Bool) {
+        guard progress != displayedPull else { return }
+        displayedPull = progress
+        visibleFooter?.setPull(progress, animated: animated)
+    }
+
+    /// The release decision: the pull the finger left at, not the spring-back.
+    @objc private func scrollPanChanged(_ pan: UIPanGestureRecognizer) {
+        switch pan.state {
+        case .began:
+            draggedPull = 0
+            firedPullHaptic = false
+        case .ended:
+            let opens = PlaylistHistoryPull.opensOnRelease(progress: draggedPull)
+            draggedPull = 0
+            firedPullHaptic = false
+            if opens, !episodes.isEmpty, presentedViewController == nil { presentHistory() }
+        case .cancelled, .failed:
+            draggedPull = 0
+            firedPullHaptic = false
+        default:
+            break
+        }
+    }
+
     // MARK: - Drag gesture (150 ms whole-card drag, 03 §3.2)
 
     /// The cell being dragged (weak: the collection view owns it).
@@ -519,10 +699,7 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
                 cell?.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
             }
             liftedCell = cell
-            // onReorderStart (playlists.dart:97-99): collapse any open
-            // strip the moment the drag starts.
-            expandCoordinator.close()
-            binder.refreshExpandedState(in: collectionView)
+            actionController.close(animated: true)
         case .changed:
             let point = gesture.location(in: collectionView)
             collectionView.updateInteractiveMovementTargetPosition(point)
@@ -606,18 +783,11 @@ final class PlaylistEpisodeListViewController: UIViewController, ScrollEdgePage 
         guard let reordered = PlaylistReorderLogic.reorderedRows(episodes, from: arrayFrom, to: arrayTo)
         else { return }
 
+        // VoiceOver reaches this path without a drag-start callback.
+        actionController.close(animated: false)
         episodes = reordered
         rebuildEpisodeIndex()
-        // The snapshot shift invalidates the expanded strip's positional
-        // IndexPath. The drag path closed at gesture start; the VoiceOver
-        // Move up/down actions land here directly — close for both, then
-        // collapse whatever stale strip state identity-kept cells render.
-        let hadExpandedStrip = expandCoordinator.expandedIndexPath != nil
-        expandCoordinator.close()
-        applySnapshot()
-        if hadExpandedStrip {
-            binder.refreshExpandedState(in: collectionView)
-        }
+        applySnapshot(animatingDifferences: animatesSnapshot)
 
         // Final → gesture space, full-row coordinates (the repository takes
         // the unadjusted gesture slot; it re-applies the adjustment).
@@ -695,13 +865,11 @@ extension PlaylistEpisodeListViewController: PlaylistEpisodeDataSource {
 
     func hideEpisode(byEnclosureURL url: String) {
         guard episodes.contains(where: { $0.enclosureUrl == url }) else { return }
-        episodes.removeAll { $0.enclosureUrl == url }
-        rebuildEpisodeIndex()
-        // Positional strip state shifts with the removal (see reloadEpisodes).
-        let hadExpandedStrip = expandCoordinator.expandedIndexPath != nil
-        expandCoordinator.close()
-        applySnapshot()
-        if hadExpandedStrip { binder.refreshExpandedState(in: collectionView) }
+        actionController.performLeave(id: url) {
+            episodes.removeAll { $0.enclosureUrl == url }
+            rebuildEpisodeIndex()
+            applySnapshot(animatingDifferences: false)
+        }
     }
 
     func visibleIndex(ofEnclosureURL url: String) -> Int? {
@@ -709,4 +877,139 @@ extension PlaylistEpisodeListViewController: PlaylistEpisodeDataSource {
     }
 
     var visibleCount: Int { episodes.compactMap(\.enclosureUrl).count }
+}
+
+// MARK: - End footer (queue summary + pull-up orb)
+
+/// Closes the Playlist list: "<b>2 h 14 m</b> left · done around 9:41 PM at
+/// 1.5×", with the History orb beneath it. The orb is invisible at rest and
+/// grows with the pull-up (`setPull`); the room it needs is part of the
+/// footer, so the end of the list is comfortable whether or not it shows.
+final class PlaylistEndFooterView: UICollectionReusableView {
+
+    static let reuseIdentifier = "PlaylistEndFooterView"
+    static let orbSide: CGFloat = 28
+    /// 12 above the line, the 20 pt line, 8, the orb, 16 below.
+    static let minimumHeight: CGFloat = 12 + 20 + 8 + orbSide + 16
+
+    private static let emphasisStyle = TypographyV2.Style(
+        size: 15, lineHeight: 20, weight: .semibold, color: Theme.onSurface, scalingTextStyle: .subheadline
+    )
+
+    private let label = UILabel()
+    private let orb = PlaylistHistoryOrbView()
+    private var text: PlaylistQueueSummary.Text?
+
+    /// The footer line as plain text (tests, VoiceOver parity).
+    var displayedText: String? { text?.plain }
+    /// The orb's current look, for tests.
+    var orbAlpha: CGFloat { orb.alpha }
+    var orbScale: CGFloat { orb.transform.a }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+        orb.translatesAutoresizingMaskIntoConstraints = false
+        orb.isAccessibilityElement = false
+        setPull(0, animated: false)
+        addSubview(orb)
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: topAnchor, constant: Spacing.gap),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.pageH),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.pageH),
+            label.heightAnchor.constraint(greaterThanOrEqualToConstant: 20),
+            orb.topAnchor.constraint(equalTo: label.bottomAnchor, constant: Spacing.md),
+            orb.centerXAnchor.constraint(equalTo: centerXAnchor),
+            orb.widthAnchor.constraint(equalToConstant: Self.orbSide),
+            orb.heightAnchor.constraint(equalToConstant: Self.orbSide),
+            orb.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+        ])
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (view: PlaylistEndFooterView, _) in
+            view.render()
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    func setText(_ text: PlaylistQueueSummary.Text?) {
+        self.text = text
+        render()
+    }
+
+    private func render() {
+        guard let text else {
+            label.attributedText = nil
+            return
+        }
+        let result = NSMutableAttributedString(
+            string: text.emphasis, attributes: attributes(for: Self.emphasisStyle)
+        )
+        result.append(NSAttributedString(string: text.rest, attributes: attributes(for: TypographyV2.meta)))
+        label.attributedText = result
+    }
+
+    private func attributes(for style: TypographyV2.Style) -> [NSAttributedString.Key: Any] {
+        var attributes = style.attributes(traits: traitCollection)
+        let paragraph = (attributes[.paragraphStyle] as? NSParagraphStyle)?.mutableCopy()
+            as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        attributes[.paragraphStyle] = paragraph
+        return attributes
+    }
+
+    /// 0…1 pull progress: the orb grows 0.4 → 1 while it fades in. Reduce
+    /// Motion keeps it at full size and only fades.
+    func setPull(_ progress: CGFloat, animated: Bool) {
+        let clamped = min(max(progress, 0), 1)
+        let apply = {
+            self.orb.alpha = clamped
+            let scale = Motion.reduceMotion ? 1 : 0.4 + 0.6 * clamped
+            self.orb.transform = CGAffineTransform(scaleX: scale, y: scale)
+        }
+        if animated {
+            UIView.animate(
+                withDuration: Motion.quick, delay: 0,
+                options: [.beginFromCurrentState, .curveEaseOut, .allowUserInteraction], animations: apply
+            )
+        } else {
+            apply()
+        }
+    }
+}
+
+/// The 28 pt gold orb: a radial gradient lit from the upper left (soft gold
+/// into the brand gold), the prototype's `.orb`. Its CGColors are frozen at
+/// assignment, so they are re-resolved when the appearance changes.
+private final class PlaylistHistoryOrbView: UIView {
+
+    override class var layerClass: AnyClass { CAGradientLayer.self }
+    private var gradient: CAGradientLayer { layer as! CAGradientLayer }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        gradient.type = .radial
+        gradient.startPoint = CGPoint(x: 0.35, y: 0.30)
+        gradient.endPoint = CGPoint(x: 1.0, y: 0.95)
+        gradient.locations = [0, 0.7]
+        gradient.cornerRadius = PlaylistEndFooterView.orbSide / 2
+        gradient.masksToBounds = true
+        updateColors()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: PlaylistHistoryOrbView, _) in
+            view.updateColors()
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    private func updateColors() {
+        gradient.colors = [
+            AnycastColor.goldSoft.resolvedColor(with: traitCollection).cgColor,
+            Theme.primary.resolvedColor(with: traitCollection).cgColor,
+        ]
+    }
 }

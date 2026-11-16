@@ -1,16 +1,9 @@
 import UIKit
 
 /// Centralized icon accessors. The Dart baseline mixes five icon packs
-/// (03 §5.3); the native port maps them to the nearest SF Symbol, except the
-/// two brand SVGs that live in the asset catalog as template imagesets
-/// (`BrandaiChat`, `BrandaiTranscript`).
-///
-/// Those imagesets are not symbol sets: `SymbolConfiguration` point size and
-/// weight do not affect them. Hosts scale them with `UIImage.withIconMetrics`.
-/// A symbol set needs an SF Symbols template (filled paths, margin guides,
-/// and weight variants). The source SVGs are stroke/fill artwork; dropping
-/// them into a symbol set would fail asset compilation, so they stay
-/// imagesets until a template export exists.
+/// (03 §5.3); the native port maps them to the nearest SF Symbol. Every
+/// accessor is a system symbol, so weight and Dynamic Type scaling come
+/// from `SymbolConfiguration` everywhere.
 ///
 /// Fill means selected, in progress, or success (tab selection, subscribed,
 /// sleep on, transcript succeeded). Idle actions stay outline. Transport
@@ -22,8 +15,7 @@ import UIKit
 ///
 ///   Material                 → SF Symbol
 ///   home_rounded             → house.fill
-///   video_library_rounded    → play.rectangle.on.rectangle
-///                               (videos.fill is not offered on iOS 18)
+///   video_library_rounded    → play.square.stack
 ///   search / search_rounded  → magnifyingglass
 ///   settings_rounded         → gearshape (outline; filled only when selected)
 ///   round_settings           → gearshape
@@ -52,7 +44,7 @@ import UIKit
 ///   round_clear / clear      → trash when it removes a row; xmark when it
 ///                               dismisses a sheet
 ///   round_playlist_add       → text.badge.plus
-///   round_playlist_add_check → checklist
+///   round_playlist_add_check → text.badge.checkmark
 ///   round_ios_share          → square.and.arrow.up
 ///   round_arrow_back         → chevron.left
 ///   round_add_circle_outline → plus.circle
@@ -81,8 +73,8 @@ nonisolated enum AppIcons {
 
     // Tab bar (03 §1.1)
     static let home = symbol("house.fill")
-    static let playlist = symbol("play.rectangle.on.rectangle")
-    static let playlistSelected = symbol("play.rectangle.on.rectangle.fill")
+    static let playlist = symbol("play.square.stack")
+    static let playlistSelected = symbol("play.square.stack.fill")
     /// Compass: "discover", distinct from the header search field.
     static let discover = symbol("safari")
     static let discoverSelected = symbol("safari.fill")
@@ -98,7 +90,7 @@ nonisolated enum AppIcons {
     static let play = symbol("play.fill")
     static let pause = symbol("pause.fill")
     static let addToList = symbol("text.badge.plus")
-    static let addedToList = symbol("checklist")
+    static let addedToList = symbol("text.badge.checkmark")
     static let remove = symbol("trash")
     static let download = symbol("arrow.down.circle")
     static let downloadDone = symbol("checkmark.circle.fill")
@@ -107,9 +99,9 @@ nonisolated enum AppIcons {
     static let share = symbol("square.and.arrow.up")
     static let back = symbol("chevron.left")
 
-    // Channel subscription toggle: outline = not subscribed, filled = subscribed.
-    static let subscribe = symbol("bookmark")
-    static let subscribed = symbol("bookmark.fill")
+    // Channel Follow control, always paired with a Follow / Following label.
+    static let subscribe = symbol("plus")
+    static let subscribed = symbol("checkmark")
 
     // Player (03 §2.10)
     static let replay10 = symbol("gobackward.10")
@@ -155,24 +147,21 @@ nonisolated enum AppIcons {
     static let smsFailed = symbol("exclamationmark.bubble.fill")
     static let photo = symbol("photo")
     static let elbowIndent = symbol("arrow.turn.down.right")
-    /// Detail transcript row / menu: lines once a transcript exists.
-    static let transcriptLines = symbol("text.alignleft")
-    /// Detail ••• "Ask AI" — a bubble, not the player-page brand mark.
-    static let chatBubble = symbol("bubble.left")
+    /// One glyph for the transcript in every state (generate, read, menu).
+    static let aiTranscript = symbol("text.page")
+    /// One glyph for every Ask AI entry.
+    static let aiChat = symbol("text.bubble")
+    /// Paywall bilingual subtitles.
+    static let bilingual = symbol("translate")
     /// Transcript line menu: keep the sentence as a moment.
     static let keepMoment = symbol("text.quote")
-
-    /// Brand SVGs (template imagesets; tint with tintColor). Ask AI is
-    /// `aiChat`; generating or opening a transcript is `aiTranscript`.
-    static let aiChat = UIImage(named: "BrandaiChat")
-    static let aiTranscript = UIImage(named: "BrandaiTranscript")
 
     /// Every SF Symbol name referenced above — the registration test asserts
     /// each resolves on the running OS (a typo would otherwise render blanks).
     static let symbolNames: [String] = [
-        "house.fill", "play.rectangle.on.rectangle", "safari", "tray.fill",
+        "house.fill", "play.square.stack", "play.square.stack.fill", "safari", "tray.fill",
         "books.vertical.fill", "play.fill", "pause.fill", "text.badge.plus",
-        "checklist", "xmark", "trash", "arrow.down.circle", "checkmark.circle.fill",
+        "text.badge.checkmark", "xmark", "trash", "arrow.down.circle", "checkmark.circle.fill",
         "square.and.arrow.up", "chevron.left", "chevron.forward", "gobackward.10",
         "goforward.30", "gearshape", "dot.radiowaves.left.and.right", "moon", "moon.fill",
         "arrow.clockwise", "exclamationmark.triangle", "gearshape.fill",
@@ -181,8 +170,8 @@ nonisolated enum AppIcons {
         "info.circle", "questionmark.circle", "questionmark", "ellipsis",
         "doc.on.doc", "safari.fill", "safari", "arrow.up.doc", "apple.logo",
         "envelope", "plus.circle", "exclamationmark.bubble.fill", "photo",
-        "arrow.turn.down.right", "text.alignleft", "exclamationmark.triangle",
-        "bubble.left", "text.quote", "arrow.up.right",
+        "arrow.turn.down.right", "plus", "text.page", "text.bubble", "translate",
+        "text.quote", "arrow.up.right",
     ]
 
     private static func symbol(_ name: String) -> UIImage {

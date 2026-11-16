@@ -3,37 +3,24 @@ import os
 import Kingfisher
 import AnycastKit
 
-/// Tab0 Inbox page (lib/pages/feeds.dart, 03 §2.3; v2 per 09 §3.2/§3.8 and
-/// the Anycast 2.0 UI kit Inbox) and the Podcast tab's root: the header is
-/// pinned above the list like the other tab headers, while the shows shelf
-/// and the category strip scroll WITH the card list (Figma 1787:7899 scroll
-/// column) over the feedEpisode table, with the full refresh trigger set — pull-to-refresh
-/// (UIRefreshControl, A4 adaptation), refreshOnStart, a 2 s-after-creation
-/// auto fetch, a periodic auto fetch every `autoRefreshInterval` seconds
-/// (DB default 300, restarted on settings change, K36), and the Tab0
-/// re-tap path. Every 60 s the inbox/history overage trim runs
-/// (states/player.dart:344-349). The episodes are rows of ONE grouped plate
-/// (InboxEpisodeCardCell on `GroupedPlateView`); actions follow
-/// `InboxActionPlanner` exactly (play / add-with-fly-in / remove) through
-/// the native-first surfaces: whole-row tap opens Detail, long-press opens
-/// the context menu, a leading swipe adds to the playlist and a trailing
-/// swipe removes (09 §7a-C1; 05 §6.3 P0). Row badges follow the playing
-/// episode and the playlist.
+/// Inbox keeps its header pinned and its shelf/strip in the scrolling column.
+/// Standalone cards share one list-owned action group; all row mutations are
+/// synchronous diffable applies inside the group's FLIP transaction.
 final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
-    /// Scroll-column sections (Figma column order). The shelf shows only
-    /// with subscriptions, the strip only with categories beyond "All", the
-    /// history tail only with cards. An empty inbox keeps a weak
-    /// "Listening history" link at the page bottom instead. The header is
-    /// not a section: it is pinned outside the list, so it stays on the
-    /// empty inbox and Settings remains reachable, with the empty state
-    /// beneath it.
-    enum Section {
-        case shelf
-        case strip
-        case cards
-        case tail
+    nonisolated enum Section: Hashable, Sendable { case shelf, strip, cards }
+    nonisolated private enum Item: Hashable, Sendable {
+        case shelf, strip
+        case episode(String)
+        case unidentified(Int)
     }
+    private var dataSource: UICollectionViewDiffableDataSource<Section, Item>!
+    private var renderedRows: [Item: FeedEpisodeRow] = [:]
+    private var plainDescriptions: [String: String] = [:]
+    private(set) var actionController: ListActionController!
+    /// Counts actual snapshot applications, including user leaves (review/test hook).
+    private(set) var snapshotApplyCount = 0
+    private var actionsInFlight: Set<String> = []
 
     private let context: UIContext
 
@@ -53,7 +40,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     private let refreshControl = UIRefreshControl()
     private let emptyStateView = InboxEmptyStateView()
     /// Empty-inbox link, shown only when History has rows. Hidden once the
-    /// inbox has cards; those use the tail.
+    /// inbox has cards.
     private let historyFooterButton = HistoryLinkButton(accessibilityIdentifier: "inbox-listening-history")
     private let htmlRenderer = HTMLContentRenderer()
 
@@ -87,8 +74,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// Rows the last refresh added; cleared when the next refresh starts.
     private var newRowCount = 0
     private var coverPrefetcher: ImagePrefetcher?
-    /// A diff batch or a row removal is animating; a render that lands now
-    /// waits for it (its diff would start from rows that are mid-removal).
+    /// A model/snapshot transaction is applying; incoming renders wait for
+    /// its commit. The gate reopens before additive travel finishes.
     private let updateGate = UpdateGate()
 
     /// An import landed while a refresh was already running; that refresh
@@ -100,10 +87,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     /// source minus this URL.
     private let pendingRemoval = PendingRemoval()
     private var pendingRemovalURL: String?
-    /// A pending removal is hiding its card (or committing its write); a
-    /// second one waits so the single `pendingRemovalURL` is never replaced
-    /// while its card is still animating.
-    private var removalInFlight = false
+    /// Earlier removals stay hidden while their commits finish. Only the
+    /// latest PendingRemoval can be undone; this is not merged undo.
+    private var hiddenRemovalURLs: Set<String> = []
 
     /// The category-filtered projection the list renders, without the row
     /// pending removal.
@@ -111,7 +97,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         InboxCategoryFilter.displayed(
             episodes: episodes, selected: selectedCategory, categoriesByFeed: categoriesByFeed,
             excluding: pendingRemovalURL
-        )
+        ).filter { !($0.enclosureUrl.map(hiddenRemovalURLs.contains) ?? false) }
     }
 
     // MARK: - Init (the shell constructs `init(context:)`)
@@ -124,16 +110,12 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         self.gate = InboxRefreshGate(now: now)
         // Placeholder layout; the real section provider is attached after
         // super.init once self is complete.
-        let collection = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
+        let collection = ListActionCollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
         self.collectionView = collection
         super.init(nibName: nil, bundle: nil)
-        // Scroll-flow chrome (09 §10 批次1): shelf/strip are list
-        // cells now, the card section is a list section so it can carry
-        // native swipe actions, and the history pill closes the column.
         let layout = UICollectionViewCompositionalLayout { [weak self] index, environment in
             self?.makeSection(index: index, environment: environment)
         }
-        layout.register(GroupedPlateView.self, forDecorationViewOfKind: GroupedPlateView.elementKind)
         collection.collectionViewLayout = layout
     }
 
@@ -151,6 +133,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         syncTopInset()
+        actionController?.collectionViewDidLayout()
         // The empty state centers in the room beneath the chrome rows, not
         // behind them (the shelf and strip scroll with the list).
         var chromeHeight: CGFloat = 0
@@ -275,7 +258,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             isUpdating: isSilentRefreshing,
             newCount: newRowCount,
             lastRefresh: gate.lastRefresh,
-            episodeCount: episodes.count - (pendingRemovalURL == nil ? 0 : 1)
+            episodeCount: episodes.filter { !($0.enclosureUrl.map(hiddenRemovalURLs.contains) ?? false) }.count
         )
         // Nothing followed: there is nothing to be "updated" or "unlistened".
         let followsNothing = didLoadSubscriptions && shows.isEmpty
@@ -288,7 +271,6 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         if hasShelf { kinds.append(.shelf) }
         if hasStrip { kinds.append(.strip) }
         kinds.append(.cards)
-        if hasCards { kinds.append(.tail) }
         return kinds
     }
 
@@ -332,52 +314,23 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         case .strip:
             return Self.chromeSection(height: CategoryStripView.chipHeight, bottomInset: gapBeforeCards)
         case .cards:
-            var config = UICollectionLayoutListConfiguration(appearance: .plain)
-            config.showsSeparators = false
-            config.backgroundColor = .clear
-            // The config-level provider (not the UICollectionViewDelegate
-            // method) — measured on iOS 27 the delegate selector never
-            // fires for a list section nested in a compositional section
-            // provider, the swipe surface never engages.
-            config.leadingSwipeActionsConfigurationProvider = { [weak self] indexPath in
-                self?.leadingSwipeActions(at: indexPath)
-            }
-            config.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
-                self?.trailingSwipeActions(at: indexPath)
-            }
-            return Self.rowsSection(
-                config: config, environment: environment, hasRows: !displayedEpisodes.isEmpty
-            )
-        case .tail:
-            return Self.chromeSection(height: nil, bottomInset: Spacing.gap)
+            return Self.rowsSection()
         }
     }
 
-    /// The episode rows as one list section (swipe actions come with the
-    /// list configuration) on a grouped plate inset 16 from the edges — the
-    /// same `GroupedPlateView` decoration Discover and Channel lists use.
-    static func rowsSection(
-        config: UICollectionLayoutListConfiguration, environment: NSCollectionLayoutEnvironment,
-        hasRows: Bool = true
-    ) -> NSCollectionLayoutSection {
-        let section = NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
+    static func rowsSection() -> NSCollectionLayoutSection {
+        let size = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1), heightDimension: .estimated(120))
+        let group = NSCollectionLayoutGroup.vertical(layoutSize: size, subitems: [NSCollectionLayoutItem(layoutSize: size)])
+        let section = NSCollectionLayoutSection(group: group)
+        section.interGroupSpacing = EpisodeCardCell.spacing
         section.contentInsets = NSDirectionalEdgeInsets(
             top: 0, leading: Spacing.pageH, bottom: Spacing.sm, trailing: Spacing.pageH
         )
-        let plate = NSCollectionLayoutDecorationItem.background(elementKind: GroupedPlateView.elementKind)
-        plate.contentInsets = NSDirectionalEdgeInsets(
-            top: 0, leading: Spacing.pageH, bottom: 0, trailing: Spacing.pageH
-        )
-        // An empty section would draw an empty plate, a stray white strip.
-        section.decorationItems = hasRows ? [plate] : []
         return section
     }
 
-    /// One chrome row (shelf / strip / history pill). The shelf and the
-    /// strip are fixed-height controls, so they get their real height here:
-    /// an estimate stays in force until the next `reloadData` and left the
-    /// shelf 64 pt too tall (cards sat 64 pt low on a cold start). Only the
-    /// history pill, which nothing sits below, keeps an estimate.
+    /// Shelf and strip have fixed heights so estimates cannot move the cards
+    /// after the first layout.
     static func chromeSection(height: CGFloat?, bottomInset: CGFloat) -> NSCollectionLayoutSection {
         let size = NSCollectionLayoutSize(
             widthDimension: .fractionalWidth(1),
@@ -410,8 +363,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = .clear
         collectionView.alwaysBounceVertical = true   // empty state stays pull-refreshable (03 §10.1)
-        collectionView.dataSource = self
-        collectionView.delegate = self   // context menu + swipe actions (09 §7a-C1)
+        collectionView.delegate = self
         collectionView.register(
             InboxEpisodeCardCell.self,
             forCellWithReuseIdentifier: InboxEpisodeCardCell.reuseIdentifier
@@ -419,8 +371,19 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         collectionView.register(
             ChromeHostingCell.self, forCellWithReuseIdentifier: ChromeHostingCell.reuseIdentifier
         )
-        collectionView.register(
-            HistoryTailCell.self, forCellWithReuseIdentifier: HistoryTailCell.reuseIdentifier
+        dataSource = UICollectionViewDiffableDataSource<Section, Item>(collectionView: collectionView) { [weak self] collection, path, item in
+            self?.cell(in: collection, at: path, item: item)
+        }
+        actionController = ListActionController(
+            collectionView: collectionView,
+            itemsProvider: { [weak self] id in self?.groupItems(for: id) ?? [] },
+            idAt: { [weak self] path in
+                guard let item = self?.dataSource.itemIdentifier(for: path),
+                      case .episode(let id) = item else { return nil }
+                return id
+            },
+            indexPathFor: { [weak self] id in self?.dataSource.indexPath(for: .episode(id)) },
+            safeArea: { [weak self] in self?.actionSafeLines() ?? (0, 0) }
         )
 
         refreshControl.addTarget(self, action: #selector(refreshControlTriggered), for: .valueChanged)
@@ -481,7 +444,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     // MARK: - Data
 
-    private func reload() async {
+    func reload() async {
         reloadGeneration += 1
         let generation = reloadGeneration
         let repository = context.database.feedRepository()
@@ -496,11 +459,18 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         // and rendering them, or a layout pass could see the new rows
         // before the diff that announces them.
         await reloadCategories()
-        // The rows commit inside the render (inside the batch update when
-        // the list is diffed), never ahead of it.
+        // Resolve every description before exposing rows to the cell provider.
+        var descriptions: [String: String] = [:]
+        for row in rows {
+            let html = row.description ?? ""
+            descriptions[html] = await PlainTextHTMLCache.shared.plainText(for: html)
+        }
+        guard generation == reloadGeneration else { return }
+        // The model and its text commit together inside the snapshot transaction.
         renderList(allowsDiff: true, incoming: rows, generation: generation) { [weak self] in
             guard let self else { return }
             self.episodes = rows
+            self.plainDescriptions = descriptions
             self.didLoadOnce = true
         }
         prefetchCovers()
@@ -544,13 +514,8 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         refreshChromeStatus()
     }
 
-    /// Plain no-animation rebuild (08 §7.2 — the Flutter Obx rebuild).
-    /// Renders the list. `incoming` are the rows the list is about to show
-    /// and `commit` makes them the page's data; both are optional, and
-    /// without them the current rows are re-rendered. With a diff the commit
-    /// runs inside `performBatchUpdates`; every other path commits at once.
-    /// A render that lands while an update animates waits for it
-    /// (`generation` drops a parked reload that a newer one has replaced).
+    /// Keep incoming rows and their commit together while the gate is closed.
+    /// A newer reload supersedes any parked older generation.
     private func renderList(
         allowsDiff: Bool = false,
         incoming: [FeedEpisodeRow]? = nil,
@@ -571,49 +536,89 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             InboxCategoryFilter.displayed(
                 episodes: $0, selected: selectedCategory, categoriesByFeed: categoriesByFeed,
                 excluding: pendingRemovalURL
-            )
+            ).filter { !($0.enclosureUrl.map(hiddenRemovalURLs.contains) ?? false) }
         } ?? displayedEpisodes
         let signature = displayed.map(\.enclosureUrl)
-        let newSections = Self.sections(
-            hasShelf: !shows.isEmpty, hasStrip: categoryStrip.hasFilters, hasCards: !displayed.isEmpty
-        )
-        var committed = false
-        func commitNow() {
-            guard !committed else { return }
-            committed = true
+        let newSections = Self.sections(hasShelf: !shows.isEmpty, hasStrip: categoryStrip.hasFilters, hasCards: !displayed.isEmpty)
+        let plan = InboxListDiff.plan(old: lastSignature, new: signature, sectionsUnchanged: newSections == dataSource.snapshot().sectionIdentifiers)
+        // Identity-only refreshes do not reconfigure surviving cells or apply a
+        // second snapshot when a deferred removal's database write settles.
+        if plan == .unchanged {
             commit?()
+        } else {
+            let anchors = actionController.selectedID == nil && allowsDiff
+                && collectionView.contentOffset.y > -collectionView.adjustedContentInset.top + 0.5
+                ? visibleAnchors(oldSignature: lastSignature) : []
+            updateGate.begin()
+            let anchorID = anchors.first { signature.contains($0) }
+            actionController.itemsDidChange(preservingItem: anchorID) {
+                commit?()
+                self.applySnapshot()
+            }
+            updateGate.end()
         }
-        // Cover changes reach the shelf in place; only a different card
-        // list or a different section set needs an update.
-        if signature != lastSignature || newSections != sections {
-            let plan = allowsDiff && view.window != nil
-                ? InboxListDiff.plan(old: lastSignature, new: signature, sectionsUnchanged: newSections == sections)
-                : .reload
-            switch plan {
-            case .unchanged:
-                commitNow()
-                lastSignature = signature
-            case .reload:
-                commitNow()
-                lastSignature = signature
-                sections = newSections
-                UIView.performWithoutAnimation {
-                    collectionView.reloadData()
+        finishListUpdate()
+        playEntranceIfNeeded()
+    }
+
+    /// Exactly one non-animated apply; called only inside a controller mutation.
+    private func applySnapshot() {
+        let rows = displayedEpisodes
+        sections = Self.sections(hasShelf: !shows.isEmpty, hasStrip: categoryStrip.hasFilters, hasCards: !rows.isEmpty)
+        lastSignature = rows.map(\.enclosureUrl)
+        renderedRows.removeAll(keepingCapacity: true)
+        var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
+        snapshot.appendSections(sections)
+        for section in sections {
+            switch section {
+            case .shelf: snapshot.appendItems([.shelf], toSection: section)
+            case .strip: snapshot.appendItems([.strip], toSection: section)
+            case .cards:
+                let ids = rows.enumerated().map { index, row -> Item in
+                    let candidate = row.enclosureUrl.map(Item.episode) ?? .unidentified(index)
+                    let id = renderedRows[candidate] == nil ? candidate : .unidentified(index)
+                    renderedRows[id] = row
+                    return id
                 }
-            case .batch(let removes, let inserts):
-                committed = true
-                applyDiff(
-                    removes: removes, inserts: inserts,
-                    oldSignature: lastSignature, signature: signature, commit: commit ?? {}
-                )
+                snapshot.appendItems(ids, toSection: section)
             }
         }
-        commitNow()
+        snapshotApplyCount += 1
+        dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func finishListUpdate() {
         applyEmptyState()
         historyFooterButton.refresh(pageIsEmpty: displayedEpisodes.isEmpty, database: context.database)
         refreshChromeStatus()
-        refreshVisibleRowPositions()
-        playEntranceIfNeeded()
+    }
+
+    private func actionSafeLines() -> (top: CGFloat, bottom: CGFloat) {
+        var bottom = collectionView.bounds.height - collectionView.safeAreaInsets.bottom
+        if let shell = tabBarController as? MainTabBarController,
+           let line = shell.bottomChromeTopY(in: collectionView) {
+            bottom = line - collectionView.bounds.minY
+        }
+        return (collectionView.adjustedContentInset.top, bottom - 52)
+    }
+
+    private func groupItems(for id: String) -> [ListActionItem] {
+        guard let episode = renderedRows[.episode(id)] else { return [] }
+        let path = dataSource.indexPath(for: .episode(id))
+        return [
+            ListActionItem(id: "play", content: .icon(AppIcons.play), accessibilityLabel: "Play") { [weak self] in
+                self?.perform(.play, episode: episode, at: path)
+            },
+            ListActionItem(id: "add", content: .icon(AppIcons.addToList), accessibilityLabel: "Add to playlist") { [weak self] in
+                self?.perform(.addToPlaylist, episode: episode, at: path)
+            },
+            ListActionItem(id: "remove", content: .icon(AppIcons.remove), accessibilityLabel: "Remove from inbox") { [weak self] in
+                self?.perform(.remove, episode: episode, at: path)
+            },
+            ListActionItem(id: "details", content: .title("Details"), accessibilityLabel: "Show details") { [weak self] in
+                self?.presentDetail(episode: episode)
+            },
+        ]
     }
 
     /// Hosts the empty state with the reason the list is empty, or clears it.
@@ -633,43 +638,9 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         collectionView.backgroundView = emptyStateView
     }
 
-    /// Applies rows that appeared or left as a batch update; the cards that
-    /// stayed are neither reconfigured nor moved relative to each other.
-    /// Scrolled away from the top: no animation and the first visible card
-    /// keeps its exact place in the viewport. Resting at the top: the new
-    /// cards come in and the rest shift down as one block (not with Reduce
-    /// Motion).
-    private func applyDiff(
-        removes: [Int], inserts: [Int], oldSignature: [String?], signature: [String?],
-        commit: @escaping () -> Void
-    ) {
-        let topY = -collectionView.adjustedContentInset.top
-        let restingAtTop = collectionView.contentOffset.y <= topY + 0.5
-        // Resolved against the OLD rows: the collection view still shows them.
-        let anchors = restingAtTop ? [] : visibleAnchors(oldSignature: oldSignature)
-        let animated = restingAtTop && !Motion.reduceMotion
-
-        updateGate.begin()
-        InboxBatchUpdate.apply(
-            to: collectionView, section: cardsSectionIndex,
-            removes: removes, inserts: inserts, animated: animated,
-            commit: { [weak self] in
-                commit()
-                self?.lastSignature = signature
-            },
-            completion: { [weak self] in
-                guard let self else { return }
-                if !animated { self.restore(anchors, signature: signature) }
-                self.refreshVisibleRowPositions()
-                self.updateGate.end()
-            }
-        )
-        if !animated { restore(anchors, signature: signature) }
-    }
-
-    /// Visible cards, topmost first, each with its distance from the top of
-    /// the visible area.
-    private func visibleAnchors(oldSignature: [String?]) -> [(url: String, offset: CGFloat)] {
+    /// Visible card identities, topmost first. The engine captures the chosen
+    /// survivor's presentation position before applying the new snapshot.
+    private func visibleAnchors(oldSignature: [String?]) -> [String] {
         let viewportTop = collectionView.contentOffset.y + collectionView.adjustedContentInset.top
         return collectionView.indexPathsForVisibleItems
             .filter { sectionKind($0.section) == .cards && oldSignature.indices.contains($0.item) }
@@ -680,22 +651,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
                 return (url, frame.minY)
             }
             .sorted { $0.minY < $1.minY }
-            .map { ($0.url, $0.minY - collectionView.contentOffset.y) }
-    }
-
-    /// Puts the first anchor that survived back at its recorded place.
-    private func restore(_ anchors: [(url: String, offset: CGFloat)], signature: [String?]) {
-        guard !anchors.isEmpty else { return }
-        collectionView.layoutIfNeeded()
-        for anchor in anchors {
-            guard let item = signature.firstIndex(where: { $0 == anchor.url }),
-                  let frame = collectionView.layoutAttributesForItem(
-                      at: IndexPath(item: item, section: cardsSectionIndex)
-                  )?.frame
-            else { continue }
-            collectionView.contentOffset.y = frame.minY - anchor.offset
-            return
-        }
+            .map { $0.url }
     }
 
     /// Plays the entrance right after the list was applied. A prewarmed page
@@ -927,7 +883,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             // idempotent under interleaving.
             // The row pending removal is going away anyway: it neither counts
             // toward the limit nor is a trim candidate.
-            let kept = self.episodes.filter { $0.enclosureUrl != self.pendingRemovalURL }
+            let kept = self.episodes.filter { !($0.enclosureUrl.map(self.hiddenRemovalURLs.contains) ?? false) }
             let plan = InboxTrimPlanner.plan(count: kept.count, keeping: settings.maxFeedEpisodes)
             // An import adds episodes the person has not seen the result of
             // yet: the Inbox waits until they tap Done.
@@ -945,7 +901,14 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
     // MARK: - Card actions (feeds.dart:84-131; ordering in InboxActionPlanner)
 
     private func perform(_ action: InboxEpisodeAction, episode: FeedEpisodeRow, at indexPath: IndexPath?) {
-        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return }
+        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty,
+              actionsInFlight.insert(enclosureURL).inserted else { return }
+        if action == .remove {
+            Haptics.queueRemoved()
+            removeWithUndo(url: enclosureURL)
+            actionsInFlight.remove(enclosureURL)
+            return
+        }
         let playlistId = ChannelPlaylistLogic.defaultPlaylistID
         let row = ChannelPlaylistLogic.playlistRow(from: episode, playlistId: playlistId)
         let steps = InboxActionPlanner.steps(
@@ -954,30 +917,21 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
             currentEnclosureURL: context.playback.currentEpisode?.enclosureUrl,
             episodeEnclosureURL: enclosureURL
         )
-        // The fly-in origin must be captured from the tapped cell BEFORE
-        // any step runs: the removal step deletes the row, so resolving the
-        // cell at fly-in time would miss it — the ball leaves from where
-        // the row was. The row's position is re-resolved by identity here,
-        // too: the action closures capture configure-time index paths,
-        // which go stale once an earlier animated removal shifts surviving
-        // rows without reconfiguring them. The re-resolution TIGHTENS only
-        // a list-surface caller's path: the Detail sheet passes nil, and
-        // nil must come out nil — its add runs without the flight (the
-        // landed Detail-action precedent,
-        // ChannelEpisodeListBinder.detailActions). A list action whose row
-        // vanished before firing (trim/refresh) also drops the flight —
-        // the configure-time fallback would feed the layout a stale,
-        // possibly out-of-range path.
+        // Capture the Add circle before any await can move or remove its
+        // selected card. Context-menu/VoiceOver actions without a group keep
+        // the row fallback; Detail supplies nil and never flies.
         let flyInStart = Self.resolvedFlyInStart(
             actionPath: indexPath,
             identityPath: currentIndexPath(of: episode),
             in: collectionView,
-            window: view.window
+            window: view.window,
+            addCircle: actionController.selectedID == enclosureURL ? actionController.groupView.button(for: "add") : nil
         )
         Task { [weak self] in
+            guard let self else { return }
+            defer { self.actionsInFlight.remove(enclosureURL) }
             var insertedRow = row
             for step in steps {
-                guard let self else { return }
                 switch step {
                 case .flyInAnimation:
                     await self.runFlyIn(from: flyInStart)
@@ -990,12 +944,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
                 case .skipInsertCurrentlyPlaying:
                     break
                 case .removeFromInbox:
-                    if Self.defersRemoval(steps) {
-                        Haptics.queueRemoved()
-                        await self.removeWithUndo(url: enclosureURL)
-                    } else {
-                        await self.removeFromInbox(urls: [enclosureURL])
-                    }
+                    await self.removeFromInbox(urls: [enclosureURL], keepsGroup: action != .play)
                 case .playInsertedEpisode:
                     await self.context.playback.playByEpisode(insertedRow)
                 case .reloadPlaybackQueue:
@@ -1017,24 +966,28 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         actionPath: IndexPath?,
         identityPath: IndexPath?,
         in collectionView: UICollectionView,
-        window: UIWindow?
+        window: UIWindow?,
+        addCircle: UIView? = nil
     ) -> CGPoint? {
-        guard let actionPath, let identityPath else { return nil }
+        guard actionPath != nil, let identityPath else { return nil }
+        if let addCircle, let window {
+            var center = addCircle.convert(CGPoint(x: addCircle.bounds.midX, y: addCircle.bounds.midY), to: window)
+            // Usually the group is stationary. At the top-clamp exception it
+            // can still be travelling; launch from the circle the user sees.
+            if let group = addCircle.superview, let parent = group.superview,
+               let presented = group.layer.presentation() {
+                let visible = parent.convert(presented.frame.origin, to: window)
+                let model = parent.convert(group.frame.origin, to: window)
+                center.x += visible.x - model.x
+                center.y += visible.y - model.y
+            }
+            return center
+        }
         return flyInOrigin(in: collectionView, at: identityPath, window: window)
     }
 
-    /// The resolution core. The origin's X never comes from the item: a
-    /// full leading swipe displaces the row toward the trailing edge, and
-    /// at action time BOTH lookup layers report the displaced position
-    /// (observed on device with the cell-center and the
-    /// layout-attributes strategies). The resting X of a full-width row
-    /// is the collection view's horizontal center, so the origin is the
-    /// item's Y (list swipes translate horizontally only — Y is
-    /// trustworthy) at the collection's center X. The path is guarded
-    /// against the collection view's CURRENT counts before touching the
-    /// layout: `layoutAttributesForItem` on a compositional section with
-    /// an out-of-range index can assert where `cellForItem` would return
-    /// nil.
+    /// Fallback for a context-menu/VoiceOver Add without an open group.
+    /// Group Add supplies its circle center instead; Detail never flies.
     static func flyInOrigin(
         in collectionView: UICollectionView, at indexPath: IndexPath?, window: UIWindow?
     ) -> CGPoint? {
@@ -1058,17 +1011,13 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         return window.center
     }
 
-    /// The row's CURRENT index path, resolved by identity (enclosure URL).
-    /// Animated removals shift surviving rows without reconfiguring them,
-    /// so the configure-time index paths captured in the action closures
-    /// drift; every action funnels through `perform`, which re-resolves
-    /// here — the context menu, the more pull-down, the swipe surfaces,
-    /// and VoiceOver custom actions all stay consistent.
+    /// Resolve against the applied snapshot, never a configure-time index.
     private func currentIndexPath(of episode: FeedEpisodeRow) -> IndexPath? {
-        guard let url = episode.enclosureUrl,
-              let index = displayedEpisodes.firstIndex(where: { $0.enclosureUrl == url })
-        else { return nil }
-        return IndexPath(item: index, section: cardsSectionIndex)
+        episode.enclosureUrl.flatMap(currentIndexPath(for:))
+    }
+
+    private func currentIndexPath(for url: String) -> IndexPath? {
+        dataSource.indexPath(for: .episode(url))
     }
 
     /// AnimatedPlaylistIndicator — runs AFTER the row's animated removal
@@ -1083,16 +1032,14 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
     }
 
-    /// The removal side of every card action: database delete, in-memory
-    /// removal, and an ANIMATED row deletion. `performBatchUpdates` keeps
-    /// the surviving rows' measured attributes — the old no-animation
-    /// `reloadData()` re-estimated every self-sizing card and the
-    /// neighbors snapped. `renderList()` stays the bulk/full-refresh path
-    /// (fetch, trim, category reselect); this list is strip-less, so no
-    /// CardExpandCoordinator index needs closing before the mutation.
-    private func removeFromInbox(urls: [String]) async {
+    /// Durable moves use the same synchronous visual leave as Remove.
+    private func removeFromInbox(urls: [String], keepsGroup: Bool = true) async {
         try? await context.database.feedRepository().removeByEnclosureUrls(urls)
-        await animateOutOfInbox(urls: urls, hiding: false)
+        while updateGate.isBusy { try? await Task.sleep(nanoseconds: 10_000_000) }
+        leaveInbox(urls: urls, hiding: false, keepsGroup: keepsGroup)
+        // The fly-in follows the leaving snapshot's travel, without locking
+        // the group: the next circle tap can already act on the filler.
+        try? await Task.sleep(for: .seconds(ListActionMotion.duration))
     }
 
     /// Only a pure Remove can be undone; Play and Add-to-playlist also end
@@ -1103,33 +1050,33 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
 
     /// Remove with a 5 s Undo: the card animates out now, the DB row goes
     /// when the window ends (see `PendingRemoval`).
-    private func removeWithUndo(url: String) async {
-        while removalInFlight {
-            try? await Task.sleep(nanoseconds: 50_000_000)
+    private func removeWithUndo(url: String) {
+        updateGate.submitOrDefer { [weak self] in
+            guard let self, self.currentIndexPath(for: url) != nil else { return }
+            let repository = self.context.database.feedRepository()
+            self.pendingRemoval.begin(url) { [weak self] in
+                let deleted = (try? await repository.removeByEnclosureUrls([url])) != nil
+                self?.settleRemoval(url: url, deleted: deleted)
+            }
+            self.leaveInbox(urls: [url], hiding: true)
+            self.showRemovalCapsule()
         }
-        removalInFlight = true
-        defer { removalInFlight = false }
-        // A previous removal finishes its write (and settles) first.
-        await pendingRemoval.commitNow()
-        let repository = context.database.feedRepository()
-        pendingRemoval.begin(url) { [weak self] in
-            let deleted = (try? await repository.removeByEnclosureUrls([url])) != nil
-            self?.settleRemoval(url: url, deleted: deleted)
-        }
-        showRemovalCapsule()
-        await animateOutOfInbox(urls: [url], hiding: true)
     }
 
     /// The write finished: the row is gone from `episodes` too. A failed
     /// write leaves the row in the DB, so it comes back.
     private func settleRemoval(url: String, deleted: Bool) {
+        // A read begun before this write must not resurrect the committed row.
+        reloadGeneration += 1
         if deleted { episodes.removeAll { $0.enclosureUrl == url } }
+        hiddenRemovalURLs.remove(url)
         if pendingRemovalURL == url { pendingRemovalURL = nil }
         renderList(allowsDiff: true)
     }
 
     private func undoRemoval() {
         guard pendingRemoval.undo() else { return }
+        if let pendingRemovalURL { hiddenRemovalURLs.remove(pendingRemovalURL) }
         pendingRemovalURL = nil
         UIAccessibility.post(notification: .announcement, argument: "Restored")
         renderList(allowsDiff: true)
@@ -1153,138 +1100,39 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         )
     }
 
-    /// The card removal animation. `hiding` keeps the row in `episodes` and
-    /// only marks it as pending; otherwise it is dropped for good.
-    private func animateOutOfInbox(urls: [String], hiding: Bool) async {
-        // One update at a time: wait out a diff or removal still animating.
-        while updateGate.isBusy {
-            try? await Task.sleep(nanoseconds: 50_000_000)
+    /// The model and the snapshot change synchronously once. FLIP owns all
+    /// motion; rapid subsequent actions can use the filler immediately.
+    private func leaveInbox(urls: [String], hiding: Bool, keepsGroup: Bool = true) {
+        if hiding, !urls.allSatisfy(pendingRemoval.isPending) { return }
+        let id = urls.first(where: { dataSource.indexPath(for: .episode($0)) != nil })
+        let hadCards = !displayedEpisodes.isEmpty
+        reloadGeneration += 1
+        updateGate.begin()
+        let apply = {
+            self.dropFromMemory(urls: urls, hiding: hiding)
+            self.applySnapshot()
         }
-        // Everything is derived from the CURRENT data before any mutation:
-        // the in-memory removal happens INSIDE the batch closure, right
-        // before deleteItems — mutating the data source ahead of the batch
-        // makes its counts report post-removal numbers, and a layout pass
-        // in between (rotation, sheet dismissal, a pending reload) then
-        // trips UIKit's item-count consistency check.
-        // Undone, or committed, while waiting: nothing to hide; show what the
-        // list now says.
-        if hiding, !urls.allSatisfy(pendingRemoval.isPending) {
-            renderList(allowsDiff: true)
-            return
+        if let id {
+            actionController.performLeave(id: id, keepsGroup: keepsGroup, apply: apply)
+        } else {
+            actionController.itemsDidChange(apply: apply)
         }
-        let displayed = displayedEpisodes
-        let cardsSection = cardsSectionIndex
-        let removedPaths = displayed.indices.compactMap { index -> IndexPath? in
-            guard let url = displayed[index].enclosureUrl, urls.contains(url) else { return nil }
-            return IndexPath(item: index, section: cardsSection)
-        }
-        let displayedAfterRemoval = displayed.filter { row in
-            guard let url = row.enclosureUrl else { return true }
-            return !urls.contains(url)
-        }
-        // The last card leaves with a row animation. The shelf section is not
-        // part of the batch, so it stays put; only the tail section (the
-        // history pill) is removed with the card. A full reloadData here
-        // re-parents the shelf and flashes the header.
-        if view.window != nil, !removedPaths.isEmpty, displayedAfterRemoval.isEmpty {
-            let tailSection = sections.firstIndex(of: .tail)
-            let reduce = Motion.reduceMotion
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                let completion: (Bool) -> Void = { _ in continuation.resume() }
-                if reduce {
-                    UIView.performWithoutAnimation {
-                        self.removeLastInboxCards(
-                            removedPaths,
-                            urls: urls,
-                            hiding: hiding,
-                            tailSection: tailSection,
-                            completion: completion
-                        )
-                    }
-                } else {
-                    self.removeLastInboxCards(
-                        removedPaths,
-                        urls: urls,
-                        hiding: hiding,
-                        tailSection: tailSection,
-                        completion: completion
-                    )
-                }
-            }
-            lastSignature = displayedEpisodes.map(\.enclosureUrl)
+        finishListUpdate()
+        if hadCards && displayedEpisodes.isEmpty {
             emptyStateView.alpha = 0
-            collectionView.backgroundView = emptyStateView
-            // Place the empty state under the shelf before it fades in, so
-            // the fade never covers the shelf or the header behind it.
             collectionView.layoutIfNeeded()
             view.layoutIfNeeded()
-            UIView.performWithoutAnimation {
-                self.refreshChromeStatus()
-            }
-            UIView.animate(
-                withDuration: Motion.quick,
-                delay: 0,
-                options: [.curveEaseOut, .allowUserInteraction]
-            ) {
+            UIView.animate(withDuration: Motion.quick, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
                 self.emptyStateView.alpha = 1
             }
-            return
         }
-        guard view.window != nil, !removedPaths.isEmpty, !displayedAfterRemoval.isEmpty else {
-            let remaining = episodes.filter { !($0.enclosureUrl.map(urls.contains) ?? false) }
-            renderList(incoming: remaining) {
-                if hiding { self.pendingRemovalURL = urls.first } else { self.episodes = remaining }
-            }
-            return
-        }
-        updateGate.begin()
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            collectionView.performBatchUpdates {
-                self.dropFromMemory(urls: urls, hiding: hiding)
-                self.lastSignature = self.displayedEpisodes.map(\.enclosureUrl)
-                self.collectionView.deleteItems(at: removedPaths)
-            } completion: { _ in
-                continuation.resume()
-            }
-        }
-        // Post-completion state, not a cached one: a concurrent refresh may
-        // have emptied the list while the delete animation ran.
-        applyEmptyState()
-        historyFooterButton.refresh(pageIsEmpty: displayedEpisodes.isEmpty, database: context.database)
-        refreshChromeStatus()
-        refreshVisibleRowPositions()
         updateGate.end()
-    }
-
-    /// Deletes the last inbox cards and the history tail without reloading
-    /// the shelf section. `completion` is escaping because UIKit's batch
-    /// completion is.
-    private func removeLastInboxCards(
-        _ removedPaths: [IndexPath],
-        urls: [String],
-        hiding: Bool,
-        tailSection: Int?,
-        completion: @escaping (Bool) -> Void
-    ) {
-        collectionView.performBatchUpdates {
-            self.dropFromMemory(urls: urls, hiding: hiding)
-            self.sections = Self.sections(
-                hasShelf: !self.shows.isEmpty,
-                hasStrip: self.categoryStrip.hasFilters,
-                hasCards: false
-            )
-            self.collectionView.deleteItems(at: removedPaths)
-            if let tailSection {
-                self.collectionView.deleteSections(IndexSet(integer: tailSection))
-            }
-        } completion: { finished in
-            completion(finished)
-        }
     }
 
     private func dropFromMemory(urls: [String], hiding: Bool) {
         if hiding {
             pendingRemovalURL = urls.first
+            hiddenRemovalURLs.formUnion(urls)
         } else {
             episodes.removeAll { $0.enclosureUrl.map(urls.contains) ?? false }
         }
@@ -1314,7 +1162,7 @@ final class InboxPageViewController: UIViewController, TabZeroTopRefresh {
         }
     }
 
-    // MARK: - Detail (whole-card and cover tap, card.dart:129-138 + 09 §7a-C1)
+    // MARK: - Detail (cover, group and menu)
 
     private func presentDetail(episode: FeedEpisodeRow) {
         guard let enclosureURL = episode.enclosureUrl else { return }
@@ -1451,60 +1299,22 @@ nonisolated enum InboxCategoryFilter {
 
 // MARK: - Data source
 
-extension InboxPageViewController: UICollectionViewDataSource {
+extension InboxPageViewController {
 
-    func numberOfSections(in collectionView: UICollectionView) -> Int {
-        sections.count
-    }
-
-    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        guard let kind = sectionKind(section) else { return 0 }
-        switch kind {
-        case .shelf, .strip, .tail:
-            return 1
-        case .cards:
-            return displayedEpisodes.count
-        }
-    }
-
-    func collectionView(
-        _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
-    ) -> UICollectionViewCell {
-        switch sectionKind(indexPath.section) {
-        case .shelf:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: ChromeHostingCell.reuseIdentifier, for: indexPath
-            )
-            (cell as? ChromeHostingCell)?.host(shelf)
+    private func cell(in collectionView: UICollectionView, at indexPath: IndexPath, item: Item) -> UICollectionViewCell {
+        switch item {
+        case .shelf, .strip:
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ChromeHostingCell.reuseIdentifier, for: indexPath)
+            (cell as? ChromeHostingCell)?.host(item == .shelf ? shelf : categoryStrip)
             return cell
-        case .strip:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: ChromeHostingCell.reuseIdentifier, for: indexPath
-            )
-            (cell as? ChromeHostingCell)?.host(categoryStrip)
-            return cell
-        case .cards:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: InboxEpisodeCardCell.reuseIdentifier,
-                for: indexPath
-            )
-            if let card = cell as? InboxEpisodeCardCell,
-               displayedEpisodes.indices.contains(indexPath.item) {
-                configure(card: card, episode: displayedEpisodes[indexPath.item], at: indexPath)
+        case .episode, .unidentified:
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: InboxEpisodeCardCell.reuseIdentifier, for: indexPath)
+            if let card = cell as? InboxEpisodeCardCell, let episode = renderedRows[item] {
+                configure(card: card, episode: episode, at: indexPath)
+                if case .episode(let id) = item { actionController.reapplyGap(to: card, id: id) }
+                else { card.setActionGap(0) }
             }
             return cell
-        case .tail:
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: HistoryTailCell.reuseIdentifier, for: indexPath
-            )
-            (cell as? HistoryTailCell)?.onOpenHistory = { [weak self] in
-                self?.presentHistory()
-            }
-            return cell
-        case nil:
-            return collectionView.dequeueReusableCell(
-                withReuseIdentifier: ChromeHostingCell.reuseIdentifier, for: indexPath
-            )
         }
     }
 
@@ -1515,37 +1325,24 @@ extension InboxPageViewController: UICollectionViewDataSource {
             dateText: episode.pubDate.map { RelativeTimeFormatter.format($0) } ?? "",
             durationText: Self.durationText(for: episode),
             imageURL: episode.imageUrl,
-            status: status(for: episode)
+            status: status(for: episode),
+            descriptionText: plainDescriptions[episode.description ?? ""] ?? ""
         )
         card.configure(content)
-        card.setPosition(
-            isFirst: indexPath.item == 0,
-            isLast: indexPath.item == displayedEpisodes.count - 1
-        )
         // The same payload feeds the long-press context menu and the
         // VoiceOver custom actions (09 §7a-C1).
         card.menuActions = actions(for: episode, at: indexPath)
         card.onCardTap = { [weak self] in
-            self?.presentDetail(episode: episode)
+            guard let id = episode.enclosureUrl else { return }
+            self?.actionController.toggle(id: id)
         }
+        card.onCoverTap = { [weak self] in self?.presentDetail(episode: episode) }
     }
 
-    /// "44m" — the row's trailing duration; empty when unknown.
+    /// "44m" — the metadata duration; empty when unknown.
     static func durationText(for episode: FeedEpisodeRow) -> String {
         guard let duration = episode.duration, duration > 0 else { return "" }
         return TimeFormats.formatDuration(duration)
-    }
-
-    /// The first and last rows round the plate's corners and the first has
-    /// no hairline, so rows that stayed through an insert or a removal
-    /// re-resolve their place.
-    private func refreshVisibleRowPositions() {
-        let count = displayedEpisodes.count
-        for indexPath in collectionView.indexPathsForVisibleItems
-        where sectionKind(indexPath.section) == .cards {
-            (collectionView.cellForItem(at: indexPath) as? InboxEpisodeCardCell)?
-                .setPosition(isFirst: indexPath.item == 0, isLast: indexPath.item == count - 1)
-        }
     }
 
     private func status(for episode: FeedEpisodeRow) -> InboxCardContent.Status {
@@ -1576,12 +1373,14 @@ extension InboxPageViewController: UICollectionViewDataSource {
             EpisodeCardAction(icon: AppIcons.remove, accessibilityLabel: "Remove from inbox") { [weak self] in
                 self?.perform(.remove, episode: episode, at: indexPath)
             },
+            EpisodeCardAction(icon: AppIcons.info, accessibilityLabel: "Show details") { [weak self] in
+                self?.presentDetail(episode: episode)
+            },
         ]
     }
 }
 
-// MARK: - Context menu + swipe actions (09 §7a-C1: the strip's actions as
-// native surfaces — long-press menu, more pull-down, trailing swipe)
+// MARK: - Long-press context menu
 
 extension InboxPageViewController: UICollectionViewDelegate {
 
@@ -1645,44 +1444,6 @@ extension InboxPageViewController: UICollectionViewDelegate {
         }
     }
 
-    /// The leading swipe surface (UI kit Inbox: swipe right to queue): Add
-    /// to playlist through the same planner path as the menu entry.
-    func leadingSwipeActions(at indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        guard sectionKind(indexPath.section) == .cards,
-              displayedEpisodes.indices.contains(indexPath.item) else { return nil }
-        let episode = displayedEpisodes[indexPath.item]
-        let add = UIContextualAction(
-            style: .normal, title: "Add to playlist",
-            handler: { [weak self] _, _, completion in
-                self?.perform(.addToPlaylist, episode: episode, at: indexPath)
-                completion(true)
-            }
-        )
-        add.image = AppIcons.addToList
-        add.backgroundColor = AnycastColor.grass9
-        return UISwipeActionsConfiguration(actions: [add])
-    }
-
-    /// The trailing swipe surface (09 §7a-C1 批次1): a single destructive
-    /// Remove running the same planner path as the menu entry. Internal so
-    /// the in-app regression suite can assert the wiring directly.
-    func trailingSwipeActions(at indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        guard sectionKind(indexPath.section) == .cards,
-              displayedEpisodes.indices.contains(indexPath.item) else { return nil }
-        let episode = displayedEpisodes[indexPath.item]
-        let remove = UIContextualAction(
-            style: .destructive, title: "Remove",
-            handler: { [weak self] _, _, completion in
-                // A list surface: pass the path (nil is reserved for the
-                // Detail sheet's no-fly contract; remove has no flight
-                // today, but the marker must stay truthful).
-                self?.perform(.remove, episode: episode, at: indexPath)
-                completion(true)
-            }
-        )
-        remove.image = AppIcons.remove
-        return UISwipeActionsConfiguration(actions: [remove])
-    }
 }
 
 // MARK: - Scroll-flow chrome hosting (批次1: the Figma column scrolls)
@@ -1720,64 +1481,6 @@ final class ChromeHostingCell: UICollectionViewCell {
             view.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ])
     }
-}
-
-/// The weak "history ›" capsule that closes the scroll column when the
-/// inbox has cards. Not chrome: it sits in the list, after the cards.
-final class HistoryTailCell: UICollectionViewCell {
-
-    static let reuseIdentifier = "InboxHistoryTailCell"
-
-    var onOpenHistory: (() -> Void)?
-
-    private let button = UIButton(type: .system)
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        var configuration = UIButton.Configuration.filled()
-        configuration.title = "history"
-        configuration.image = AppIcons.disclosure
-        configuration.imagePlacement = .trailing
-        configuration.imagePadding = Spacing.xs
-        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
-            textStyle: TypographyV2.meta.scalingTextStyle
-        )
-        configuration.baseBackgroundColor = Theme.surfaceContainer
-        configuration.baseForegroundColor = Theme.onSurfaceVariant
-        configuration.contentInsets = NSDirectionalEdgeInsets(
-            top: Spacing.row, leading: Spacing.cardInner, bottom: Spacing.row, trailing: Spacing.cardInner
-        )
-        configuration.cornerStyle = .capsule
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
-            var outgoing = incoming
-            outgoing.font = TypographyV2.meta.font()
-            return outgoing
-        }
-        button.configuration = configuration
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.accessibilityIdentifier = "inbox-history-tail"
-        button.accessibilityLabel = "history"
-        button.addAction(
-            UIAction { [weak self] _ in self?.onOpenHistory?() },
-            for: .touchUpInside
-        )
-        contentView.addSubview(button)
-        NSLayoutConstraint.activate([
-            button.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            button.leadingAnchor.constraint(
-                greaterThanOrEqualTo: contentView.leadingAnchor, constant: Spacing.pageH
-            ),
-            button.trailingAnchor.constraint(
-                lessThanOrEqualTo: contentView.trailingAnchor, constant: -Spacing.pageH
-            ),
-            button.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Spacing.gap),
-            button.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            button.heightAnchor.constraint(greaterThanOrEqualToConstant: IconMetrics.minimumHit),
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
 
 // MARK: - Empty state

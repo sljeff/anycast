@@ -71,7 +71,8 @@ struct InboxLoadRedrawTests {
             let long = "Episode \(indexPath.item) with a title long enough to need a couple of lines in a row"
             (cell as? InboxEpisodeCardCell)?.configure(InboxCardContent(
                 title: indexPath.item.isMultiple(of: 2) ? long : "Short",
-                showName: "Show", dateText: "1d ago", durationText: "30m"
+                showName: "Show", dateText: "1d ago", durationText: "30m",
+                descriptionText: "A precomputed description that fills the available lines without arriving later."
             ))
             return cell
         }
@@ -92,10 +93,7 @@ struct InboxLoadRedrawTests {
         defer { window.isHidden = true; window.rootViewController = nil }
 
         let layout = UICollectionViewCompositionalLayout { _, environment in
-            var config = UICollectionLayoutListConfiguration(appearance: .plain)
-            config.showsSeparators = false
-            config.backgroundColor = .clear
-            return NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
+            InboxPageViewController.rowsSection()
         }
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         let source = CardSource()
@@ -208,10 +206,7 @@ struct InboxChromeLayoutTests {
             case 0: return InboxPageViewController.chromeSection(height: ShowsShelfLayout.itemSide, bottomInset: Spacing.gap)
             case 1: return InboxPageViewController.chromeSection(height: CategoryStripView.chipHeight, bottomInset: Spacing.gap)
             default:
-                var config = UICollectionLayoutListConfiguration(appearance: .plain)
-                config.showsSeparators = false
-                config.backgroundColor = .clear
-                return NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
+                return InboxPageViewController.rowsSection()
             }
         }
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
@@ -253,28 +248,29 @@ struct InboxListDiffTests {
         InboxListDiff.plan(old: old, new: new, sectionsUnchanged: sections)
     }
 
-    @Test("Rows that only appeared or left become inserts and removes")
+    @Test("Insertions and removals require one snapshot")
     func insertsAndRemoves() {
-        #expect(plan(["a", "b", "c"], ["n1", "n2", "a", "b", "c"]) == .batch(removes: [], inserts: [0, 1]))
-        #expect(plan(["a", "b", "c"], ["a", "c"]) == .batch(removes: [1], inserts: []))
-        #expect(plan(["a", "b", "c"], ["n", "a", "c", "z"]) == .batch(removes: [1], inserts: [0, 3]))
+        #expect(plan(["a", "b", "c"], ["n1", "n2", "a", "b", "c"]) == .applySnapshot)
+        #expect(plan(["a", "b", "c"], ["a", "c"]) == .applySnapshot)
+        #expect(plan(["a", "b", "c"], ["n", "a", "c", "z"]) == .applySnapshot)
     }
 
     @Test("Identical lists need nothing")
     func unchanged() {
         #expect(plan(["a", "b"], ["a", "b"]) == .unchanged)
+        #expect(plan([], []) == .unchanged)
     }
 
-    @Test("Everything else falls back to a reload")
+    @Test("Section changes, empty transitions, invalid identities and reorders require a snapshot")
     func fallbacks() {
-        #expect(plan(["a", "b"], ["a", "n"], sections: false) == .reload, "sections changed")
-        #expect(plan([], ["a"]) == .reload, "empty before")
-        #expect(plan(["a"], []) == .reload, "empty after")
-        #expect(plan(["a", nil], ["a", "b"]) == .reload, "nil url before")
-        #expect(plan(["a", "b"], ["a", nil]) == .reload, "nil url after")
-        #expect(plan(["a", "a"], ["a", "b"]) == .reload, "duplicate before")
-        #expect(plan(["a", "b"], ["b", "b"]) == .reload, "duplicate after")
-        #expect(plan(["a", "b", "c"], ["a", "c", "b"]) == .reload, "a row moved")
+        #expect(plan(["a", "b"], ["a", "n"], sections: false) == .applySnapshot, "sections changed")
+        #expect(plan([], ["a"]) == .applySnapshot, "empty before")
+        #expect(plan(["a"], []) == .applySnapshot, "empty after")
+        #expect(plan(["a", nil], ["a", "b"]) == .applySnapshot, "nil url before")
+        #expect(plan(["a", "b"], ["a", nil]) == .applySnapshot, "nil url after")
+        #expect(plan(["a", "a"], ["a", "b"]) == .applySnapshot, "duplicate before")
+        #expect(plan(["a", "b"], ["b", "b"]) == .applySnapshot, "duplicate after")
+        #expect(plan(["a", "b", "c"], ["a", "c", "b"]) == .applySnapshot, "a row moved")
     }
 }
 
@@ -404,37 +400,63 @@ struct LoadingRuleTests {
         ).height
         #expect(podcastHeight == realHeight, "skeleton \(podcastHeight) vs real \(realHeight)")
 
-        let episode = ChannelEpisodeRowCell(frame: CGRect(x: 0, y: 0, width: 358, height: 70))
+        // Channel skeleton rows are Show cards with the loaded card's geometry.
+        let frame = CGRect(x: 0, y: 0, width: 358, height: EpisodeCardCell.showRowHeight)
+        let episode = EpisodeCardCell(frame: frame)
         episode.configureSkeleton()
         let episodeHeight = episode.contentView.systemLayoutSizeFitting(
             CGSize(width: 358, height: UIView.layoutFittingCompressedSize.height),
             withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel
         ).height
-        #expect(episodeHeight == ChannelEpisodeRowCell.minimumHeight, "channel skeleton row is \(episodeHeight)")
+        let loaded = EpisodeCardCell(frame: frame)
+        loaded.configure(EpisodeCardContent(
+            title: String(repeating: "A long episode title that wraps ", count: 4), channelTitle: "Show",
+            rightText: "Nov 14 · 42 min", descriptionHTML: nil, imageURL: nil,
+            showsChannel: false, layout: .show, inPlaylist: true
+        ), actions: [])
+        let loadedHeight = loaded.contentView.systemLayoutSizeFitting(
+            CGSize(width: 358, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel
+        ).height
+        #expect(episodeHeight == EpisodeCardCell.showRowHeight, "channel skeleton card is \(episodeHeight)")
+        #expect(loadedHeight == episodeHeight, "loaded \(loadedHeight) vs skeleton \(episodeHeight)")
     }
 }
 
-// MARK: - P2.0 the data commits inside the batch
+// MARK: - P2.0 the model and diffable snapshot commit together
 
 @MainActor
 @Suite(.serialized)
 struct InboxBatchCommitTests {
 
-    private final class Model: NSObject, UICollectionViewDataSource {
+    private final class Model {
         var rows: [String] = []
-        func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int { rows.count }
-        func collectionView(
-            _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
-        ) -> UICollectionViewCell {
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "c", for: indexPath)
-            let label = (cell.contentView.subviews.first as? UILabel) ?? {
-                let label = UILabel()
-                label.frame = CGRect(x: 0, y: 0, width: 300, height: 40)
-                cell.contentView.addSubview(label)
-                return label
-            }()
-            label.text = rows[indexPath.item]
-            return cell
+        let source: UICollectionViewDiffableDataSource<Int, String>
+        let controller: ListActionController
+        init(collection: UICollectionView) {
+            source = UICollectionViewDiffableDataSource<Int, String>(collectionView: collection) { collection, path, id in
+                let cell = collection.dequeueReusableCell(withReuseIdentifier: "c", for: path)
+                let label = (cell.contentView.subviews.first as? UILabel) ?? {
+                    let label = UILabel(frame: CGRect(x: 0, y: 0, width: 300, height: 40))
+                    cell.contentView.addSubview(label)
+                    return label
+                }()
+                label.text = id
+                return cell
+            }
+            controller = ListActionController(
+                collectionView: collection, itemsProvider: { _ in [] }, idAt: { _ in nil },
+                indexPathFor: { _ in nil }, safeArea: { (0, 800) }
+            )
+        }
+        func apply(_ rows: [String]) {
+            controller.itemsDidChange {
+                self.rows = rows
+                var snapshot = NSDiffableDataSourceSnapshot<Int, String>()
+                snapshot.appendSections([0])
+                snapshot.appendItems(rows)
+                self.source.apply(snapshot, animatingDifferences: false)
+            }
         }
     }
 
@@ -442,22 +464,18 @@ struct InboxBatchCommitTests {
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let window = UIWindow(windowScene: scene)
         window.windowLevel = .alert + 1
-        let layout = UICollectionViewCompositionalLayout { _, environment in
-            var config = UICollectionLayoutListConfiguration(appearance: .plain)
-            config.showsSeparators = false
-            return NSCollectionLayoutSection.list(using: config, layoutEnvironment: environment)
-        }
-        let collectionView = UICollectionView(frame: CGRect(x: 0, y: 0, width: 390, height: 800), collectionViewLayout: layout)
-        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "c")
-        let model = Model()
-        model.rows = rows
-        collectionView.dataSource = model
+        let layout = UICollectionViewFlowLayout()
+        layout.itemSize = CGSize(width: 350, height: 50)
+        let collection = ListActionCollectionView(frame: CGRect(x: 0, y: 0, width: 390, height: 800), collectionViewLayout: layout)
+        collection.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "c")
+        let model = Model(collection: collection)
         let controller = UIViewController()
-        controller.view.addSubview(collectionView)
+        controller.view.addSubview(collection)
         window.rootViewController = controller
         window.isHidden = false
-        collectionView.layoutIfNeeded()
-        return (collectionView, model, window)
+        model.apply(rows)
+        collection.layoutIfNeeded()
+        return (collection, model, window)
     }
 
     private func texts(_ collectionView: UICollectionView, _ model: Model) -> [String?] {
@@ -466,49 +484,29 @@ struct InboxBatchCommitTests {
         }
     }
 
-    private func apply(
-        _ new: [String], on collectionView: UICollectionView, model: Model, animated: Bool,
-        gate: UpdateGate? = nil, completion: @escaping () -> Void = {}
-    ) {
-        guard case .batch(let removes, let inserts) = InboxListDiff.plan(
-            old: model.rows, new: new, sectionsUnchanged: true
-        ) else { Issue.record("expected a batch"); return }
-        gate?.begin()
-        InboxBatchUpdate.apply(
-            to: collectionView, section: 0, removes: removes, inserts: inserts, animated: animated,
-            commit: { model.rows = new },
-            completion: { completion(); gate?.end() }
-        )
-    }
-
-    @Test("A pending layout pass does not see post-change counts")
+    @Test("A pending layout pass stays consistent through a synchronous snapshot")
     func pendingLayoutBeforeBatch() async throws {
         let (collectionView, model, window) = try host(rows: ["a", "b", "c", "d", "e"])
         defer { window.isHidden = true; window.rootViewController = nil }
         collectionView.setNeedsLayout()
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            apply(["x", "a", "c", "e", "y"], on: collectionView, model: model, animated: false) { continuation.resume() }
-        }
+        model.apply(["x", "a", "c", "e", "y"])
         collectionView.layoutIfNeeded()
         #expect(collectionView.numberOfItems(inSection: 0) == 5)
         #expect(texts(collectionView, model) == ["x", "a", "c", "e", "y"])
     }
 
-    @Test("A second update while the first still animates waits and lands consistently")
+    @Test("A closed gate defers the model and snapshot together until it reopens")
     func secondUpdateWhileAnimating() async throws {
         let (collectionView, model, window) = try host(rows: ["a", "b", "c", "d", "e"])
         defer { window.isHidden = true; window.rootViewController = nil }
         let gate = UpdateGate()
-        var firstDone = false
-        apply(["a", "c", "d", "e"], on: collectionView, model: model, animated: true, gate: gate) { firstDone = true }
-        // The first batch is animating: park the second, with a layout pass pending.
+        gate.begin()
+        model.apply(["a", "c", "d", "e"])
         collectionView.setNeedsLayout()
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            gate.submitOrDefer {
-                #expect(firstDone, "the second update must wait for the first")
-                self.apply(["n", "a", "d", "e", "m"], on: collectionView, model: model, animated: true) { continuation.resume() }
-            }
-        }
+        gate.submitOrDefer { model.apply(["n", "a", "d", "e", "m"]) }
+        #expect(model.rows == ["a", "c", "d", "e"])
+        #expect(collectionView.numberOfItems(inSection: 0) == 4)
+        gate.end()
         collectionView.layoutIfNeeded()
         #expect(model.rows == ["n", "a", "d", "e", "m"])
         #expect(collectionView.numberOfItems(inSection: 0) == 5)
