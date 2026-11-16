@@ -209,6 +209,20 @@ extension TypographyV2.Style {
     static let emphasis = TypographyV2.emphasis
     static let body = TypographyV2.body
     static let meta = TypographyV2.meta
+
+    /// Same style with tabular (monospaced) digits, still following
+    /// Dynamic Type. `UIFont.monospacedDigits()` rebuilds the font from
+    /// its descriptor, which drops the metrics association a scaled font
+    /// carries — so the digits are applied to the unscaled base first and
+    /// the result is scaled here.
+    func monospacedDigitFont(traits: UITraitCollection? = nil) -> UIFont {
+        let base = ThemeRegistry.current.typography.font(size, weight, role).monospacedDigits()
+        let metrics = UIFontMetrics(forTextStyle: scalingTextStyle)
+        if let traits {
+            return metrics.scaledFont(for: base, compatibleWith: traits)
+        }
+        return metrics.scaledFont(for: base)
+    }
 }
 
 extension UIFont {

@@ -48,6 +48,15 @@ final class RootViewController: UIViewController {
         for url in pending {
             deliverShareHandoff(url)
         }
+
+        // First launch only; never over a sheet that is already up. A
+        // cold-start share handoff is about to present the import sheet;
+        // presenting the onboarding alongside it would have one of the two
+        // rejected mid-presentation (and the handoff's payload is already
+        // consumed), so the onboarding waits for the next launch instead.
+        if pending.isEmpty {
+            OnboardingLauncher.presentIfNeeded(from: self, context: context)
+        }
     }
 
     // MARK: - URL routing (both arrival paths end here, SceneDelegate)

@@ -26,6 +26,16 @@ public struct PlaylistRepository: Sendable {
         }
     }
 
+    /// Number of queued episodes across ALL playlists (membership is
+    /// table-wide, like `playlistContainsURLs`). Read-only, for cheap
+    /// emptiness checks.
+    @concurrent
+    public func episodeCount() async throws -> Int {
+        try await database.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM playlistEpisode") ?? 0
+        }
+    }
+
     @concurrent
     public func episode(byEnclosureURL url: String) async throws -> PlaylistEpisodeRow? {
         try await database.queue.read { db in

@@ -16,6 +16,14 @@ public struct SubscriptionRepository: Sendable {
         }
     }
 
+    /// Number of followed shows. Read-only, for cheap emptiness checks.
+    @concurrent
+    public func count() async throws -> Int {
+        try await database.queue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM subscription") ?? 0
+        }
+    }
+
     @concurrent
     public func get(byRSSFeedURL url: String) async throws -> SubscriptionRow? {
         try await database.queue.read { db in

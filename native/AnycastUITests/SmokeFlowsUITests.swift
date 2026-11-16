@@ -27,7 +27,7 @@ final class SmokeFlowsUITests: XCTestCase {
 
     func testColdStartTabsAndScrolling() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
 
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
         XCTAssertTrue(app.buttons["tab-1"].exists, "Playlist chip missing")
@@ -83,7 +83,7 @@ final class SmokeFlowsUITests: XCTestCase {
 
     func testSearchSheetOpens() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         let searchTab = app.buttons["tab-search"]
@@ -114,7 +114,7 @@ final class SmokeFlowsUITests: XCTestCase {
 
     func testSettingsChangePersistsAcrossRelaunch() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         // The Played audio row is a stepper row that writes immediately: its
@@ -143,7 +143,7 @@ final class SmokeFlowsUITests: XCTestCase {
         func restoreOriginalInterval() {
             guard let original = before, !original.isEmpty else { return }
             app.terminate()
-            app.launch()
+            app.launchPastOnboarding()
             guard app.buttons["tab-0"].waitForExistence(timeout: 20) else { return }
             app.buttons["Settings"].tap()
             let row = app.cells["settings-row-cacheLimit"]
@@ -161,7 +161,7 @@ final class SmokeFlowsUITests: XCTestCase {
 
         // Relaunch: the value must come back from the database.
         app.terminate()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
         app.buttons["Settings"].tap()
         let reopened = app.cells["settings-row-cacheLimit"]
@@ -176,7 +176,7 @@ final class SmokeFlowsUITests: XCTestCase {
 
     func testChannelSheetFromSubscriptions() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         // The first cover on the Podcast tab's shows shelf opens its Channel.
@@ -205,7 +205,7 @@ final class SmokeFlowsUITests: XCTestCase {
 
     func testPlayerSheetPagesAndSpeed() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         let miniPlayerTitle = app.staticTexts["mini-player-title"]
@@ -238,7 +238,7 @@ final class SmokeFlowsUITests: XCTestCase {
     /// overflow control ("More episode actions", which carries Share).
     func testCardTapOpensDetailSheet() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         let card = app.collectionViews.descendants(matching: .any)
@@ -265,7 +265,7 @@ final class SmokeFlowsUITests: XCTestCase {
     /// would consume a seeded episode on every run.
     func testInboxSwipeRevealsRemove() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         let card = app.collectionViews.descendants(matching: .any)
@@ -295,7 +295,7 @@ final class SmokeFlowsUITests: XCTestCase {
     /// park at loading forever, spinning the lottie and dimming controls).
     func testPlaybackFailureShowsRetryAndEndsLoading() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         let miniPlayerTitle = app.staticTexts["mini-player-title"]
@@ -333,7 +333,7 @@ final class SmokeFlowsUITests: XCTestCase {
     /// directly).
     func testFlyInOverlayCapturedMidFlight() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         // Inbox rows are located by their row identifier. Tapping the
@@ -379,7 +379,7 @@ final class SmokeFlowsUITests: XCTestCase {
     /// (database round trip).
     func testPlaylistCardDragReorders() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
         app.buttons["tab-1"].tap()
 
@@ -454,7 +454,7 @@ final class SmokeFlowsUITests: XCTestCase {
 
         // The restored order must survive a relaunch (database round trip).
         app.terminate()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(
             app.buttons["tab-1"].waitForExistence(timeout: 20),
             "pill tab bar did not install after relaunch"
@@ -479,7 +479,7 @@ final class SmokeFlowsUITests: XCTestCase {
     /// Two stacked sheets expose two "Continue with Apple" buttons.
     func testLoginSheetOpens() throws {
         let app = XCUIApplication()
-        app.launch()
+        app.launchPastOnboarding()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
         app.buttons["Settings"].tap()
