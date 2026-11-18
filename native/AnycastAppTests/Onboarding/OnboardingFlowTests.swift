@@ -3,10 +3,15 @@ import Testing
 import AnycastKit
 @testable import Anycast
 
-/// The onboarding's step state: what the primary button needs on each step,
-/// what the skip button does, and the first-launch gate.
+/// The onboarding's 4-step state: step order, skip behavior, primary
+/// button readiness, progress, finish tab routing, and the first-launch gate.
 @MainActor
 struct OnboardingFlowTests {
+
+    @Test("Step order matches the 4-step flow")
+    func stepOrder() {
+        #expect(OnboardingStep.allCases == [.welcome, .subscriptions, .inbox, .transcript])
+    }
 
     @Test("Starts on the welcome step, which can continue or skip everything")
     func startsOnWelcome() {
@@ -23,164 +28,94 @@ struct OnboardingFlowTests {
         flow.skipAll()
         #expect(flow.isFinished)
         #expect(flow.step == .welcome)
-    }
-
-    @Test("Skip-all only works on the welcome step")
-    func skipAllOnlyOnWelcome() {
-        var flow = OnboardingFlow()
-        flow.advance()
-        flow.skipAll()
-        #expect(!flow.isFinished)
-        #expect(flow.step == .interests)
-    }
-
-    @Test("Interests needs at least one choice, kept in the order chosen")
-    func interestsRequireAChoice() {
-        var flow = OnboardingFlow()
-        flow.advance()
-        #expect(flow.step == .interests)
-        #expect(!flow.canContinue)
         #expect(flow.advance() == false)
-        #expect(flow.step == .interests)
-
-        #expect(flow.toggleInterest("Design") == true)
-        #expect(flow.toggleInterest("Tech") == true)
-        #expect(flow.interests == ["Design", "Tech"])
-        #expect(flow.toggleInterest("Design") == false)
-        #expect(flow.interests == ["Tech"])
-        #expect(flow.canContinue)
-        #expect(flow.advance() == true)
-        #expect(flow.step == .subscriptions)
     }
 
-    @Test("Skip is offered on the interests step only while nothing is chosen")
-    func interestsSkipFlipsOnceChosen() {
+    @Test("Skip is offered only on the welcome step")
+    func skipOptionsPerStep() {
+        var flow = OnboardingFlow()
+        #expect(flow.skipOption == .all)
+
+        for expected in [OnboardingStep.subscriptions, .inbox, .transcript] {
+            #expect(flow.advance() == true)
+            #expect(flow.step == expected)
+            #expect(flow.skipOption == .none)
+            flow.skipAll()
+            #expect(!flow.isFinished)
+            #expect(flow.step == expected)
+        }
+    }
+
+    @Test("Continue is enabled on every step and advancing past the last step finishes")
+    func advanceAndCanContinueAcrossAllSteps() {
+        var flow = OnboardingFlow()
+        for expected in [OnboardingStep.welcome, .subscriptions, .inbox, .transcript] {
+            #expect(flow.step == expected)
+            #expect(flow.canContinue)
+            #expect(!flow.isFinished)
+            #expect(flow.advance() == true)
+        }
+        #expect(flow.isFinished)
+        #expect(flow.step == .transcript)
+        #expect(flow.advance() == false)
+    }
+
+    @Test("The inbox lesson toggles sample episodes in add order without gating continue")
+    func inboxToggleDoesNotGateContinue() {
         var flow = OnboardingFlow()
         flow.advance()
-        #expect(flow.skipOption == .step)
-
-        flow.toggleInterest("News")
-        #expect(flow.skipOption == .none)
-        // With no skip offered, skipping does nothing and keeps the choice.
-        flow.skipStep()
-        #expect(flow.step == .interests)
-        #expect(flow.interests == ["News"])
-
-        flow.toggleInterest("News")
-        #expect(flow.skipOption == .step)
-        flow.skipStep()
-        #expect(flow.step == .subscriptions)
-        #expect(flow.interests.isEmpty)
-    }
-
-    @Test("The queue lesson continues once two sample episodes are added")
-    func queueLessonNeedsTwo() {
-        var flow = flow(at: .queueLesson)
-        #expect(!flow.canContinue)
-        #expect(flow.skipOption == .step)
+        flow.advance()
+        #expect(flow.step == .inbox)
+        #expect(flow.canContinue)
 
         #expect(flow.toggleQueued("sample-2") == true)
-        #expect(!flow.canContinue)
-        #expect(flow.skipOption == .step)
-        #expect(flow.toggleQueued("sample-1") == true)
         #expect(flow.canContinue)
-        #expect(flow.skipOption == .none)
+        #expect(flow.toggleQueued("sample-1") == true)
         #expect(flow.queuedEpisodeIDs == ["sample-2", "sample-1"])
         #expect(flow.toggleQueued("sample-2") == false)
-        #expect(!flow.canContinue)
-        #expect(flow.skipOption == .step)
         #expect(flow.queuedEpisodeIDs == ["sample-1"])
-    }
-
-    @Test("The transcript lesson continues once the sample question is asked")
-    func transcriptLessonNeedsTheQuestion() {
-        var flow = flow(at: .transcriptLesson)
-        #expect(!flow.canContinue)
-        #expect(flow.skipOption == .step)
-        flow.markEpisodeAsked()
         #expect(flow.canContinue)
-        #expect(flow.skipOption == .none)
-        #expect(flow.advance() == true)
-        #expect(flow.step == .done)
     }
 
-    @Test("Steps without a requirement offer no skip")
-    func noSkipWithoutRequirement() {
-        for step in [OnboardingStep.subscriptions, .impression, .done] {
-            var flow = flow(at: step)
-            #expect(flow.skipOption == .none)
-            flow.skipStep()
-            #expect(flow.step == step)
-        }
-    }
-
-    @Test("An unmet step can be skipped; the last step has no skip and finishes")
-    func skipThroughToTheEnd() {
+    @Test("Progress grows by equal quarters across all four steps")
+    func progressValues() {
         var flow = OnboardingFlow()
-        flow.advance()
-        var skipped: [OnboardingStep] = []
-        while true {
-            if flow.skipOption == .step {
-                skipped.append(flow.step)
-                flow.skipStep()
-            } else if flow.step != .done {
-                flow.advance()
-            } else {
-                break
-            }
-        }
-        // Nothing was answered, so each requirement step is skipped.
-        #expect(skipped == [.interests, .queueLesson, .transcriptLesson])
-        #expect(flow.step == .done)
-        #expect(flow.skipOption == .none)
-
-        // Skip does nothing on the last step; the primary button finishes.
-        flow.skipStep()
-        #expect(flow.step == .done)
-        #expect(!flow.isFinished)
-        #expect(flow.advance() == true)
-        #expect(flow.isFinished)
-        #expect(flow.advance() == false)
-    }
-
-    @Test("Progress grows with each step and ends full")
-    func progress() {
-        var flow = OnboardingFlow()
-        var previous = flow.progress
-        #expect(previous > 0)
-        while flow.step != .done {
-            if flow.skipOption == .step { flow.skipStep() } else { flow.advance() }
-            #expect(flow.progress > previous)
-            previous = flow.progress
-        }
-        #expect(flow.progress == 1)
-    }
-
-    @Test("The impression names the first two interests, or none")
-    func impressionCopy() {
-        #expect(OnboardingCopy.impression(interests: ["Tech", "Business", "Design"]).contains("You lean toward Tech and Business shows"))
-        #expect(OnboardingCopy.impression(interests: ["Comedy"]).contains("You lean toward Comedy shows"))
-        #expect(!OnboardingCopy.impression(interests: []).contains("You lean toward"))
-    }
-
-    /// A flow moved to `target` with every requirement met on the way.
-    private func flow(at target: OnboardingStep) -> OnboardingFlow {
-        var flow = OnboardingFlow()
-        while flow.step != target {
-            switch flow.step {
-            case .interests:
-                flow.toggleInterest("Tech")
-            case .queueLesson:
-                flow.toggleQueued("sample-1")
-                flow.toggleQueued("sample-2")
-            case .transcriptLesson:
-                flow.markEpisodeAsked()
-            default:
-                break
-            }
+        var recorded: [Float] = []
+        for _ in OnboardingStep.allCases {
+            recorded.append(flow.progress)
             flow.advance()
         }
-        return flow
+        #expect(recorded == [0.25, 0.5, 0.75, 1.0])
+        #expect(flow.isFinished)
+    }
+
+    @Test("Exit tab routes to Inbox when subscribed and Discover when empty")
+    func exitTabRouting() {
+        #expect(OnboardingFlow.exitTabIndex(subscriptionCount: 0) == 2)
+        #expect(OnboardingFlow.exitTabIndex(subscriptionCount: 1) == 0)
+        #expect(OnboardingFlow.exitTabIndex(subscriptionCount: 5) == 0)
+    }
+
+    @Test("Subscription status formats singular, plural, and hidden states")
+    func subscriptionStatusCopy() {
+        #expect(OnboardingCopy.subscriptionStatus(count: 0) == nil)
+        #expect(OnboardingCopy.subscriptionStatus(count: 1) == "Following 1 show · New episodes are in your Inbox")
+        #expect(OnboardingCopy.subscriptionStatus(count: 3) == "Following 3 shows · New episodes are in your Inbox")
+    }
+
+    @Test("Sample episodes and transcript copy follow product specs")
+    func sampleContentAndCopy() {
+        #expect(OnboardingSamples.episodes.count == 3)
+        #expect(OnboardingCopy.transcriptHint.contains(PlusOffer.freePitch))
+
+        let chinese = OnboardingSamples.transcript(forPreferredLanguages: ["zh-Hans-US"])
+        let japanese = OnboardingSamples.transcript(forPreferredLanguages: ["ja-JP"])
+        let fallback = OnboardingSamples.transcript(forPreferredLanguages: ["en-US"])
+        #expect(chinese.count == 3)
+        #expect(japanese.count == 3)
+        #expect(fallback.count == 3)
+        #expect(chinese[0].translation != fallback[0].translation)
+        #expect(japanese[0].translation != chinese[0].translation)
     }
 
     // MARK: - Gate

@@ -4,15 +4,15 @@ import UIKit
 @MainActor
 enum OnboardingUI {
 
-    /// A multi-line label in a v2 text style that follows Dynamic Type.
-    static func label(_ text: String, style: TypographyV2.Style, color: UIColor? = nil) -> UILabel {
-        let label = UILabel()
-        label.text = text
-        label.font = style.font()
-        label.textColor = color ?? style.color
-        label.adjustsFontForContentSizeCategory = true
-        label.numberOfLines = 0
-        return label
+    /// A multi-line label in a v2 text style that applies its design line
+    /// height and follows Dynamic Type.
+    static func label(
+        _ text: String,
+        style: TypographyV2.Style,
+        color: UIColor? = nil,
+        monospacedDigits: Bool = false
+    ) -> UILabel {
+        OnboardingStyledLabel(text: text, style: style, color: color, monospacedDigits: monospacedDigits)
     }
 
     /// Pins a top and a bottom `ScrollEdgeFade` over `host`'s edges so
@@ -33,6 +33,246 @@ enum OnboardingUI {
             bottom.bottomAnchor.constraint(equalTo: host.bottomAnchor),
             bottom.heightAnchor.constraint(equalToConstant: ScrollEdgeFade.fadeLength),
         ])
+    }
+}
+
+/// Applies `TypographyV2.Style.attributes(traits:)` so labels honor exact token
+/// line heights and recompute both font and line height on Dynamic Type or
+/// text changes.
+private final class OnboardingStyledLabel: UILabel {
+
+    private let style: TypographyV2.Style
+    private let usesMonospacedDigits: Bool
+    private var currentColor: UIColor?
+    private var rawText: String?
+    private var isReady = false
+    private var isApplyingStyle = false
+
+    init(text: String, style: TypographyV2.Style, color: UIColor?, monospacedDigits: Bool) {
+        self.style = style
+        self.currentColor = color
+        self.usesMonospacedDigits = monospacedDigits
+        self.rawText = text
+        super.init(frame: .zero)
+        isReady = true
+        adjustsFontForContentSizeCategory = true
+        numberOfLines = 0
+        lineBreakMode = .byWordWrapping
+        applyStyle()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (label: OnboardingStyledLabel, _) in
+            label.applyStyle()
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override var text: String? {
+        get { super.text }
+        set {
+            if isReady {
+                rawText = newValue
+                applyStyle()
+            } else {
+                super.text = newValue
+            }
+        }
+    }
+
+    override var textColor: UIColor! {
+        get { super.textColor }
+        set {
+            if isReady {
+                currentColor = newValue
+                applyStyle()
+            } else {
+                super.textColor = newValue
+            }
+        }
+    }
+
+    override var lineBreakMode: NSLineBreakMode {
+        didSet {
+            if isReady, oldValue != lineBreakMode { applyStyle() }
+        }
+    }
+
+    override var textAlignment: NSTextAlignment {
+        didSet {
+            if isReady, oldValue != textAlignment { applyStyle() }
+        }
+    }
+
+    private func applyStyle() {
+        guard isReady, !isApplyingStyle else { return }
+        isApplyingStyle = true
+        defer { isApplyingStyle = false }
+
+        var attributes = style.attributes(traits: traitCollection)
+        if usesMonospacedDigits {
+            let font = style.monospacedDigitFont(traits: traitCollection)
+            let line = style.resolvedLineHeight(for: font, traits: traitCollection)
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.minimumLineHeight = line
+            paragraph.maximumLineHeight = line
+            attributes[.font] = font
+            attributes[.paragraphStyle] = paragraph
+        }
+        if let currentColor {
+            attributes[.foregroundColor] = currentColor
+        }
+        if let existing = attributes[.paragraphStyle] as? NSParagraphStyle,
+           let paragraph = existing.mutableCopy() as? NSMutableParagraphStyle {
+            paragraph.lineBreakMode = lineBreakMode
+            paragraph.alignment = textAlignment
+            attributes[.paragraphStyle] = paragraph
+        }
+
+        super.font = attributes[.font] as? UIFont
+        super.textColor = attributes[.foregroundColor] as? UIColor
+        super.attributedText = rawText.map { NSAttributedString(string: $0, attributes: attributes) }
+    }
+}
+
+// MARK: - Artwork tiles
+
+/// Draws distinct warm-hued editorial tiles in code for the onboarding's
+/// sample shows (no image assets, no grey letter placeholders).
+@MainActor
+enum OnboardingArtworkTile {
+
+    private static var cache: [String: UIImage] = [:]
+
+    static func image(for show: String) -> UIImage {
+        if let cached = cache[show] { return cached }
+        let side: CGFloat = 88
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = true
+        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
+            draw(show: show, in: CGRect(x: 0, y: 0, width: side, height: side), cg: context.cgContext)
+        }
+        cache[show] = image
+        return image
+    }
+
+    private static func draw(show: String, in rect: CGRect, cg: CGContext) {
+        switch show {
+        case "Morning Notes":
+            drawLinearGradient(
+                in: rect, cg: cg,
+                colors: [
+                    UIColor(red: 0.85, green: 0.42, blue: 0.26, alpha: 1),
+                    UIColor(red: 0.78, green: 0.54, blue: 0.29, alpha: 1),
+                    UIColor(red: 0.29, green: 0.18, blue: 0.15, alpha: 1),
+                ],
+                locations: [0, 0.55, 1]
+            )
+            UIColor(red: 0.97, green: 0.90, blue: 0.77, alpha: 0.92).setFill()
+            UIBezierPath(ovalIn: CGRect(x: rect.width * 0.295, y: rect.height * 0.227, width: rect.width * 0.41, height: rect.height * 0.41)).fill()
+
+            let ridge = UIBezierPath()
+            ridge.move(to: CGPoint(x: 0, y: rect.height * 0.68))
+            ridge.addCurve(
+                to: CGPoint(x: rect.width, y: rect.height * 0.68),
+                controlPoint1: CGPoint(x: rect.width * 0.30, y: rect.height * 0.59),
+                controlPoint2: CGPoint(x: rect.width * 0.70, y: rect.height * 0.59)
+            )
+            ridge.addLine(to: CGPoint(x: rect.width, y: rect.height))
+            ridge.addLine(to: CGPoint(x: 0, y: rect.height))
+            ridge.close()
+            UIColor(red: 0.17, green: 0.13, blue: 0.11, alpha: 0.80).setFill()
+            ridge.fill()
+
+            cg.setLineCap(.round)
+            cg.setLineWidth(2.5)
+            UIColor(red: 0.97, green: 0.90, blue: 0.77, alpha: 0.55).setStroke()
+            cg.move(to: CGPoint(x: rect.width * 0.24, y: rect.height * 0.78))
+            cg.addLine(to: CGPoint(x: rect.width * 0.76, y: rect.height * 0.78))
+            cg.strokePath()
+            UIColor(red: 0.97, green: 0.90, blue: 0.77, alpha: 0.35).setStroke()
+            cg.move(to: CGPoint(x: rect.width * 0.32, y: rect.height * 0.87))
+            cg.addLine(to: CGPoint(x: rect.width * 0.62, y: rect.height * 0.87))
+            cg.strokePath()
+
+        case "Craft & Form":
+            drawLinearGradient(
+                in: rect, cg: cg,
+                colors: [
+                    UIColor(red: 0.48, green: 0.22, blue: 0.22, alpha: 1),
+                    UIColor(red: 0.28, green: 0.13, blue: 0.14, alpha: 1),
+                ],
+                locations: [0, 1]
+            )
+            let arch = UIBezierPath()
+            let archLeft = rect.width * 0.27
+            let archRight = rect.width * 0.73
+            let archBottom = rect.height * 0.84
+            let archRadius = (archRight - archLeft) / 2
+            let archCenter = CGPoint(x: rect.midX, y: rect.height * 0.48)
+            arch.move(to: CGPoint(x: archLeft, y: archBottom))
+            arch.addLine(to: CGPoint(x: archLeft, y: archCenter.y))
+            arch.addArc(withCenter: archCenter, radius: archRadius, startAngle: .pi, endAngle: 0, clockwise: true)
+            arch.addLine(to: CGPoint(x: archRight, y: archBottom))
+            arch.close()
+            UIColor(red: 0.94, green: 0.90, blue: 0.84, alpha: 0.92).setFill()
+            arch.fill()
+
+            UIColor(red: 0.85, green: 0.51, blue: 0.35, alpha: 1).setFill()
+            UIBezierPath(ovalIn: CGRect(x: rect.midX - rect.width * 0.105, y: rect.height * 0.35, width: rect.width * 0.21, height: rect.width * 0.21)).fill()
+
+            UIColor(red: 0.36, green: 0.16, blue: 0.17, alpha: 1).setFill()
+            UIBezierPath(rect: CGRect(x: rect.midX - rect.width * 0.09, y: rect.height * 0.62, width: rect.width * 0.18, height: rect.height * 0.22)).fill()
+
+        default:
+            drawLinearGradient(
+                in: rect, cg: cg,
+                colors: [
+                    UIColor(red: 0.33, green: 0.39, blue: 0.29, alpha: 1),
+                    UIColor(red: 0.53, green: 0.51, blue: 0.31, alpha: 1),
+                    UIColor(red: 0.70, green: 0.57, blue: 0.35, alpha: 1),
+                ],
+                locations: [0, 0.58, 1]
+            )
+            let duneBack = UIBezierPath()
+            duneBack.move(to: CGPoint(x: 0, y: rect.height * 0.72))
+            duneBack.addQuadCurve(to: CGPoint(x: rect.width * 0.58, y: rect.height * 0.65), controlPoint: CGPoint(x: rect.width * 0.28, y: rect.height * 0.52))
+            duneBack.addQuadCurve(to: CGPoint(x: rect.width, y: rect.height * 0.59), controlPoint: CGPoint(x: rect.width * 0.80, y: rect.height * 0.71))
+            duneBack.addLine(to: CGPoint(x: rect.width, y: rect.height))
+            duneBack.addLine(to: CGPoint(x: 0, y: rect.height))
+            duneBack.close()
+            UIColor(red: 0.84, green: 0.71, blue: 0.47, alpha: 0.85).setFill()
+            duneBack.fill()
+
+            let duneFront = UIBezierPath()
+            duneFront.move(to: CGPoint(x: 0, y: rect.height * 0.84))
+            duneFront.addQuadCurve(to: CGPoint(x: rect.width * 0.72, y: rect.height * 0.79), controlPoint: CGPoint(x: rect.width * 0.38, y: rect.height * 0.67))
+            duneFront.addQuadCurve(to: CGPoint(x: rect.width, y: rect.height * 0.75), controlPoint: CGPoint(x: rect.width * 0.88, y: rect.height * 0.84))
+            duneFront.addLine(to: CGPoint(x: rect.width, y: rect.height))
+            duneFront.addLine(to: CGPoint(x: 0, y: rect.height))
+            duneFront.close()
+            UIColor(red: 0.19, green: 0.24, blue: 0.19, alpha: 0.76).setFill()
+            duneFront.fill()
+
+            UIColor(red: 0.96, green: 0.94, blue: 0.90, alpha: 0.9).setFill()
+            UIBezierPath(ovalIn: CGRect(x: rect.width * 0.61, y: rect.height * 0.22, width: rect.width * 0.18, height: rect.width * 0.18)).fill()
+        }
+    }
+
+    private static func drawLinearGradient(
+        in rect: CGRect, cg: CGContext, colors: [UIColor], locations: [CGFloat]
+    ) {
+        let cgColors = colors.map(\.cgColor) as CFArray
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: cgColors,
+            locations: locations
+        ) else { return }
+        cg.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: rect.minX, y: rect.minY),
+            end: CGPoint(x: rect.maxX, y: rect.maxY),
+            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+        )
     }
 }
 
@@ -111,7 +351,7 @@ final class OnboardingThreadView: UIView {
         }
         for (index, view) in items.enumerated() {
             let position = min(index, Motion.cardEntranceMaxStaggered)
-            let delay = Double(position) * Motion.cardEntranceStagger * 2
+            let delay = Double(position) * Motion.cardEntranceStagger
             let isLast = index == items.indices.last
             animateEntrance(of: view, delay: delay) {
                 if isLast { onSettled?() }
@@ -119,7 +359,7 @@ final class OnboardingThreadView: UIView {
         }
     }
 
-    /// Fades `view` out and collapses it in the column, then calls
+    /// Fades `view` out and collapses it smoothly in the column, then calls
     /// `completion`. Reduce Motion collapses it at once.
     func collapse(_ view: UIView, then completion: @escaping () -> Void) {
         guard !Motion.reduceMotion else {
@@ -127,9 +367,19 @@ final class OnboardingThreadView: UIView {
             completion()
             return
         }
-        Motion.animate(Motion.quick, { view.alpha = 0 }, completion: {
-            view.isHidden = true
-            completion()
+        Motion.animate(Motion.stripFadeOut, { view.alpha = 0 }, completion: { [weak self] in
+            UIView.animate(
+                withDuration: 0.24,
+                delay: 0,
+                usingSpringWithDamping: 0.88,
+                initialSpringVelocity: 0,
+                options: [.allowUserInteraction],
+                animations: {
+                    view.isHidden = true
+                    self?.layoutIfNeeded()
+                },
+                completion: { _ in completion() }
+            )
         })
     }
 
@@ -159,14 +409,6 @@ final class OnboardingThreadView: UIView {
             },
             completion: { _ in completion?() }
         )
-    }
-
-    /// Scrolls so `view` is visible, without animation. Used before the
-    /// queue lesson's fly-in: its endpoint is sampled from the tray's
-    /// position at animation start, so the tray must already be on screen.
-    func reveal(_ view: UIView) {
-        let rect = view.convert(view.bounds, to: scrollView)
-        scrollView.scrollRectToVisible(rect, animated: false)
     }
 
     private func scrollToBottom() {
@@ -235,7 +477,7 @@ final class OnboardingBubbleView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
 
-// MARK: - Chip
+// MARK: - Chip & Timestamp Pill
 
 /// A capsule chip. Selection is the button's own `isSelected`, so a tap
 /// restyles only this chip; VoiceOver reads the selected state from it.
@@ -263,8 +505,10 @@ final class OnboardingChipButton: UIButton {
         self.configuration = configuration
         configurationUpdateHandler = { button in
             var updated = button.configuration
-            updated?.baseBackgroundColor = button.isSelected ? Theme.onSurface : Theme.surface
-            updated?.baseForegroundColor = button.isSelected ? Theme.surface : Theme.onSurface
+            updated?.baseBackgroundColor = button.isSelected ? AnycastColor.sandAlpha4 : Theme.surface
+            updated?.baseForegroundColor = Theme.onSurface
+            updated?.background.strokeColor = button.isSelected ? Theme.primary : AnycastColor.sandAlpha3
+            updated?.background.strokeWidth = button.isSelected ? 1.5 : 1
             button.configuration = updated
         }
         titleLabel?.adjustsFontForContentSizeCategory = true
@@ -304,7 +548,7 @@ final class OnboardingChipButton: UIButton {
         let maxWidth = targetSize.width - insets.leading - insets.trailing
         guard maxWidth > 0 else { return singleLine }
 
-        let text = NSAttributedString(string: title, attributes: [.font: TypographyV2.body.font()])
+        let text = NSAttributedString(string: title, attributes: TypographyV2.body.attributes(traits: traitCollection))
         let textBounds = text.boundingRect(
             with: CGSize(width: maxWidth, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -312,6 +556,50 @@ final class OnboardingChipButton: UIButton {
         )
         let height = max(Self.minimumHeight, ceil(textBounds.height) + insets.top + insets.bottom)
         return CGSize(width: targetSize.width, height: height)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+}
+
+/// A tappable timestamp citation pill (`▶ 00:42`) in gold (`Theme.primary`),
+/// matching `ChatBubbleView`'s jump buttons.
+final class OnboardingTimestampPillButton: UIButton {
+
+    private static let minimumHeight: CGFloat = 44
+
+    init(timestamp: String) {
+        super.init(frame: .zero)
+
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = timestamp
+        configuration.cornerStyle = .capsule
+        configuration.image = AppIcons.play
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
+            textStyle: TypographyV2.meta.scalingTextStyle, scale: .small
+        )
+        configuration.imagePadding = Spacing.sm
+        configuration.contentInsets = NSDirectionalEdgeInsets(
+            top: Spacing.row, leading: Spacing.chip, bottom: Spacing.row, trailing: Spacing.chip
+        )
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = TypographyV2.meta.monospacedDigitFont()
+            return outgoing
+        }
+        self.configuration = configuration
+        configurationUpdateHandler = { button in
+            var updated = button.configuration
+            updated?.baseBackgroundColor = button.isSelected ? AnycastColor.sandAlpha4 : AnycastColor.goldAlpha3
+            updated?.baseForegroundColor = Theme.primary
+            updated?.background.strokeColor = button.isSelected ? Theme.primary : AnycastColor.goldAlpha7
+            updated?.background.strokeWidth = button.isSelected ? 1.5 : 1
+            button.configuration = updated
+        }
+        titleLabel?.adjustsFontForContentSizeCategory = true
+        accessibilityLabel = OnboardingCopy.jumpToTimestamp(timestamp)
+        heightAnchor.constraint(greaterThanOrEqualToConstant: Self.minimumHeight).isActive = true
+        addPressFeedback(scale: Motion.pressScaleSubtle)
     }
 
     @available(*, unavailable)
@@ -494,16 +782,19 @@ final class OnboardingOptionRow: UIControl {
     }
 }
 
-// MARK: - Up Next tray
+// MARK: - Playlist tray
 
-/// The "Up Next" tray of the queue lesson and the last step: the sample
-/// episodes added so far. Updating it appends rows for newly added episodes
-/// and removes rows for removed ones; rows that stay are left alone.
-final class OnboardingUpNextTrayView: UIView {
+/// The "Playlist" tray of the inbox lesson: the sample episodes added so
+/// far. Updating it appends rows for newly added episodes and removes rows
+/// for removed ones; rows that stay are left alone.
+final class OnboardingPlaylistTrayView: UIView {
 
     private let rowsStack = UIStackView()
-    private let emptyLabel = OnboardingUI.label(OnboardingCopy.upNextEmpty, style: TypographyV2.meta)
+    private let emptyLabel = OnboardingUI.label(OnboardingCopy.playlistEmpty, style: TypographyV2.meta)
     private var rows: [(id: String, view: UIView)] = []
+
+    /// Exposed for unit tests to inspect rendered row count and titles.
+    var rowCount: Int { rows.count }
 
     init() {
         super.init(frame: .zero)
@@ -512,7 +803,7 @@ final class OnboardingUpNextTrayView: UIView {
         plate.translatesAutoresizingMaskIntoConstraints = false
         addSubview(plate)
 
-        let titleLabel = OnboardingUI.label(OnboardingCopy.upNext, style: TypographyV2.emphasis)
+        let titleLabel = OnboardingUI.label(OnboardingCopy.playlist, style: TypographyV2.emphasis)
         titleLabel.accessibilityTraits = .header
 
         rowsStack.axis = .vertical
@@ -568,7 +859,9 @@ final class OnboardingUpNextTrayView: UIView {
         title.numberOfLines = 1
         title.lineBreakMode = .byTruncatingTail
         title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let minutes = OnboardingUI.label(OnboardingCopy.minutes(episode.minutes), style: TypographyV2.meta)
+        let minutes = OnboardingUI.label(
+            OnboardingCopy.minutes(episode.minutes), style: TypographyV2.meta, monospacedDigits: true
+        )
         minutes.numberOfLines = 1
         minutes.setContentHuggingPriority(.required, for: .horizontal)
         minutes.setContentCompressionResistancePriority(.required, for: .horizontal)

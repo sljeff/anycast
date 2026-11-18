@@ -1,9 +1,9 @@
 import UIKit
 import AnycastKit
 
-/// The first-launch onboarding: a short conversation (interests, moving
-/// subscriptions, a first read of the listener) and two hands-on lessons
-/// (the queue, the transcript). Presented full screen over the tab shell.
+/// The first-launch onboarding: a welcome screen, moving existing
+/// subscriptions, and two hands-on lessons (adding to Playlist and reading
+/// and asking an AI transcript). Presented full screen over the tab shell.
 ///
 /// This container owns the step state (`OnboardingFlow`), the progress bar
 /// and the two buttons; each step's content is an `OnboardingStepView`.
@@ -21,10 +21,13 @@ final class OnboardingViewController: UIViewController {
     private let primaryButton = AnycastButton.make(.primary, title: OnboardingCopy.start)
     private let skipButton = UIButton(type: .system)
     private var stepView: OnboardingStepView?
-    /// True while a step change is animating. A double tap on the primary
-    /// or skip button during that window would otherwise race the swap and
-    /// advance a second step (or finish) off one gesture.
+    /// True while a step change (or finish) is in flight. A double tap on
+    /// the primary or skip button during that window would otherwise race
+    /// the swap and advance a second step (or finish) off one gesture.
     private var isChangingStep = false
+    private var stepTransitionToken = 0
+    private var isStepFadeFinished = true
+    private var isStepEntranceSettled = true
 
     private static let primaryHeight: CGFloat = 52
     private static let skipHeight: CGFloat = 44
@@ -54,7 +57,9 @@ final class OnboardingViewController: UIViewController {
 
     private func buildViews() {
         progressView.trackTintColor = AnycastColor.sandAlpha4
-        progressView.progressTintColor = Theme.onSurface
+        progressView.progressTintColor = Theme.primary
+        progressView.clipsToBounds = true
+        progressView.layer.cornerRadius = Spacing.compactProgress / 2
         progressView.isAccessibilityElement = false
         progressView.accessibilityIdentifier = "onboarding-progress"
 
@@ -110,40 +115,26 @@ final class OnboardingViewController: UIViewController {
         switch step {
         case .welcome:
             return OnboardingWelcomeStepView()
-        case .interests:
-            return OnboardingInterestsStepView(selected: flow.interests) { [weak self] name in
-                guard let self else { return false }
-                let isSelected = self.flow.toggleInterest(name)
-                self.renderControls()
-                return isSelected
-            }
         case .subscriptions:
+            let database = context.database
             return OnboardingSubscriptionsStepView(
-                interests: flow.interests,
+                fetchSubscriptionCount: {
+                    (try? await database.subscriptionRepository().count()) ?? 0
+                },
                 onImportFile: { [weak self] in self?.importFile() },
                 onPasteFeed: { [weak self] in self?.pasteFeedAddress() }
             )
-        case .impression:
-            return OnboardingImpressionStepView(interests: flow.interests)
-        case .queueLesson:
-            return OnboardingQueueLessonStepView(
-                episodes: OnboardingSamples.episodes, queued: flow.queuedEpisodeIDs
+        case .inbox:
+            return OnboardingInboxStepView(
+                episodes: OnboardingSamples.episodes,
+                queued: flow.queuedEpisodeIDs
             ) { [weak self] id in
                 guard let self else { return [] }
                 self.flow.toggleQueued(id)
-                self.renderControls()
                 return self.flow.queuedEpisodeIDs
             }
-        case .transcriptLesson:
-            return OnboardingTranscriptLessonStepView(
-                lines: OnboardingSamples.transcript, hasAsked: flow.hasAskedEpisode
-            ) { [weak self] in
-                guard let self else { return }
-                self.flow.markEpisodeAsked()
-                self.renderControls()
-            }
-        case .done:
-            return OnboardingDoneStepView(interests: flow.interests)
+        case .transcript:
+            return OnboardingTranscriptStepView(lines: OnboardingSamples.transcript)
         }
     }
 
@@ -162,64 +153,100 @@ final class OnboardingViewController: UIViewController {
 
         let outgoing = stepView
         stepView = incoming
-        renderControls()
+        stepTransitionToken &+= 1
+        let token = stepTransitionToken
+
+        renderControls(animated: animated)
         progressView.setProgress(flow.progress, animated: animated && !Motion.reduceMotion)
 
         guard animated else {
+            isStepFadeFinished = true
+            isStepEntranceSettled = true
             outgoing?.removeFromSuperview()
             return
         }
-        contentContainer.layoutIfNeeded()
-        // VoiceOver focus moves once the incoming step's entrance has
-        // settled: posting during the fade lands the focus on views that
-        // are still alpha 0. Reduce Motion settles immediately.
-        incoming.stepDidAppear(onSettled: { [weak incoming] in
-            UIAccessibility.post(notification: .screenChanged, argument: incoming)
-        })
 
-        guard let outgoing else { return }
         guard !Motion.reduceMotion else {
-            outgoing.removeFromSuperview()
+            isStepFadeFinished = true
+            isStepEntranceSettled = false
+            contentContainer.layoutIfNeeded()
+            outgoing?.removeFromSuperview()
+            incoming.stepDidAppear(onSettled: { [weak self, weak incoming] in
+                guard let self, self.stepTransitionToken == token else { return }
+                self.isStepEntranceSettled = true
+                self.postScreenChangedIfReady(incoming)
+            })
             return
         }
-        outgoing.isUserInteractionEnabled = false
+
+        incoming.alpha = 0
+        contentContainer.layoutIfNeeded()
+        outgoing?.isUserInteractionEnabled = false
         isChangingStep = true
+        isStepFadeFinished = false
+        isStepEntranceSettled = false
         Motion.animate(
             Motion.quick,
-            { outgoing.alpha = 0 },
-            completion: { [weak self] in
-                self?.isChangingStep = false
-                outgoing.removeFromSuperview()
+            {
+                outgoing?.alpha = 0
+                incoming.alpha = 1
+            },
+            completion: { [weak self, weak incoming] in
+                outgoing?.removeFromSuperview()
+                guard let self, self.stepTransitionToken == token else { return }
+                self.isChangingStep = false
+                self.isStepFadeFinished = true
+                self.postScreenChangedIfReady(incoming)
             }
         )
+        // VoiceOver focus moves once both the crossfade and the incoming
+        // step's entrance have settled so focus lands on visible content.
+        incoming.stepDidAppear(onSettled: { [weak self, weak incoming] in
+            guard let self, self.stepTransitionToken == token else { return }
+            self.isStepEntranceSettled = true
+            self.postScreenChangedIfReady(incoming)
+        })
     }
 
-    /// Updates the two buttons from the flow. Called on every answer.
-    private func renderControls() {
+    private func postScreenChangedIfReady(_ target: OnboardingStepView?) {
+        guard isStepFadeFinished, isStepEntranceSettled, let target else { return }
+        UIAccessibility.post(notification: .screenChanged, argument: target)
+    }
+
+    /// Updates the two buttons and progress visibility from the flow.
+    private func renderControls(animated: Bool = false) {
         let title: String
         switch flow.step {
         case .welcome: title = OnboardingCopy.start
-        case .interests: title = OnboardingCopy.interestsDone(count: flow.interests.count)
-        case .done: title = OnboardingCopy.enter
-        case .subscriptions, .impression, .queueLesson, .transcriptLesson: title = OnboardingCopy.next
+        case .subscriptions, .inbox: title = OnboardingCopy.next
+        case .transcript: title = OnboardingCopy.openAnycast
         }
         if primaryButton.configuration?.title != title {
             primaryButton.configuration?.title = title
         }
         primaryButton.isEnabled = flow.canContinue
 
-        // The skip row is always reserved, so the primary button never
-        // moves when the skip option comes or goes.
+        // The skip row is always reserved so the primary button never
+        // jumps when the skip option fades out.
         let option = flow.skipOption
-        switch option {
-        case .none: break
-        case .step: skipButton.configuration?.title = OnboardingCopy.skipStep
-        case .all: skipButton.configuration?.title = OnboardingCopy.skipAll
+        if option == .all, skipButton.configuration?.title != OnboardingCopy.skip {
+            skipButton.configuration?.title = OnboardingCopy.skip
         }
         let isSkipVisible = option != .none
-        skipButton.alpha = isSkipVisible ? 1 : 0
         skipButton.isUserInteractionEnabled = isSkipVisible
         skipButton.accessibilityElementsHidden = !isSkipVisible
+
+        let targetSkipAlpha: CGFloat = isSkipVisible ? 1 : 0
+        let targetProgressAlpha: CGFloat = flow.step == .welcome ? 0 : 1
+        if animated, !Motion.reduceMotion {
+            Motion.animate(Motion.quick) {
+                self.skipButton.alpha = targetSkipAlpha
+                self.progressView.alpha = targetProgressAlpha
+            }
+        } else {
+            skipButton.alpha = targetSkipAlpha
+            progressView.alpha = targetProgressAlpha
+        }
     }
 
     // MARK: - Actions
@@ -233,7 +260,6 @@ final class OnboardingViewController: UIViewController {
         guard !isChangingStep else { return }
         switch flow.skipOption {
         case .none: return
-        case .step: flow.skipStep()
         case .all: flow.skipAll()
         }
         stepChanged()
@@ -247,21 +273,35 @@ final class OnboardingViewController: UIViewController {
         }
     }
 
-    /// Finishing and skipping end the same way: remember it, land on the
-    /// Playlist tab, and leave.
+    /// Finishing and skipping end the same way: mark completion, route to
+    /// Inbox (when subscribed) or Discover (when not), and dismiss.
     private func finish() {
+        guard !isChangingStep else { return }
+        isChangingStep = true
+        view.isUserInteractionEnabled = false
         gate.markCompleted()
-        // Tab 1 is Playlist (MainTabBarController.selectTab).
-        context.tabs.select(1)
-        dismiss(animated: true)
+        let database = context.database
+        Task { [weak self] in
+            let count = (try? await database.subscriptionRepository().count()) ?? 0
+            let destination = OnboardingFlow.exitTabIndex(subscriptionCount: count)
+            guard let self else { return }
+            self.context.tabs.select(destination)
+            self.dismiss(animated: true)
+        }
     }
 
     // MARK: - Moving subscriptions (the app's existing import flows)
 
-    /// The same door as Settings' "Import subscriptions": the file picker,
-    /// then the import sheet.
+    /// Mirrors `InboxPageViewController`'s empty-state import: present
+    /// instructions first, then hand over to the file picker and import sheet.
     private func importFile() {
-        ImportFlow.chooseFile(from: self, context: context)
+        ImportInstructionsViewController.present(from: self) { [weak self] instructions in
+            guard let self else { return }
+            ImportFlow.chooseFile(from: instructions, context: self.context) { [weak instructions] in
+                // Done closes the sheet and the instructions under it.
+                instructions?.presentingViewController?.dismiss(animated: true)
+            }
+        }
     }
 
     /// Asks for a feed address, then shows the same feed row Search shows
