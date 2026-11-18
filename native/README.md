@@ -155,6 +155,24 @@ unavailable, and it starts without the store app's data. It never touches
   - Composition root only (`AppEnvironment`); no service locator, no lazy
     registration.
   - No timer is scheduled before settings finish loading (startup DAG).
+- Preflight (`scripts/preflight.py`, python3 stdlib, seconds, no Xcode; CI job
+  "Preflight"). Diff rules look only at lines added since the merge base with
+  `origin/main` (no baseline file): no new `UIActivityIndicatorView` (use the
+  shared skeleton / `LoadingDelay`), no new `UIImage(systemName:)` outside
+  `DesignSystem/AppIcons.swift` (use `AppIcons`), no new hard-coded colours
+  outside `DesignSystem/` (`UIColor(red:/white:/hue:)`, `#colorLiteral`,
+  `.systemRed` and friends; use Theme roles), GRDB in the app target, app SDKs
+  in AnycastKit, timers in pre-settings startup files. Whole-repo release
+  checks: `TARGETED_DEVICE_FAMILY "1,2"` on the app and ShareExtension targets,
+  the `.appex` name `release-core.yml` checks matches `project.yml`, no
+  duplicate names in `AppIcons.swift`. An intentional exception takes a
+  trailing `// preflight:allow <reason>` on the line.
+
+  ```sh
+  scripts/preflight.py                  # from native/; diff rules + release checks
+  scripts/preflight.py --repo-only      # release checks only
+  python3 -m unittest discover -s scripts/tests
+  ```
 - Version numbers live in `project.yml` (`MARKETING_VERSION` /
   `CURRENT_PROJECT_VERSION`); a bump here is an intentional release step
   (see AGENTS.md).
