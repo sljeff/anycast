@@ -140,8 +140,18 @@ public enum PodcastFeedParser {
 
             var episode = FeedEpisodeRow()
             episode.title = item.title?.dartTrimmed()
-            episode.description = item.iTunesSummary?.dartTrimmed()
-                ?? item.description?.dartTrimmed()
+            // Deviation from rss_fetcher.dart (summary first): hosts such as
+            // Amperwave and Simplecast publish itunes:summary as the
+            // description with its tags stripped and nothing in their place,
+            // so paragraphs run together ("Public Media.Storytellers:"). A
+            // markup description keeps that structure, and the display path
+            // already renders a leading '<' as HTML.
+            let description = item.description?.dartTrimmed()
+            if let description, description.hasPrefix("<") {
+                episode.description = description
+            } else {
+                episode.description = item.iTunesSummary?.dartTrimmed() ?? description
+            }
             episode.duration = item.iTunesDurationMilliseconds
             episode.enclosureUrl = item.enclosureURL
             episode.pubDate = item.pubDateEpochMilliseconds
