@@ -143,7 +143,7 @@ final class OnboardingViewController: UIViewController {
                 self.renderControls()
             }
         case .done:
-            return OnboardingDoneStepView()
+            return OnboardingDoneStepView(interests: flow.interests)
         }
     }
 
@@ -351,6 +351,17 @@ enum OnboardingLauncher {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
+    /// Debug builds only: launching with `-onboarding.preview YES` shows the
+    /// onboarding on every launch, even on an install that already follows
+    /// shows, so it can be reviewed on a device with real data.
+    private static var isPreviewRequested: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "onboarding.preview")
+        #else
+        false
+        #endif
+    }
+
     /// Presents the onboarding over `root` on a first launch. Someone with
     /// any existing data — subscriptions, playlist episodes, history or
     /// inbox episodes — upgraded from an earlier version and is marked as
@@ -359,10 +370,13 @@ enum OnboardingLauncher {
     static func presentIfNeeded(
         from root: UIViewController, context: UIContext, gate: OnboardingGate = OnboardingGate()
     ) {
-        guard !gate.hasCompleted, !isRunningTests else { return }
+        guard !gate.hasCompleted || isPreviewRequested, !isRunningTests else { return }
         Task { [weak root] in
             let hasExistingData = try? await Self.listenerHasExistingData(context.database)
-            switch OnboardingGate.decision(hasCompleted: gate.hasCompleted, hasExistingData: hasExistingData) {
+            let decision = isPreviewRequested
+                ? .present
+                : OnboardingGate.decision(hasCompleted: gate.hasCompleted, hasExistingData: hasExistingData)
+            switch decision {
             case .skip:
                 return
             case .markCompleted:

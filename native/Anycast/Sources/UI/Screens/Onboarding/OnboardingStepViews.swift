@@ -53,41 +53,19 @@ final class OnboardingWelcomeStepView: OnboardingStepView {
     override init() {
         super.init()
 
-        // The brand mark again, large and faint, behind the copy. Not
-        // clipped to this (inset) step view: a clip here cuts the glyph
-        // with a straight edge mid-stroke. It bleeds to the screen edge,
-        // where the window clips it naturally.
-        let watermark = UILabel()
-        watermark.text = OnboardingCopy.brandMark
-        watermark.font = .systemFont(ofSize: 300, weight: .ultraLight)
-        watermark.textColor = AnycastColor.sandAlpha3
-        watermark.transform = CGAffineTransform(rotationAngle: -15 * .pi / 180)
-        watermark.isAccessibilityElement = false
-        watermark.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(watermark)
-
-        let mark = UILabel()
-        mark.text = OnboardingCopy.brandMark
-        mark.font = TypographyV2.displayLarge.font()
-        mark.textColor = Theme.onSurface
-        mark.adjustsFontForContentSizeCategory = true
-        mark.isAccessibilityElement = false
-
-        let waveform = OnboardingWaveformView()
-
+        // Type only, resting just above the buttons where the thumb is; no
+        // mark until the app icon is decided.
         let title = OnboardingUI.label(OnboardingCopy.welcomeTitle, style: TypographyV2.displaySmall)
         title.accessibilityTraits = .header
-        let body = OnboardingUI.label(OnboardingCopy.welcomeBody, style: TypographyV2.meta, color: Theme.onSurfaceVariant)
+        let body = OnboardingUI.label(OnboardingCopy.welcomeBody, style: TypographyV2.meta)
 
-        let column = UIStackView(arrangedSubviews: [mark, waveform, title, body])
+        let column = UIStackView(arrangedSubviews: [title, body])
         column.axis = .vertical
         column.alignment = .fill
         column.spacing = Spacing.gap
-        column.setCustomSpacing(Spacing.pageHeader, after: mark)
-        column.setCustomSpacing(Spacing.sectionGap, after: waveform)
         column.translatesAutoresizingMaskIntoConstraints = false
 
-        // Scrolls at the largest text sizes; centered when it fits.
+        // Scrolls at the largest text sizes; anchored low when it fits.
         let scrollView = UIScrollView()
         scrollView.showsVerticalScrollIndicator = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -101,9 +79,6 @@ final class OnboardingWelcomeStepView: OnboardingStepView {
         fitsFrame.priority = .defaultLow
 
         NSLayoutConstraint.activate([
-            watermark.centerXAnchor.constraint(equalTo: centerXAnchor, constant: 100),
-            watermark.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 120),
-
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
@@ -119,9 +94,8 @@ final class OnboardingWelcomeStepView: OnboardingStepView {
 
             column.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             column.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            column.centerYAnchor.constraint(equalTo: content.centerYAnchor),
             column.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor, constant: Spacing.pageHeader),
-            column.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -Spacing.pageHeader),
+            column.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -Spacing.large),
         ])
         OnboardingUI.addEdgeFades(to: self)
     }
@@ -582,9 +556,45 @@ final class OnboardingTranscriptLessonStepView: OnboardingThreadStepView {
 
 final class OnboardingDoneStepView: OnboardingThreadStepView {
 
-    override init() {
+    /// A recap of what the steps set up, on one plate; nothing on it is
+    /// tappable.
+    init(interests: [String]) {
         super.init()
-        thread.append(OnboardingBubbleView(.anycast, text: OnboardingCopy.done))
+
+        let title = OnboardingUI.label(OnboardingCopy.doneTitle, style: TypographyV2.displaySmall)
+        title.accessibilityTraits = .header
+        thread.append(title)
+
+        let interestsDetail = interests.isEmpty
+            ? OnboardingCopy.doneInterestsNone
+            : interests.joined(separator: " · ")
+        let rows = [
+            Self.makeRow(title: OnboardingCopy.doneInterests, detail: interestsDetail),
+            Self.makeRow(title: OnboardingCopy.donePlaylist, detail: OnboardingCopy.donePlaylistDetail),
+            Self.makeRow(title: OnboardingCopy.doneSubscriptions, detail: OnboardingCopy.doneSubscriptionsDetail),
+        ]
+        thread.append(OnboardingGroupedPlate(rows: rows, separatorInset: Spacing.pageH), spacingBefore: Spacing.cardInner)
+    }
+
+    private static func makeRow(title: String, detail: String) -> UIView {
+        let titleLabel = OnboardingUI.label(title, style: TypographyV2.emphasis)
+        let detailLabel = OnboardingUI.label(detail, style: TypographyV2.meta)
+        let texts = UIStackView(arrangedSubviews: [titleLabel, detailLabel])
+        texts.axis = .vertical
+        texts.spacing = Spacing.xxs
+        texts.translatesAutoresizingMaskIntoConstraints = false
+
+        let row = UIView()
+        row.addSubview(texts)
+        NSLayoutConstraint.activate([
+            texts.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: Spacing.pageH),
+            texts.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -Spacing.pageH),
+            texts.topAnchor.constraint(equalTo: row.topAnchor, constant: Spacing.chip),
+            texts.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -Spacing.chip),
+        ])
+        row.isAccessibilityElement = true
+        row.accessibilityLabel = "\(title), \(detail)"
+        return row
     }
 
     @available(*, unavailable)

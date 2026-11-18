@@ -192,8 +192,6 @@ struct OnboardingGate {
 /// the app's copy it lives in source (see `ImportCopy`).
 nonisolated enum OnboardingCopy {
 
-    static let brandMark = "\u{2731}"
-
     // Buttons.
     static let start = "Get started"
     static let next = "Continue"
@@ -260,10 +258,15 @@ nonisolated enum OnboardingCopy {
     static let askEpisode = "Ask this episode: what are the three main points?"
     static let askEpisodeAnswer = "This episode makes three points:\n1. Attention is scarcer than time\n2. Save the hardest work for your best energy\n3. Switching tasks costs a lot\n(Sample answer)"
 
-    // Step 7.
-    // The lessons queue sample episodes only, so this never speaks of a
-    // queue the user will not find on the Playlist tab.
-    static let done = "You're all set. Those were practice episodes, so your Playlist starts empty. Add real ones the same way and they'll line up there."
+    // Step 7. The lessons queue sample episodes only, so the recap never
+    // speaks of a queue the user will not find on the Playlist tab.
+    static let doneTitle = "You're all set."
+    static let doneInterests = "Interests"
+    static let doneInterestsNone = "None yet. You can pick them later."
+    static let donePlaylist = "Playlist"
+    static let donePlaylistDetail = "Starts empty. Tap + on any episode to add it."
+    static let doneSubscriptions = "Subscriptions"
+    static let doneSubscriptionsDetail = "Import from another app any time in Settings."
 }
 
 /// Sample content for the two lessons.
