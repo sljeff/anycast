@@ -114,6 +114,31 @@ struct HistoryClearUndoTests {
         #expect(await fixture.historyCount() == 0)
     }
 
+    @Test("History is local: no spinner or skeleton while its read is pending")
+    func noLoadingState() async throws {
+        guard let context = await Self.liveUIContext() else { return }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("history-loading-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let database = try await AppDatabase.openAt(url, localeIdentifier: "en_US")
+        let controller = HistoryDialogViewController(context: context, database: database)
+        controller.loadViewIfNeeded()
+        func hierarchy(_ view: UIView) -> [UIView] { view.subviews + view.subviews.flatMap(hierarchy) }
+        // Still loading: nothing to look at, no empty sentence either.
+        #expect(!hierarchy(controller.view).contains { $0 is UIActivityIndicatorView })
+        #expect(!hierarchy(controller.view).contains { $0 is SkeletonBlocksView })
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 600)
+        controller.view.layoutIfNeeded()
+        #expect(!Self.visibleLabelTexts(in: controller.view).contains("Episodes you play show up here."))
+
+        let shown = await Self.waitUntil {
+            controller.view.layoutIfNeeded()
+            return Self.visibleLabelTexts(in: controller.view).contains("Episodes you play show up here.")
+        }
+        #expect(shown, "the empty state appears once the read resolves")
+        #expect(!hierarchy(controller.view).contains { $0 is UIActivityIndicatorView })
+    }
+
     @Test("an empty history shows one sentence, no button and no header Clear All")
     func emptyState() async throws {
         guard let context = await Self.liveUIContext() else { return }

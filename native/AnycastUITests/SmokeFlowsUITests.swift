@@ -75,6 +75,23 @@ final class SmokeFlowsUITests: XCTestCase {
                 let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
                 lower.press(forDuration: 0.05, thenDragTo: upper)   // scroll down
                 upper.press(forDuration: 0.05, thenDragTo: lower)   // scroll back
+                // The Playlist pulls up to History past its list end; a
+                // short seeded list bottoms out inside this drag band, and
+                // the release at full pull opens the History sheet over
+                // the tab bar. Close it so the next chip tap reaches the
+                // bar: the sheet opens at its medium detent, so drag its
+                // top area down (a plain swipeDown lands on the list and
+                // scrolls it instead).
+                let clearHistory = app.buttons["Hold to Clear History"]
+                if clearHistory.waitForExistence(timeout: 1) {
+                    let grab = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.53))
+                    let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
+                    grab.press(forDuration: 0.05, thenDragTo: bottom)
+                    XCTAssertFalse(
+                        clearHistory.waitForExistence(timeout: 3),
+                        "History sheet stayed open over the tab bar"
+                    )
+                }
             }
         }
     }
@@ -187,9 +204,9 @@ final class SmokeFlowsUITests: XCTestCase {
         cover.tap()
 
         // The tristate capsule is the channel sheet's stable marker.
-        let subscribe = app.buttons["Subscribe"]
-        let unsubscribe = app.buttons["Unsubscribe"]
-        let subscribing = app.buttons["Subscribing"]
+        let subscribe = app.buttons["Follow"]
+        let unsubscribe = app.buttons["Following"]
+        let subscribing = app.buttons["Checking follow status"]
         XCTAssertTrue(
             subscribe.waitForExistence(timeout: 12)
                 || unsubscribe.waitForExistence(timeout: 2)
@@ -232,59 +249,41 @@ final class SmokeFlowsUITests: XCTestCase {
 
     // MARK: - 6. Cover tap opens the Detail sheet (R1 regression)
 
-    /// v2 cards are text-forward: the whole card opens the Detail sheet
-    /// (the v1 cover slot is gone, 09 §10 批次1); the row is located
-    /// by its identifier. The Detail sheet is proven by its unique
-    /// overflow control ("More episode actions", which carries Share).
-    func testCardTapOpensDetailSheet() throws {
+    /// The artwork has its own Detail target; the body owns the action group.
+    func testCoverTapOpensDetailSheet() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
-
-        let card = app.collectionViews.descendants(matching: .any)
-            .matching(identifier: "inbox-episode-row").firstMatch
-        guard card.waitForExistence(timeout: 8) else {
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20))
+        let cover = app.collectionViews.descendants(matching: .any)
+            .matching(identifier: "inbox-episode-cover").firstMatch
+        guard cover.waitForExistence(timeout: 8) else {
             throw XCTSkip("no inbox cards on this runner — Detail flow needs db_smoke")
         }
-        card.tap()
-
-        let overflow = app.buttons["More episode actions"]
-        XCTAssertTrue(overflow.waitForExistence(timeout: 6), "Detail sheet did not open from the card tap")
-
-        let shot = XCUIScreen.main.screenshot()
-        let attachment = XCTAttachment(screenshot: shot)
-        attachment.name = "inbox-card-detail-v2"
+        cover.tap()
+        XCTAssertTrue(app.buttons["More episode actions"].waitForExistence(timeout: 6), "cover did not open Detail")
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "inbox-cover-detail"
         attachment.lifetime = .keepAlways
         add(attachment)
     }
 
-    /// 批次1 swipe surface (09 §7a-C1): a left swipe over an inbox card
-    /// reveals the destructive Remove action. The probe only REVEALS and
-    /// dismisses — a slow short drag, never a full swipe: full-swipe
-    /// performs the first action by default (native delete idiom) and
-    /// would consume a seeded episode on every run.
-    func testInboxSwipeRevealsRemove() throws {
+    /// Open and close Remove without consuming a seeded episode.
+    func testInboxBodyRevealsRemove() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
-
-        let card = app.collectionViews.descendants(matching: .any)
-            .matching(identifier: "inbox-episode-row").firstMatch
-        guard card.waitForExistence(timeout: 8) else {
-            throw XCTSkip("no inbox cards on this runner — swipe flow needs db_smoke")
+        XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20))
+        let title = app.collectionViews.descendants(matching: .any)
+            .matching(identifier: "inbox-episode-title").firstMatch
+        guard title.waitForExistence(timeout: 8) else {
+            throw XCTSkip("no inbox cards on this runner — group flow needs db_smoke")
         }
-        let start = card.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.3))
-        let target = card.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.3))
-        start.press(forDuration: 0.1, thenDragTo: target)
-
-        // The revealed action is reachable as a button titled Remove.
-        let remove = app.buttons["Remove"].firstMatch
-        XCTAssertTrue(remove.waitForExistence(timeout: 4), "swipe did not reveal the Remove action")
-
-        // Dismiss without deleting (drag the card back right).
-        target.press(forDuration: 0.1, thenDragTo: start)
+        title.tap()
+        let remove = app.buttons["Remove from inbox"].firstMatch
+        XCTAssertTrue(remove.waitForExistence(timeout: 4), "body tap did not reveal Remove")
+        XCTAssertFalse(app.buttons["More episode actions"].exists, "body tap opened Detail")
+        title.tap()
         Thread.sleep(forTimeInterval: 0.5)
-        XCTAssertFalse(remove.exists, "swipe surface stayed open after the dismiss drag")
+        XCTAssertFalse(remove.exists, "group stayed open after the second tap")
     }
 
     // MARK: - 7. Playback failure: K6 retry + the loading state must END (R7)
@@ -336,20 +335,16 @@ final class SmokeFlowsUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 20), "pill tab bar did not install")
 
-        // Inbox rows are located by their row identifier. Tapping the
-        // card opens Detail, so the "Add to playlist" action is reached by
-        // LONG-PRESS — the native context menu (09 §7a-C1; the strip and
-        // its ➕ button are retired on Inbox).
         let card = app.collectionViews.descendants(matching: .any)
-            .matching(identifier: "inbox-episode-row").firstMatch
+            .matching(identifier: "inbox-episode-title").firstMatch
         guard card.waitForExistence(timeout: 10) else {
             throw XCTSkip("no inbox cards on this runner — fly-in flow needs db_smoke")
         }
-        card.press(forDuration: 1.2)
+        card.tap()
 
         let addButton = app.buttons["Add to playlist"].firstMatch
         guard addButton.waitForExistence(timeout: 4) else {
-            XCTFail("context menu did not appear")
+            XCTFail("action group did not appear")
             return
         }
 

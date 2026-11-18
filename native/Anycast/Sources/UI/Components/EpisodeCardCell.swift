@@ -20,11 +20,11 @@ struct EpisodeCardAction {
 enum DownloadDisplay: Equatable {
     /// No indicator (non-playlist cards).
     case hidden
-    /// Blue 70% circle with a download glyph; tap starts the download.
+    /// Circle with a download glyph; tap starts the download.
     case notDownloaded
     /// Progress ring 0…1.
     case downloading(Double)
-    /// Green check.
+    /// Check in secondary (sand) ink.
     case downloaded
 
     static func == (lhs: DownloadDisplay, rhs: DownloadDisplay) -> Bool {
@@ -66,25 +66,33 @@ struct EpisodeCardContent {
     /// Precomputed plain-text description (screen may pass a cached value;
     /// otherwise the cell resolves it through PlainTextHTMLCache).
     var descriptionPlainText: String?
+
+    /// The card's composition. `.playlist` is the list-owned-actions card
+    /// (09 §7a, Playlist tab): a 72 pt cover, a two-line title and ONE meta
+    /// row with no description, so its height (96 pt) is final at the first
+    /// layout — no late description can push the action group.
+    enum Layout: Equatable {
+        case standard
+        case playlist
+        case show
+    }
+    var layout: Layout = .standard
+    var inPlaylist = false
+
+    /// The now-playing marker at the start of a playlist card's meta row.
+    enum NowPlaying: Equatable {
+        case none
+        /// The current episode, not playing: a static glyph.
+        case paused
+        /// The current episode, playing: the glyph animates.
+        case playing
+    }
+    var nowPlaying: NowPlaying = .none
 }
 
-/// The generic episode card (lib/widgets/card.dart:30-297, 03 §2.11) in the
-/// compact 2.0 form (adopted 2026-10-21): the shared card plate (radius 32,
-/// hairline, padding 12), a 64 pt rounded cover (tap → Detail), and three
-/// one-line rows in the three text styles — the Emphasis title; the Meta
-/// line `show · time` with the download mark after the show name and, on
-/// playlist cards with progress, a 36 × 4 meter before the time left; and
-/// the Meta description. Whole-card tap toggles the action drawer — a split
-/// capsule of equal segments (UI kit `QueueSplitCapsuleButtonGroup`).
-/// Lists that took the native-first path (09 §7a-C1,
-/// Inbox) render no strip and surface the same actions through the list's
-/// context menu, passing them here as `menuActions` for VoiceOver.
-///
-/// VoiceOver: the container's children carry the labels, so the card itself
-/// is not an element — the title acts as the card action button
-/// (accessibilityActivate → onCardTap) and carries the menu actions as
-/// accessibility custom actions, so every card action stays reachable
-/// without sight on strip and strip-less lists alike.
+/// Shared covered episode card. The list owns its action group; this cell
+/// reserves only the selected card's transparent gap. Playlist and Show
+/// compositions have no description or asynchronous text sizing.
 private final class TitleActivatableLabel: UILabel {
     var onActivate: (() -> Void)?
     override func accessibilityActivate() -> Bool {
@@ -93,23 +101,23 @@ private final class TitleActivatableLabel: UILabel {
     }
 }
 
-final class EpisodeCardCell: UICollectionViewCell {
+final class EpisodeCardCell: UICollectionViewCell, ListActionGapHosting {
 
     static let reuseIdentifier = "EpisodeCardCell"
     /// 12 pt padding ×2 around the text column (22 title + 4 + 20 meta +
     /// 4 + 20 description), which is taller than the 64 pt cover.
     static let cardRowHeight: CGFloat = 94
     static let coverSide: CGFloat = 64
-    static let stripHeight: CGFloat = 60
-    /// The drawer capsule inside the strip (12 pt above it, then 48 pt).
-    static let drawerHeight: CGFloat = 48
+    /// The playlist composition: 12 + 72 cover + 12.
+    static let playlistRowHeight: CGFloat = 96
+    static let playlistCoverSide: CGFloat = 72
+    /// 12 + two title lines (44) + 4 + fixed meta row (20) + 12.
+    static let showRowHeight: CGFloat = 92
     static let spacing: CGFloat = Spacing.gap // list row gap (compact cards, 12)
 
     /// Card cover tap → open the Detail sheet.
     var onCoverTap: (() -> Void)?
-    /// Whole-card tap → toggle the action strip (route through the list's
-    /// CardExpandCoordinator); strip-less lists point this at the card's
-    /// primary action instead (Inbox: open the Detail sheet, 09 §7a-C1).
+    /// Whole-card tap toggles the list-owned group.
     var onCardTap: (() -> Void)?
     /// Tap on the not-downloaded indicator → start download.
     var onDownloadTap: (() -> Void)?
@@ -128,6 +136,25 @@ final class EpisodeCardCell: UICollectionViewCell {
     private let progressMeter = EpisodeProgressBackdrop()
     private let rightTextLabel = UILabel()
     private let descriptionLabel = UILabel()
+    /// Playlist cards only: the animated "wave" glyph of the current episode.
+    private let nowPlayingMarker = UIImageView()
+    private var nowPlayingState: EpisodeCardContent.NowPlaying = .none
+    private let metaRow = UIStackView()
+    private let metaColumn = UIStackView()
+    private let textColumn = UIStackView()
+    private var layout: EpisodeCardContent.Layout = .standard
+    private var titleText = ""
+    private var coverWidthConstraint: NSLayoutConstraint!
+    private var coverHeightConstraint: NSLayoutConstraint!
+    private var coverLeadingConstraint: NSLayoutConstraint!
+    private var textTrailingConstraint: NSLayoutConstraint!
+    private var plateHeightConstraint: NSLayoutConstraint!
+    private var plateMinHeightConstraint: NSLayoutConstraint!
+    /// Standard: the text column hangs from the top padding.
+    private var textTopConstraint: NSLayoutConstraint!
+    /// Playlist: the column centres on the cover, never above the padding.
+    private var textTopMinConstraint: NSLayoutConstraint!
+    private var textCenterConstraint: NSLayoutConstraint!
     private let downloadCircle = MinimumHitAreaView()
     private let cardTapGuard = DownloadTapGuard()
     private let downloadIcon = UIImageView()
@@ -136,18 +163,13 @@ final class EpisodeCardCell: UICollectionViewCell {
     /// The meta row's trailing slot the download indicator centers on.
     private let downloadSlot = UIView()
 
-    private let stripContainer = UIView()
-    /// A tonal capsule, not glass: the cell clips (strip-race guard), and a
-    /// clipped glass shadow reads as a hard rectangle.
-    private let drawer = CapsuleView()
-    private let drawerRow = UIStackView()
-    private var stripHeightConstraint: NSLayoutConstraint!
-    private var drawerHeightConstraint: NSLayoutConstraint!
-    /// Source images for strip buttons, keyed by button tag, so Dynamic
-    /// Type can redraw brand imagesets without losing an AI state swap.
-    private var stripIconSources: [Int: UIImage] = [:]
-    private var actionButtons: [UIButton] = []
-    private var actions: [EpisodeCardAction] = []
+    private let actionSpacer = UIView()
+    private var actionGapConstraint: NSLayoutConstraint!
+    private let playlistChip = CapsuleView()
+    private let playlistChipLabel = UILabel()
+    private let metaSpacer = UIView()
+    private var showMetaHeightConstraint: NSLayoutConstraint!
+    private var timeWidthConstraint: NSLayoutConstraint!
     private var descriptionTask: Task<Void, Never>?
     /// Guards the description resolve: a reconfigure with the same HTML must
     /// not blank the text and restart the async parse each time.
@@ -157,6 +179,8 @@ final class EpisodeCardCell: UICollectionViewCell {
     /// restart an in-flight cover download from zero each time.
     private var renderedCoverURL: URL?
     private var showsProgress = false
+    /// Created on the first skeleton; loaded cards never carry it.
+    private var skeletonView: SkeletonBlocksView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -168,12 +192,18 @@ final class EpisodeCardCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
+        setActionGap(0)
+        layer.removeAnimation(forKey: ListActionMotion.translationKey)
         cancelDescriptionTask()
         renderedDescriptionHTML = nil
+        applyNowPlaying(.none)
         onCoverTap = nil
         onCardTap = nil
         onDownloadTap = nil
         menuActions = []
+        skeletonView?.isHidden = true
+        layer.removeAllAnimations()
+        alpha = 1
         // A reused cell must never inherit a card-entrance pose.
         contentView.layer.removeAllAnimations()
         contentView.alpha = 1
@@ -193,15 +223,33 @@ final class EpisodeCardCell: UICollectionViewCell {
     // MARK: - Configure
 
     func configure(_ content: EpisodeCardContent, actions: [EpisodeCardAction]) {
-        self.actions = actions
+        // The list's cell provider re-applies the selected identity's gap AFTER
+        // configure. Reconfiguration can happen without prepareForReuse.
+        setActionGap(0)
+        menuActions = actions
+        contentView.isUserInteractionEnabled = true
+        contentView.accessibilityElementsHidden = false
+        endSkeleton()
+        titleLabel.textColor = TypographyV2.emphasis.color
+        rightTextLabel.textColor = TypographyV2.meta.color
+        applyLayout(content.layout)
 
-        titleLabel.text = content.title
+        titleText = content.title
+        applyTitle()
         channelLabel.text = content.channelTitle
         channelLabel.isHidden = !content.showsChannel
         rightTextLabel.text = content.rightText
         rightTextLabel.isHidden = content.rightText.isEmpty
 
-        if let plain = content.descriptionPlainText {
+        playlistChip.isHidden = content.layout != .show || !content.inPlaylist
+
+        if content.layout != .standard {
+            // No description line, so nothing to resolve: its late arrival
+            // is exactly the height change the list-owned group cannot take.
+            cancelDescriptionTask()
+            renderedDescriptionHTML = nil
+            descriptionLabel.text = ""
+        } else if let plain = content.descriptionPlainText {
             if renderedDescriptionHTML != nil {
                 cancelDescriptionTask()
             }
@@ -241,15 +289,29 @@ final class EpisodeCardCell: UICollectionViewCell {
         if url != renderedCoverURL {
             renderedCoverURL = url
             coverView.kf.cancelDownloadTask()
-            coverView.setArtwork(url, title: content.channelTitle, side: Self.coverSide)
+            coverView.setArtwork(url, title: content.channelTitle, side: coverSide)
         }
 
         showsProgress = content.showsProgress
         applyProgress(content.progressFraction)
+        applyNowPlaying(content.nowPlaying)
 
         configureDownload(content.downloadDisplay)
-        rebuildActionButtons()
-        setExpanded(false)
+    }
+
+    var actionGap: CGFloat { actionGapConstraint.constant }
+
+    /// Change only the spacer target. The list must remeasure before settling
+    /// layout, otherwise the old item height could compress the card body.
+    func setActionGap(_ gap: CGFloat) {
+        actionGapConstraint.constant = gap
+    }
+
+    var cardFrameInCell: CGRect { cardContainer.convert(cardContainer.bounds, to: self) }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        if actionGap > 0, point.y >= bounds.maxY - actionGap { return false }
+        return super.point(inside: point, with: event)
     }
 
     /// Live progress push for the CURRENT episode (positionData-driven);
@@ -276,96 +338,173 @@ final class EpisodeCardCell: UICollectionViewCell {
         separatorLabel.isHidden = channelLabel.isHidden || (!visible && rightTextLabel.isHidden)
     }
 
+    // MARK: - Layout
+
+    private var coverSide: CGFloat {
+        layout == .playlist ? Self.playlistCoverSide : Self.coverSide
+    }
+
+    /// Switches the composition. Applied only on a change — a list renders
+    /// one layout for every cell, so this runs once per cell instance, and
+    /// the stack → plate hierarchy and the plate-height priority scheme
+    /// stay what the list-action tests measure.
+    private func applyLayout(_ new: EpisodeCardContent.Layout) {
+        guard new != layout else { return }
+        layout = new
+        let playlist = new == .playlist
+        let compact = new != .standard
+        let rowHeight = playlist ? Self.playlistRowHeight : (new == .show ? Self.showRowHeight : Self.cardRowHeight)
+        showMetaHeightConstraint.isActive = new == .show
+        timeWidthConstraint.isActive = new != .show
+        plateHeightConstraint.constant = rowHeight
+        plateMinHeightConstraint.constant = rowHeight
+        coverWidthConstraint.constant = coverSide
+        coverHeightConstraint.constant = coverSide
+        // The playlist plate follows the prototype's 12 pt padding all round.
+        let padding = compact ? Spacing.gap : Spacing.pageH
+        coverLeadingConstraint.constant = padding
+        textTrailingConstraint.constant = -padding
+        if compact {
+            textTopConstraint.isActive = false
+            textTopMinConstraint.isActive = true
+            textCenterConstraint.isActive = true
+        } else {
+            textTopMinConstraint.isActive = false
+            textCenterConstraint.isActive = false
+            textTopConstraint.isActive = true
+        }
+        titleLabel.numberOfLines = compact ? 2 : 1
+        descriptionLabel.isHidden = compact
+        // Playlist: the meta row spans the column so the download mark sits
+        // at its trailing end.
+        metaColumn.alignment = compact ? .fill : .leading
+        metaRow.spacing = playlist ? Spacing.md : Spacing.sm
+        arrangeMetaRow()
+        // The placeholder glyph is drawn for the cover's side.
+        renderedCoverURL = nil
+        applyTitle()
+        setNeedsLayout()
+    }
+
+    /// Standard: show · download · meter · time. Playlist: marker · meter ·
+    /// time · show, with the download mark closing the row. Views are only
+    /// re-ordered inside the stack, never removed from the hierarchy (that
+    /// would drop the size constraints that reference them) — except the
+    /// marker, which has none.
+    private func arrangeMetaRow() {
+        for view in metaRow.arrangedSubviews {
+            metaRow.removeArrangedSubview(view)
+            view.isHidden = true
+        }
+        channelLabel.isHidden = false
+        rightTextLabel.isHidden = false
+        metaSpacer.isHidden = false
+        let order: [UIView]
+        if layout == .playlist {
+            order = [
+                nowPlayingMarker, progressMeter, rightTextLabel, separatorLabel, channelLabel, downloadSlot,
+            ]
+        } else if layout == .show {
+            order = [channelLabel, separatorLabel, rightTextLabel, metaSpacer, playlistChip]
+        } else {
+            order = [channelLabel, downloadSlot, separatorLabel, progressMeter, rightTextLabel]
+        }
+        for view in order { metaRow.addArrangedSubview(view) }
+    }
+
+    /// The playlist title is attributed so two lines keep the 22 pt line
+    /// height; it is re-applied when the content size changes because an
+    /// attributed font does not follow Dynamic Type by itself.
+    private func applyTitle() {
+        guard layout != .standard else {
+            titleLabel.text = titleText
+            return
+        }
+        var attributes = TypographyV2.emphasis.attributes(traits: traitCollection)
+        let paragraph = (attributes[.paragraphStyle] as? NSParagraphStyle)?.mutableCopy()
+            as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        attributes[.paragraphStyle] = paragraph
+        titleLabel.attributedText = NSAttributedString(string: titleText, attributes: attributes)
+    }
+
+    // MARK: - Now playing
+
+    /// Marker state push for playlist cards. Playback ticks never come here
+    /// (they use `updateLiveProgress`); only the current episode changing or
+    /// play/pause flipping does, and an unchanged state is a no-op so the
+    /// symbol effect is not restarted.
+    func updateNowPlaying(_ state: EpisodeCardContent.NowPlaying) {
+        applyNowPlaying(state)
+    }
+
+    private func applyNowPlaying(_ state: EpisodeCardContent.NowPlaying) {
+        guard state != nowPlayingState else { return }
+        nowPlayingState = state
+        nowPlayingMarker.isHidden = state == .none
+        refreshMarkerEffect()
+    }
+
+    /// Reduce Motion keeps the glyph still. Symbol effects stop when the
+    /// view leaves the window, so `didMoveToWindow` re-arms them.
+    private func refreshMarkerEffect() {
+        nowPlayingMarker.removeAllSymbolEffects()
+        if nowPlayingState == .playing, !Motion.reduceMotion {
+            nowPlayingMarker.addSymbolEffect(.variableColor.iterative, options: .repeating)
+        }
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil, nowPlayingState == .playing { refreshMarkerEffect() }
+    }
+
     /// Live download-state push (PlaybackService.cacheStates).
     func updateDownload(_ display: DownloadDisplay) {
         configureDownload(display)
     }
 
-    /// Action strip height 0↔60 (card.dart:279-291). The owning list drives
-    /// the animation through `CardExpandAnimator.refresh`: this method only
-    /// moves the target (constraint + visibility) and — unless the caller
-    /// opts out — settles the cell's layout. The cell must NOT run its own
-    /// animate block — a self-run reveal raced the list's layout pass, and a
-    /// height update that lost the race left the strip overflowing the
-    /// un-resized item.
-    ///
-    /// `settleLayout: false` is the animator's path. At animator time the
-    /// cell's item frame is still collapsed, so settling here would solve
-    /// the expanded strip INSIDE the collapsed frame — an over-constrained
-    /// state whose committed solve deforms the card body until the item
-    /// resize catches up. Deferred settling lets the animator's single
-    /// layout pass apply the item frame and the internal constraints in one
-    /// solve, inside one animation transaction.
-    ///
-    /// Always lands on the SETTLED pose: the drawer at alpha 1 / identity
-    /// with any reveal or fade cancelled, so a reconfigure never leaves a
-    /// half-faded strip behind and the next reveal starts from a known state.
-    func setExpanded(_ expanded: Bool, settleLayout: Bool = true) {
-        drawer.layer.removeAllAnimations()
-        drawer.alpha = 1
-        drawer.transform = .identity
-        stripHeightConstraint.constant = expanded ? resolvedStripHeight() : 0
-        stripContainer.isHidden = !expanded
-        if settleLayout {
-            layoutIfNeeded()
-        }
+    /// The loading card: the Show card itself, configured with placeholder
+    /// text that is never drawn, under the shared skeleton. The cover, the
+    /// two title lines and the meta line are blocks drawn from the real
+    /// views' frames, so the card is the loaded card's size and shape.
+    func configureSkeleton() {
+        configure(EpisodeCardContent(
+            title: Self.skeletonTitle, channelTitle: "", rightText: "Placeholder meta",
+            descriptionHTML: nil, imageURL: nil, showsChannel: false, layout: .show
+        ), actions: [])
+        coverView.kf.cancelDownloadTask()
+        coverView.image = nil
+        renderedCoverURL = nil
+        for view in [coverView, titleLabel, rightTextLabel] { view.alpha = 0 }
+        let overlay = skeletonView ?? cardContainer.installSkeletonOverlay()
+        skeletonView = overlay
+        overlay.shapes = [.cover(coverView), .lines(titleLabel, [1, 0.6]), .lines(rightTextLabel, [1])]
+        overlay.isHidden = false
+        overlay.setNeedsLayout()
+        contentView.isUserInteractionEnabled = false
+        contentView.accessibilityElementsHidden = true
+        onCardTap = nil
+        onCoverTap = nil
     }
 
-    /// Whether the strip is open as a layout target (a fade-out in flight
-    /// still counts as open until `setExpanded(false)` closes it).
-    var isStripExpanded: Bool { !stripContainer.isHidden }
+    /// Long enough to fill the two title lines at any phone width.
+    private static let skeletonTitle = String(repeating: "Placeholder episode title ", count: 5)
 
-    /// Parks the just-opened drawer in its pre-reveal pose (invisible, one
-    /// `stripRevealOffset` up under the card). Call right after
-    /// `setExpanded(true)`, without animation, then run `revealStrip()`.
-    func prepareStripReveal() {
-        drawer.alpha = 0
-        if !Motion.reduceMotion {
-            drawer.transform = CGAffineTransform(translationX: 0, y: -Motion.stripRevealOffset)
-        }
+    /// Real content takes the card back from the skeleton.
+    private func endSkeleton() {
+        skeletonView?.isHidden = true
+        for view in [coverView, titleLabel, rightTextLabel] { view.alpha = 1 }
     }
 
-    /// The drawer slides down out of the card while fading in. Only the
-    /// strip moves — the card's own content never does. Reduce Motion
-    /// fades only.
-    func revealStrip() {
-        let settle = {
-            self.drawer.alpha = 1
-            self.drawer.transform = .identity
+    /// The skeleton's blocks follow the real views' frames, so they refresh
+    /// after this card's own layout.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if let skeletonView, !skeletonView.isHidden {
+            contentView.layoutIfNeeded()
+            skeletonView.refreshBlocks()
         }
-        if Motion.reduceMotion {
-            UIView.animate(
-                withDuration: Motion.standard, delay: 0,
-                options: [.curveEaseOut, .allowUserInteraction], animations: settle
-            )
-        } else {
-            UIView.animate(
-                withDuration: Motion.standard, delay: 0,
-                usingSpringWithDamping: 0.9, initialSpringVelocity: 0,
-                options: [.allowUserInteraction], animations: settle
-            )
-        }
-    }
-
-    /// Brings a half-faded drawer back to the settled open pose — a strip
-    /// that is re-targeted open while its fade-out is still running. A
-    /// reveal in flight is left alone (its model values are already final).
-    func cancelStripFade() {
-        guard drawer.alpha < 1 else { return }
-        drawer.layer.removeAllAnimations()
-        drawer.alpha = 1
-        drawer.transform = .identity
-    }
-
-    /// Fades the drawer out ahead of the height close; `completion` runs
-    /// when the fade ends or is superseded, and must tolerate both.
-    func fadeOutStrip(completion: @escaping () -> Void) {
-        UIView.animate(
-            withDuration: Motion.stripFadeOut, delay: 0,
-            options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState],
-            animations: { self.drawer.alpha = 0 },
-            completion: { _ in completion() }
-        )
     }
 
     // MARK: - Build
@@ -377,10 +516,7 @@ final class EpisodeCardCell: UICollectionViewCell {
 
     private func build() {
         contentView.backgroundColor = .clear
-        // Any content that outruns its item height must clip instead of
-        // painting over neighbor cards (and stealing their taps) — an
-        // un-clipped overflow is exactly the strip-over-cards corruption
-        // the M3 review hit when a height update raced the strip reveal.
+        // The plate never paints over adjacent cards during gap remeasurement.
         clipsToBounds = true
 
         let stack = UIStackView()
@@ -389,8 +525,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         stack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stack)
 
-        // Card row (UI kit: surface plate, radius 32, sandAlpha3 hairline;
-        // 16pt inner padding).
+        // Card row (UI kit: surface plate, radius 32, 16pt inner padding).
         cardContainer.backgroundColor = Theme.surface
         cardContainer.layer.borderWidth = Spacing.hairline
         updateCardStroke()
@@ -474,7 +609,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         // assert it gains a non-zero frame once the text lands).
         descriptionLabel.accessibilityIdentifier = "episode-card-description"
 
-        let textColumn = UIStackView(arrangedSubviews: [titleLabel])
+        textColumn.addArrangedSubview(titleLabel)
         textColumn.axis = .vertical
         textColumn.alignment = .fill
         textColumn.spacing = Spacing.xs
@@ -482,19 +617,31 @@ final class EpisodeCardCell: UICollectionViewCell {
         cardContainer.addSubview(textColumn)
 
         downloadSlot.isHidden = true
-        let metaRow = UIStackView(arrangedSubviews: [
-            channelLabel, downloadSlot, separatorLabel, progressMeter, rightTextLabel,
-        ])
+        for view in [channelLabel, downloadSlot, separatorLabel, progressMeter, rightTextLabel] {
+            metaRow.addArrangedSubview(view)
+        }
         metaRow.axis = .horizontal
         metaRow.distribution = .fill
         metaRow.alignment = .center
         metaRow.spacing = Spacing.sm
         // The time hugs its text; the row's slack stays after it.
-        let metaColumn = UIStackView(arrangedSubviews: [metaRow])
+        metaColumn.addArrangedSubview(metaRow)
         metaColumn.axis = .vertical
         metaColumn.alignment = .leading
         textColumn.addArrangedSubview(metaColumn)
         textColumn.addArrangedSubview(descriptionLabel)
+
+        // The now-playing glyph (playlist cards): ink, 13 pt, a waveform that
+        // sweeps while the episode plays.
+        nowPlayingMarker.image = UIImage(systemName: "waveform")
+        nowPlayingMarker.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        nowPlayingMarker.tintColor = Theme.onSurface
+        nowPlayingMarker.contentMode = .center
+        nowPlayingMarker.isHidden = true
+        nowPlayingMarker.isAccessibilityElement = true
+        nowPlayingMarker.accessibilityLabel = "Now playing"
+        nowPlayingMarker.setContentHuggingPriority(.required, for: .horizontal)
+        nowPlayingMarker.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         // Download indicator (16×16) in the slot after the show name.
         downloadCircle.backgroundColor = Theme.primary
@@ -512,6 +659,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         downloadCircle.enableIconLargeContentViewer(title: "Download", image: AppIcons.download)
         downloadCircle.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(downloadTapped)))
         cardTapGuard.download = downloadCircle
+        cardTapGuard.cover = coverView
         cardContainer.addSubview(downloadCircle)
 
         downloadRing.tintColorOverride = Theme.primary
@@ -521,8 +669,8 @@ final class EpisodeCardCell: UICollectionViewCell {
         cardContainer.addSubview(downloadRing)
 
         downloadDoneIcon.image = AppIcons.downloadDone
-        // grass9 (03 §2.11), appearance-aware.
-        downloadDoneIcon.tintColor = AnycastColor.grass9
+        // Completed is secondary (sand), not a status colour.
+        downloadDoneIcon.tintColor = Theme.onSurfaceVariant
         downloadDoneIcon.contentMode = .scaleAspectFit
         downloadDoneIcon.translatesAutoresizingMaskIntoConstraints = false
         downloadDoneIcon.isHidden = true
@@ -530,44 +678,57 @@ final class EpisodeCardCell: UICollectionViewCell {
         downloadDoneIcon.accessibilityLabel = "Downloaded"
         cardContainer.addSubview(downloadDoneIcon)
 
-        // Action drawer below the card (strip height animated 0↔60).
-        stripContainer.translatesAutoresizingMaskIntoConstraints = false
-        stripContainer.isHidden = true
-        drawer.backgroundColor = AnycastColor.sandAlpha3
-        drawer.translatesAutoresizingMaskIntoConstraints = false
-        stripContainer.addSubview(drawer)
-        drawerRow.axis = .horizontal
-        drawerRow.alignment = .fill
-        drawerRow.translatesAutoresizingMaskIntoConstraints = false
-        drawer.addSubview(drawerRow)
-        stripContainer.isUserInteractionEnabled = true
-        stack.addArrangedSubview(stripContainer)
-        // While the item height animates, the cell frame lags the strip's
-        // height target by a few frames. The tail absorbs a taller frame and
-        // the soft bottom pin gives way to a shorter one, so the card plate
-        // keeps its size and position and only the strip area grows/closes.
-        let tail = UIView()
-        tail.setContentHuggingPriority(UILayoutPriority(1), for: .vertical)
-        tail.setContentCompressionResistancePriority(UILayoutPriority(1), for: .vertical)
-        stack.addArrangedSubview(tail)
-        stripHeightConstraint = stripContainer.heightAnchor.constraint(equalToConstant: 0)
-        drawerHeightConstraint = drawer.heightAnchor.constraint(equalToConstant: Self.drawerHeight)
+        actionSpacer.isUserInteractionEnabled = false
+        stack.addArrangedSubview(actionSpacer)
+        actionGapConstraint = actionSpacer.heightAnchor.constraint(equalToConstant: 0)
+        actionGapConstraint.isActive = true
+        showMetaHeightConstraint = metaRow.heightAnchor.constraint(equalToConstant: 20)
+        timeWidthConstraint = rightTextLabel.widthAnchor.constraint(
+            lessThanOrEqualTo: textColumn.widthAnchor, multiplier: 0.5)
+        timeWidthConstraint.isActive = true
+        playlistChip.backgroundColor = AnycastColor.sandAlpha3
+        playlistChip.isHidden = true
+        playlistChip.accessibilityIdentifier = "episode-card-in-playlist"
+        playlistChipLabel.text = "In playlist"
+        playlistChipLabel.font = .systemFont(ofSize: 13)
+        playlistChipLabel.textColor = Theme.onSurface
+        playlistChipLabel.translatesAutoresizingMaskIntoConstraints = false
+        playlistChip.addSubview(playlistChipLabel)
+        playlistChip.setContentCompressionResistancePriority(.required, for: .horizontal)
+        NSLayoutConstraint.activate([
+            playlistChip.heightAnchor.constraint(equalToConstant: 20),
+            playlistChipLabel.leadingAnchor.constraint(equalTo: playlistChip.leadingAnchor, constant: 6),
+            playlistChipLabel.trailingAnchor.constraint(equalTo: playlistChip.trailingAnchor, constant: -6),
+            playlistChipLabel.centerYAnchor.constraint(equalTo: playlistChip.centerYAnchor),
+        ])
         registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (cell: EpisodeCardCell, _) in
-            cell.applyStripMetrics()
+            cell.applyTitle()
         }
         rightTextLabel.setContentHuggingPriority(.required, for: .horizontal)
         separatorLabel.setContentHuggingPriority(.required, for: .horizontal)
         separatorLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         rightTextLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        // The strip target is set before the item resizes, so the stack and
-        // the cell briefly disagree on height. The bottom pin is breakable
-        // (the stack overflows into the clipped area) and the plate holds
-        // its own height, so only the strip moves while the cell catches up.
+        // The plate holds its height while the list remeasures the gap.
         let stackBottomPin = stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
         stackBottomPin.priority = .defaultHigh
         let plateHeight = cardContainer.heightAnchor.constraint(equalToConstant: Self.cardRowHeight)
         plateHeight.priority = UILayoutPriority(UILayoutPriority.defaultHigh.rawValue + 1)
+        plateHeightConstraint = plateHeight
+        plateMinHeightConstraint = cardContainer.heightAnchor.constraint(
+            greaterThanOrEqualToConstant: Self.cardRowHeight)
+        coverWidthConstraint = coverView.widthAnchor.constraint(equalToConstant: Self.coverSide)
+        coverHeightConstraint = coverView.heightAnchor.constraint(equalToConstant: Self.coverSide)
+        coverLeadingConstraint = coverView.leadingAnchor.constraint(
+            equalTo: cardContainer.leadingAnchor, constant: Spacing.pageH)
+        textTrailingConstraint = textColumn.trailingAnchor.constraint(
+            equalTo: cardContainer.trailingAnchor, constant: -Spacing.pageH)
+        textTopConstraint = textColumn.topAnchor.constraint(
+            equalTo: cardContainer.topAnchor, constant: Spacing.gap)
+        textTopMinConstraint = textColumn.topAnchor.constraint(
+            greaterThanOrEqualTo: cardContainer.topAnchor, constant: Spacing.gap)
+        textCenterConstraint = textColumn.centerYAnchor.constraint(equalTo: coverView.centerYAnchor)
+        textCenterConstraint.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -580,22 +741,20 @@ final class EpisodeCardCell: UICollectionViewCell {
             // self-sizes taller when the scaled fonts demand it (hosts use
             // .estimated heights). The cover pins to the top only, so the
             // extra space at accessibility sizes goes to the text column.
-            cardContainer.heightAnchor.constraint(
-                greaterThanOrEqualToConstant: Self.cardRowHeight),
+            plateMinHeightConstraint,
             cardContainer.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
             cardContainer.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
 
-            coverView.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: Spacing.pageH),
+            coverLeadingConstraint,
             coverView.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.gap),
-            coverView.widthAnchor.constraint(equalToConstant: Self.coverSide),
-            coverView.heightAnchor.constraint(equalToConstant: Self.coverSide),
+            coverWidthConstraint,
+            coverHeightConstraint,
 
             textColumn.leadingAnchor.constraint(equalTo: coverView.trailingAnchor, constant: Spacing.gap),
-            textColumn.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -Spacing.pageH),
-            textColumn.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: Spacing.gap),
+            textTrailingConstraint,
+            textTopConstraint,
             textColumn.bottomAnchor.constraint(lessThanOrEqualTo: cardContainer.bottomAnchor, constant: -Spacing.gap),
             metaRow.widthAnchor.constraint(lessThanOrEqualTo: textColumn.widthAnchor),
-            rightTextLabel.widthAnchor.constraint(lessThanOrEqualTo: textColumn.widthAnchor, multiplier: 0.5),
 
             progressMeter.widthAnchor.constraint(equalToConstant: 36),
             progressMeter.heightAnchor.constraint(equalToConstant: 4),
@@ -621,25 +780,13 @@ final class EpisodeCardCell: UICollectionViewCell {
             downloadDoneIcon.widthAnchor.constraint(equalToConstant: 16),
             downloadDoneIcon.heightAnchor.constraint(equalToConstant: 16),
 
-            // The drawer spans the full strip width, 12 pt under the card;
-            // its segments split the width equally.
-            drawer.leadingAnchor.constraint(equalTo: stripContainer.leadingAnchor),
-            drawer.trailingAnchor.constraint(equalTo: stripContainer.trailingAnchor),
-            drawer.topAnchor.constraint(equalTo: stripContainer.topAnchor, constant: Spacing.gap),
-            drawerHeightConstraint,
-            drawerRow.leadingAnchor.constraint(equalTo: drawer.leadingAnchor, constant: Spacing.xs),
-            drawerRow.trailingAnchor.constraint(equalTo: drawer.trailingAnchor, constant: -Spacing.xs),
-            drawerRow.topAnchor.constraint(equalTo: drawer.topAnchor),
-            drawerRow.bottomAnchor.constraint(equalTo: drawer.bottomAnchor),
-            stripHeightConstraint,
         ])
     }
 
     // MARK: - Actions
 
     /// Mirrors `menuActions` onto the title as accessibility custom actions
-    /// — the VoiceOver equivalent of the context menu (strip-less lists,
-    /// 09 §7a-C1). Strip lists pass nothing and keep their strip buttons.
+    /// — the VoiceOver equivalent of the context menu (09 §7a-C1).
     private func applyMenuActions() {
         titleLabel.accessibilityCustomActions = menuActions.map { action in
             UIAccessibilityCustomAction(name: action.accessibilityLabel) { _ in
@@ -661,11 +808,6 @@ final class EpisodeCardCell: UICollectionViewCell {
         onDownloadTap?()
     }
 
-    @objc private func actionTapped(_ sender: UIButton) {
-        guard actions.indices.contains(sender.tag) else { return }
-        actions[sender.tag].handler()
-    }
-
     private func configureDownload(_ display: DownloadDisplay) {
         downloadSlot.isHidden = display == .hidden
         downloadCircle.isHidden = display != .notDownloaded
@@ -684,101 +826,7 @@ final class EpisodeCardCell: UICollectionViewCell {
         }
     }
 
-    /// Replaces one strip glyph (AI state swaps) and remembers the source
-    /// so a later content-size change redraws the same asset.
-    func setStripIcon(_ image: UIImage, at index: Int) {
-        stripIconSources[index] = image
-        guard let button = actionButtons.first(where: { $0.tag == index }) else { return }
-        let foreground = button.configuration?.baseForegroundColor
-        var configuration = button.configuration ?? UIButton.Configuration.plain()
-        configuration.image = image.preparedStripIcon(compatibleWith: traitCollection)
-            .withRenderingMode(.alwaysTemplate)
-        configuration.preferredSymbolConfigurationForImage = IconMetrics.stripSymbolConfiguration(
-            compatibleWith: traitCollection
-        )
-        if let foreground { configuration.baseForegroundColor = foreground }
-        button.configuration = configuration
-        button.largeContentImage = configuration.image
-    }
 
-    /// Drawer row grows with body metrics from the 48 pt design height.
-    /// At the default content size this is `stripHeight` (12 + 48).
-    private func resolvedDrawerHeight() -> CGFloat {
-        IconMetrics.scaledUp(Self.drawerHeight, style: TypographyV2.body, compatibleWith: traitCollection)
-    }
-
-    private func resolvedStripHeight() -> CGFloat {
-        Spacing.gap + resolvedDrawerHeight()
-    }
-
-    private func applyStripMetrics() {
-        let drawer = resolvedDrawerHeight()
-        drawerHeightConstraint?.constant = drawer
-        if isStripExpanded {
-            stripHeightConstraint?.constant = resolvedStripHeight()
-        }
-        for button in actionButtons {
-            guard let source = stripIconSources[button.tag] else { continue }
-            let foreground = button.configuration?.baseForegroundColor
-            var configuration = button.configuration ?? UIButton.Configuration.plain()
-            configuration.image = source.preparedStripIcon(compatibleWith: traitCollection)
-                .withRenderingMode(.alwaysTemplate)
-            configuration.preferredSymbolConfigurationForImage = IconMetrics.stripSymbolConfiguration(
-                compatibleWith: traitCollection
-            )
-            if let foreground { configuration.baseForegroundColor = foreground }
-            button.configuration = configuration
-        }
-    }
-
-    /// Equal segments split by hairlines; destructive (remove) actions in
-    /// the error ink.
-    private func rebuildActionButtons() {
-        drawerRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        actionButtons = []
-        stripIconSources = [:]
-        guard !actions.isEmpty else { return }
-        var firstButton: UIButton?
-        for (index, action) in actions.enumerated() {
-            if index > 0 {
-                let divider = UIView()
-                divider.backgroundColor = AnycastColor.sandAlpha3
-                divider.widthAnchor.constraint(equalToConstant: Spacing.hairline).isActive = true
-                let dividerHost = UIView()
-                dividerHost.addSubview(divider)
-                divider.translatesAutoresizingMaskIntoConstraints = false
-                NSLayoutConstraint.activate([
-                    divider.centerXAnchor.constraint(equalTo: dividerHost.centerXAnchor),
-                    divider.centerYAnchor.constraint(equalTo: dividerHost.centerYAnchor),
-                    divider.heightAnchor.constraint(equalToConstant: Spacing.pageHeader),
-                    dividerHost.widthAnchor.constraint(equalToConstant: Spacing.hairline),
-                ])
-                drawerRow.addArrangedSubview(dividerHost)
-            }
-            let button = UIButton(type: .system)
-            var configuration = UIButton.Configuration.plain()
-            configuration.image = action.icon.preparedStripIcon(compatibleWith: traitCollection)
-                .withRenderingMode(.alwaysTemplate)
-            configuration.preferredSymbolConfigurationForImage = IconMetrics.stripSymbolConfiguration(
-                compatibleWith: traitCollection
-            )
-            configuration.baseForegroundColor = action.accessibilityLabel.hasPrefix("Remove") ? Theme.error : Theme.onSurface
-            button.configuration = configuration
-            button.accessibilityLabel = action.accessibilityLabel
-            button.enableIconLargeContentViewer(image: action.icon)
-            button.tag = index
-            stripIconSources[index] = action.icon
-            button.addTarget(self, action: #selector(actionTapped(_:)), for: .touchUpInside)
-            button.addPressFeedback()
-            drawerRow.addArrangedSubview(button)
-            if let firstButton {
-                button.widthAnchor.constraint(equalTo: firstButton.widthAnchor).isActive = true
-            } else {
-                firstButton = button
-            }
-            actionButtons.append(button)
-        }
-    }
 }
 
 /// Card taps pass through except on the download control, whose hit area
@@ -786,8 +834,10 @@ final class EpisodeCardCell: UICollectionViewCell {
 @MainActor
 private final class DownloadTapGuard: NSObject, UIGestureRecognizerDelegate {
     weak var download: UIView?
+    weak var cover: UIView?
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if let cover, cover.bounds.contains(touch.location(in: cover)) { return false }
         guard let download, !download.isHidden else { return true }
         return download.point(inside: touch.location(in: download), with: nil) == false
     }

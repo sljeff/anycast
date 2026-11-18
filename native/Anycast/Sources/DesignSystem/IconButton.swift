@@ -41,7 +41,7 @@ final class AnycastIconButton: UIButton {
         accessibilityLabel: String?,
         diameter: CGFloat = AnycastIconButton.standardDiameter,
         glyphSize: CGFloat = 17,
-        glyphWeight: UIImage.SymbolWeight = .medium,
+        glyphWeight: UIImage.SymbolWeight = .regular,
         metrics: TypographyV2.Style = TypographyV2.body
     ) {
         self.style = style

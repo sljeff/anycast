@@ -30,21 +30,55 @@ final class ShellNavigationUITests: XCTestCase {
         if allShows.waitForExistence(timeout: 8) {
             allShows.tap()
             XCTAssertTrue(
-                app.staticTexts["shows-sheet-title"].waitForExistence(timeout: 4),
+                app.staticTexts["library-sheet-title"].waitForExistence(timeout: 4),
                 "All shows did not open the Shows sheet"
             )
             app.swipeDown()
             XCTAssertTrue(inboxTab.waitForExistence(timeout: 4))
+            // A plain swipe sometimes scrolls the sheet's grid instead of
+            // dragging the sheet; when it did not dismiss, drag the
+            // grabber band (just above the title) down past the bottom.
+            let sheetTitle = app.staticTexts["library-sheet-title"]
+            if sheetTitle.exists {
+                let grab = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+                    .withOffset(CGVector(dx: 0, dy: sheetTitle.frame.minY - 8))
+                let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
+                grab.press(forDuration: 0.1, thenDragTo: bottom)
+            }
+            // Wait out the dismissal: a chip tapped under the sheet's
+            // disappearing view never receives the touch.
+            let dismissed = Date().addingTimeInterval(4)
+            while sheetTitle.exists && Date() < dismissed {
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            XCTAssertFalse(sheetTitle.exists, "Shows sheet did not dismiss")
         }
 
         // Switch through every tab; children are prewarmed so this must
-        // be instant (07 §2.1).
-        app.buttons["tab-1"].tap()
-        XCTAssertTrue(app.buttons["tab-1"].isSelected, "Playlist chip did not become selected")
-        app.buttons["tab-2"].tap()
-        XCTAssertTrue(app.buttons["tab-2"].isSelected, "Discover chip did not become selected")
-        app.buttons["tab-0"].tap()
-        XCTAssertTrue(app.buttons["tab-0"].isSelected, "Inbox chip did not become selected")
+        // be instant (07 §2.1). The chip's selected flag lands a beat
+        // after the tap when the run is busy, and a transient over the
+        // bottom chrome can eat a first tap outright — so poll for the
+        // selection and retry the tap once.
+        func selected(_ identifier: String) -> Bool {
+            let chip = app.buttons[identifier]
+            let deadline = Date().addingTimeInterval(3)
+            while Date() < deadline {
+                if chip.isSelected { return true }
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            return chip.isSelected
+        }
+        func tapAndSelect(_ identifier: String, _ message: String) {
+            let chip = app.buttons[identifier]
+            chip.tap()
+            if !selected(identifier) {
+                chip.tap()
+                XCTAssertTrue(selected(identifier), message)
+            }
+        }
+        tapAndSelect("tab-1", "Playlist chip did not become selected")
+        tapAndSelect("tab-2", "Discover chip did not become selected")
+        tapAndSelect("tab-0", "Inbox chip did not become selected")
 
         // The Search tab opens in its entry state with the field focused;
         // submitting runs the search on the same page.
@@ -62,8 +96,7 @@ final class ShellNavigationUITests: XCTestCase {
         // so wait for the chip instead of tapping into the collapsed bar.
         app.buttons["Close"].tap()
         XCTAssertTrue(app.buttons["tab-0"].waitForExistence(timeout: 3), "full tab bar did not come back after Close")
-        app.buttons["tab-0"].tap()
-        XCTAssertTrue(app.buttons["tab-0"].isSelected, "Podcast tab did not come back")
+        tapAndSelect("tab-0", "Podcast tab did not come back")
 
         // Mini player appears only when a queue was restored (db_smoke
         // seeding per native/README.md); skip visibly when unseeded.

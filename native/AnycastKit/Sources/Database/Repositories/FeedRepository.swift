@@ -47,6 +47,22 @@ public struct FeedRepository: Sendable {
         }
     }
 
+    /// Puts rows back after an Undo, unlike `insertMany` in two ways.
+    /// The original row ids are dropped: `id` is not AUTOINCREMENT, so a
+    /// deleted id may have been recycled by a row inserted inside the undo
+    /// window, and a REPLACE keyed on that id would clobber the new row.
+    /// And a same-URL conflict KEEPS the existing row (INSERT OR IGNORE):
+    /// a refresh that landed inside the window wins over the stale copy.
+    @concurrent
+    public func reinsertIgnoringConflicts(_ episodes: [FeedEpisodeRow]) async throws {
+        try await database.queue.write { db in
+            for var episode in episodes {
+                episode.id = nil
+                try episode.insert(db, onConflict: .ignore)
+            }
+        }
+    }
+
     @concurrent
     public func removeByEnclosureUrls(_ urls: [String]) async throws {
         try await database.queue.write { db in

@@ -39,7 +39,6 @@ struct SpecimenSnapshotTests {
                 EpisodeCardAction(icon: AppIcons.remove, accessibilityLabel: "Remove") {},
             ]
         )
-        card.setExpanded(false)
         container.addSubview(card)
 
         NSLayoutConstraint.activate([

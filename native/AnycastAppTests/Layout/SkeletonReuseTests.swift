@@ -9,11 +9,12 @@ import AnycastKit
 /// on a separate image view, loaded fine — and further reused rows down
 /// the list did the same).
 ///
-/// Each case paints a skeleton and then real content on the SAME instance —
-/// the reuse path a collection view takes — and asserts the label wears its
-/// base style again: the base font, the base color, the real string, and no
-/// bar residue (no background fill, no clear foreground) anywhere in the
-/// attributed text.
+/// Each case shows the shared skeleton and then real content on the SAME
+/// instance — the reuse path a collection view takes — and asserts the
+/// skeleton is gone (overlay hidden, the real views visible again) and the
+/// label wears its base style: the base font, the base color, the real
+/// string, and no attributed-text residue (no background fill, no clear
+/// foreground).
 @MainActor
 struct SkeletonReuseTests {
 
@@ -24,7 +25,7 @@ struct SkeletonReuseTests {
     // MARK: - PodcastCardCell (Discover rows)
 
     @Test("A channel card reused from a skeleton shows the real title and description")
-    func podcastCard() {
+    func podcastCard() throws {
         let cell = PodcastCardCell(frame: CGRect(x: 0, y: 0, width: 358, height: PodcastCardCell.rowHeight))
         cell.configureSkeleton()
 
@@ -34,9 +35,10 @@ struct SkeletonReuseTests {
         let description = cellLabels.last { Self.sameFace($0.font, TypographyV2.meta.font()) }
         #expect(title != nil)
         #expect(description != nil)
-        // The skeleton really painted bars (the taint this file pins).
-        #expect(title?.textColor == UIColor.clear)
-        #expect(description?.textColor == UIColor.clear)
+        // The skeleton is up: the real views are invisible under the blocks.
+        let overlay = try #require(skeletonOverlay(in: cell.contentView))
+        #expect(!overlay.isHidden)
+        #expect(title?.alpha == 0 && description?.alpha == 0)
 
         cell.configure(PodcastCardContent(
             rssFeedURL: "https://example.com/feed.xml",
@@ -53,34 +55,42 @@ struct SkeletonReuseTests {
             description.unsafelyUnwrapped, "A real description",
             baseFont: TypographyV2.meta.font(), baseColor: TypographyV2.meta.color
         )
+        #expect(overlay.isHidden, "the skeleton leaves with the placeholder")
+        #expect(title?.alpha == 1 && description?.alpha == 1)
+        #expect(cellLabels.allSatisfy { $0.alpha == 1 })
     }
 
-    // MARK: - ChannelEpisodeRowCell (Channel page)
+    // MARK: - EpisodeCardCell .show (Channel page skeleton rows)
 
-    @Test("A channel episode row reused from a skeleton shows the real title and meta")
-    func channelEpisodeRow() {
-        let cell = ChannelEpisodeRowCell(frame: CGRect(x: 0, y: 0, width: 358, height: ChannelEpisodeRowCell.minimumHeight))
+    @Test("A Show card reused from a skeleton shows the real title and meta like a fresh card")
+    func showEpisodeCard() throws {
+        let content = EpisodeCardContent(
+            title: "A real episode title", channelTitle: "Show", rightText: "Nov 14 · 42 min",
+            descriptionHTML: nil, imageURL: nil, showsChannel: false, layout: .show
+        )
+        let frame = CGRect(x: 0, y: 0, width: 358, height: EpisodeCardCell.showRowHeight)
+        let cell = EpisodeCardCell(frame: frame)
         cell.configureSkeleton()
 
-        let cellLabels = labels(in: cell.contentView)
-        #expect(cellLabels.count == 2, "title + meta")
-        let title = cellLabels.first { Self.sameFace($0.font, TypographyV2.emphasis.font()) }
-        let meta = cellLabels.last { Self.sameFace($0.font, TypographyV2.meta.font().monospacedDigits()) }
-        #expect(title != nil)
-        #expect(meta != nil)
-        #expect(title?.textColor == UIColor.clear)
-        #expect(meta?.textColor == UIColor.clear)
+        let skeletonLabels = labels(in: cell.contentView)
+        let barTitle = skeletonLabels.first { $0.text?.hasPrefix("Placeholder episode title") == true }
+        let barMeta = skeletonLabels.first { $0.text == "Placeholder meta" }
+        #expect(barTitle != nil)
+        #expect(barMeta != nil)
+        // The skeleton is up: the real views are invisible under the blocks.
+        let overlay = try #require(skeletonOverlay(in: cell.contentView))
+        #expect(!overlay.isHidden)
+        #expect(barTitle?.alpha == 0 && barMeta?.alpha == 0)
 
-        cell.configure(title: "A real episode title", meta: "Nov 14 · 42 min")
-
-        expectRealText(
-            title.unsafelyUnwrapped, "A real episode title",
-            baseFont: TypographyV2.emphasis.font(), baseColor: TypographyV2.emphasis.color
-        )
-        expectRealText(
-            meta.unsafelyUnwrapped, "Nov 14 · 42 min",
-            baseFont: TypographyV2.meta.font().monospacedDigits(), baseColor: TypographyV2.meta.color
-        )
+        cell.configure(content, actions: [])
+        #expect(overlay.isHidden, "the skeleton leaves with the placeholder")
+        let fresh = EpisodeCardCell(frame: frame)
+        fresh.configure(content, actions: [])
+        for text in ["A real episode title", "Nov 14 · 42 min"] {
+            let reused = try #require(labels(in: cell.contentView).first { $0.text == text })
+            let base = try #require(labels(in: fresh.contentView).first { $0.text == text })
+            expectRealText(reused, text, baseFont: base.font, baseColor: base.textColor)
+        }
     }
 
     // MARK: - SearchFeedAddressViewController (pasted address row)
@@ -168,6 +178,10 @@ struct SkeletonReuseTests {
     }
 
     // MARK: - View traversal
+
+    private func skeletonOverlay(in view: UIView) -> SkeletonBlocksView? {
+        view.subviewsRecursive().compactMap { $0 as? SkeletonBlocksView }.first
+    }
 
     /// The labels under `view`, not counting a button's internal title
     /// label (the Follow button's is a semibold-17 UILabel too).

@@ -632,6 +632,77 @@ struct PlaybackStateMachineTests {
         #expect(harness.engine.playCount == 1, "play() on no current episode never reaches the engine again")
     }
 
+    @Test("removing the playing head loads the next episode PAUSED; Undo restores the head paused at its progress")
+    func removePlayingLoadsNextPausedAndUndoRestores() async throws {
+        let harness = try await makeHarness()
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        await restore(harness)
+        let repository = harness.database.playlistRepository()
+        let head = "https://x.example/ep1.mp3"
+        let next = "https://x.example/ep2.mp3"
+
+        await harness.service.playByEpisode(harness.service.queue.first!)
+        harness.engine.emit(.playingChanged(true))
+        let playsBefore = harness.engine.playCount
+        let removedRow = try #require(try await repository.episode(byEnclosureURL: head))
+
+        try await repository.removeEpisode(byEnclosureURL: head)
+        await harness.service.replaceCurrentWithNext()
+
+        // The next episode is current and loaded, but nothing plays.
+        #expect(harness.service.currentEpisode?.enclosureUrl == next)
+        #expect(harness.service.queue.first?.enclosureUrl == next)
+        #expect(harness.service.queue.map(\.enclosureUrl) == [next])
+        #expect(harness.service.currentPlaylistId == 1)
+        #expect(harness.service.isPlaying == false)
+        #expect(harness.engine.playCount == playsBefore, "no auto-play")
+        #expect(harness.engine.pauseCount >= 1)
+        #expect(harness.engine.loads.last?.url.absoluteString == next)
+        #expect(harness.engine.hasItem)
+        #expect(harness.service.nowPlaying.currentInfo[MPMediaItemPropertyTitle] as? String == "Ep 2")
+        await harness.service.flushStoreWrites()
+        #expect(try await harness.database.playerRepository().loadPointer()?.currentPlaylistId == 1)
+
+        // Undo: re-insert at the head with its progress, make it current again.
+        try await repository.insertOrUpdateByIndex(removedRow, playlistId: 1, index: 0)
+        await harness.service.restoreCurrentPaused(enclosureURL: head, playlistId: 1)
+        #expect(harness.service.currentEpisode?.enclosureUrl == head)
+        #expect(harness.service.queue.map(\.enclosureUrl) == [head, next])
+        #expect(harness.service.queue.first?.enclosureUrl == harness.service.currentEpisode?.enclosureUrl)
+        #expect(harness.service.positionData.positionMilliseconds == 120_000)
+        #expect(harness.engine.loads.last?.url.absoluteString == head)
+        #expect(harness.engine.loads.last?.initialPositionMilliseconds == 120_000)
+        #expect(harness.service.isPlaying == false)
+        #expect(harness.engine.playCount == playsBefore, "Undo never starts playback")
+    }
+
+    @Test("removing the playing episode with no next episode clears the player like clear()")
+    func removePlayingWithoutNextClears() async throws {
+        let harness = try await makeHarness(seed: false)
+        defer { SandboxCleanup.remove(harness.databaseURL.deletingLastPathComponent(),
+                                     closing: [harness.database.queue]) }
+        let repository = harness.database.playlistRepository()
+        try await repository.insertOrUpdateByIndex(
+            PlaylistEpisodeRow(title: "Ep only", duration: 600_000,
+                               enclosureUrl: "https://x.example/only.mp3",
+                               channelTitle: "Channel", rssFeedUrl: "https://x.example/feed.xml",
+                               playlistId: 1, playedDuration: 0),
+            playlistId: 1, index: 0
+        )
+        await restore(harness)
+        await harness.service.playByEpisode(harness.service.queue.first!)
+
+        try await repository.removeEpisode(byEnclosureURL: "https://x.example/only.mp3")
+        await harness.service.replaceCurrentWithNext()
+
+        #expect(harness.service.currentEpisode == nil)
+        #expect(harness.service.currentPlaylistId == nil)
+        #expect(harness.service.queue.isEmpty)
+        #expect(harness.engine.hasItem == false)
+        #expect(harness.service.nowPlaying.isPublishing == false)
+    }
+
     @Test("late engine events after clear do not resurrect the Now Playing card")
     func lateEventsDoNotResurrectCard() async throws {
         let harness = try await makeHarness()

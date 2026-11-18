@@ -383,7 +383,7 @@ struct UIFixRegressionTests {
 
     // MARK: - Inbox native-first card interactions (6a)
 
-    @Test("Inbox row: tap opens Detail; context menu + VoiceOver actions carry the 3 actions")
+    @Test("Inbox body toggles actions, cover opens Detail, menu and VoiceOver retain all actions")
     func inboxNativeCardInteractions() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
@@ -408,7 +408,7 @@ struct UIFixRegressionTests {
 
         // VoiceOver parity: the context-menu payload is mirrored onto the
         // card as custom actions (09 §7a-C1).
-        #expect(cell.menuActions.count == 3,
+        #expect(cell.menuActions.count == 4,
                 "menu actions not mirrored (count \(cell.menuActions.count))")
 
         // The long-press menu itself: Play / Add to playlist / Remove from inbox.
@@ -416,26 +416,21 @@ struct UIFixRegressionTests {
             Issue.record("no context menu for inbox card 0"); return
         }
         let titles = menu.children.compactMap { ($0 as? UIAction)?.title }
-        #expect(titles == ["Play", "Add to playlist", "Remove from inbox"],
+        #expect(titles == ["Play", "Add to playlist", "Remove from inbox", "Show details"],
                 "menu children \(titles)")
 
-        // Leading swipe adds to the playlist (UI kit swipe right).
-        let leading = inbox.leadingSwipeActions(at: path)?.actions ?? []
-        #expect(leading.count == 1 && leading.first?.title == "Add to playlist",
-                "leading swipe actions \(leading.map { $0.title ?? "" })")
-
-        // Trailing swipe surface (批次1 list-section half): a single
-        // destructive Remove action.
-        let swipeActions = inbox.trailingSwipeActions(at: path)?.actions ?? []
-        #expect(swipeActions.count == 1 && swipeActions.first?.style == .destructive
-                && swipeActions.first?.title == "Remove",
-                "swipe actions \(swipeActions.map { $0.title ?? "" })")
-
-        // Whole-card tap now opens the Detail sheet (was: strip toggle).
+        inbox.actionController.close(animated: false)
         cell.onCardTap?()
+        try await Self.settle(window, seconds: 0.4)
+        #expect(!inbox.actionController.groupView.isHidden)
+        #expect(cell.actionGap == 68)
+        #expect(inbox.presentedViewController == nil, "body tap must not open Detail")
+        let title = Self.firstView(in: cell, where: { $0.accessibilityIdentifier == "inbox-episode-title" })
+        #expect(title?.accessibilityCustomActions?.map(\.name) == titles)
+        cell.onCoverTap?()
         try await Self.settle(window, seconds: 1.2)
         guard let detail = Self.find(DetailViewController.self, in: window.rootViewController) else {
-            Issue.record("card tap did not present Detail"); return
+            Issue.record("cover tap did not present Detail"); return
         }
         await Self.capture(window, name: "uifix-inbox-card-detail")
         detail.dismiss(animated: false)
@@ -505,8 +500,8 @@ struct UIFixRegressionTests {
     /// The strip-resize corruption guard. Inbox went strip-less (09 §7a-C1),
     /// so the walk runs on the playlist episode list — the strips that
     /// remain (Channel/Search/Playlist/History) share the cell + animator.
-    @Test("Playlist strip expand: every toggle resizes item heights, no stuck cards")
-    func playlistStripExpandReliability() async throws {
+    @Test("Playlist action group: every toggle resizes item heights, no stuck cards")
+    func playlistActionGroupReliability() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
             print("[uifix] shell not ready; skipping"); return
@@ -558,17 +553,22 @@ struct UIFixRegressionTests {
             try await Self.settle(window, seconds: 0.5)
 
             let expandedHeight = height(at: item)
-            #expect(expandedHeight > collapsedHeights[item] + 40,
-                    "step \(step): item \(item) expanded to \(expandedHeight) (collapsed \(collapsedHeights[item]))")
+            #expect(abs(expandedHeight - collapsedHeights[item] - ListActionMetrics.gap) < 2,
+                    "step \(step): item \(item) expanded to \(expandedHeight) (collapsed \(collapsedHeights[item]), expected +\(ListActionMetrics.gap))")
+            let selectedURL = list.episode(at: IndexPath(item: item, section: 0))?.enclosureUrl
+            #expect(selectedURL != nil && list.actionController.selectedID == selectedURL,
+                    "step \(step): group not selected on item \(item)")
+            #expect(!list.actionController.groupView.isHidden, "step \(step): action group hidden")
             for other in collapsedHeights.indices where other != item {
-                #expect(abs(height(at: other) - collapsedHeights[other]) < 8,
+                #expect(abs(height(at: other) - collapsedHeights[other]) < 2,
                         "step \(step): item \(other) did not collapse (\(height(at: other)))")
             }
             // The expanded cell's own frame must match its item height —
-            // the strip must never outgrow the cell.
+            // the action gap must never outgrow the cell.
             guard let expandedCell = collection.cellForItem(
                 at: IndexPath(item: item, section: 0)
             ) as? EpisodeCardCell else { continue }
+            #expect(expandedCell.actionGap == ListActionMetrics.gap, "step \(step): cell gap not applied")
             #expect(abs(expandedCell.frame.height - expandedHeight) < 3,
                     "step \(step): cell frame \(expandedCell.frame.height) ≠ item \(expandedHeight)")
             if step == 0 {
@@ -577,28 +577,21 @@ struct UIFixRegressionTests {
         }
     }
 
-    // MARK: - 9. Expand animation source height (playlist list)
+    // MARK: - 9. Action-group expand motion (playlist list)
 
-    /// The expand/collapse must animate from the card's CURRENT measured
-    /// height. A global `invalidateLayout()` inside the animation
-    /// transaction discarded the compositional layout's measured item
-    /// sizes, so the animator's before-values fell back to the
-    /// `.estimated(112)` height: a taller tapped card visibly shrank
-    /// before expanding, and taller untouched cards twitched toward the
-    /// estimate. The two-phase fix for that then committed a second
-    /// shrink source: the unanimated constraint settle solved the expanded
-    /// strip inside the still-collapsed item frame, deforming the card
-    /// body for one visible frame on device. The animator now applies the
-    /// strip targets UN-settled outside the animation transaction (the
-    /// re-measure needs the constants outside it) and animates one
-    /// targeted invalidation inside — no solve ever runs against the
-    /// stale item frame. Pinned here by three probes: the animation's
-    /// from-value (the layer animation's `fromValue` when present, else
-    /// early presentation-layer samples), mid-transition card-body
-    /// stillness (never below its pre-tap height — kills both shrink
-    /// mechanisms empirically), and the settled +stripHeight outcome.
-    @Test("Playlist strip expand animates from the card's current height; neighbors hold still")
-    func playlistStripExpandAnimatesFromCurrentHeight() async throws {
+    /// The Playlist list owns ONE action group (ListActionController). A
+    /// card-body tap writes the 68 pt gap spacer on the selected cell WITHOUT
+    /// animation, re-measures the item, positions the group view 12 pt under
+    /// the card body, and then animates by FLIP (additive "position.y"
+    /// animations) — never by animating `bounds.size`. The old per-cell strip
+    /// failed in two ways this test still pins: the card body compressing
+    /// below its pre-tap height mid-transition (a settle solved inside a stale
+    /// item frame), and neighbors twitching toward the .estimated() height.
+    /// Probes: model height at t≈0 (already +gap), card body never below its
+    /// pre-tap height in model or presentation, no bounds.size animation on the
+    /// tapped cell, neighbors untouched, and the settled gap + group placement.
+    @Test("Playlist action group expand animates by FLIP, not bounds; card body and neighbors hold still")
+    func playlistActionGroupExpandHoldsCardAndNeighborsStill() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
             print("[uifix] shell not ready; skipping"); return
@@ -652,30 +645,22 @@ struct UIFixRegressionTests {
                 as? UICollectionView else {
             Issue.record("playlist collection not found"); return
         }
-
         func itemHeight(_ item: Int) -> CGFloat {
             collection.collectionViewLayout.layoutAttributesForItem(
                 at: IndexPath(item: item, section: 0)
             )?.frame.height ?? 0
         }
-        /// The card plate (the stack's first arranged subview) — the body
-        /// the intermediate-state deformation compresses.
         func cardBody(of cell: EpisodeCardCell) -> UIView? {
             (cell.contentView.subviews.first as? UIStackView)?.arrangedSubviews.first
+        }
+        func groupView() -> ListActionGroupView? {
+            Self.firstView(in: collection, where: { $0 is ListActionGroupView }) as? ListActionGroupView
         }
 
         let target = IndexPath(item: collection.numberOfItems(inSection: 0) - 1, section: 0)
         collection.scrollToItem(at: target, at: .top, animated: false)
         try await Self.settle(window, seconds: 0.4)
         let targetBefore = itemHeight(target.item)
-        // The redesigned card plate is a fixed `cardRowHeight` tall, so the
-        // collapsed card measures exactly the `.estimated()` fallback and the
-        // estimate-vs-actual gap that originally exposed the global
-        // invalidation is no longer constructible. The from-height probe
-        // (presentation layer at t≈0), body stillness, neighbor stillness
-        // and the settled +stripHeight outcome below still discriminate
-        // the settle-before-invalidate and un-targeted-invalidation
-        // regressions.
         let neighbors = collection.indexPathsForVisibleItems
             .filter { $0.section == 0 && $0 != target }
             .sorted { $0.item < $1.item }
@@ -688,6 +673,7 @@ struct UIFixRegressionTests {
             Issue.record("target card cell not visible"); return
         }
         let bodyBefore = body.frame.height
+        let cardBefore = cell.cardFrameInCell.height
         guard !neighborsBefore.isEmpty else {
             Issue.record("no visible neighbor card — the neighbor-stillness probe has nothing to track")
             return
@@ -695,75 +681,58 @@ struct UIFixRegressionTests {
 
         cell.onCardTap?()
 
-        // Proof a real animation ran, captured synchronously at t≈0: the
-        // layer must carry the resize animation (Core Animation keys it
-        // "bounds.size"; the system's own self-sizing pass adds a second
-        // "-2" copy), and the MODEL must already sit at the final size
-        // while the PRESENTATION layer still shows the pre-tap height —
-        // an animated transition, not a snap. Mid-animation presentation
-        // SAMPLING is not usable as a probe here: the two overlapping
-        // resize animations blend in the presentation layer and can read
-        // far outside [from, to] mid-flight (observed 25⅔ pt between
-        // 137⅔ and 197⅔); the synchronous t≈0 read below is immune
-        // because the main thread has not yielded, so the last committed
-        // presentation is exactly the pre-tap state.
-        guard let resizeAnimation = cell.layer.animation(forKey: "bounds.size") as? CABasicAnimation else {
-            Issue.record("the expand produced no bounds.size animation — the item never animated")
-            return
-        }
-        #expect(cell.frame.height > targetBefore + EpisodeCardCell.stripHeight - 8,
-                "model height \(cell.frame.height) did not reach \(targetBefore + EpisodeCardCell.stripHeight) at t≈0")
-        // The RENDERED from-value: at t≈0 the presentation layer still
-        // shows the pre-tap height (within a few points) while the model
-        // is already at the final size — the resize visibly starts AT the
-        // measured height, never at the .estimated() fallback. (The
-        // animations' DECLARED fromValues are additive deltas from the
-        // system's overlapping self-sizing pass — observed 25⅔ = measured
-        // − estimate — and are not pinnable; the presentation layer is
-        // what the user sees.)
-        if let presentedAtStart = cell.layer.presentation()?.frame.height {
-            #expect(abs(presentedAtStart - targetBefore) < 8,
-                    "presentation at \(presentedAtStart) at t≈0 — not the card's measured height \(targetBefore)")
-        }
-        #expect(abs(resizeAnimation.duration - 0.2) < 0.05,
-                "expand animation duration \(resizeAnimation.duration) is not the animator's 0.2 s cadence")
-        if let secondary = cell.layer.animation(forKey: "bounds.size-2") as? CABasicAnimation {
-            print("[uifix] resize animations: primary from \(String(describing: resizeAnimation.fromValue)) additive=\(resizeAnimation.isAdditive), secondary from \(String(describing: secondary.fromValue)) additive=\(secondary.isAdditive)")
-        }
+        // t≈0 (the main thread has not yielded): the MODEL is already final.
+        #expect(abs(itemHeight(target.item) - (targetBefore + ListActionMetrics.gap)) <= 1,
+                "model item height \(itemHeight(target.item)) did not reach \(targetBefore + ListActionMetrics.gap) at t≈0")
+        #expect(cell.actionGap == ListActionMetrics.gap, "tapped cell gap \(cell.actionGap) at t≈0")
+        // The gap opens by FLIP; a bounds.size animation is the old strip path.
+        #expect(cell.layer.animation(forKey: "bounds.size") == nil
+                && cell.layer.animation(forKey: "bounds.size-2") == nil,
+                "the tapped cell animated bounds.size — the gap must open by FLIP, not by a resize")
         for _ in 0..<2 {
             try await Task.sleep(for: .milliseconds(25))
-            // Card body never compresses: neither the model layer (an
-            // unanimated forced settle committing the deformed solve) nor
-            // the presentation layer (an animation whose from-value is the
-            // deformed solve) may dip below the pre-tap height.
+            // Card body never compresses, in the model or the presentation.
             let bodyPresented = body.layer.presentation()?.frame.height ?? body.frame.height
             #expect(body.frame.height > bodyBefore - 1,
                     "card body model height \(body.frame.height) dipped below pre-tap \(bodyBefore) mid-expand")
             #expect(bodyPresented > bodyBefore - 1,
                     "card body presented height \(bodyPresented) dipped below pre-tap \(bodyBefore) mid-expand")
-            // Neighbors animate nothing: presentation stays on their item
-            // height, and their item height never moves toward the estimate.
+            #expect(cell.cardFrameInCell.height > cardBefore - 1,
+                    "card frame \(cell.cardFrameInCell.height) dipped below pre-tap \(cardBefore) mid-expand")
             for path in neighbors {
-                guard let other = collection.cellForItem(at: path) else { continue }
-                let otherPresented = other.layer.presentation()?.frame.height ?? other.frame.height
-                #expect(abs(otherPresented - itemHeight(path.item)) < 4,
-                        "neighbor \(path.item) animated mid-expand (presented \(otherPresented), item \(itemHeight(path.item)))")
-                #expect(abs(itemHeight(path.item) - (neighborsBefore.first(where: { $0.0 == path.item })?.1 ?? itemHeight(path.item))) < 4,
-                        "neighbor \(path.item) item height drifted toward the estimate")
+                guard let other = collection.cellForItem(at: path) as? EpisodeCardCell else { continue }
+                #expect(other.actionGap == 0, "neighbor \(path.item) acquired a gap \(other.actionGap)")
+                #expect(abs(itemHeight(path.item) - (neighborsBefore.first(where: { $0.0 == path.item })?.1 ?? itemHeight(path.item))) <= 1,
+                        "neighbor \(path.item) item height drifted mid-expand")
             }
         }
 
-        // Settled: exactly +stripHeight on the tapped card, neighbors intact.
-        try await Self.settle(window, seconds: 0.5)
-        #expect(abs(itemHeight(target.item) - (targetBefore + EpisodeCardCell.stripHeight)) < 8,
-                "expanded height \(itemHeight(target.item)) != collapsed \(targetBefore) + strip \(EpisodeCardCell.stripHeight)")
+        // Settled: +gap on the tapped card, group visible 12 pt under the card body.
+        try await Self.settle(window, seconds: 0.6)
+        #expect(abs(itemHeight(target.item) - (targetBefore + ListActionMetrics.gap)) <= 1,
+                "expanded height \(itemHeight(target.item)) != collapsed \(targetBefore) + gap \(ListActionMetrics.gap)")
         let settledBody = cardBody(of: cell)?.frame.height ?? 0
         #expect(abs(settledBody - bodyBefore) < 1,
                 "settled card body height changed: \(settledBody) vs pre-tap \(bodyBefore)")
+        if let group = groupView() {
+            #expect(!group.isHidden, "action group not visible after expand")
+            let bodyMaxY = cell.cardFrameInCell.maxY + cell.frame.minY
+            #expect(abs(group.frame.minY - (bodyMaxY + ListActionMetrics.spacing)) <= 1,
+                    "group minY \(group.frame.minY) != card body maxY \(bodyMaxY) + \(ListActionMetrics.spacing)")
+        } else {
+            Issue.record("ListActionGroupView not found in the playlist collection")
+        }
         for (item, before) in neighborsBefore {
-            #expect(abs(itemHeight(item) - before) < 1,
+            #expect(abs(itemHeight(item) - before) <= 1,
                     "neighbor \(item) changed height \(before) → \(itemHeight(item))")
         }
+
+        // Toggle again: height returns, group hidden.
+        cell.onCardTap?()
+        try await Self.settle(window, seconds: 0.6)
+        #expect(abs(itemHeight(target.item) - targetBefore) <= 1,
+                "collapsed height \(itemHeight(target.item)) != original \(targetBefore)")
+        #expect(groupView()?.isHidden ?? true, "action group still visible after collapse")
 
         // Restore the fixture: the seeded tall row leaves the playlist it
         // was appended to (awaited, so later serialized tests read clean).
@@ -772,25 +741,15 @@ struct UIFixRegressionTests {
 
     // MARK: - 9b. Off-screen collapse (scroll-back settling)
 
-    /// The animator's targeted invalidation only reaches VISIBLE items.
-    /// When card A expands, scrolls fully off-screen, and card B is then
-    /// expanded (the coordinator logically collapses A), nothing told the
-    /// layout solver to drop A's measured +strip item size. On scroll-back
-    /// A's cell reconfigures collapsed (strip constant 0) — if its item
-    /// kept the stale expanded size, the top/bottom-pinned stack stretches
-    /// the card plate to fill the taller item.
-    ///
-    /// Measured on iOS 27: the stretch does NOT occur. The stale measured
-    /// size dies with the cell — once A's cell leaves the visible set and
-    /// recycles, the compositional layout re-resolves the item's estimated
-    /// dimension against the freshly configured (collapsed) cell when it
-    /// reappears: A settles at exactly its collapsed height with an
-    /// unstretched plate (137⅔ → 137⅔ in both this run and every retry).
-    /// No completion-phase invalidation of the previous path is needed;
-    /// this test pins that behavior so a future UIKit change that keeps
-    /// the stale size surfaces here instead of on users.
-    @Test("Playlist strip expand: off-screen collapse settles on scroll-back")
-    func playlistStripExpandOffscreenCollapseSettlesOnScrollBack() async throws {
+    /// With the list-owned action group, card A opens (gap on its cell), is
+    /// scrolled fully off-screen, and card B is then opened: selection moves
+    /// by identity, so A's gap must be gone by the time A scrolls back. If the
+    /// stale +gap item size survived recycling, A would come back taller than
+    /// its collapsed height and the top/bottom-pinned stack would stretch the
+    /// card plate. A must return at its collapsed height with actionGap == 0
+    /// and an unstretched plate, while B (visible) keeps its gap.
+    @Test("Playlist action group: off-screen collapse settles on scroll-back")
+    func playlistActionGroupOffscreenCollapseSettlesOnScrollBack() async throws {
         guard let context = await Self.liveContext(),
               let window = Self.keyWindow() else {
             print("[uifix] shell not ready; skipping"); return
@@ -850,7 +809,7 @@ struct UIFixRegressionTests {
             (cell.contentView.subviews.first as? UIStackView)?.arrangedSubviews.first
         }
 
-        // Expand card A (item 0).
+        // Open card A (item 0).
         let pathA = IndexPath(item: 0, section: 0)
         collection.scrollToItem(at: pathA, at: .top, animated: false)
         try await Self.settle(window, seconds: 0.3)
@@ -861,15 +820,14 @@ struct UIFixRegressionTests {
         }
         let plateHeightBefore = plateBefore.frame.height
         cellA.onCardTap?()
-        try await Self.settle(window, seconds: 0.5)
-        #expect(abs(itemHeight(0) - collapsedA - EpisodeCardCell.stripHeight) < 8,
-                "card A did not expand (item \(itemHeight(0)), collapsed \(collapsedA))")
+        try await Self.settle(window, seconds: 0.6)
+        #expect(abs(itemHeight(0) - collapsedA - ListActionMetrics.gap) <= 1,
+                "card A did not open (item \(itemHeight(0)), collapsed \(collapsedA))")
 
-        // Push A fully off-screen, then expand card B — the coordinator
-        // collapses A while nothing visible represents it. The criterion
-        // is the collection view's VISIBLE set (the same bounds-based set
-        // the animator drives); UIKit keeps buffer cells materialized
-        // slightly past the viewport, so cellForItem alone is not proof.
+        // Push A fully off-screen, then open card B — selection moves by
+        // identity while nothing visible represents A. The criterion is the
+        // collection view's VISIBLE set; UIKit keeps buffer cells past the
+        // viewport, so cellForItem alone is not proof.
         let lastIndex = collection.numberOfItems(inSection: 0) - 1
         let pathB = IndexPath(item: lastIndex, section: 0)
         collection.scrollToItem(at: pathB, at: .top, animated: false)
@@ -882,9 +840,9 @@ struct UIFixRegressionTests {
             Issue.record("card B not visible"); return
         }
         cellB.onCardTap?()
-        try await Self.settle(window, seconds: 0.5)
+        try await Self.settle(window, seconds: 0.6)
 
-        // Scroll back: A must settle COLLAPSED — item height restored, no
+        // Scroll back: A must settle COLLAPSED — height restored, no gap, no
         // stretched plate.
         collection.scrollToItem(at: pathA, at: .top, animated: false)
         try await Self.settle(window, seconds: 0.5)
@@ -894,66 +852,25 @@ struct UIFixRegressionTests {
             Issue.record("card A did not come back on screen"); return
         }
         print("[uifix] off-screen collapse: item \(collapsedA) → settled \(settledA); plate \(plateHeightBefore) → \(plateReturned.frame.height)")
-        #expect(abs(settledA - collapsedA) < 4,
+        #expect(abs(settledA - collapsedA) <= 1,
                 "card A's item settled at \(settledA) after scroll-back, not its collapsed height \(collapsedA)")
-        #expect(abs(plateReturned.frame.height - plateHeightBefore) < 2,
+        #expect(cellAReturned.actionGap == 0,
+                "card A still hosts a gap (\(cellAReturned.actionGap)) after scroll-back")
+        #expect(abs(plateReturned.frame.height - plateHeightBefore) <= 1,
                 "card A's plate stretched on scroll-back (\(plateHeightBefore) → \(plateReturned.frame.height))")
+
+        // B keeps its gap when visible.
+        collection.scrollToItem(at: pathB, at: .top, animated: false)
+        try await Self.settle(window, seconds: 0.5)
+        if let cellBNow = collection.cellForItem(at: pathB) as? EpisodeCardCell {
+            #expect(cellBNow.actionGap == ListActionMetrics.gap,
+                    "card B lost its gap (\(cellBNow.actionGap)) after scrolling away and back")
+        }
 
         // Fixture restore (awaited; the defer Task above is the early-exit net).
         for url in fillerURLs {
             try? await context.database.playlistRepository().removeEpisode(byEnclosureURL: url)
         }
-    }
-
-    /// The intermediate-state mechanism, pinned deterministically (no
-    /// shell): settling the expanded strip inside a still-collapsed cell
-    /// frame over-constrains the layout — the committed solve deforms the
-    /// card (body compressed or strip squashed away from its 60 pt target).
-    /// The animator's deferred settle (`settleLayout: false`) leaves the
-    /// cell's solved geometry untouched, so the single animated batch pass
-    /// is the first and only solve that sees the new constraints.
-    @Test("Strip target: forced settle deforms a collapsed cell; deferred settle does not solve")
-    func stripTargetSettleDeformsCollapsedCell() {
-        func makeCard() -> (EpisodeCardCell, UIView, UIView) {
-            let cell = EpisodeCardCell(
-                frame: CGRect(x: 0, y: 0, width: 354, height: EpisodeCardCell.cardRowHeight)
-            )
-            cell.configure(
-                EpisodeCardContent(
-                    title: "Episode", channelTitle: "Channel", rightText: "12m left",
-                    descriptionHTML: nil, imageURL: nil, descriptionPlainText: "Description"
-                ),
-                actions: [EpisodeCardAction(
-                    icon: UIImage(), accessibilityLabel: "Play"
-                ) {}]
-            )
-            cell.layoutIfNeeded()
-            let arranged = (cell.contentView.subviews.first as? UIStackView)?.arrangedSubviews ?? []
-            return (cell, arranged.first!, arranged.last!)
-        }
-
-        // Forced settle (the retired Phase 1): the expanded strip must fit
-        // inside the collapsed frame — impossible; the solve breaks. Either
-        // the card body compresses below its pre-expand height or the strip
-        // lands short of its 60 pt target — both are the deformed
-        // intermediate state.
-        let (forced, forcedBody, forcedStrip) = makeCard()
-        let forcedBefore = forcedBody.frame.height
-        UIView.performWithoutAnimation { forced.setExpanded(true) }
-        let deformed = abs(forcedBody.frame.height - forcedBefore) > 0.5
-            || abs(forcedStrip.frame.height - EpisodeCardCell.stripHeight) > 0.5
-        print("[uifix] forced settle: body \(forcedBefore) → \(forcedBody.frame.height), strip → \(forcedStrip.frame.height)")
-        #expect(deformed,
-                "forced settle inside a collapsed frame solved cleanly (body \(forcedBefore) → \(forcedBody.frame.height), strip \(forcedStrip.frame.height)) — the intermediate-state hypothesis would be unfounded")
-
-        // Deferred settle (the animator path): the target lands, no solve
-        // runs — the body keeps its collapsed geometry until the batch's
-        // own animated pass.
-        let (deferred, deferredBody, _) = makeCard()
-        let deferredBefore = deferredBody.frame.height
-        deferred.setExpanded(true, settleLayout: false)
-        #expect(abs(deferredBody.frame.height - deferredBefore) < 0.5,
-                "deferred settle moved the card body (\(deferredBefore) → \(deferredBody.frame.height)) before any layout pass")
     }
 
     // MARK: - 10. Whole-card drag reorder (the interactive-movement path)
@@ -1037,14 +954,9 @@ struct UIFixRegressionTests {
 
     // MARK: - 11. Inbox add-to-playlist: animated removal precedes the fly-in
 
-    /// The add flow's shape: the playlist insert commits FIRST (kill-window
-    /// safety), the row animates away (a batch delete that keeps the
-    /// surviving rows' measured sizes — the old no-animation reloadData()
-    /// re-estimated every self-sizing card and the neighbors snapped), THEN
-    /// the ball flies. Pins the visual order (the fly overlay appears only
-    /// after the row VISUALLY leaves the list), the neighbor stillness
-    /// (tracked by cell identity, not position), the collection view's own
-    /// row count, and the database outcome, then restores the fixture.
+    /// Add inserts durably, applies one snapshot and hands the group to the
+    /// filler. Its leaving snapshot fades before the fly-in, while surviving
+    /// plate heights stay fixed (the filler's transparent gap changes).
     @Test("Inbox add-to-playlist: row animates away first, then the fly-in")
     func inboxAddToPlaylistRemovesRowBeforeFlyIn() async throws {
         guard let context = await Self.liveContext(),
@@ -1082,14 +994,24 @@ struct UIFixRegressionTests {
               ) as? InboxEpisodeCardCell else {
             print("[uifix] target card not visible; skipping"); return
         }
-        guard let add = cell.menuActions.first(where: { $0.accessibilityLabel == "Add to playlist" }) else {
-            Issue.record("card carries no add action"); return
-        }
+        inbox.actionController.close(animated: false)
+        cell.onCardTap?()
+        try await Self.settle(window, seconds: 0.4)
+        let add = try #require(inbox.actionController.groupView.button(for: "add"))
+        let applies = inbox.snapshotApplyCount
 
         // Identity-tracked cells: after the delete, positions shift, so the
         // probes follow the CELL OBJECTS (the removed card's cell and one
         // surviving neighbor) instead of index paths.
         weak let removedCell = cell
+        // Rows apply without diffable animation, so UIKit may immediately
+        // reuse the removed card's cell for a row scrolling in: "gone" means
+        // the cell no longer shows the removed episode's title.
+        let removedTitle = Self.labels(in: cell).first { ($0.text ?? "").count > 8 }?.text
+        func cellStillShowsRemoved(_ c: UICollectionViewCell) -> Bool {
+            guard let removedTitle else { return true }
+            return Self.labels(in: c).contains { $0.text == removedTitle }
+        }
         let neighborCandidate = collection.indexPathsForVisibleItems
             .filter { $0 != IndexPath(item: episodeIndex, section: cardSection) }
             .sorted { $0.item < $1.item }
@@ -1105,7 +1027,7 @@ struct UIFixRegressionTests {
         // source's.
         let cardsCountBefore = collection.numberOfItems(inSection: cardSection)
 
-        add.handler()
+        add.sendActions(for: .touchUpInside)
 
         // Order probes. The fly overlay's MODEL frame is its 24×24 endpoint
         // from the moment the flight commits — the 200×48 capsule exists
@@ -1121,10 +1043,17 @@ struct UIFixRegressionTests {
         // `window` stays non-nil), so the probe watches the fade-out end
         // state instead of view teardown.
         func removedCellVisuallyGone() -> Bool {
+            // FLIP keeps a leaving-card snapshot above the group (-1),
+            // below the real cells (0), until its fade ends.
+            let leavingGhostVisible = collection.subviews.contains {
+                $0.layer.zPosition == -0.5 && ($0.layer.presentation()?.opacity ?? $0.layer.opacity) > 0.05
+            }
+            guard !leavingGhostVisible else { return false }
             guard let removedCell else { return true }
-            return removedCell.isHidden || removedCell.alpha < 0.05
+            return !collection.visibleCells.contains(removedCell) || removedCell.isHidden
+                || removedCell.alpha < 0.05 || !cellStillShowsRemoved(removedCell)
         }
-        var commitTime: TimeInterval?      // batch commits (count drops)
+        var commitTime: TimeInterval?      // snapshot applies (count drops)
         var goneTime: TimeInterval?        // delete animation ends (cell leaves the window)
         var flyTime: TimeInterval?
         var neighborHeights: [CGFloat] = []
@@ -1137,10 +1066,12 @@ struct UIFixRegressionTests {
             }
             if goneTime == nil, removedCellVisuallyGone() { goneTime = elapsed }
             if flyTime == nil, flyOverlayPresent() { flyTime = elapsed }
-            if let neighborCell { neighborHeights.append(neighborCell.frame.height) }
+            if let neighborCell { neighborHeights.append(neighborCell.cardFrameInCell.height) }
             if commitTime != nil, goneTime != nil, flyTime != nil { break }
             try await Task.sleep(for: .milliseconds(30))
         }
+        #expect(inbox.snapshotApplyCount == applies + 1, "one snapshot per Add")
+        #expect(inbox.actionController.selectedID != nil && inbox.actionController.selectedID != url)
         #expect(commitTime != nil, "collection view row count never decreased")
         #expect(flyTime != nil, "fly-in overlay never appeared")
         #expect(goneTime != nil, "the removed card's cell never faded out")
@@ -1154,9 +1085,7 @@ struct UIFixRegressionTests {
             #expect(fly >= gone - 0.1,
                     "fly-in (\(fly)s) started before the row left the screen (\(gone)s)")
         }
-        // Neighbor stillness by identity: the surviving cell's height never
-        // moves through the whole flow (a reloadData() would re-estimate
-        // it; the animated delete keeps it).
+        // The filler gains the gap, but its plate height must stay fixed.
         #expect(!neighborHeights.isEmpty, "the neighbor probe never sampled its cell")
         #expect(neighborHeights.allSatisfy { abs($0 - (neighborHeights.first ?? $0)) < 1.5 },
                 "neighbor card height changed mid-removal (\(neighborHeights)) — the list re-estimated its cards")
@@ -1168,10 +1097,8 @@ struct UIFixRegressionTests {
         #expect(collection.numberOfItems(inSection: cardSection) == cardsCountBefore - 1,
                 "collection view count \(collection.numberOfItems(inSection: cardSection)) != \(cardsCountBefore - 1)")
         #expect(removedCellVisuallyGone(), "the removed card's cell is still visible after the settle")
-        if let removedCell {
-            #expect(!collection.visibleCells.contains(removedCell),
-                    "the removed card's cell still reports as visible after the settle")
-        }
+        #expect(!collection.visibleCells.contains { cellStillShowsRemoved($0) },
+                "a visible cell still shows the removed episode after the settle")
         #expect(neighborCell?.window != nil,
                 "the surviving neighbor cell left the screen — the wrong row was deleted")
         let inboxAfter = (try? await context.database.feedRepository().listAll()) ?? []
@@ -1400,3 +1327,12 @@ private extension UIViewController {
     }
 }
 
+
+extension UIFixRegressionTests {
+    /// Every label under `view` (for identity-free cell content probes).
+    static func labels(in view: UIView) -> [UILabel] {
+        view.subviews.flatMap { sub -> [UILabel] in
+            ((sub as? UILabel).map { [$0] } ?? []) + labels(in: sub)
+        }
+    }
+}

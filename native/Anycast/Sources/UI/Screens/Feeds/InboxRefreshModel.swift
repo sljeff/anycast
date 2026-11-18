@@ -79,36 +79,20 @@ enum InboxHeaderStatus {
     }
 }
 
-/// How the inbox card list moves from one render to the next, pure. A list
-/// whose rows only appeared or left (everything else in the same order) is
-/// applied as inserts and removes so unchanged cards stay put; anything else
-/// falls back to a plain `reloadData`.
+/// Identity/section changes need one diffable snapshot. Equal, unambiguous
+/// identities need none, including the database settle after a visual leave.
+/// Diffable owns inserts, deletes and moves; there is no manual batch plan.
 nonisolated enum InboxListDiff {
-
-    enum Plan: Equatable {
-        /// Same rows in the same order: nothing to apply.
-        case unchanged
-        /// Rebuild the whole list.
-        case reload
-        /// Indices in the OLD list to remove and in the NEW list to insert.
-        case batch(removes: [Int], inserts: [Int])
-    }
+    enum Plan: Equatable { case unchanged, applySnapshot }
 
     static func plan(old: [String?], new: [String?], sectionsUnchanged: Bool) -> Plan {
-        guard sectionsUnchanged, !old.isEmpty, !new.isEmpty else { return .reload }
+        guard sectionsUnchanged else { return .applySnapshot }
         let oldURLs = old.compactMap { $0 }
         let newURLs = new.compactMap { $0 }
-        // A nil URL has no identity, a duplicate has an ambiguous one.
         guard oldURLs.count == old.count, newURLs.count == new.count,
               Set(oldURLs).count == oldURLs.count, Set(newURLs).count == newURLs.count
-        else { return .reload }
-        if oldURLs == newURLs { return .unchanged }
-        let oldSet = Set(oldURLs), newSet = Set(newURLs)
-        // Rows that stayed must keep their relative order, else a row moved.
-        guard oldURLs.filter(newSet.contains) == newURLs.filter(oldSet.contains) else { return .reload }
-        let removes = oldURLs.indices.filter { !newSet.contains(oldURLs[$0]) }
-        let inserts = newURLs.indices.filter { !oldSet.contains(newURLs[$0]) }
-        return .batch(removes: removes, inserts: inserts)
+        else { return .applySnapshot }
+        return oldURLs == newURLs ? .unchanged : .applySnapshot
     }
 }
 
@@ -269,6 +253,61 @@ enum InboxActionPlanner {
 
         case .remove:
             return [.removeFromInbox]
+        }
+    }
+}
+
+// MARK: - Merged Undo batches
+
+/// The two kinds of Inbox action that share one Undo window.
+enum InboxBatchKind: Hashable {
+    case remove
+    case add
+}
+
+/// One action in a batch. A Remove needs only the URL (its row stays stored
+/// until the commit). An Add keeps the FULL feed row it took out of the
+/// Inbox, and the playlist row it created, so Undo can put both back.
+struct InboxBatchItem {
+    let url: String
+    var feedRow: FeedEpisodeRow?
+    /// Nil when the Add created no playlist row (the episode was playing, or
+    /// already queued): Undo then leaves the playlist alone.
+    var createdPlaylistRow: PlaylistEpisodeRow?
+
+    init(url: String, feedRow: FeedEpisodeRow? = nil, createdPlaylistRow: PlaylistEpisodeRow? = nil) {
+        self.url = url
+        self.feedRow = feedRow
+        self.createdPlaylistRow = createdPlaylistRow
+    }
+}
+
+enum InboxBatchLogic {
+
+    /// The capsule text: one action reads plainly, several carry the count.
+    static func message(kind: InboxBatchKind, count: Int) -> String {
+        switch kind {
+        case .remove: return count > 1 ? "Removed \(count) episodes" : "Removed"
+        case .add: return count > 1 ? "Added \(count) to Playlist" : "Added to Playlist"
+        }
+    }
+
+    /// Undoes an Add batch. The feed rows come back first — without their
+    /// original ids and never over a same-URL row a refresh landed inside
+    /// the window (see `reinsertIgnoringConflicts`) — and only when that
+    /// whole write succeeded do the created playlist rows go. A failure
+    /// throws before any playlist deletion, so an episode can end up in
+    /// both places (recoverable) but never in neither. A created row that
+    /// has since become the current episode stays, as the player owns it.
+    static func undoAdd(
+        _ items: [InboxBatchItem],
+        currentEnclosureURL: String?,
+        feedRepository: FeedRepository,
+        playlistRepository: PlaylistRepository
+    ) async throws {
+        try await feedRepository.reinsertIgnoringConflicts(items.compactMap(\.feedRow))
+        for item in items where item.createdPlaylistRow != nil && item.url != currentEnclosureURL {
+            try await playlistRepository.removeEpisode(byEnclosureURL: item.url)
         }
     }
 }

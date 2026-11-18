@@ -1,19 +1,7 @@
 import UIKit
 import AnycastKit
 
-extension EpisodeCardAction {
-    /// The add-to-playlist action's index — `EpisodeCardCell` tags its strip
-    /// buttons by action index, so this locates the fly-in origin.
-    static let addActionTag = 1
-}
-
-/// Shared episode wiring for the Channel and ChannelSearch lists (the two
-/// card lists of channel.dart:101-193 and 796-885): identical actions
-/// (play / add-to-playlist), the channel-page inPlaylist guard and Detail
-/// presentation. ChannelSearch renders `EpisodeCardCell` cards (strip,
-/// fly-in-then-insert, mutual exclusion through a `CardExpandCoordinator`);
-/// the Channel page renders grouped-plate rows whose tap opens Detail and
-/// whose long press offers the same actions (`menu(for:)`).
+/// Covered Show cards with persistent, list-owned Play / Add / Details actions.
 @MainActor
 final class ChannelEpisodeListBinder {
 
@@ -21,7 +9,8 @@ final class ChannelEpisodeListBinder {
     private let context: UIContext
     private let viewModel: ChannelViewModel
     private let htmlRenderer: HTMLContentRenderer
-    private let expandCoordinator: CardExpandCoordinator
+    weak var actionController: ListActionController?
+    private var pendingAdds: Set<String> = []
 
     /// Enclosure URLs known to sit in any playlist (isInPlaylists,
     /// states/playlist.dart) — refreshed on appear, after adds, and when the
@@ -29,24 +18,18 @@ final class ChannelEpisodeListBinder {
     private var playlistMembers: Set<String> = []
     private let observation = ObservationLoop()
 
-    /// The owner's collection view (set at build time) — resolves tapped
-    /// cells for the fly-in start point.
-    weak var collectionView: UICollectionView?
-
     var onListContentChanged: (() -> Void)?
 
     init(
         owner: UIViewController,
         context: UIContext,
         viewModel: ChannelViewModel,
-        htmlRenderer: HTMLContentRenderer,
-        expandCoordinator: CardExpandCoordinator
+        htmlRenderer: HTMLContentRenderer
     ) {
         self.owner = owner
         self.context = context
         self.viewModel = viewModel
         self.htmlRenderer = htmlRenderer
-        self.expandCoordinator = expandCoordinator
     }
 
     func startObservingPlayback() {
@@ -58,7 +41,10 @@ final class ChannelEpisodeListBinder {
                 _ = self.context.playback.isLoading
                 _ = self.context.playback.queueEnclosureURLs
             },
-            onChange: { [weak self] in self?.refreshPlaylistMembership() }
+            onChange: { [weak self] in
+                self?.refreshGroup()
+                self?.refreshPlaylistMembership()
+            }
         )
     }
 
@@ -77,13 +63,8 @@ final class ChannelEpisodeListBinder {
                 playlistMembers = members
                 onListContentChanged?()
             }
+            refreshGroup()
         }
-    }
-
-    // MARK: - Grouped rows (the Channel page)
-
-    func configure(row: ChannelEpisodeRowCell, episode: FeedEpisodeRow) {
-        row.configure(title: episode.title ?? "", meta: Self.rightText(for: episode))
     }
 
     /// The row's long-press menu: Play / Pause, then Add to playlist (or a
@@ -99,7 +80,7 @@ final class ChannelEpisodeListBinder {
         let add = inPlaylist
             ? UIAction(title: "In playlist", image: AppIcons.addedToList, attributes: .disabled) { _ in }
             : UIAction(title: "Add to playlist", image: AppIcons.addToList) { [weak self] _ in
-                Task { await self?.insertIntoPlaylist(episode) }
+                self?.addTapped(episode)
             }
         return UIMenu(children: [play, add])
     }
@@ -110,39 +91,57 @@ final class ChannelEpisodeListBinder {
         collectionView.register(EpisodeCardCell.self, forCellWithReuseIdentifier: EpisodeCardCell.reuseIdentifier)
     }
 
-    func configure(cell: EpisodeCardCell, episode: FeedEpisodeRow, at indexPath: IndexPath, in collectionView: UICollectionView) {
+    /// `actionID` is the row's list-action identity — nil for a duplicate
+    /// enclosure URL, whose row then toggles nothing and carries no gap.
+    func configure(
+        cell: EpisodeCardCell,
+        episode: FeedEpisodeRow,
+        actionID: String?,
+        at indexPath: IndexPath,
+        in collectionView: UICollectionView
+    ) {
         let enclosureURL = episode.enclosureUrl ?? ""
-        let playing = !enclosureURL.isEmpty && context.playback.isPlayingEpisode(enclosureURL)
         let inPlaylist = playlistMembers.contains(enclosureURL)
 
         let content = EpisodeCardContent(
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? viewModel.channel.title ?? "",
             rightText: Self.rightText(for: episode),
-            descriptionHTML: episode.description,
-            imageURL: episode.imageUrl,
-            showsChannel: false
+            descriptionHTML: nil,
+            imageURL: episode.imageUrl ?? viewModel.channel.imageUrl,
+            showsChannel: false,
+            layout: .show,
+            inPlaylist: inPlaylist
         )
-        cell.configure(content, actions: actions(for: episode, playing: playing, inPlaylist: inPlaylist, at: indexPath))
+        cell.configure(content, actions: detailActions(for: episode))
         cell.onCardTap = { [weak self] in
-            guard let self else { return }
-            self.expandCoordinator.toggle(at: indexPath)
-            self.refreshExpandedState(in: collectionView)
+            guard let actionID else { return }
+            self?.actionController?.toggle(id: actionID)
         }
-        cell.onCoverTap = { [weak self] in
-            self?.presentDetail(episode: episode)
-        }
-        if expandCoordinator.expandedIndexPath == indexPath {
-            cell.setExpanded(true)
-        }
+        cell.onCoverTap = { [weak self] in self?.presentDetail(episode: episode) }
+        actionController?.reapplyGap(to: cell, id: actionID ?? "")
     }
 
-    /// Re-applies the strip state after any reconfigure (configure resets
-    /// the strip) and animates the item height with it.
-    func refreshExpandedState(in collectionView: UICollectionView) {
-        CardExpandAnimator.refresh(
-            expandedPath: expandCoordinator.expandedIndexPath,
-            in: collectionView
+    func groupItems(for episode: FeedEpisodeRow) -> [ListActionItem] {
+        let inPlaylist = playlistMembers.contains(episode.enclosureUrl ?? "")
+        return [
+            ListActionItem(id: "play", content: .icon(AppIcons.play), accessibilityLabel: "Play") { [weak self] in
+                self?.playTapped(episode)
+            },
+            ListActionItem(id: "add", content: .icon(inPlaylist ? AppIcons.addedToList : AppIcons.addToList),
+                           accessibilityLabel: inPlaylist ? "In playlist" : "Add to playlist") { [weak self] in
+                self?.addTapped(episode)
+            },
+            ListActionItem(id: "details", content: .title("Details"), accessibilityLabel: "Details") { [weak self] in
+                self?.presentDetail(episode: episode)
+            },
+        ]
+    }
+
+    func refreshGroup() {
+        guard let controller = actionController, let id = controller.selectedID else { return }
+        ShowEpisodeActionGroup.refresh(
+            controller, playback: context.playback, inPlaylist: playlistMembers.contains(id)
         )
     }
 
@@ -156,28 +155,6 @@ final class ChannelEpisodeListBinder {
     }
 
     // MARK: - Actions (channel.dart:137-186 / 831-880)
-
-    private func actions(
-        for episode: FeedEpisodeRow,
-        playing: Bool,
-        inPlaylist: Bool,
-        at indexPath: IndexPath
-    ) -> [EpisodeCardAction] {
-        [
-            EpisodeCardAction(
-                icon: playing ? AppIcons.pause : AppIcons.play,
-                accessibilityLabel: playing ? "Pause" : "Play"
-            ) { [weak self] in
-                self?.playTapped(episode)
-            },
-            EpisodeCardAction(
-                icon: inPlaylist ? AppIcons.addedToList : AppIcons.addToList,
-                accessibilityLabel: inPlaylist ? "Already in playlist" : "Add to playlist"
-            ) { [weak self] in
-                self?.addTapped(episode, at: indexPath)
-            },
-        ]
-    }
 
     private func playTapped(_ episode: FeedEpisodeRow) {
         guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return }
@@ -207,23 +184,16 @@ final class ChannelEpisodeListBinder {
         return row
     }
 
-    private func addTapped(_ episode: FeedEpisodeRow, at indexPath: IndexPath) {
-        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return }
-        // Channel + ChannelSearch are the ONLY card lists with this guard
-        // (channel.dart:152-155 / 831-834, 03 §2.6 correction).
-        guard ChannelPlaylistGate.action(inPlaylist: playlistMembers.contains(enclosureURL)) == .flyInAndInsert else {
-            return
+    private func addTapped(_ episode: FeedEpisodeRow) {
+        
+        guard let url = episode.enclosureUrl, !url.isEmpty,
+              ChannelPlaylistGate.action(inPlaylist: playlistMembers.contains(url)) != .blocked,
+              pendingAdds.insert(url).inserted else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            defer { pendingAdds.remove(url) }
+            await insertIntoPlaylist(episode)
         }
-        // Fly-in first (600 ms), insert on completion — channel.dart:160-183.
-        let insert: () -> Void = { [weak self] in
-            Task { await self?.insertIntoPlaylist(episode) }
-        }
-        guard let window = owner.view?.window else {
-            insert()
-            return
-        }
-        let start = plusButtonCenter(at: indexPath, in: window)
-        context.flyInAnimator.fly(from: start, in: window, completion: insert)
     }
 
     /// addToPlaylist(1, ep) (states/feed_episode.dart:80-105).
@@ -257,36 +227,7 @@ final class ChannelEpisodeListBinder {
             await context.playback.reloadQueue()
         }
         onListContentChanged?()
-    }
-
-    /// The fly-in origin is the tapped plus button (epBtnKey in Dart); the
-    /// cell tags its action buttons by action index, so the second action's
-    /// button is reachable without touching the shared component.
-    private func plusButtonCenter(at indexPath: IndexPath, in window: UIWindow) -> CGPoint {
-        guard let collectionView,
-              let cell = collectionView.cellForItem(at: indexPath) as? EpisodeCardCell else {
-            return window.center
-        }
-        if let button = Self.descendant(tagged: EpisodeCardAction.addActionTag, in: cell) {
-            return button.convert(CGPoint(x: button.bounds.midX, y: button.bounds.midY), to: window)
-        }
-        // Fallback: the right action button's strip position.
-        return cell.convert(
-            CGPoint(x: cell.bounds.width - 44, y: cell.bounds.height - 28),
-            to: window
-        )
-    }
-
-    private static func descendant(tagged tag: Int, in view: UIView) -> UIButton? {
-        if let button = view as? UIButton, button.tag == tag {
-            return button
-        }
-        for subview in view.subviews {
-            if let found = descendant(tagged: tag, in: subview) {
-                return found
-            }
-        }
-        return nil
+        refreshGroup()
     }
 
     // MARK: - Detail (cover tap, card.dart:129-138)
@@ -346,9 +287,7 @@ final class ChannelEpisodeListBinder {
                 icon: AppIcons.addToList,
                 accessibilityLabel: "Add to playlist"
             ) { [weak self] in
-                guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return }
-                guard ChannelPlaylistGate.action(inPlaylist: false) == .flyInAndInsert else { return }
-                Task { await self?.insertIntoPlaylist(episode) }
+                self?.addTapped(episode)
             },
         ]
     }

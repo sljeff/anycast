@@ -77,7 +77,7 @@ final class PaywallDetailsViewController: UIViewController {
 
     private static func icon(_ icon: PaywallModel.Feature.Icon) -> UIImage? {
         switch icon {
-        case .subtitles: UIImage(systemName: "sparkles")
+        case .subtitles: AppIcons.bilingual
         case .transcripts: AppIcons.aiTranscript
         case .account: UIImage(systemName: "person.crop.circle")
         }

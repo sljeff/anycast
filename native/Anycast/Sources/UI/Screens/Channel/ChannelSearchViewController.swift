@@ -14,14 +14,20 @@ final class ChannelSearchViewController: UIViewController {
     private let searchField = UITextField()
     private var viewModel: ChannelViewModel?
 
-    private let collectionView: UICollectionView
+    private let collectionView: ListActionCollectionView
     private let playerBar: PlayerBarView
     private let playerBarHeight: NSLayoutConstraint
     private let noResultsLabel = UILabel()
     private var noResultsCenterY: NSLayoutConstraint!
 
-    private let expandCoordinator = CardExpandCoordinator()
     private var binder: ChannelEpisodeListBinder?
+    /// The list-owned Play · Add · Details group, as on the Channel page.
+    private(set) var actionController: ListActionController!
+    /// The filtered rows the collection view currently shows (see
+    /// ChannelViewController.displayedEpisodes), plus their action-group
+    /// ids — nil for a repeated enclosure URL, which gets no group.
+    private(set) var displayedEpisodes: [FeedEpisodeRow] = []
+    private var actionIDs: [String?] = []
     private let htmlRenderer = HTMLContentRenderer()
 
     private let modelObservation = ObservationLoop()
@@ -63,12 +69,12 @@ final class ChannelSearchViewController: UIViewController {
         AppSheets.presentExpand(controller, from: presenter)
     }
 
-    private static func makeCoreViews(context: UIContext) -> (UICollectionView, PlayerBarView, NSLayoutConstraint) {
+    private static func makeCoreViews(context: UIContext) -> (ListActionCollectionView, PlayerBarView, NSLayoutConstraint) {
         let layout = UICollectionViewCompositionalLayout { _, _ in
             let item = NSCollectionLayoutItem(
                 layoutSize: NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1),
-                    heightDimension: .estimated(EpisodeCardCell.cardRowHeight)
+                    heightDimension: .estimated(EpisodeCardCell.showRowHeight)
                 )
             )
             let group = NSCollectionLayoutGroup.horizontal(
@@ -79,7 +85,7 @@ final class ChannelSearchViewController: UIViewController {
             section.interGroupSpacing = EpisodeCardCell.spacing
             return section
         }
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        let collectionView = ListActionCollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = .clear
         collectionView.contentInsetAdjustmentBehavior = .never
         collectionView.keyboardDismissMode = .interactive
@@ -100,6 +106,7 @@ final class ChannelSearchViewController: UIViewController {
 
         buildViewHierarchy()
         resolveViewModel()
+        configureActionController()
 
         modelObservation.track(
             read: { [weak self] in
@@ -231,11 +238,9 @@ final class ChannelSearchViewController: UIViewController {
             owner: self,
             context: context,
             viewModel: entry.model,
-            htmlRenderer: htmlRenderer,
-            expandCoordinator: expandCoordinator
+            htmlRenderer: htmlRenderer
         )
         binder.onListContentChanged = { [weak self] in self?.refreshVisibleCards() }
-        binder.collectionView = collectionView
         binder.startObservingPlayback()
         self.binder = binder
     }
@@ -261,8 +266,44 @@ final class ChannelSearchViewController: UIViewController {
     /// indicator clearance is applied by hand.
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        collectionView.contentInset.bottom = view.safeAreaInsets.bottom
+        // Keep the action controller's own extension on top of the base.
+        collectionView.contentInset.bottom = view.safeAreaInsets.bottom + (actionController?.insetExtension ?? 0)
         collectionView.verticalScrollIndicatorInsets.bottom = view.safeAreaInsets.bottom
+    }
+
+    // MARK: - List-owned action group
+
+    private func configureActionController() {
+        actionController = ListActionController(
+            collectionView: collectionView,
+            itemsProvider: { [weak self] id in
+                guard let self, let binder = self.binder,
+                      let episode = self.displayedEpisodes.first(where: { $0.enclosureUrl == id }) else { return [] }
+                return binder.groupItems(for: episode)
+            },
+            idAt: { [weak self] path in
+                guard let self, path.section == 0, self.actionIDs.indices.contains(path.item) else { return nil }
+                return self.actionIDs[path.item]
+            },
+            indexPathFor: { [weak self] id in
+                guard let index = self?.actionIDs.firstIndex(where: { $0 == id }) else { return nil }
+                return IndexPath(item: index, section: 0)
+            },
+            safeArea: { [weak self] in self?.actionSafeLines() ?? (0, 0) }
+        )
+        binder?.actionController = actionController
+        actionController.onGroupUpdate = { [weak self] in self?.binder?.refreshGroup() }
+    }
+
+    /// Top: below the search field (the list's top inset). Bottom: the
+    /// floating capsule's top when it shows, else the safe-area bottom —
+    /// minus the 52 pt toast slot.
+    private func actionSafeLines() -> (top: CGFloat, bottom: CGFloat) {
+        let bottomY = playerBar.isHidden || playerBar.bounds.height < 1
+            ? view.bounds.height - view.safeAreaInsets.bottom
+            : playerBar.frame.minY
+        let bottom = view.convert(CGPoint(x: 0, y: bottomY), to: collectionView).y - collectionView.bounds.minY
+        return (collectionView.adjustedContentInset.top, bottom - 52)
     }
 
     @objc private func queryChanged() {
@@ -277,8 +318,18 @@ final class ChannelSearchViewController: UIViewController {
         let signature = filtered.map(\.enclosureUrl)
         if signature != lastFilteredSignature {
             lastFilteredSignature = signature
-            UIView.performWithoutAnimation {
-                collectionView.reloadData()
+            let ids = ListActionIdentity.ids(for: filtered.map(\.enclosureUrl))
+            let apply = {
+                self.displayedEpisodes = filtered
+                self.actionIDs = ids
+                self.collectionView.reloadData()
+            }
+            if let actionController, actionController.selectedID != nil {
+                // The group stays with its episode while it still matches
+                // the query and closes once it is filtered out.
+                actionController.itemsDidChange(apply: apply)
+            } else {
+                UIView.performWithoutAnimation(apply)
             }
             refreshVisibleCards()
         }
@@ -299,12 +350,17 @@ final class ChannelSearchViewController: UIViewController {
     }
 
     private func refreshVisibleCards() {
-        let filtered = filteredEpisodes
         for path in collectionView.indexPathsForVisibleItems {
-            guard filtered.indices.contains(path.item),
+            guard displayedEpisodes.indices.contains(path.item),
                   let cell = collectionView.cellForItem(at: path) as? EpisodeCardCell
             else { continue }
-            binder?.configure(cell: cell, episode: filtered[path.item], at: path, in: collectionView)
+            binder?.configure(
+                cell: cell,
+                episode: displayedEpisodes[path.item],
+                actionID: actionIDs.indices.contains(path.item) ? actionIDs[path.item] : nil,
+                at: path,
+                in: collectionView
+            )
         }
     }
 }
@@ -314,7 +370,7 @@ final class ChannelSearchViewController: UIViewController {
 extension ChannelSearchViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        filteredEpisodes.count
+        displayedEpisodes.count
     }
 
     func collectionView(
@@ -323,9 +379,14 @@ extension ChannelSearchViewController: UICollectionViewDataSource, UICollectionV
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: EpisodeCardCell.reuseIdentifier, for: indexPath
         ) as! EpisodeCardCell
-        let filtered = filteredEpisodes
-        if filtered.indices.contains(indexPath.item) {
-            binder?.configure(cell: cell, episode: filtered[indexPath.item], at: indexPath, in: collectionView)
+        if displayedEpisodes.indices.contains(indexPath.item) {
+            binder?.configure(
+                cell: cell,
+                episode: displayedEpisodes[indexPath.item],
+                actionID: actionIDs.indices.contains(indexPath.item) ? actionIDs[indexPath.item] : nil,
+                at: indexPath,
+                in: collectionView
+            )
         }
         return cell
     }

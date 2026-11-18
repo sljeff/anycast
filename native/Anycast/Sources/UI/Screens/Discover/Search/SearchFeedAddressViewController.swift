@@ -68,6 +68,9 @@ final class SearchFeedAddressViewController: UIViewController {
     private var topConstraint: NSLayoutConstraint?
 
     private let plate = UIControl()
+    /// The loading rule: the skeleton row shows only past 300 ms.
+    private let skeletonDelay = LoadingDelay()
+    private var skeletonView: SkeletonBlocksView?
     private let coverView = UIImageView()
     private let titleLabel = UILabel()
     private let hostLabel = UILabel()
@@ -239,18 +242,22 @@ final class SearchFeedAddressViewController: UIViewController {
     // MARK: - Render
 
     private func render() {
+        let isLoading: Bool
+        if case .loading = phase { isLoading = true } else { isLoading = false }
+        let showsSkeleton = skeletonDelay.update(isLoading: isLoading) { [weak self] in self?.render() }
+        if !isLoading { endSkeleton() }
         switch phase {
         case .loading:
-            plate.isHidden = false
+            plate.isHidden = !showsSkeleton
             messageLabel.isHidden = true
             plate.isUserInteractionEnabled = false
             followButton.isHidden = true
             coverView.kf.cancelDownloadTask()
             coverView.image = nil
-            coverView.backgroundColor = AnycastColor.sandAlpha4
-            titleLabel.setSkeletonBar("Placeholder show title")
-            hostLabel.setSkeletonBar("placeholder.example")
-            plate.isAccessibilityElement = true
+            titleLabel.text = "Placeholder show title"
+            hostLabel.text = "placeholder.example"
+            beginSkeleton()
+            plate.isAccessibilityElement = showsSkeleton
             plate.accessibilityLabel = "Loading"
         case .notAFeed:
             plate.isHidden = true
@@ -260,10 +267,9 @@ final class SearchFeedAddressViewController: UIViewController {
             plate.isHidden = false
             messageLabel.isHidden = true
             plate.isUserInteractionEnabled = true
-            coverView.backgroundColor = nil
             let title = data.subscription.title ?? ""
-            titleLabel.setRealText(title)
-            hostLabel.setRealText(FeedAddress.host(of: address))
+            titleLabel.text = title
+            hostLabel.text = FeedAddress.host(of: address)
             coverView.setArtwork(
                 data.subscription.imageUrl.flatMap(URL.init(string:)), title: title, side: PodcastCardCell.coverSide
             )
@@ -285,6 +291,23 @@ final class SearchFeedAddressViewController: UIViewController {
                 },
             ]
         }
+    }
+
+    // MARK: - Skeleton
+
+    /// The row's cover and two text lines as shared skeleton blocks; the
+    /// real views stay in place (invisible) so the row keeps its size.
+    private func beginSkeleton() {
+        for view in [coverView, titleLabel, hostLabel] { view.alpha = 0 }
+        let overlay = skeletonView ?? plate.installSkeletonOverlay()
+        skeletonView = overlay
+        overlay.shapes = [.cover(coverView), .lines(titleLabel, [0.6]), .lines(hostLabel, [0.4])]
+        overlay.isHidden = false
+    }
+
+    private func endSkeleton() {
+        skeletonView?.isHidden = true
+        for view in [coverView, titleLabel, hostLabel] { view.alpha = 1 }
     }
 
     // MARK: - Actions

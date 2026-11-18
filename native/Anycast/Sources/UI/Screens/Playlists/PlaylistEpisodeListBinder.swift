@@ -3,23 +3,18 @@ import Lottie
 import AnycastKit
 
 /// Shared wiring of `EpisodeCardCell` rows for one playlist's episode list
-/// (playlists.dart:122-195): the three strip actions (play/pause, AI
-/// transcribe, remove), live play/pause and robot-lottie overlays, the
-/// Detail sheet on cover tap, and the download indicator. Reordering is
+/// (playlists.dart:122-195): the list-owned actions, live play/pause and
+/// robot-lottie overlays, the Detail sheet on cover tap, and the download indicator. Reordering is
 /// owned by the list controller's 150 ms interactive movement (07 §6) —
 /// this binder carries no drag-and-drop surface.
 @MainActor
 final class PlaylistEpisodeListBinder: NSObject {
 
-    /// Action strip button tags (`EpisodeCardCell` tags buttons by index).
-    private static let playActionTag = 0
-    private static let aiActionTag = 1
-
     private unowned let owner: UIViewController
     private let context: UIContext
     let playlistId: Int64
 
-    private let expandCoordinator: CardExpandCoordinator
+    weak var actionController: ListActionController?
 
     /// Manual card downloads (the old `CacheController.download`) —
     /// play-driven downloads report through `PlaybackService.cacheStates`.
@@ -40,19 +35,17 @@ final class PlaylistEpisodeListBinder: NSObject {
     weak var episodeSource: PlaylistEpisodeDataSource?
 
     /// Fired whenever list-affecting state changed — the owning list reloads
-    /// its data and reconfigures visible cells.
+    /// its data while retaining cells by identity.
     var onListContentChanged: (() -> Void)?
 
     init(
         owner: UIViewController,
         context: UIContext,
-        playlistId: Int64,
-        expandCoordinator: CardExpandCoordinator
+        playlistId: Int64
     ) {
         self.owner = owner
         self.context = context
         self.playlistId = playlistId
-        self.expandCoordinator = expandCoordinator
     }
 
     deinit {
@@ -90,15 +83,14 @@ final class PlaylistEpisodeListBinder: NSObject {
             title: episode.title ?? "",
             channelTitle: episode.channelTitle ?? "",
             rightText: PlaylistCardDisplay.rightText(input),
-            descriptionHTML: episode.description,
             imageURL: episode.imageUrl,
             showsProgress: true,
             progressFraction: PlaylistCardDisplay.progressFraction(input),
-            downloadDisplay: downloadDisplay(for: enclosureURL)
+            downloadDisplay: downloadDisplay(for: enclosureURL),
+            layout: .playlist,
+            nowPlaying: isCurrent ? (playback.isPlaying ? .playing : .paused) : .none
         )
-        cell.configure(content, actions: actions(for: episode))
-        installPlayOverlay(on: cell, enclosureURL: enclosureURL)
-        applyAIDisplay(on: cell, enclosureURL: enclosureURL)
+        cell.configure(content, actions: [])
         installAccessibilityReorderActions(on: cell, episode: episode)
 
         // Closures resolve the row's CURRENT index at tap time — a cell that
@@ -107,9 +99,7 @@ final class PlaylistEpisodeListBinder: NSObject {
         // card still pausing playback on play-tap).
         cell.onCardTap = { [weak self] in
             guard let self else { return }
-            guard let current = self.episodeSource?.index(of: episode) else { return }
-            self.expandCoordinator.toggle(at: current)
-            self.refreshExpandedState(in: collectionView)
+            self.actionController?.toggle(id: enclosureURL)
         }
         cell.onCoverTap = { [weak self] in
             self?.presentDetail(episode: episode)
@@ -117,40 +107,44 @@ final class PlaylistEpisodeListBinder: NSObject {
         cell.onDownloadTap = { [weak self] in
             self?.downloadTapped(enclosureURL)
         }
-        if expandCoordinator.expandedIndexPath == indexPath {
-            cell.setExpanded(true)
-        }
-    }
-
-    /// Re-applies strip state after reconfigure and animates item heights
-    /// (the Channel-list precedent for the 0↔60 AnimatedContainer).
-    func refreshExpandedState(in collectionView: UICollectionView) {
-        CardExpandAnimator.refresh(
-            expandedPath: expandCoordinator.expandedIndexPath,
-            in: collectionView
-        )
     }
 
     /// Pushes coarse playback/AI/download state into the visible cells
     /// (play icon snapshot, AI four-state, download indicator) without a
     /// full data reload.
     func refreshVisibleCards() {
+        refreshGroup()
+        refreshNowPlaying()
         forEachVisibleCard { cell, enclosureURL in
-            updatePlayOverlay(on: cell, enclosureURL: enclosureURL)
-            applyAIDisplay(on: cell, enclosureURL: enclosureURL)
             cell.updateDownload(downloadDisplay(for: enclosureURL))
         }
     }
 
+    /// Moves the now-playing marker to the current episode's card and
+    /// toggles its animation with play/pause. Cell-level pushes only —
+    /// playback ticks never reach here, so no card is reconfigured.
+    private func refreshNowPlaying() {
+        let playback = context.playback
+        let currentURL = playback.currentEpisode?.enclosureUrl
+        let isPlaying = playback.isPlaying
+        forEachVisibleCard { cell, enclosureURL in
+            let isCurrent = !enclosureURL.isEmpty && enclosureURL == currentURL
+            cell.updateNowPlaying(isCurrent ? (isPlaying ? .playing : .paused) : .none)
+        }
+    }
+
     /// Each live source refreshes only the part of the card it drives: a
-    /// download tick must not re-run the strip icons and play glyph of
-    /// every visible card.
+    /// download tick must not rebuild the group's live overlays.
     private func refreshVisiblePlayOverlays() {
-        forEachVisibleCard { cell, enclosureURL in updatePlayOverlay(on: cell, enclosureURL: enclosureURL) }
+        guard let controller = actionController, let id = controller.selectedID,
+              let button = controller.groupView.button(for: "play") else { return }
+        updatePlayOverlay(on: button, enclosureURL: id)
     }
 
     private func refreshVisibleAIDisplays() {
-        forEachVisibleCard { cell, enclosureURL in applyAIDisplay(on: cell, enclosureURL: enclosureURL) }
+        guard let controller = actionController, let id = controller.selectedID,
+              let button = controller.groupView.button(for: "transcript") else { return }
+        applyAIDisplay(on: button, enclosureURL: id)
     }
 
     private func refreshVisibleDownloads() {
@@ -209,7 +203,10 @@ final class PlaylistEpisodeListBinder: NSObject {
                 _ = playback.isPlaying
                 _ = playback.isLoading
             },
-            onChange: { [weak self] in self?.refreshVisiblePlayOverlays() }
+            onChange: { [weak self] in
+                self?.refreshNowPlaying()
+                self?.refreshVisiblePlayOverlays()
+            }
         )
         downloadObservation.track(
             read: { _ = playback.cacheStates },
@@ -218,6 +215,27 @@ final class PlaylistEpisodeListBinder: NSObject {
         positionObservation.track(
             read: { _ = playback.positionData },
             onChange: { [weak self] in self?.pushLiveProgress() }
+        )
+        // Deferred removals commit once the playing episode changes: the
+        // in-memory queue still holds their rows and could advance into one.
+        batch.onCommit = {
+            ToastPresenter.shared.dismissAction(capsuleIdentifier: Self.capsuleIdentifier)
+        }
+        trackObservation.track(
+            read: { _ = playback.currentEpisodeContent },
+            onChange: { [weak self] in
+                guard let self, self.ownTrackChanges == 0 else { return }
+                let deferred = Set(self.batch.items.filter {
+                    if case .stored = $0.storage { true } else { false }
+                }.map(\.url))
+                if PlaylistRemovalLogic.shouldCommitOnTrackChange(
+                    pendingURLs: deferred,
+                    currentURLAtRemoval: self.currentURLAtRemoval,
+                    currentURL: playback.currentEpisode?.enclosureUrl
+                ) {
+                    Task { await self.batch.commitNow() }
+                }
+            }
         )
         let subtitles = context.subtitles
         aiObservation.track(
@@ -275,53 +293,64 @@ final class PlaylistEpisodeListBinder: NSObject {
         }
     }
 
-    // MARK: - Strip actions (playlists.dart:170-228)
+    // MARK: - List-owned actions
 
-    /// The card strip's play button renders through a live
-    /// PlayPauseIconControl overlay — the strip action carries a BLANK icon
-    /// (the overlay draws the glyph on top). Detail has no overlay, so its
-    /// copy must swap in a real play glyph or the button renders as an
-    /// empty white circle.
-    private func actions(for episode: PlaylistEpisodeRow, livePlayOverlay: Bool = true) -> [EpisodeCardAction] {
+    func groupItems(for episode: PlaylistEpisodeRow) -> [ListActionItem] {
         [
-            EpisodeCardAction(
-                // Blank: the live PlayPauseIconControl overlay renders the
-                // icon/lottie on top of this button.
-                icon: livePlayOverlay ? UIImage() : AppIcons.play,
-                accessibilityLabel: "Play"
-            ) { [weak self] in
+            ListActionItem(id: "play", content: .icon(AppIcons.play), accessibilityLabel: "Play") { [weak self] in
                 self?.playTapped(episode)
             },
-            EpisodeCardAction(
-                icon: AppIcons.aiTranscript ?? UIImage(),
-                accessibilityLabel: "Transcribe with AI"
-            ) { [weak self] in
+            ListActionItem(id: "transcript", content: .icon(AppIcons.aiTranscript),
+                           accessibilityLabel: "Transcribe with AI") { [weak self] in
                 self?.aiTapped(episode)
             },
-            EpisodeCardAction(
-                icon: AppIcons.remove,
-                accessibilityLabel: "Remove"
-            ) { [weak self] in
+            ListActionItem(id: "remove", content: .icon(AppIcons.remove), accessibilityLabel: "Remove") { [weak self] in
+                self?.removeTapped(episode)
+            },
+            ListActionItem(id: "details", content: .title("Details"), accessibilityLabel: "Details") { [weak self] in
+                self?.presentDetail(episode: episode)
+            },
+        ]
+    }
+
+    /// Detail keeps its own static actions; only the list owns live overlays.
+    private func actions(for episode: PlaylistEpisodeRow) -> [EpisodeCardAction] {
+        [
+            EpisodeCardAction(icon: AppIcons.play, accessibilityLabel: "Play") { [weak self] in
+                self?.playTapped(episode)
+            },
+            EpisodeCardAction(icon: AppIcons.aiTranscript, accessibilityLabel: "Transcribe with AI") { [weak self] in
+                self?.aiTapped(episode)
+            },
+            EpisodeCardAction(icon: AppIcons.remove, accessibilityLabel: "Remove") { [weak self] in
                 self?.removeTapped(episode)
             },
         ]
     }
 
-    /// Play/pause (playlists.dart:136-148): playing the head pauses it;
-    /// anything else moves to top and plays. The head check uses the row's
-    /// CURRENT index — the configure-time index goes stale after a drag.
+    /// Resolve the CURRENT index: identity-kept cells can move without configure.
     private func playTapped(_ episode: PlaylistEpisodeRow) {
-        guard let item = episodeSource?.index(of: episode)?.item else { return }
+        guard let url = episode.enclosureUrl,
+              let item = episodeSource?.visibleIndex(ofEnclosureURL: url) else { return }
         let playback = context.playback
-        let isPlayingThisList = playback.isPlaying
-            && playback.currentPlaylistId == playlistId
-        if isPlayingThisList && item == 0 {
-            playback.pause()
-            refreshVisibleCards()
+        // The loaded head toggles pause/resume in place and keeps the group
+        // open. Moving any other episode to the head must finish closing the
+        // group first, so its controls cannot travel into a different Play tap.
+        if item == 0, playback.currentPlaylistId == playlistId,
+           playback.currentEpisode?.enclosureUrl == url {
+            Task { [weak self] in
+                await playback.togglePlay()
+                self?.refreshVisibleCards()
+            }
             return
         }
-        Task { [weak self] in
-            await self?.moveToTopAndPlay(episode)
+        let play: () -> Void = { [weak self] in
+            Task { await self?.moveToTopAndPlay(episode) }
+        }
+        if let actionController {
+            actionController.close(animated: true, completion: play)
+        } else {
+            play()
         }
     }
 
@@ -377,80 +406,325 @@ final class PlaylistEpisodeListBinder: NSObject {
         }
     }
 
-    /// Remove (playlists.dart:182-190): removing the playing episode
-    /// also stops playback and clears the player state. The current-track
+    // MARK: - Remove with Undo
+
+    /// One removed row of the batch. A class: the eager work and the commit
+    /// both settle its state after the batch value has been handed around.
+    @MainActor
+    final class RemovedEpisode {
+        enum Storage: Equatable {
+            /// The row is still stored; the commit deletes it.
+            case stored
+            /// Deleted already (eager); Undo re-inserts it at `index`.
+            case deleted(row: PlaylistEpisodeRow, index: Int)
+            /// Nothing to delete or restore (the row was already gone).
+            case gone
+        }
+
+        let url: String
+        let wasCurrent: Bool
+        /// The live position at tap time; the stored progress is up to 2 s
+        /// behind.
+        let livePosition: Int64
+        var storage: Storage = .stored
+
+        init(url: String, wasCurrent: Bool, livePosition: Int64) {
+            self.url = url
+            self.wasCurrent = wasCurrent
+            self.livePosition = livePosition
+        }
+    }
+
+    private enum BatchKind { case remove }
+
+    /// The serialized DB/playback work of eager removals, shared with the
+    /// commit closure so a commit finishes after it.
+    @MainActor
+    private final class EagerWork {
+        var chain: Task<Void, Never>?
+        func settle() async { await chain?.value }
+    }
+
+    /// Every removal inside one Undo window. A deferred row (later in the
+    /// queue) is only hidden and stays stored until the commit. An eager row
+    /// (playing, or next in the in-memory queue, which could advance into
+    /// it) leaves the card list at tap time like any other row, then its
+    /// delete and the playback change run on `eagerWork`.
+    private let batch = PendingBatch<BatchKind, RemovedEpisode>()
+    private let eagerWork = EagerWork()
+    /// Rows the list filters out of every reload: removed in this batch, or
+    /// committed with their write still running.
+    private(set) var hiddenEpisodeURLs: Set<String> = []
+    private var currentURLAtRemoval: String?
+    /// Playback changes this screen causes itself (stop-and-load-next, an
+    /// Undo that restores the current episode) never commit the batch.
+    private var ownTrackChanges = 0
+    private let trackObservation = ObservationLoop()
+    private static let capsuleIdentifier = "playlist-removal-capsule"
+
+    /// Remove (playlists.dart:182-190), undoable for 5 s, merged with the
+    /// removals before it. The card leaves at once. Removing the playing
+    /// episode stops it and loads the next one paused. The current-track
     /// check is BY IDENTITY, captured before the first await (a reload
-    /// landing mid-task would reshuffle indexes; a positional check can
-    /// also misfire across playlists).
+    /// landing mid-task would reshuffle indexes).
     func removeTapped(_ episode: PlaylistEpisodeRow) {
-        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty else { return }
+        guard let enclosureURL = episode.enclosureUrl, !enclosureURL.isEmpty,
+              !hiddenEpisodeURLs.contains(enclosureURL) else { return }
         Haptics.queueRemoved()
-        let wasCurrent = context.playback.currentEpisode?.enclosureUrl == enclosureURL
-        Task { [weak self] in
-            guard let self else { return }
-            let repository = self.context.database.playlistRepository()
-            try? await repository.removeEpisode(byEnclosureURL: enclosureURL)
+        let playback = context.playback
+        let wasCurrent = playback.currentEpisode?.enclosureUrl == enclosureURL
+        let eager = PlaylistRemovalLogic.isEager(
+            url: enclosureURL, wasCurrent: wasCurrent, playlistId: playlistId,
+            playingPlaylistId: playback.currentPlaylistId, queueURLs: playback.queueEnclosureURLs
+        )
+        let item = RemovedEpisode(
+            url: enclosureURL, wasCurrent: wasCurrent,
+            livePosition: wasCurrent ? playback.positionData.positionMilliseconds : 0
+        )
+        hiddenEpisodeURLs.insert(enclosureURL)
+        batch.add(item, kind: .remove, commit: makeCommit())
+        if !eager { currentURLAtRemoval = playback.currentEpisode?.enclosureUrl }
+        // UI first: the card leaves now, the work follows.
+        episodeSource?.hideEpisode(byEnclosureURL: enclosureURL)
+        showRemovalCapsule()
+        if eager { enqueueEagerRemoval(item) }
+    }
+
+    /// Commits the pending batch now (the list is leaving, or a drag reorder
+    /// is about to write); resolves once every write finished.
+    func commitPendingRemoval() async {
+        await batch.commitNow()
+        await eagerWork.settle()
+    }
+
+    /// Waits for the eager removals' delete and playback work to finish.
+    func settleEagerRemovals() async {
+        await eagerWork.settle()
+    }
+
+    private func makeCommit() -> @MainActor ([RemovedEpisode]) async -> Void {
+        let repository = context.database.playlistRepository()
+        let cacheStore = context.cacheStore
+        let playback = context.playback
+        let playlistId = playlistId
+        let work = eagerWork
+        return { [weak self] items in
+            await work.settle()
             // Only the queue row and cached audio go. Transcripts and their
             // in-flight polling stay (the Dart K3 cascade is dropped).
-            await self.context.cacheStore.remove(url: enclosureURL)
-            if wasCurrent {
-                // The episode may have completed and advanced the queue on
-                // its own while the awaits above ran — only clear when THIS
-                // row is still what is playing (a positional recheck here
-                // would stop the newly-started head instead).
-                let stillCurrent = self.context.playback.currentEpisode?.enclosureUrl == enclosureURL
-                if stillCurrent {
-                    await self.context.playback.clear()
-                } else {
+            var deletedDeferred = false
+            for item in items {
+                guard case .stored = item.storage else { continue }
+                if (try? await repository.removeEpisode(byEnclosureURL: item.url)) != nil {
+                    item.storage = .gone
+                    deletedDeferred = true
+                }
+            }
+            // The audio file is kept until the window ends, so Undo never
+            // forces a re-download — and only rows whose delete actually
+            // landed lose it. A failed delete leaves the row stored, and
+            // its cache must survive with it.
+            for item in items where item.storage != .stored {
+                await cacheStore.remove(url: item.url)
+            }
+            self?.hiddenEpisodeURLs.subtract(items.map(\.url))
+            if deletedDeferred, playback.currentPlaylistId == playlistId {
+                // The in-memory queue must lose the rows too, or a head
+                // completion later pulls a dead row back out of it.
+                await playback.reloadQueue()
+            }
+            self?.onListContentChanged?()
+        }
+    }
+
+    private func enqueueEagerRemoval(_ item: RemovedEpisode) {
+        let predecessor = eagerWork.chain
+        eagerWork.chain = Task { [weak self] in
+            await predecessor?.value
+            await self?.performEagerRemoval(item)
+        }
+    }
+
+    /// Deletes the row and applies the playback change. Rows hidden by
+    /// earlier deferred removals are deleted first, so the in-memory queue
+    /// can reach none of them once the head moves; their stored indexes are
+    /// taken in this same order, which Undo reverses.
+    private func performEagerRemoval(_ item: RemovedEpisode) async {
+        ownTrackChanges += 1
+        defer {
+            currentURLAtRemoval = context.playback.currentEpisode?.enclosureUrl
+            ownTrackChanges -= 1
+        }
+        let repository = context.database.playlistRepository()
+        let playback = context.playback
+        // Every row still stored goes first, in batch order: the player must
+        // never load a hidden row as the next episode. Undo reverses exactly
+        // this order.
+        let pending = batch.items.contains { $0 === item } ? batch.items : [item]
+        for removed in pending { await delete(removed, repository: repository) }
+        // Decided now, by identity, not at tap time: an earlier removal of
+        // this batch may have made this row current, and the episode may have
+        // completed and advanced the queue while the awaits above ran.
+        if playback.currentEpisode?.enclosureUrl == item.url {
+            await playback.replaceCurrentWithNext()
+        } else if playback.currentPlaylistId == playlistId {
+            await playback.reloadQueue()
+        }
+        onListContentChanged?()
+    }
+
+    /// Deletes the row of an item that is still stored; any other state is
+    /// final.
+    private func delete(_ item: RemovedEpisode, repository: PlaylistRepository) async {
+        guard case .stored = item.storage else { return }
+        guard var stored = await PlaylistRemovalLogic.snapshot(
+            url: item.url, playlistId: playlistId, repository: repository
+        ) else {
+            item.storage = .gone
+            return
+        }
+        // The stored progress is up to 2 s behind the player.
+        if item.wasCurrent, item.livePosition > 0 { stored.row.playedDuration = item.livePosition }
+        guard (try? await repository.removeEpisode(byEnclosureURL: item.url)) != nil else { return }
+        item.storage = .deleted(row: stored.row, index: stored.index)
+    }
+
+    private func undoRemoval() {
+        guard let undone = batch.undo() else { return }
+        ownTrackChanges += 1
+        Task { [weak self] in
+            guard let self else { return }
+            // Eager work settles first, so every item's storage is final.
+            await self.eagerWork.settle()
+            do {
+                try await self.restore(undone.items)
+                UIAccessibility.post(notification: .announcement, argument: "Restored")
+            } catch {
+                // Rows that failed to come back are gone from the database
+                // and stay hidden so the list matches it; rows that made it
+                // back (marked .stored by restore) reappear. Either way the
+                // listener hears what happened instead of a false "Restored".
+                if let window = self.owner.view?.window {
+                    ToastPresenter.shared.show(
+                        "Couldn't restore the episode", in: window, duration: 3
+                    )
+                }
+                self.hiddenEpisodeURLs.subtract(
+                    undone.items.filter { if case .stored = $0.storage { true } else { false } }
+                        .map(\.url)
+                )
+                if self.context.playback.currentPlaylistId == self.playlistId {
                     await self.context.playback.reloadQueue()
                 }
-            } else if self.context.playback.currentPlaylistId == self.playlistId {
-                // A non-head removal must reach the in-memory queue too, or
-                // the playing head's completion later pulls this now-dead
-                // row back out of the stale queue (Channel/Search/Inbox all
-                // reload the queue after their writes; the Dart list was
-                // mutated in place).
-                await self.context.playback.reloadQueue()
+                self.onListContentChanged?()
             }
-            self.onListContentChanged?()
+            self.currentURLAtRemoval = self.context.playback.currentEpisode?.enclosureUrl
+            self.ownTrackChanges -= 1
         }
+    }
+
+    /// `items` come newest first: each stored index is only valid right
+    /// before its own removal, so re-inserting last-to-first rebuilds the
+    /// original order. Rows that were only hidden need nothing. Throws on
+    /// the first failed re-insert: rows before it are back (their storage
+    /// marked .stored again), rows after it stay out.
+    private func restore(_ items: [RemovedEpisode]) async throws {
+        let repository = context.database.playlistRepository()
+        let playback = context.playback
+        let playlistId = playlistId
+        // Pressing Play on the episode that took over during the window is
+        // the user's choice; the restored ones then queue behind it.
+        let playbackMoved = playback.isPlaying
+        let formerCurrent = items.last { $0.wasCurrent }
+        let formerCurrentWasDeleted = formerCurrent.map {
+            if case .deleted = $0.storage { true } else { false }
+        } ?? false
+        let hadDeletedRows = items.contains {
+            if case .deleted = $0.storage { true } else { false }
+        }
+        var restored: [(url: String, index: Int)] = []
+        for item in items {
+            guard case .deleted(let row, let index) = item.storage else { continue }
+            // Every restored row — not just the former current — lands
+            // after the head while playback moved elsewhere: eager removals
+            // store index 0 too, and any row re-inserted at 0 would push
+            // the playing episode out of the queue head.
+            let target = PlaylistRemovalLogic.restoreTargetIndex(storedIndex: index, playbackMoved: playbackMoved)
+            try await PlaylistRemovalLogic.reinsert(row, at: target, playlistId: playlistId, repository: repository)
+            item.storage = .stored
+            restored.append((item.url, index))
+            hiddenEpisodeURLs.remove(item.url)
+        }
+        hiddenEpisodeURLs.subtract(items.filter { if case .stored = $0.storage { true } else { false } }.map(\.url))
+        if let formerCurrent, formerCurrentWasDeleted, !playbackMoved {
+            // The queue head is the current episode again, paused, at its
+            // original progress.
+            await playback.restoreCurrentPaused(enclosureURL: formerCurrent.url, playlistId: playlistId)
+        } else if hadDeletedRows, playback.currentPlaylistId == playlistId {
+            await playback.reloadQueue()
+        }
+        // The group stays anchored while rows return above it, so the
+        // restored card would park above the viewport: reveal the topmost one.
+        if let first = restored.min(by: { $0.index < $1.index }), let episodeSource {
+            await episodeSource.reloadAndReveal(byEnclosureURL: first.url)
+        } else {
+            onListContentChanged?()
+        }
+    }
+
+    private func showRemovalCapsule() {
+        let count = batch.count
+        let message = count > 1 ? "Removed \(count) episodes" : "Removed"
+        if ToastPresenter.shared.updateAction(message, capsuleIdentifier: Self.capsuleIdentifier) { return }
+        guard let window = owner.view?.window else { return }
+        ToastPresenter.shared.showAction(
+            message,
+            actionTitle: "Undo",
+            in: window,
+            above: (owner.tabBarController as? MainTabBarController)?.bottomChromeTopAnchor,
+            capsuleIdentifier: Self.capsuleIdentifier,
+            actionIdentifier: "playlist-removal-undo",
+            onAction: { [weak self] in self?.undoRemoval() },
+            // Another toast replaced the capsule: Undo is out of reach.
+            onSuperseded: { [weak self] in
+                guard let self else { return }
+                Task { await self.batch.commitNow() }
+            }
+        )
     }
 
     // MARK: - Live overlays (PlayIcon / AIIcon, play_icon.dart)
 
-    /// The play/pause strip button renders through a live
-    /// `PlayPauseIconControl` overlay (loading lottie included) — the strip
-    /// API only takes static images, so the blank-icon button is its tap
-    /// target and accessibility anchor.
-    private func installPlayOverlay(on cell: EpisodeCardCell, enclosureURL: String) {
-        guard let button = Self.descendantButton(tagged: Self.playActionTag, in: cell) else { return }
-        if let existing = button.subviews.compactMap({ $0 as? PlayPauseIconControl }).first {
-            existing.removeFromSuperview()
+    func refreshGroup() {
+        guard let controller = actionController, let id = controller.selectedID else { return }
+        if let button = controller.groupView.button(for: "play") {
+            installPlayOverlay(on: button, enclosureURL: id)
         }
-        let overlay = PlayPauseIconControl(size: 24)
-        overlay.isUserInteractionEnabled = false
-        overlay.translatesAutoresizingMaskIntoConstraints = false
-        button.addSubview(overlay)
-        NSLayoutConstraint.activate([
-            overlay.centerXAnchor.constraint(equalTo: button.centerXAnchor),
-            overlay.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-            // Explicit size is mandatory: with only the center pins the
-            // loading lottie's animation canvas (edge-pinned to the control
-            // by PlayPauseIconControl.ensureLottie) blew the overlay up to
-            // hundreds of points and covered the whole row on device (PR #9
-            // regression; the mini player / player page pin explicit sizes).
-            overlay.widthAnchor.constraint(equalToConstant: overlay.size),
-            overlay.heightAnchor.constraint(equalToConstant: overlay.size),
-        ])
-        cell.setStripIcon(UIImage(), at: Self.playActionTag)
-        button.isAccessibilityElement = true
-        overlay.isAccessibilityElement = false
-        updatePlayOverlay(on: cell, enclosureURL: enclosureURL)
+        refreshVisibleAIDisplays()
     }
 
-    private func updatePlayOverlay(on cell: EpisodeCardCell, enclosureURL: String) {
-        guard let button = Self.descendantButton(tagged: Self.playActionTag, in: cell),
-              let overlay = button.subviews.compactMap({ $0 as? PlayPauseIconControl }).first else { return }
+    private func installPlayOverlay(on button: ListActionCircle, enclosureURL: String) {
+        if !button.contentHost.subviews.contains(where: { $0 is PlayPauseIconControl }) {
+            let overlay = PlayPauseIconControl(size: 24)
+            overlay.isUserInteractionEnabled = false
+            overlay.isAccessibilityElement = false
+            overlay.translatesAutoresizingMaskIntoConstraints = false
+            button.contentHost.addSubview(overlay)
+            NSLayoutConstraint.activate([
+                overlay.centerXAnchor.constraint(equalTo: button.contentHost.centerXAnchor),
+                overlay.centerYAnchor.constraint(equalTo: button.contentHost.centerYAnchor),
+                // PR #9: center pins alone let the loading Lottie canvas grow
+                // to hundreds of points. Always pin BOTH dimensions explicitly.
+                overlay.widthAnchor.constraint(equalToConstant: overlay.size),
+                overlay.heightAnchor.constraint(equalToConstant: overlay.size),
+            ])
+        }
+        button.setDefaultContentHidden(true)
+        updatePlayOverlay(on: button, enclosureURL: enclosureURL)
+    }
+
+    private func updatePlayOverlay(on button: ListActionCircle, enclosureURL: String) {
+        guard let overlay = button.contentHost.subviews.compactMap({ $0 as? PlayPauseIconControl }).first else { return }
         let playback = context.playback
         overlay.update(
             snapshot: PlayPauseIconControl.Snapshot(
@@ -464,43 +738,29 @@ final class PlaylistEpisodeListBinder: NSObject {
         button.accessibilityLabel = overlay.accessibilityLabel
     }
 
-    /// AI four state (play_icon.dart AIIcon): transcript mark / robot lottie /
-    /// green check / outline triangle. The lottie overlays the strip button;
-    /// the static tinted symbols cover the rest.
-    private func applyAIDisplay(on cell: EpisodeCardCell, enclosureURL: String) {
-        guard let button = Self.descendantButton(tagged: Self.aiActionTag, in: cell) else { return }
+    private func applyAIDisplay(on button: ListActionCircle, enclosureURL: String) {
         let display = AITranscriptDisplay.display(status: context.subtitles.statuses[enclosureURL])
         switch display {
         case .processing:
-            cell.setStripIcon(UIImage(), at: Self.aiActionTag)
-            button.tintColor = Theme.onSurface
-            // Reuse an in-flight robot: visible cards reconfigure on every
-            // playback / download tick, and rebuilding the lottie restarts
-            // it from frame 0 — a processing robot would effectively freeze
-            // while any download progresses.
-            if let robot = button.subviews.compactMap({ $0 as? LottieAnimationView }).first {
+            button.setDefaultContentHidden(true)
+            if let robot = button.contentHost.subviews.compactMap({ $0 as? LottieAnimationView }).first {
                 if !robot.isAnimationPlaying { robot.play() }
             } else {
-                Self.installRobotOverlay(on: button).play()
+                Self.installRobotOverlay(on: button.contentHost).play()
             }
         default:
-            // Strip any previous lottie overlay.
-            button.subviews.compactMap { $0 as? LottieAnimationView }.forEach {
+            button.contentHost.subviews.compactMap { $0 as? LottieAnimationView }.forEach {
                 $0.stop()
                 $0.removeFromSuperview()
             }
-            cell.setStripIcon(display.icon, at: Self.aiActionTag)
-            button.tintColor = display.tintColor
-            if var configuration = button.configuration {
-                configuration.baseForegroundColor = display.tintColor
-                button.configuration = configuration
-            }
+            button.setIcon(display.icon, tint: display.tintColor)
+            button.setDefaultContentHidden(false)
         }
         button.accessibilityLabel = Self.aiAccessibilityLabel(for: display)
     }
 
-    /// Installs the processing-state robot lottie centered in a strip
-    /// button, pinned to the animation's own canvas aspect: height 24,
+    /// Installs the processing-state robot lottie centered in the circle's
+    /// content host, pinned to the animation's own canvas aspect: height 24,
     /// width derived. The canvas is 1920×1080 — a square 24×24 slot
     /// aspect-fits that wide scene down to 24×13.5, and the robot renders
     /// roughly half the neighboring glyph sizes. An explicit width also
@@ -508,7 +768,7 @@ final class PlaylistEpisodeListBinder: NSObject {
     /// animation canvas stretch the view horizontally — the same class of
     /// blow-up as the play overlay (PR #9 device regression). Internal for
     /// the UIFixRegressionTests slot guard.
-    static func installRobotOverlay(on button: UIButton) -> LottieAnimationView {
+    static func installRobotOverlay(on button: UIView) -> LottieAnimationView {
         let robot = LottieAnimationView(name: "robot_loading")
         robot.contentMode = .scaleAspectFit
         robot.loopMode = .loop
@@ -548,39 +808,33 @@ final class PlaylistEpisodeListBinder: NSObject {
     // MARK: - Accessibility reorder (whole-card drag has no handle)
 
     /// Whole-card drag is a touch-only gesture; VoiceOver users reorder
-    /// through custom actions anchored on the play/pause strip button
-    /// (surfaced via the actions rotor), plus a details action replacing
-    /// the now-element-hosting card body.
+    /// through custom actions on the card title, reachable with the group closed.
     private func installAccessibilityReorderActions(
         on cell: EpisodeCardCell, episode: PlaylistEpisodeRow
     ) {
-        guard let button = Self.descendantButton(tagged: Self.playActionTag, in: cell) else { return }
         // Each action resolves the row's current index when fired — the
         // configure-time index goes stale after a drag — and no-ops at the
         // list edges (item 0 up / last down would otherwise move row 0 with
         // (0, -1) and flip the playback source).
-        button.accessibilityCustomActions = [
-            UIAccessibilityCustomAction(name: "Show details") { [weak self] _ in
+        cell.menuActions = [
+            EpisodeCardAction(icon: UIImage(), accessibilityLabel: "Show details") { [weak self] in
                 self?.presentDetail(episode: episode)
-                return true
             },
-            UIAccessibilityCustomAction(name: "Move up") { [weak self] _ in
+            EpisodeCardAction(icon: UIImage(), accessibilityLabel: "Move up") { [weak self] in
                 guard let self,
                       let url = episode.enclosureUrl,
                       let item = self.episodeSource?.visibleIndex(ofEnclosureURL: url),
-                      item > 0 else { return false }
+                      item > 0 else { return }
                 self.reorderHandler?(item, item - 1)
-                return true
             },
-            UIAccessibilityCustomAction(name: "Move down") { [weak self] _ in
+            EpisodeCardAction(icon: UIImage(), accessibilityLabel: "Move down") { [weak self] in
                 guard let self,
                       let url = episode.enclosureUrl,
                       let item = self.episodeSource?.visibleIndex(ofEnclosureURL: url),
-                      item < (self.episodeSource?.visibleCount ?? 0) - 1 else { return false }
+                      item < (self.episodeSource?.visibleCount ?? 0) - 1 else { return }
                 self.reorderHandler?(item, item + 1)
-                return true
             },
-        ]
+        ] + actions(for: episode)
     }
 
     /// Programmatic reorder entry (accessibility actions, tests). The list
@@ -609,7 +863,7 @@ final class PlaylistEpisodeListBinder: NSObject {
         DetailViewController.present(
             from: owner.topMostPresented(),
             episode: detailEpisode,
-            actions: actions(for: episode, livePlayOverlay: false),
+            actions: actions(for: episode),
             htmlRenderer: HTMLContentRenderer(),
             shortenURL: { [weak self] url in
                 await self?.context.api.getShortURL(for: url) ?? url
@@ -646,18 +900,6 @@ final class PlaylistEpisodeListBinder: NSObject {
     private func episode(at indexPath: IndexPath) -> PlaylistEpisodeRow? {
         episodeSource?.episode(at: indexPath)
     }
-
-    private static func descendantButton(tagged tag: Int, in view: UIView) -> UIButton? {
-        if let button = view as? UIButton, button.tag == tag {
-            return button
-        }
-        for subview in view.subviews {
-            if let found = descendantButton(tagged: tag, in: subview) {
-                return found
-            }
-        }
-        return nil
-    }
 }
 
 /// The data-source surface the binder needs to resolve an index path back
@@ -665,10 +907,12 @@ final class PlaylistEpisodeListBinder: NSObject {
 @MainActor
 protocol PlaylistEpisodeDataSource: AnyObject {
     func episode(at indexPath: IndexPath) -> PlaylistEpisodeRow?
-    /// The row's CURRENT position — closures captured at configure time go
-    /// stale after a drag reorder (moved cells are not reconfigured).
-    func index(of episode: PlaylistEpisodeRow) -> IndexPath?
-    var rowCount: Int { get }
+    /// Drops the card of a deferred removal from the list (animated like any
+    /// removed row); the stored row stays.
+    func hideEpisode(byEnclosureURL url: String)
+    /// Reloads the rows, then scrolls the card into view when it sits outside
+    /// the viewport (an Undo that returned it above the open group).
+    func reloadAndReveal(byEnclosureURL url: String) async
     /// The URL's position among the VISIBLE rows (non-nil enclosure URLs —
     /// the same space the diffable snapshot and reorder coordinates use).
     /// Legacy rows with a NULL enclosureUrl are invisible to the snapshot;

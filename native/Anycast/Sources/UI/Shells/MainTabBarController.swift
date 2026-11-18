@@ -220,6 +220,35 @@ final class MainTabBarController: UITabBarController, UITabBarControllerDelegate
         )
     }
 
+    /// The top edge of the bottom chrome: a toast with an action anchors
+    /// above it so it never covers the tab bar or the mini player. iOS 26
+    /// follows the system's content layout guide (accessory, tab bar,
+    /// minimized bar); iOS 18 uses the floating capsule when it shows.
+    var bottomChromeTopAnchor: NSLayoutYAxisAnchor {
+        if #available(iOS 26.0, *) { return contentLayoutGuide.bottomAnchor }
+        return playerBar.isHidden ? tabBar.topAnchor : playerBar.topAnchor
+    }
+
+    /// The `bottomChromeTopAnchor` line as a y in `target`'s coordinates,
+    /// read from frames (no constraint across hierarchies); nil when
+    /// `target` is not in this shell's window.
+    ///
+    /// No forced layout here: this runs several times per group
+    /// open/close/switch, and `view` contains the whole tab content — a
+    /// forced pass would lay out every visible list each time. The chrome
+    /// geometry only changes outside those transitions (bar minimize,
+    /// player insertion — both of which run their own layout), so the
+    /// current frames are what the caller sees on screen.
+    func bottomChromeTopY(in target: UIView) -> CGFloat? {
+        guard let window = view.window, target.window === window else { return nil }
+        if #available(iOS 26.0, *) {
+            guard let owner = contentLayoutGuide.owningView ?? view else { return nil }
+            return owner.convert(CGPoint(x: 0, y: contentLayoutGuide.layoutFrame.maxY), to: target).y
+        }
+        let bar: UIView = playerBar.isHidden ? tabBar : playerBar
+        return bar.convert(CGPoint.zero, to: target).y
+    }
+
     // MARK: - Bottom bar fade (iOS 26+)
 
     /// A page-background gradient behind the system bars and above the tab

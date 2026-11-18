@@ -6,13 +6,13 @@ import AnycastKit
 /// Hosted visual smoke for the playlists tab (05 §6.1 S6 — progress-backdrop
 /// cards, download states; S7 history dialog): presents the page over the
 /// live shell with the db_smoke-seeded queue, captures the list, an
-/// expanded-strip state, a programmatic reorder, and the history dialog.
+/// expanded action-group state, a programmatic reorder, and the history dialog.
 /// Skips silently when the startup DAG has no context or the seeded queue
 /// is empty (unseeded simulator).
 @MainActor
 struct PlaylistsVisualSmokeTests {
 
-    @Test("Playlists tab: list, expanded strip, reorder, history dialog")
+    @Test("Playlists tab: list, expanded action group, reorder, history dialog")
     func playlistsScreenshots() async throws {
         guard let context = await Self.liveUIContext() else { return }
         let queue = (try? await context.database.playlistRepository()
@@ -28,7 +28,7 @@ struct PlaylistsVisualSmokeTests {
         await Self.captureWindow(name: "t3-playlists-list")
         guard let list else { return }
 
-        // Expanded strip state (card tap toggles the action buttons).
+        // Expanded action-group state (card tap opens the list-owned group).
         if let collectionView = Self.firstCollectionView(in: list.view) {
             let firstVisible = collectionView.indexPathsForVisibleItems
                 .filter { $0.section == 0 }
@@ -36,8 +36,16 @@ struct PlaylistsVisualSmokeTests {
                 .first
             if let firstVisible,
                let cell = collectionView.cellForItem(at: firstVisible) as? EpisodeCardCell {
+                let controller = try #require(list.actionController)
+                let tappedURL = list.episode(at: firstVisible)?.enclosureUrl
+                #expect(tappedURL != nil)
+                #expect(controller.selectedID == nil && controller.groupView.isHidden,
+                        "the group must start closed")
                 cell.onCardTap?()
                 try await Task.sleep(for: .milliseconds(700))
+                #expect(controller.selectedID == tappedURL, "card tap did not select the row")
+                #expect(!controller.groupView.isHidden, "the action group is not visible")
+                #expect(cell.actionGap == ListActionMetrics.gap, "the selected card did not open the 68 pt gap")
                 await Self.captureWindow(name: "t3-playlists-expanded")
 
                 // The a11y reorder path doubles as the programmatic move:

@@ -27,7 +27,7 @@ final class ChannelViewController: UIViewController {
 
     private var viewModel: ChannelViewModel?
 
-    private let collectionView: UICollectionView
+    private let collectionView: ListActionCollectionView
     private let playerBar: PlayerBarView
     private let playerBarHeight: NSLayoutConstraint
     private let skeletonDelay = LoadingDelay()
@@ -39,19 +39,29 @@ final class ChannelViewController: UIViewController {
     private let bodyState = EmptyStateView()
     private var bodyStateTop: NSLayoutConstraint?
 
-    private let expandCoordinator = CardExpandCoordinator()
     private var binder: ChannelEpisodeListBinder?
+    /// The list-owned Play · Add · Details group (09 §7a, Show tab).
+    private(set) var actionController: ListActionController!
+    /// The rows the collection view currently shows. The data source, the
+    /// action controller's identity lookups and the context menu read this —
+    /// never the live view model, which can change before the reload runs.
+    private(set) var displayedEpisodes: [FeedEpisodeRow] = []
+    /// Per-row action-group ids, aligned with `displayedEpisodes`. A
+    /// repeated enclosure URL keeps only its FIRST row addressable — a
+    /// shared id would open the group at the wrong row and gap both cells.
+    private var actionIDs: [String?] = []
     private let htmlRenderer = HTMLContentRenderer()
 
     private var headerView: ChannelHeaderView?
     /// The page's actions, in thumb reach above the mini player:
-    /// Latest Episode, subscribe, share (long press: Copy RSS URL).
+    /// Latest Episode, Follow, share (long press: Copy RSS URL).
     private let actionRow = UIStackView()
     private let latestButton = UIButton(type: .custom)
-    private let subscribeButton = AnycastIconButton(
-        style: .glass, icon: AppIcons.subscribe, accessibilityLabel: "Subscribe",
-        diameter: AnycastIconButton.largeDiameter, glyphSize: 20
-    )
+    /// Labelled Follow control (the shared secondary capsule). Its width is
+    /// reserved for the wider of "Follow" / "Following" so toggling never
+    /// re-lays out the neighbouring buttons.
+    private let subscribeButton = AnycastButton.make(.secondary, title: "Follow", image: AppIcons.subscribe)
+    private var subscribeWidth: NSLayoutConstraint?
     private let shareButton = AnycastIconButton(
         style: .glass, icon: AppIcons.share, accessibilityLabel: "Share",
         diameter: AnycastIconButton.largeDiameter, glyphSize: 20
@@ -100,8 +110,8 @@ final class ChannelViewController: UIViewController {
         AppSheets.presentExpand(controller, from: presenter)
     }
 
-    private static func makeCoreViews(context: UIContext) -> (UICollectionView, PlayerBarView, NSLayoutConstraint) {
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
+    private static func makeCoreViews(context: UIContext) -> (ListActionCollectionView, PlayerBarView, NSLayoutConstraint) {
+        let collectionView = ListActionCollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
         collectionView.backgroundColor = .clear
         collectionView.contentInsetAdjustmentBehavior = .never
         collectionView.keyboardDismissMode = .interactive
@@ -132,6 +142,7 @@ final class ChannelViewController: UIViewController {
         buildViewHierarchy()
         resolveChannel()
         collectionView.setCollectionViewLayout(makeLayout(), animated: false)
+        configureActionController()
 
         modelObservation.track(
             read: { [weak self] in
@@ -256,7 +267,7 @@ final class ChannelViewController: UIViewController {
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.register(
-            ChannelEpisodeRowCell.self, forCellWithReuseIdentifier: ChannelEpisodeRowCell.reuseIdentifier
+            EpisodeCardCell.self, forCellWithReuseIdentifier: EpisodeCardCell.reuseIdentifier
         )
         collectionView.register(
             ChannelBodyHeaderCell.self,
@@ -299,11 +310,9 @@ final class ChannelViewController: UIViewController {
             owner: self,
             context: context,
             viewModel: entry.model,
-            htmlRenderer: htmlRenderer,
-            expandCoordinator: expandCoordinator
+            htmlRenderer: htmlRenderer
         )
         binder.onListContentChanged = { [weak self] in self?.refreshVisibleCards() }
-        binder.collectionView = collectionView
         binder.startObservingPlayback()
         self.binder = binder
 
@@ -359,11 +368,11 @@ final class ChannelViewController: UIViewController {
             // ONE section hosts everything: the pinned boundary supplementary
             // only pins while its host section is on screen, so the header
             // must belong to the section that spans the whole list. Item 0 is
-            // the order/search row; the rest are rows on one grouped plate.
+            // the order/search row; the rest are covered episode cards.
             let item = NSCollectionLayoutItem(
                 layoutSize: NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1),
-                    heightDimension: .estimated(ChannelEpisodeRowCell.minimumHeight)
+                    heightDimension: .estimated(EpisodeCardCell.showRowHeight)
                 )
             )
             // Horizontal margins live on the ITEM — section content insets
@@ -373,14 +382,9 @@ final class ChannelViewController: UIViewController {
                 layoutSize: item.layoutSize, subitems: [item]
             )
             let section = NSCollectionLayoutSection(group: group)
-            // The plate starts under the header and the order row.
-            if !(self.viewModel?.showEpisodes.isEmpty ?? true) || self.showsSkeleton {
-                let plate = NSCollectionLayoutDecorationItem.background(elementKind: GroupedPlateView.elementKind)
-                plate.contentInsets = NSDirectionalEdgeInsets(
-                    top: maxExtent + ChannelBodyHeaderCell.fixedHeight, leading: 16, bottom: 0, trailing: 16
-                )
-                section.decorationItems = [plate]
-            }
+            // The card gap; it also separates the order row from the first
+            // card (ChannelBodyHeaderCell.fixedHeight counts it).
+            section.interGroupSpacing = EpisodeCardCell.spacing
             let header = NSCollectionLayoutBoundarySupplementaryItem(
                 layoutSize: NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1),
@@ -393,7 +397,6 @@ final class ChannelViewController: UIViewController {
             section.boundarySupplementaryItems = [header]
             return section
         }
-        layout.register(GroupedPlateView.self, forDecorationViewOfKind: GroupedPlateView.elementKind)
         return layout
     }
 
@@ -412,15 +415,11 @@ final class ChannelViewController: UIViewController {
         headerView?.configure(channel: viewModel.channel, dominant: viewModel.dominantColor)
         renderActionRow()
 
-        // The loading rule: with a title and no rows yet, static skeleton
-        // rows appear only after 300 ms; rows already on hand (the inbox's
-        // own, or a finished fetch) show at once. No list spinner.
+        // The loading rule: with a title and no rows yet, the shared
+        // skeleton appears only after 300 ms; rows already on hand (the
+        // inbox's own, or a finished fetch) show at once. No list spinner.
         let waitingEmpty = viewModel.episodes.isEmpty && viewModel.isLoading && viewModel.hasTitle
-        if waitingEmpty {
-            skeletonDelay.start { [weak self] in self?.render() }
-        } else {
-            skeletonDelay.cancel()
-        }
+        skeletonDelay.update(isLoading: waitingEmpty) { [weak self] in self?.render() }
         let skeleton = ChannelBodyReducer.display(
             hasEpisodes: !viewModel.episodes.isEmpty, isLoading: viewModel.isLoading,
             hasTitle: viewModel.hasTitle, skeletonDue: skeletonDelay.isDue
@@ -432,13 +431,24 @@ final class ChannelViewController: UIViewController {
         if signature != lastEpisodeSignature || skeleton != showsSkeleton {
             let startsSkeleton = skeleton && !showsSkeleton
             lastEpisodeSignature = signature
-            showsSkeleton = skeleton
-            UIView.performWithoutAnimation {
-                collectionView.reloadData()
+            let episodes = viewModel.showEpisodes
+            let ids = ListActionIdentity.ids(for: episodes.map(\.enclosureUrl))
+            let apply = {
+                self.showsSkeleton = skeleton
+                self.displayedEpisodes = episodes
+                self.actionIDs = ids
+                self.collectionView.reloadData()
+            }
+            if let actionController, actionController.selectedID != nil {
+                // An open group stays with its episode when it survives the
+                // reload (reorder, refetch) and closes when it is gone.
+                actionController.itemsDidChange(apply: apply)
+            } else {
+                UIView.performWithoutAnimation(apply)
             }
             refreshVisibleCards()
             if startsSkeleton, !Motion.reduceMotion {
-                for cell in collectionView.visibleCells where cell is ChannelEpisodeRowCell { cell.alpha = 0 }
+                for cell in collectionView.visibleCells where cell is EpisodeCardCell { cell.alpha = 0 }
                 UIView.animate(withDuration: Motion.quick) {
                     for cell in self.collectionView.visibleCells { cell.alpha = 1 }
                 }
@@ -446,9 +456,16 @@ final class ChannelViewController: UIViewController {
             // The first episode arrival rises in after the reload, matching
             // the card grids; later reloads stay plain.
             if !hadEpisodes && !signature.isEmpty, view.window != nil {
-                let rows = collectionView.visibleCells.filter { $0 is ChannelEpisodeRowCell }
+                let rows = collectionView.visibleCells.filter { $0 is EpisodeCardCell }
                 MotionArrival.reveal(in: collectionView, cells: rows, staggered: true)
             }
+        } else {
+            // Same URLs, fresh content: a refetch can change a title,
+            // duration or artwork without touching the identity the diff
+            // above keys on. The rows cells read must not stay stale.
+            displayedEpisodes = viewModel.showEpisodes
+            actionIDs = ListActionIdentity.ids(for: viewModel.showEpisodes.map(\.enclosureUrl))
+            refreshVisibleCards()
         }
 
         renderBodyState(viewModel)
@@ -509,7 +526,9 @@ final class ChannelViewController: UIViewController {
             ? PlayerBarView.barHeight + Spacing.xs + row + Spacing.pageH
             : row + Spacing.pageH
         let bottom = view.safeAreaInsets.bottom + clearance
-        collectionView.contentInset.bottom = bottom
+        // The action controller extends the inset by its own delta while a
+        // group is open; keep that extension on top of the base.
+        collectionView.contentInset.bottom = bottom + (actionController?.insetExtension ?? 0)
         collectionView.verticalScrollIndicatorInsets.bottom = bottom
     }
 
@@ -520,11 +539,56 @@ final class ChannelViewController: UIViewController {
                 if let cell = collectionView.cellForItem(at: path) as? ChannelBodyHeaderCell {
                     cell.setOrder(reversed: viewModel.isReversed)
                 }
-            } else if viewModel.showEpisodes.indices.contains(path.item - 1),
-                      let cell = collectionView.cellForItem(at: path) as? ChannelEpisodeRowCell {
-                configureRow(cell, at: path.item - 1)
+            } else if !showsSkeleton, let cell = collectionView.cellForItem(at: path) as? EpisodeCardCell {
+                configureCard(cell, at: path)
             }
         }
+    }
+
+    // MARK: - List-owned action group
+
+    private func configureActionController() {
+        actionController = ListActionController(
+            collectionView: collectionView,
+            itemsProvider: { [weak self] id in
+                guard let self, let binder = self.binder,
+                      let episode = self.displayedEpisodes.first(where: { $0.enclosureUrl == id }) else { return [] }
+                return binder.groupItems(for: episode)
+            },
+            idAt: { [weak self] path in self?.episodeID(at: path) },
+            indexPathFor: { [weak self] id in
+                guard let self, !self.showsSkeleton,
+                      let index = self.displayedEpisodes.firstIndex(where: { $0.enclosureUrl == id }) else { return nil }
+                return IndexPath(item: index + 1, section: 0)
+            },
+            safeArea: { [weak self] in self?.actionSafeLines() ?? (0, 0) },
+            // The pinned fold header stays put while the cards move.
+            skipsFLIP: { $0 is ChannelHeaderView }
+        )
+        binder?.actionController = actionController
+        actionController.onGroupUpdate = { [weak self] in self?.binder?.refreshGroup() }
+    }
+
+    /// Item 0 (the order row) and skeleton rows carry no action identity;
+    /// neither does a duplicate enclosure URL (see `actionIDs`).
+    private func episodeID(at path: IndexPath) -> String? {
+        guard path.section == 0, path.item > 0, !showsSkeleton,
+              actionIDs.indices.contains(path.item - 1) else { return nil }
+        return actionIDs[path.item - 1]
+    }
+
+    /// Top: under the pinned header at its current fold height. Bottom: the
+    /// shell's chrome when this page sits in it; as a sheet, the top of the
+    /// page's own bottom row (Latest · Follow · Share over the capsule) —
+    /// minus the 52 pt toast slot either way.
+    private func actionSafeLines() -> (top: CGFloat, bottom: CGFloat) {
+        let top = foldGeometry.headerHeight(shrink: collectionView.contentOffset.y)
+        var bottom = view.convert(actionRow.frame, to: collectionView).minY - collectionView.bounds.minY
+        if let shell = tabBarController as? MainTabBarController,
+           let line = shell.bottomChromeTopY(in: collectionView) {
+            bottom = min(bottom, line - collectionView.bounds.minY)
+        }
+        return (top, bottom - 52)
     }
 
     // MARK: - Bottom action row
@@ -563,22 +627,72 @@ final class ChannelViewController: UIViewController {
         for button in [latestButton, subscribeButton, shareButton] as [UIView] {
             actionRow.addArrangedSubview(button)
         }
+
+        subscribeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        subscribeButton.setContentHuggingPriority(.required, for: .horizontal)
+        let width = subscribeButton.widthAnchor.constraint(equalToConstant: 0)
+        subscribeWidth = width
+        NSLayoutConstraint.activate([
+            width,
+            subscribeButton.heightAnchor.constraint(greaterThanOrEqualToConstant: AnycastIconButton.largeDiameter),
+        ])
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (controller: ChannelViewController, _) in
+            controller.renderActionRow()
+        }
+    }
+
+    private func followConfiguration(for display: ChannelSubscriptionDisplay) -> UIButton.Configuration {
+        var configuration = AnycastButton.configuration(
+            .secondary, title: display.followTitle, image: display.toggleIcon
+        )
+        configuration.imagePadding = Spacing.xs
+        configuration.contentInsets.leading = Spacing.chip
+        configuration.contentInsets.trailing = Spacing.chip
+        return configuration
+    }
+
+    /// Accessibility sizes cannot fit three controls on one line, so the
+    /// row stacks instead of truncating a label.
+    private var stacksActionRow: Bool {
+        traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+    }
+
+    /// The wider of the two labelled states at the current Dynamic Type size.
+    private func reservedFollowWidth() -> CGFloat {
+        let probe = UIButton(configuration: followConfiguration(for: .subscribe))
+        probe.traitOverrides.preferredContentSizeCategory = traitCollection.preferredContentSizeCategory
+        var widest: CGFloat = 0
+        for display in [ChannelSubscriptionDisplay.subscribe, .unsubscribe] {
+            probe.configuration = followConfiguration(for: display)
+            widest = max(widest, probe.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width)
+        }
+        return ceil(widest)
     }
 
     /// The shared primary capsule; while the feed loads it shows the
     /// configuration's own activity indicator in place of the glyph.
     private func latestConfiguration(loading: Bool) -> UIButton.Configuration {
         var configuration = AnycastButton.configuration(.primary, title: "Latest Episode", image: AppIcons.play)
+        configuration.imagePadding = Spacing.xs
+        configuration.contentInsets.leading = Spacing.pageH
+        configuration.contentInsets.trailing = Spacing.pageH
         configuration.showsActivityIndicator = loading
         return configuration
     }
 
     private func renderActionRow() {
         let display = subscriptionDisplay
-        subscribeButton.setIcon(display.toggleIcon)
-        subscribeButton.configuration?.baseForegroundColor =
-            display == .unsubscribe ? Theme.primary : Theme.onSurface
+        subscribeButton.configuration = followConfiguration(for: display)
+        subscribeButton.titleLabel?.numberOfLines = 1
+        actionRow.axis = stacksActionRow ? .vertical : .horizontal
+        subscribeWidth?.isActive = !stacksActionRow
+        subscribeWidth?.constant = reservedFollowWidth()
         subscribeButton.accessibilityLabel = display.toggleAccessibilityLabel
+        if display == .unsubscribe {
+            subscribeButton.accessibilityTraits.insert(.selected)
+        } else {
+            subscribeButton.accessibilityTraits.remove(.selected)
+        }
         subscribeButton.isEnabled = display != .loading
         subscribeButton.alpha = display == .loading ? 0.5 : 1
         let loading = viewModel?.isLoading ?? false
@@ -615,7 +729,16 @@ final class ChannelViewController: UIViewController {
         case .loading:
             return
         case .subscribe:
-            Task { await viewModel.subscribe() }
+            let addsToInbox = !viewModel.episodes.isEmpty
+            Task {
+                await viewModel.subscribe()
+                guard let window = view.window else { return }
+                ToastPresenter.shared.show(
+                    addsToInbox ? "Following · latest episode added to Inbox" : "Following",
+                    in: window,
+                    duration: 2.5
+                )
+            }
         case .unsubscribe:
             let alert = UIAlertController(
                 title: "Unsubscribe from \(viewModel.channel.title ?? "this show")?",
@@ -689,7 +812,7 @@ final class ChannelViewController: UIViewController {
 extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        1 + (showsSkeleton ? Self.skeletonRowCount : (viewModel?.showEpisodes.count ?? 0))
+        1 + (showsSkeleton ? Self.skeletonRowCount : displayedEpisodes.count)
     }
 
     func collectionView(
@@ -719,46 +842,44 @@ extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDel
         }
 
         let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: ChannelEpisodeRowCell.reuseIdentifier, for: indexPath
-        ) as! ChannelEpisodeRowCell
+            withReuseIdentifier: EpisodeCardCell.reuseIdentifier, for: indexPath
+        ) as! EpisodeCardCell
         if showsSkeleton {
-            cell.setPosition(isFirst: indexPath.item == 1, isLast: indexPath.item == Self.skeletonRowCount)
             cell.configureSkeleton()
             return cell
         }
-        configureRow(cell, at: indexPath.item - 1)
+        configureCard(cell, at: indexPath)
         return cell
     }
 
-    private func configureRow(_ cell: ChannelEpisodeRowCell, at index: Int) {
-        guard let viewModel, viewModel.showEpisodes.indices.contains(index) else { return }
-        binder?.configure(row: cell, episode: viewModel.showEpisodes[index])
-        cell.setPosition(isFirst: index == 0, isLast: index == viewModel.showEpisodes.count - 1)
+    /// The cover opens Detail and the card body toggles the action group —
+    /// both wired by the binder; the cells take no collection selection.
+    private func configureCard(_ cell: EpisodeCardCell, at path: IndexPath) {
+        guard displayedEpisodes.indices.contains(path.item - 1) else { return }
+        binder?.configure(
+            cell: cell,
+            episode: displayedEpisodes[path.item - 1],
+            actionID: actionIDs.indices.contains(path.item - 1) ? actionIDs[path.item - 1] : nil,
+            at: path,
+            in: collectionView
+        )
     }
-
-    // Row tap opens Detail (it carries Play and the ••• menu); the order
-    // row is not selectable.
 
     func collectionView(_ collectionView: UICollectionView, shouldHighlightItemAt indexPath: IndexPath) -> Bool {
-        indexPath.item > 0
-    }
-
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        collectionView.deselectItem(at: indexPath, animated: false)
-        guard let viewModel, viewModel.showEpisodes.indices.contains(indexPath.item - 1) else { return }
-        binder?.presentDetail(episode: viewModel.showEpisodes[indexPath.item - 1])
+        false
     }
 
     /// Long press: Play / Add to playlist (the Inbox native-first pattern).
+    /// Duplicate-URL rows have no group identity but keep their menu.
     func collectionView(
         _ collectionView: UICollectionView,
         contextMenuConfigurationForItemsAt indexPaths: [IndexPath],
         point: CGPoint
     ) -> UIContextMenuConfiguration? {
-        guard let path = indexPaths.first, path.item > 0,
-              let viewModel, viewModel.showEpisodes.indices.contains(path.item - 1),
+        guard let path = indexPaths.first, path.section == 0, path.item > 0, !showsSkeleton,
+              displayedEpisodes.indices.contains(path.item - 1),
               let binder else { return nil }
-        let episode = viewModel.showEpisodes[path.item - 1]
+        let episode = displayedEpisodes[path.item - 1]
         return UIContextMenuConfiguration(actionProvider: { _ in binder.menu(for: episode) })
     }
 
@@ -793,19 +914,25 @@ extension ChannelViewController: UICollectionViewDataSource, UICollectionViewDel
 
 extension ChannelSubscriptionDisplay {
 
-    /// Outline bookmark = not subscribed, filled = subscribed; the loading
-    /// state keeps the outline (dimmed and disabled by the button).
+    /// plus = not following, checkmark = following; the loading state keeps
+    /// the plus (dimmed and disabled by the button).
     var toggleIcon: UIImage {
         self == .unsubscribe ? AppIcons.subscribed : AppIcons.subscribe
     }
 
-    /// "Subscribing" while the state is unknown keeps the loading state
-    /// addressable for UI tests.
+    /// Visible label; also the accessibility label. Following carries the
+    /// selected trait. The loading title matches the not-following width.
+    var followTitle: String {
+        self == .unsubscribe ? "Following" : "Follow"
+    }
+
+    /// "Checking follow status" while the state is unknown keeps the loading
+    /// state addressable for UI tests.
     var toggleAccessibilityLabel: String {
         switch self {
-        case .loading: "Subscribing"
-        case .subscribe: "Subscribe"
-        case .unsubscribe: "Unsubscribe"
+        case .loading: "Checking follow status"
+        case .subscribe: "Follow"
+        case .unsubscribe: "Following"
         }
     }
 }
@@ -1108,12 +1235,13 @@ final class ChannelHeaderView: UICollectionReusableView {
 // MARK: - Sort and search row (channel.dart:62-100 / 636-748)
 
 /// "Newest ⇅" — a quiet menu button choosing the order — and the search
-/// glyph opening ChannelSearch. The row ends 12 pt above the episode plate.
+/// glyph opening ChannelSearch. The row ends 12 pt (the card gap) above the
+/// first episode card.
 @MainActor
 final class ChannelBodyHeaderCell: UICollectionViewCell {
 
     static let reuseIdentifier = "ChannelBodyHeaderCell"
-    /// 44 (the row) + 12 (gap to the plate).
+    /// 44 (the row) + 12 (the section's card gap to the first card).
     static let fixedHeight: CGFloat = 56
 
     var onSearch: (() -> Void)?
@@ -1167,12 +1295,13 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
         setOrder(reversed: false)
     }
 
-    /// The row height is fixed; the plate below starts at this edge.
+    /// The row height is fixed; the section's inter-card spacing supplies
+    /// the gap below it.
     override func preferredLayoutAttributesFitting(
         _ layoutAttributes: UICollectionViewLayoutAttributes
     ) -> UICollectionViewLayoutAttributes {
         let attributes = super.preferredLayoutAttributesFitting(layoutAttributes)
-        attributes.frame.size.height = Self.fixedHeight
+        attributes.frame.size.height = Self.fixedHeight - EpisodeCardCell.spacing
         return attributes
     }
 
@@ -1182,7 +1311,7 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
         configuration.title = reversed ? "Oldest" : "Newest"
         configuration.image = UIImage(systemName: "chevron.up.chevron.down")
         configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(textStyle: .caption1)
-            .applying(UIImage.SymbolConfiguration(weight: .semibold))
+            .applying(UIImage.SymbolConfiguration(weight: .medium))
         configuration.imagePlacement = .trailing
         configuration.imagePadding = Spacing.sm
         configuration.baseForegroundColor = TypographyV2.emphasis.color
@@ -1197,127 +1326,6 @@ final class ChannelBodyHeaderCell: UICollectionViewCell {
         orderButton.menu = UIMenu(children: [
             UIAction(title: "Newest", state: reversed ? .off : .on) { [weak self] _ in self?.onOrderSelect?(false) },
             UIAction(title: "Oldest", state: reversed ? .on : .off) { [weak self] _ in self?.onOrderSelect?(true) },
-        ])
-    }
-}
-
-// MARK: - Episode row (one grouped plate)
-
-/// One episode on the Channel page's grouped plate: the Emphasis title on
-/// up to two lines and the Meta "date · duration" line. No cover — the
-/// show's artwork already heads the page, and per-episode art is usually
-/// the same picture. Rows after the first draw a hairline from the text on; touching fills the
-/// row (no scale). Tap opens Detail; long press offers Play / Add to
-/// playlist — both wired by the list.
-@MainActor
-final class ChannelEpisodeRowCell: UICollectionViewCell {
-
-    static let reuseIdentifier = "ChannelEpisodeRowCell"
-    /// 12 + one-line title (22) + 4 + meta (20) + 12.
-    static let minimumHeight: CGFloat = 70
-
-    private let titleLabel = UILabel()
-    private let metaLabel = UILabel()
-    private let separator = UIView()
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        build()
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    override func prepareForReuse() {
-        super.prepareForReuse()
-        // A reused row must never inherit an entrance pose — the skeleton
-        // fade animates the cell itself and the staggered arrival the
-        // content view, so both reset.
-        layer.removeAllAnimations()
-        alpha = 1
-        contentView.layer.removeAllAnimations()
-        contentView.alpha = 1
-        contentView.transform = .identity
-    }
-
-    /// A static placeholder row at the row's resting height (one title line
-    /// and the meta line): the loading rule's skeleton, no shimmer.
-    func configureSkeleton() {
-        titleLabel.setSkeletonBar("Placeholder episode title text")
-        metaLabel.setSkeletonBar("Placeholder meta")
-        contentView.isUserInteractionEnabled = false
-        contentView.isAccessibilityElement = false
-    }
-
-    func configure(title: String, meta: String) {
-        contentView.isUserInteractionEnabled = true
-        contentView.isAccessibilityElement = true
-        titleLabel.setRealText(title)
-        metaLabel.setRealText(meta)
-        contentView.accessibilityLabel = title
-        contentView.accessibilityValue = meta
-    }
-
-    /// Where the row sits on its plate: the first row has no hairline, and
-    /// the first and last rows round their press fill into the plate.
-    func setPosition(isFirst: Bool, isLast: Bool) {
-        separator.isHidden = isFirst
-        var corners: CACornerMask = []
-        if isFirst { corners.formUnion([.layerMinXMinYCorner, .layerMaxXMinYCorner]) }
-        if isLast { corners.formUnion([.layerMinXMaxYCorner, .layerMaxXMaxYCorner]) }
-        contentView.layer.maskedCorners = corners
-        contentView.layer.cornerRadius = corners.isEmpty ? 0 : Radius.card
-    }
-
-    override var isHighlighted: Bool {
-        didSet {
-            let fill = isHighlighted ? AnycastColor.sandAlpha5 : .clear
-            UIView.animate(withDuration: isHighlighted ? 0.1 : Motion.quick) {
-                self.contentView.backgroundColor = fill
-            }
-        }
-    }
-
-    private func build() {
-        contentView.backgroundColor = .clear
-        contentView.layer.cornerCurve = .continuous
-        contentView.isAccessibilityElement = true
-        contentView.accessibilityTraits = [.button]
-        contentView.accessibilityHint = "Opens episode details"
-
-        titleLabel.font = TypographyV2.emphasis.font()
-        titleLabel.textColor = TypographyV2.emphasis.color
-        titleLabel.numberOfLines = 2
-        titleLabel.adjustsFontForContentSizeCategory = true
-        metaLabel.font = TypographyV2.meta.font().monospacedDigits()
-        metaLabel.textColor = TypographyV2.meta.color
-        metaLabel.numberOfLines = 1
-        metaLabel.adjustsFontForContentSizeCategory = true
-
-        let text = UIStackView(arrangedSubviews: [titleLabel, metaLabel])
-        text.axis = .vertical
-        text.spacing = Spacing.xs
-        text.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(text)
-
-        separator.backgroundColor = Theme.outline
-        separator.isUserInteractionEnabled = false
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(separator)
-
-        NSLayoutConstraint.activate([
-            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: Self.minimumHeight),
-
-            text.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Spacing.pageH),
-            text.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageH),
-            text.topAnchor.constraint(greaterThanOrEqualTo: contentView.topAnchor, constant: Spacing.gap),
-            text.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -Spacing.gap),
-            text.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-
-            separator.topAnchor.constraint(equalTo: contentView.topAnchor),
-            separator.leadingAnchor.constraint(equalTo: text.leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Spacing.pageH),
-            separator.heightAnchor.constraint(equalToConstant: 0.5),
         ])
     }
 }

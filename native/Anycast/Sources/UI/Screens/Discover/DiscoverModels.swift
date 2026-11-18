@@ -35,7 +35,7 @@ enum ContentLoadDisplay: Equatable {
     case content
     /// The rows, plus the one-line "Couldn't update" with Retry.
     case contentWithRetry
-    /// No rows yet and the wait is past the threshold: static skeleton rows.
+    /// No rows yet and the wait is past the threshold: the shared skeleton rows.
     case skeleton
     /// No rows yet, inside the threshold: nothing at all (no spinner).
     case blank
@@ -133,7 +133,7 @@ enum DiscoverCategoriesReducer {
     }
 }
 
-/// Search tab list phase (discover.dart:169-204 / 204-293): loading spinner;
+/// Search tab list phase (discover.dart:169-204 / 204-293): loading skeleton;
 /// empty results; a failed fetch instead of the Dart eternal spinner (K4
 /// fix). The sentence drawn for the empty and failed phases lives in
 /// `SearchResultState` — this value only says which phase it is.
@@ -191,26 +191,6 @@ struct DiscoverPagingModel: Equatable {
 /// ALL alive pages refetch immediately, not only the selected one.
 enum DiscoverCountryReload {
     static func reloadTargets(aliveIndices: Set<Int>) -> Set<Int> { aliveIndices }
-}
-
-// MARK: - SearchPage add button (03 §2.6, 2026-09-22 correction)
-
-/// SearchPage's add-to-playlist button (discover.dart:276-286): the icon
-/// reflects playlist membership, but the tap is NOT gated — this page has no
-/// `if (inPlaylist) return` guard (that guard exists ONLY on Channel /
-/// ChannelSearch, channel.dart:152-155 / 831-834). Every tap fires the
-/// fly-in animation and then inserts/moves via addToPlaylist (contrast
-/// `ChannelPlaylistGate.action(inPlaylist:)`, which returns `.blocked` for
-/// members).
-enum SearchPageAddButton {
-
-    enum Icon: Equatable {
-        case add
-        /// Ic.round_playlist_add_check — the already-in-playlist variant.
-        case added
-    }
-
-    static func icon(inPlaylist: Bool) -> Icon { inPlaylist ? .added : .add }
 }
 
 // MARK: - View models
@@ -485,7 +465,7 @@ final class SearchPageViewModel {
     }
 
     /// Starts the segment's fetch the first time it is shown. A segment that
-    /// already loaded in this search is left as it is: no spinner, no
+    /// already loaded in this search is left as it is: no skeleton, no
     /// request. A failed segment loads again.
     func activate(tab index: Int) {
         if index == 1 {
@@ -497,7 +477,7 @@ final class SearchPageViewModel {
         }
     }
 
-    /// Re-fetches one segment and returns it to the loading spinner. Does
+    /// Re-fetches one segment and returns it to the loading skeleton. Does
     /// not touch the other segment or Recent.
     func retry(tab index: Int) {
         if index == 1 {

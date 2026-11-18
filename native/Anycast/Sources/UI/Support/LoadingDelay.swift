@@ -1,9 +1,11 @@
 import Foundation
 
-/// "Show after 300 ms if still loading": a loading affordance (skeleton rows)
-/// must not flash for a fetch that finishes at once. Start it when loading
-/// begins, cancel it when loading ends; `onDue` fires on the main actor only
-/// if it was not cancelled first.
+/// "Show after 300 ms if still loading": a loading affordance (the shared
+/// skeleton) must not flash for a fetch that finishes at once. Every network
+/// list uses it. Start it when loading begins, cancel it when loading ends;
+/// `onDue` fires on the main actor only if it was not cancelled first. Pages
+/// call `update(isLoading:onDue:)` from their render and show the skeleton
+/// exactly when it returns true.
 @MainActor
 final class LoadingDelay {
 
@@ -25,6 +27,19 @@ final class LoadingDelay {
             self.task = nil
             onDue()
         }
+    }
+
+    /// Follows the loading state and says whether the skeleton shows now:
+    /// loading and past the threshold. Nothing shows inside the threshold,
+    /// and a state that is not loading forgets the clock.
+    @discardableResult
+    func update(isLoading: Bool, onDue: @escaping @MainActor () -> Void) -> Bool {
+        if isLoading {
+            start(onDue: onDue)
+        } else {
+            cancel()
+        }
+        return isLoading && isDue
     }
 
     /// Loading ended: forget the clock and the fired state.

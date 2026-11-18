@@ -699,10 +699,9 @@ final class QACrawlUITests: XCTestCase {
     private func ensureDetailOpen() -> Bool {
         if app.buttons["More episode actions"].exists { return true }
         closeSheet()
-        // Inbox rows are located by their row identifier; the whole
-        // row opens Detail (09 §10 批次1).
+        // Detail is opened from the cover, independently of the body group.
         let card = app.collectionViews.descendants(matching: .any)
-            .matching(identifier: "inbox-episode-row").firstMatch
+            .matching(identifier: "inbox-episode-cover").firstMatch
         guard card.waitForExistence(timeout: 4) else { return false }
         tapElement(card)
         return app.buttons["More episode actions"].waitForExistence(timeout: 6)
@@ -789,16 +788,13 @@ final class QACrawlUITests: XCTestCase {
 
             Checkpoint(state: "inbox-expanded",
                        action: { s in
-                           // The v2 card surfaces its actions through the
-                           // long-press context menu (09 §7a-C1) — the v1
-                           // strip and its offset-tap target are retired.
                            let card = s.app.collectionViews.descendants(matching: .any)
-                               .matching(identifier: "inbox-episode-row").firstMatch
+                               .matching(identifier: "inbox-episode-title").firstMatch
                            guard card.waitForExistence(timeout: 5) else {
                                s.markSkipped("inbox-expanded", "inbox cards", "needs db_smoke")
                                return false
                            }
-                           card.press(forDuration: 1.2)
+                           card.tap()
                            return s.app.buttons["Add to playlist"].waitForExistence(timeout: 4)
                        },
                        required: ["Add to playlist", "Remove from inbox"],
@@ -806,14 +802,9 @@ final class QACrawlUITests: XCTestCase {
 
             Checkpoint(state: "detail",
                        action: { s in
-                           // Cell subtrees merge into the cell's accessibility
-                           // element, so the description identifier is not
-                           // queryable — instead try cards (located by the
-                           // row identifier) until a Detail sheet renders a
-                           // real show-notes body (up to 3 visible cards).
-                           // The sheet grabber tap closes.
+                           // Try visible covers until a Detail sheet has show notes.
                            let cards = s.app.collectionViews.descendants(matching: .any)
-                               .matching(identifier: "inbox-episode-row")
+                               .matching(identifier: "inbox-episode-cover")
                            guard cards.count > 0 else {
                                s.markSkipped("detail", "inbox cards", "needs db_smoke")
                                return false
@@ -845,8 +836,8 @@ final class QACrawlUITests: XCTestCase {
                                NSPredicate(format: "label BEGINSWITH 'Open channel'")).firstMatch
                            guard channel.waitForExistence(timeout: 4) else { return false }
                            s.tapElement(channel)
-                           let marker = s.app.buttons["Subscribe"]
-                           let alt = s.app.buttons["Unsubscribe"]
+                           let marker = s.app.buttons["Follow"]
+                           let alt = s.app.buttons["Following"]
                            return marker.waitForExistence(timeout: 10)
                                || alt.waitForExistence(timeout: 3)
                        },
@@ -859,7 +850,7 @@ final class QACrawlUITests: XCTestCase {
                            s.currentTab = "tab-0"
                            guard s.tap(s.app.buttons["tab-0"], "Podcast chip") else { return false }
                            guard s.tap(s.app.buttons["shows-shelf-all"], "All shows button") else { return false }
-                           return s.app.staticTexts["shows-sheet-title"].waitForExistence(timeout: 4)
+                           return s.app.staticTexts["library-sheet-title"].waitForExistence(timeout: 4)
                        },
                        required: [],
                        probe: true, settle: 3),
@@ -873,9 +864,9 @@ final class QACrawlUITests: XCTestCase {
                                return false
                            }
                            s.tapElement(cover)
-                           return s.app.buttons["Subscribe"].waitForExistence(timeout: 10)
-                               || s.app.buttons["Unsubscribe"].waitForExistence(timeout: 3)
-                               || s.app.buttons["Subscribing"].waitForExistence(timeout: 3)
+                           return s.app.buttons["Follow"].waitForExistence(timeout: 10)
+                               || s.app.buttons["Following"].waitForExistence(timeout: 3)
+                               || s.app.buttons["Checking follow status"].waitForExistence(timeout: 3)
                        },
                        required: ["Share"],
                        probe: true, settle: 3),
@@ -1124,12 +1115,10 @@ final class QACrawlUITests: XCTestCase {
         runCrawl()
     }
 
-    /// Focused check for the channel-card description parity question: the
-    /// Flutter channel list renders a 2-line description under each episode
-    /// while qa-6's native channel dump showed none. The card resolves the
-    /// HTML description asynchronously — this measures whether (and when)
-    /// the label populates, separating a real parity gap from a capture
-    /// race.
+    /// Channel cards are the covered Show composition (09 §7a): title and
+    /// one meta row, deliberately WITHOUT a description line — a late
+    /// description would change the card height under the list-owned
+    /// action group. Checks the list loads and no description surfaces.
     func testChannelDesc() throws {
         app.launch()
         // Podcasts tab → Subscriptions strip.
@@ -1146,42 +1135,31 @@ final class QACrawlUITests: XCTestCase {
             throw XCTSkip("subscription rows missing — needs db_smoke")
         }
         tapElement(list.cells.firstMatch)
-        guard app.buttons["Subscribe"].waitForExistence(timeout: 12)
-                || app.buttons["Unsubscribe"].waitForExistence(timeout: 4) else {
+        guard app.buttons["Follow"].waitForExistence(timeout: 12)
+                || app.buttons["Following"].waitForExistence(timeout: 4) else {
             XCTFail("channel sheet never opened"); return
         }
 
-        // Poll up to 30 s: the episode list itself arrives via live fetch,
-        // then each card's HTML→plain task fills the label.
+        // Poll up to 30 s: the episode list itself arrives via live fetch.
         var cellsSeen = false
-        var descSeen = false
         for tick in 0..<60 {
-            let cells = app.collectionViews.cells
-            if cells.count > 0 { cellsSeen = true }
-            let desc = app.staticTexts.matching(
-                NSPredicate(format: "identifier == 'episode-card-description'"))
-            for i in 0..<desc.count {
-                let el = desc.element(boundBy: i)
-                if el.exists, el.frame.height > 5, !(el.label.isEmpty) {
-                    descSeen = true
-                }
+            if app.collectionViews.cells.count > 1 {
+                cellsSeen = true
+                print("[desc-check] cards visible after ~\(tick * 500) ms")
+                break
             }
-            if descSeen { print("[desc-check] visible after ~\(tick * 500) ms"); break }
             Thread.sleep(forTimeInterval: 0.5)
         }
-        print("[desc-check] cellsSeen=\(cellsSeen) descSeen=\(descSeen)")
-        if !descSeen {
-            let anyDesc = app.descendants(matching: .any).matching(
-                NSPredicate(format: "identifier == 'episode-card-description'"))
-            print("[desc-check] any-type matches: \(anyDesc.count)")
-            for i in 0..<min(5, anyDesc.count) {
-                let el = anyDesc.element(boundBy: i)
-                print("[desc-check]   exists=\(el.exists) frame=\(el.frame) label='\(el.label)'")
-            }
-            _ = captureState("channel-desc-debug", settleTimeout: 1)
+        if !cellsSeen { XCTFail("channel episode list never loaded"); return }
+        let desc = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier == 'episode-card-description'"))
+        var shown = 0
+        for i in 0..<desc.count {
+            let el = desc.element(boundBy: i)
+            if el.exists, el.frame.height > 5, !el.label.isEmpty { shown += 1 }
         }
-        if !cellsSeen { XCTFail("channel episode list never loaded") }
-        if !descSeen { XCTFail("episode-card-description never populated within 30 s") }
+        if shown > 0 { _ = captureState("channel-desc-debug", settleTimeout: 1) }
+        XCTAssertEqual(shown, 0, "Show cards must not carry a description line")
     }
 
     /// Screenshot-only tour for the Flutter reference build (the shipped

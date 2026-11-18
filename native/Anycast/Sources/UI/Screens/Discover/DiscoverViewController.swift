@@ -19,7 +19,9 @@ final class DiscoverViewController: UIViewController {
     private var categoryStrip: ChipTabBarView?
     private var didAttachStripEdge = false
     private var pagingContainer: DiscoverPagingContainer?
-    private let bodySpinner = UIActivityIndicatorView(style: .large)
+    /// Skeleton rows while the categories load (after the 300 ms rule).
+    private let bodySkeleton = PodcastSkeletonListView()
+    private let bodyDelay = LoadingDelay()
     private let failedState = EmptyStateView()
 
     private let observation = ObservationLoop()
@@ -107,10 +109,9 @@ final class DiscoverViewController: UIViewController {
     // MARK: - Body
 
     private func buildBodyOverlay() {
-        bodySpinner.color = Theme.primary
-        bodySpinner.hidesWhenStopped = true
-        bodySpinner.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(bodySpinner)
+        bodySkeleton.isHidden = true
+        bodySkeleton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(bodySkeleton)
 
         // A failed (or empty) category list: one sentence and Retry.
         let retry = AnycastButton.make(
@@ -124,10 +125,14 @@ final class DiscoverViewController: UIViewController {
         view.addSubview(failedState)
 
         NSLayoutConstraint.activate([
-            bodySpinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            bodySpinner.centerYAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -160
+            // Where the first category page's rows will start: under the
+            // header and the category strip.
+            bodySkeleton.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bodySkeleton.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bodySkeleton.topAnchor.constraint(
+                equalTo: header.bottomAnchor, constant: Spacing.gap + ChipTabBarView.chipHeight
             ),
+            bodySkeleton.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             failedState.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             failedState.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             failedState.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -217,15 +222,16 @@ final class DiscoverViewController: UIViewController {
     }
 
     private func renderCategories() {
-        switch viewModel.categoriesPhase {
+        let phase = viewModel.categoriesPhase
+        bodySkeleton.isHidden = !bodyDelay.update(isLoading: phase == .loading) { [weak self] in
+            self?.renderCategories()
+        }
+        switch phase {
         case .loading:
-            bodySpinner.startAnimating()
             failedState.isHidden = true
         case .networkError:
-            bodySpinner.stopAnimating()
             failedState.isHidden = false
         case .loaded(let names):
-            bodySpinner.stopAnimating()
             failedState.isHidden = true
             if categoryStrip == nil {
                 buildTabsAndPages(names: names)

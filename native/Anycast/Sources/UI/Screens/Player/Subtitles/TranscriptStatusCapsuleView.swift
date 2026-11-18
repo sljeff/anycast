@@ -102,7 +102,7 @@ final class TranscriptStatusCapsuleView: UIView {
             configuration.image = image
             configuration.imagePadding = 8
             configuration.preferredSymbolConfigurationForImage = IconMetrics.symbolConfiguration(
-                pointSize: 14, weight: .semibold, textStyle: .footnote, compatibleWith: traitCollection
+                pointSize: 14, weight: .medium, textStyle: .footnote, compatibleWith: traitCollection
             )
         }
         configuration.baseBackgroundColor = Theme.playerText
@@ -153,9 +153,7 @@ final class TranscriptStatusCapsuleView: UIView {
                 pointSize: 16, weight: .medium, style: TypographyV2.meta, compatibleWith: traitCollection
             )
             if let image {
-                glyph.image = image.isSymbolImage
-                    ? image
-                    : image.withIconMetrics(pointSize: point, weight: .medium, compatibleWith: traitCollection)
+                glyph.image = image
             }
             glyph.translatesAutoresizingMaskIntoConstraints = false
             glyph.widthAnchor.constraint(equalToConstant: point).isActive = true

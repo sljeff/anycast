@@ -3,11 +3,8 @@ import Testing
 import AnycastKit
 @testable import Anycast
 
-/// The inbox episode list as ONE dense grouped plate: hosts the real rows
-/// section (`InboxPageViewController.rowsSection`) with the pinned header,
-/// shelf and strip above it in a 402 x 874 window, asserts the density and
-/// alignment contract, and writes a PNG into NSTemporaryDirectory (same
-/// convention as the other visual suites).
+/// Hosts the production standalone-card section with the scrolling chrome.
+/// Verifies plate geometry, spacing, and settled heights, and captures a PNG.
 @MainActor
 @Suite(.serialized)
 struct InboxPlateVisualTests {
@@ -60,14 +57,13 @@ struct InboxPlateVisualTests {
                     title: row.title, showName: row.show, dateText: row.date,
                     durationText: row.duration, status: row.status
                 ))
-                card?.setPosition(isFirst: indexPath.item == 0, isLast: indexPath.item == InboxPlateVisualTests.rows.count - 1)
                 return cell
             }
         }
     }
 
-    @Test("Inbox rows: one dense plate, 7+ rows on screen, aligned columns")
-    func plateIsDenseAndAligned() async throws {
+    @Test("Inbox cards: separate rounded plates, 12 pt gaps and aligned columns")
+    func cardsAreSeparatedAndAligned() async throws {
         let scene = try #require(
             UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first,
             "self-sizing needs a connected scene"
@@ -90,13 +86,9 @@ struct InboxPlateVisualTests {
             case 0: return InboxPageViewController.chromeSection(height: ShowsShelfLayout.itemSide, bottomInset: Spacing.gap)
             case 1: return InboxPageViewController.chromeSection(height: CategoryStripView.chipHeight, bottomInset: Spacing.gap)
             default:
-                var config = UICollectionLayoutListConfiguration(appearance: .plain)
-                config.showsSeparators = false
-                config.backgroundColor = .clear
-                return InboxPageViewController.rowsSection(config: config, environment: environment)
+                return InboxPageViewController.rowsSection()
             }
         }
-        layout.register(GroupedPlateView.self, forDecorationViewOfKind: GroupedPlateView.elementKind)
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = .clear
         let source = Source()
@@ -129,11 +121,20 @@ struct InboxPlateVisualTests {
             let frame = cell.convert(cell.bounds, to: window)
             return frame.maxY <= window.bounds.height
         }
-        print("[inbox-plate] rows realised \(cells.count), fully on screen \(fitting.count), heights \(cells.map { Int($0.frame.height) })")
-        #expect(fitting.count >= 6, "only \(fitting.count) rows fit")
+        #expect(!fitting.isEmpty, "standalone cards did not materialize")
+        #expect(cells.allSatisfy { $0.cardFrameInCell.height >= 92 })
+        for pair in zip(cells, cells.dropFirst()) {
+            #expect(abs(pair.1.frame.minY - pair.0.frame.maxY - 12) <= 0.5)
+        }
+        #expect(InboxPageViewController.rowsSection().decorationItems.isEmpty)
+        for cell in cells {
+            let plate = try #require(cell.contentView.subviews.first)
+            #expect(plate.backgroundColor == Theme.surface)
+            #expect(plate.layer.cornerRadius == Radius.largeCard)
+            #expect(plate.layer.cornerCurve == .continuous)
+            #expect(plate.layer.borderWidth == Spacing.hairline)
+        }
 
-        // Columns: the cover starts 32 pt from the screen edge, the plate
-        // 16 pt; the hairline of a non-first row starts at the text.
         let first = try #require(cells.first)
         let firstFrame = first.convert(first.bounds, to: window)
         #expect(firstFrame.minX == Spacing.pageH, "row is not inset 16 from the screen edge")
@@ -157,9 +158,9 @@ struct InboxPlateVisualTests {
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
         }
         if let data = image.pngData() {
-            let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("inbox-plate.png")
+            let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("inbox-cards.png")
             try? data.write(to: url)
-            print("[inbox-plate] wrote \(url.path)")
+            print("[inbox-cards] wrote \(url.path)")
         }
     }
 }

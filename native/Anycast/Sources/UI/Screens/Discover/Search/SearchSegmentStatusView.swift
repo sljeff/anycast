@@ -2,7 +2,7 @@ import UIKit
 
 /// The search segment's result sentence: an `EmptyStateView` with no icon
 /// and no message, in a scroll view so an accessibility size can scroll.
-/// The first load keeps the page's own spinner; this view stays hidden
+/// The first load shows the page's own skeleton; this view stays hidden
 /// until a sentence exists. The block is centered through xxxLarge and
 /// top-aligned at accessibility sizes, and its bottom follows the keyboard.
 @MainActor
