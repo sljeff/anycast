@@ -1,0 +1,1194 @@
+{
+  "note": "Real podcast metadata and artwork from the publishers’ public RSS feeds, captured November 18, 2026. The hero transcript is aligned to the downloaded recording and includes a Simplified Chinese translation. Discover lists are curated, led by two shows from Apple Podcasts’ US Top 25.",
+  "host": "https://demo.anycast.example",
+  "shows": [
+    {
+      "slug": "99-percent-invisible",
+      "title": "99% Invisible",
+      "author": "Roman Mars",
+      "description": "Design is everywhere in our lives, perhaps most importantly in the places where we've just stopped noticing. 99% Invisible is a weekly exploration of the process and power of design and architecture. From award winning producer Roman Mars. Learn more at 99percentinvisible.org.",
+      "language": "en-us",
+      "category": "Arts",
+      "feedUrl": "https://feeds.simplecast.com/BqbsxVfO",
+      "artworkUrl": "https://image.simplecastcdn.com/images/8436e3c1-2479-4466-ac48-fa58259960bb/a6d5b177-ab5d-430d-b3f2-b393a09d8101/3000x3000/sxm-cover-99percentinvisible-r2025-3000x3000-final.jpg?aid=rss_feed"
+    },
+    {
+      "slug": "the-daily",
+      "title": "The Daily",
+      "author": "The New York Times",
+      "description": "This is what the news should sound like. The biggest stories of our time, told by the best journalists in the world. Hosted by Michael Barbaro, Rachel Abrams and Natalie Kitroeff. Twenty minutes a day, six days a week, ready by 6 a.m.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here",
+      "language": "en",
+      "category": "News",
+      "feedUrl": "https://feeds.simplecast.com/54nAGcIl",
+      "artworkUrl": "https://image.simplecastcdn.com/images/7f2f4c05-9c2f-4deb-82b7-b538062bc22d/73549bf1-94b3-40ff-8aeb-b4054848ec1b/3000x3000/the-daily-album-art-original.jpg?aid=rss_feed"
+    },
+    {
+      "slug": "radio-ambulante",
+      "title": "Radio Ambulante",
+      "author": "My Cultura, Radio Ambulante and iHeartPodcasts",
+      "description": "Radio Ambulante es un podcast pionero en español que cuenta crónicas latinoamericanas en audio, celebrando la diversidad y complejidad de la región. / Radio Ambulante is an award-winning Spanish language podcast that uses long-form audio journalism to tell neglected and under-reported Latin American and Latino stories.",
+      "language": "es",
+      "category": "Society & Culture, Education, News",
+      "feedUrl": "https://feeds.npr.org/510315/podcast.xml",
+      "artworkUrl": "https://www.omnycontent.com/d/programs/e73c998e-6e60-432f-8610-ae210140c5b1/b3c9b6e7-72ba-45c4-aff9-b1e7012d213b/image.jpg?t=1771965809&size=Large"
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "title": "Learn Japanese with Noriko",
+      "author": "Japanese with Noriko",
+      "description": "Hi, I’m Noriko 🌸—a certified Japanese teacher and Neurolanguage Coach®. Learn Japanese with Noriko is for intermediate to advanced learners. If you're an intermediate student, please start from Season 1—I speak slowly at first, then gradually faster. Season 3 is a level-up version with real-life dialogues, philosophy, and language learning topics. Join Japanese Together for our Podcast Conversation Club & Book Club, and sign up for my newsletter at Japanese with Noriko to learn about my coaching service. Enjoy listening!",
+      "language": "ja",
+      "category": "Education",
+      "feedUrl": "https://anchor.fm/s/1380f800/podcast/rss",
+      "artworkUrl": "https://d3t3ozftmdmh3i.cloudfront.net/production/podcast_uploaded/3172192/3172192-1580928765546-9ac6decd1173b.jpg"
+    },
+    {
+      "slug": "left-right",
+      "title": "忽左忽右",
+      "author": "JustPod",
+      "description": "「忽左忽右」是一档文化沙龙类播客节目，试图为中文播客听众提供基于经验视角的话题和内容。本节目由JustPod出品。",
+      "language": "zh-cn",
+      "category": "Society & Culture",
+      "feedUrl": "https://feed.xyzfm.space/cv4bkgpuglwp",
+      "artworkUrl": "https://image.xyzcdn.net/FrYMqb37Wg_LA8aenDJJ8SFGsjea"
+    },
+    {
+      "slug": "hard-fork",
+      "title": "Hard Fork",
+      "author": "The New York Times",
+      "description": "“Hard Fork” is a show about the future that’s already here. Each week, New York Times journalists explore and make sense of the latest in the rapidly changing world of tech.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.",
+      "language": "en",
+      "category": "Technology",
+      "feedUrl": "https://feeds.simplecast.com/l2i9YnTd",
+      "artworkUrl": "https://image.simplecastcdn.com/images/4105a47a-42e5-4ccc-887a-832af7989986/23965394-f5e4-4fdb-b150-639f4910353e/3000x3000/nyt-hf-album-art-3000-2.jpg?aid=rss_feed"
+    },
+    {
+      "slug": "planet-money",
+      "title": "Planet Money",
+      "author": "NPR",
+      "description": "Wanna see a trick? Give us any topic and we can tie it back to the economy. At Planet Money, we explore the forces that shape our lives and bring you along for the ride. Don't just understand the economy – understand the world.\n\nSupport public media by joining NPR+ at plus.npr.org. You’ll get perks for over 25 NPR podcasts, including bonus episodes and sponsor-free listening for Planet Money.",
+      "language": "en",
+      "category": "Business, News",
+      "feedUrl": "https://feeds.npr.org/510289/podcast.xml",
+      "artworkUrl": "https://media.npr.org/assets/img/2022/10/24/pm_new_tile_2022_sq-e543deddd0a46a98be481b46e6a72efa6b52236f.jpg?s=1400&c=66&f=jpg"
+    },
+    {
+      "slug": "ted-talks-daily",
+      "title": "TED Talks Daily",
+      "author": "TED",
+      "description": "Want TED Talks on the go? Everyday, this feed brings you our latest talks in audio format. Hear thought-provoking ideas on every subject imaginable – from Artificial Intelligence to Zoology, and everything in between – given by the world's leading thinkers and doers. This collection of talks, given at TED and TEDx conferences around the globe, is also available in video format.\n\nHosted on Acast. See acast.com/privacy for more information.",
+      "language": "en",
+      "category": "Society & Culture",
+      "feedUrl": "https://feeds.acast.com/public/shows/67587e77c705e441797aff96",
+      "artworkUrl": "https://assets.pippa.io/shows/67587e77c705e441797aff96/show-cover.png"
+    },
+    {
+      "slug": "radiolab",
+      "title": "Radiolab",
+      "author": "WNYC Studios",
+      "description": "Radiolab is on a curiosity bender. We ask deep questions and use investigative journalism to get the answers. A given episode might whirl you through science, legal history, and into the home of someone halfway across the world. The show is known for innovative sound design, smashing information into music. It is hosted by Latif Nasser and Molly Webster.",
+      "language": "en-us",
+      "category": "Science, Society & Culture, History",
+      "feedUrl": "https://feeds.feedburner.com/radiolab",
+      "artworkUrl": "https://image.simplecastcdn.com/images/2c9187d6-9dff-4257-bc55-469cf13afd48/60a2cfed-b8ca-460b-abb8-8ab0afb3fa8c/3000x3000/radiolab-showsquare-3000x3000.jpg?aid=rss_feed"
+    },
+    {
+      "slug": "ezra-klein",
+      "title": "The Ezra Klein Show",
+      "author": "New York Times Opinion",
+      "description": "Ezra Klein invites you into a conversation on something that matters. How do we address climate change if the political system fails to act? Has the logic of markets infiltrated too many aspects of our lives? What is the future of the Republican Party? What do psychedelics teach us about consciousness? What does sci-fi understand about our present that we miss? Can our food system be just to humans and animals alike?\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here",
+      "language": "en",
+      "category": "Society & Culture, News, Government",
+      "feedUrl": "https://feeds.simplecast.com/82FI35Px",
+      "artworkUrl": "https://image.simplecastcdn.com/images/47913775-afcf-4643-935f-31f1dcc86cfb/6a0e5e15-04a3-47c8-9c50-2f2fe8e84437/3000x3000/teks-album-20art-3000px.jpg?aid=rss_feed"
+    }
+  ],
+  "hero": {
+    "slug": "99-percent-invisible",
+    "number": 1,
+    "language": "en",
+    "translationLanguage": "zh",
+    "audioUrl": "https://stitcher.simplecastaudio.com/3bb687b0-04af-4257-90f1-39eef4e631b6/episodes/74c9d99e-1e9d-4e40-be72-f1c9e1d374da/audio/128/default.mp3?aid=rss_feed&awCollectionId=3bb687b0-04af-4257-90f1-39eef4e631b6&awEpisodeId=74c9d99e-1e9d-4e40-be72-f1c9e1d374da&feed=BqbsxVfO",
+    "audioSha256": "5e451bc2f929bbf79257099b1972f017e9b3589cf406c61cd404ce403f204368",
+    "resumeLine": 14,
+    "momentLines": [
+      26,
+      29,
+      41
+    ],
+    "lines": [
+      {
+        "startMs": 640,
+        "endMs": 2500,
+        "text": "This is 99% Invisible.",
+        "zh": "这里是《99% Invisible》。"
+      },
+      {
+        "startMs": 3280,
+        "endMs": 4100,
+        "text": "I'm Roman Mars.",
+        "zh": "我是罗曼·马尔斯。"
+      },
+      {
+        "startMs": 6540,
+        "endMs": 14400,
+        "text": "Last August, producer Vivian Le received a voicemail that kicked off the first of several panic attacks that would span months.",
+        "zh": "去年八月，制作人薇薇安·黎收到一条语音留言。从那时起，接下来的几个月里，她经历了好几次惊恐发作。"
+      },
+      {
+        "startMs": 15140,
+        "endMs": 18300,
+        "text": "Hi Vivian, this is Samir calling from Mercedes-Benz of Oakland.",
+        "zh": "你好，薇薇安，我是奥克兰奔驰经销店的萨米尔。"
+      },
+      {
+        "startMs": 18900,
+        "endMs": 20680,
+        "text": "Please give me a call back when you get a chance.",
+        "zh": "你有空时，请给我回个电话。"
+      },
+      {
+        "startMs": 22540,
+        "endMs": 24320,
+        "text": "Um, just something came up.",
+        "zh": "嗯，是有这么个事。"
+      },
+      {
+        "startMs": 24540,
+        "endMs": 26480,
+        "text": "Someone submitted a lead under your name.",
+        "zh": "有人用你的名字提交了购车意向。"
+      },
+      {
+        "startMs": 26620,
+        "endMs": 27720,
+        "text": "Just wanted to give you a quick call.",
+        "zh": "我就想赶紧给你打个电话。"
+      },
+      {
+        "startMs": 28220,
+        "endMs": 38640,
+        "text": "The manager of a Mercedes-Benz dealership had called me to let me know that someone had walked into their dealership with a fake ID in my name and tried to drive out with a zero-down loan on a brand new Benz.",
+        "zh": "这位奔驰经销店经理打电话告诉我，有人拿着写有我名字的假证件进了店，想办一笔零首付贷款，把一辆崭新的奔驰开走。"
+      },
+      {
+        "startMs": 39360,
+        "endMs": 40780,
+        "text": "My identity had been stolen.",
+        "zh": "我的身份被人冒用了。"
+      },
+      {
+        "startMs": 41440,
+        "endMs": 43060,
+        "text": "That's the real Vivian Le.",
+        "zh": "这位才是真正的薇薇安·黎。"
+      },
+      {
+        "startMs": 43860,
+        "endMs": 47460,
+        "text": "I mean, I've been working in the car business for a while, and I can tell when something's off.",
+        "zh": "我在汽车这行干了有些年头了，一看就知道哪里不对劲。"
+      },
+      {
+        "startMs": 47840,
+        "endMs": 53320,
+        "text": "And the minute I saw the driver's license and information, nothing really matched up.",
+        "zh": "我一看驾照和那些资料，就发现怎么都对不上。"
+      },
+      {
+        "startMs": 53750,
+        "endMs": 56300,
+        "text": "This is my man, Samir, the manager who tipped me off.",
+        "zh": "这就是萨米尔，那位给我通风报信的经理。"
+      },
+      {
+        "startMs": 57000,
+        "endMs": 62480,
+        "text": "After I got that call, I found out that at some point, my personal information had been leaked in a data breach.",
+        "zh": "接完那通电话，我才知道自己的个人信息早在某次数据泄露中就流出去了。"
+      },
+      {
+        "startMs": 63160,
+        "endMs": 75900,
+        "text": "Most likely, several people had been pretending to be me and using my social security number to attempt to get car loans, register for utilities, get car insurance, and rent multiple apartments and houses all under my name.",
+        "zh": "很可能已经有好几个人冒充我，拿着我的社保号码，试着用我的名义申请车贷、开通水电、买车险，还租了好几套公寓和房子。"
+      },
+      {
+        "startMs": 76760,
+        "endMs": 83390,
+        "text": "When I see that, I feel for the people, because it's a pain to go and clean up all the mess that they create.",
+        "zh": "遇到这种事，我挺替当事人难受的。别人捅了娄子，收拾起来可太折腾了。"
+      },
+      {
+        "startMs": 84150,
+        "endMs": 85870,
+        "text": "It was such a pain.",
+        "zh": "真的太折腾了。"
+      },
+      {
+        "startMs": 86470,
+        "endMs": 98710,
+        "text": "Over the next several months, I needed to fill out multiple police reports, fill out FTC affidavits, assemble fraud packets, change every single password I've ever made in my entire life, and deal with debt collectors.",
+        "zh": "接下来的几个月，我填了好几份警方报案材料和联邦贸易委员会的宣誓声明，整理了整套欺诈证明，把这辈子设过的密码全改了一遍，还得应付催债的人。"
+      },
+      {
+        "startMs": 99630,
+        "endMs": 109530,
+        "text": "And I had to go through each of these tedious, stress-inducing steps because this whole identity theft situation was impacting one very important thing: my credit score.",
+        "zh": "这些又繁琐又让人焦虑的手续，我全都得一一办下来，因为身份被盗影响了一件特别重要的事：我的信用评分。"
+      },
+      {
+        "startMs": 110230,
+        "endMs": 114730,
+        "text": "And, like, you had stellar credit, so even if it's fraud, it still hurts your credit.",
+        "zh": "你原本的信用那么好，可哪怕是别人冒用身份，也照样会伤到你的信用。"
+      },
+      {
+        "startMs": 114910,
+        "endMs": 116010,
+        "text": "It still does a bunch of stuff.",
+        "zh": "还会惹出一大堆麻烦。"
+      },
+      {
+        "startMs": 116850,
+        "endMs": 123050,
+        "text": "A credit score is essentially a three-digit number that here in the U.S. usually ranges from 300 to 850.",
+        "zh": "信用评分说白了就是个三位数，在美国通常介于 300 到 850 之间。"
+      },
+      {
+        "startMs": 123790,
+        "endMs": 128170,
+        "text": "It's a metric that lenders can use to predict your ability to pay back a loan.",
+        "zh": "贷款机构用这个指标来判断你有没有能力还钱。"
+      },
+      {
+        "startMs": 128630,
+        "endMs": 132630,
+        "text": "The higher the number, the more likely you are to be approved for lines of credit.",
+        "zh": "分数越高，获批信用额度的可能性就越大。"
+      },
+      {
+        "startMs": 133510,
+        "endMs": 140390,
+        "text": "Aside from applying for a new apartment every few years, I almost never questioned what my credit score was or where it came from.",
+        "zh": "除了隔几年要申请租房，我几乎从来没想过自己的信用分有多少，也没有问过这分数从哪儿来。"
+      },
+      {
+        "startMs": 140870,
+        "endMs": 152150,
+        "text": "But in the months that followed, I found myself hyperfixated on that number and how to make it go back up because as I learned very quickly, those three little numbers are weirdly powerful.",
+        "zh": "可在之后的几个月里，我满脑子都是这个分数，还有怎么把它提回去。我很快就发现，这小小的三位数，影响力大得出奇。"
+      },
+      {
+        "startMs": 152810,
+        "endMs": 158330,
+        "text": "If you have good credit, all they ask for is your name, date of birth, social security number, and address.",
+        "zh": "只要信用好，对方要的就只有姓名、出生日期、社保号码和住址。"
+      },
+      {
+        "startMs": 158730,
+        "endMs": 162570,
+        "text": "If you have good credit, the system auto-approves you and you just buy a car and move on.",
+        "zh": "信用好，系统就会自动批准，你买了车就可以走人。"
+      },
+      {
+        "startMs": 163170,
+        "endMs": 169070,
+        "text": "In the United States, your credit score decides where you can live, what car you can drive, and whether you can get a loan.",
+        "zh": "在美国，信用分决定了你能住哪儿、能开什么车，以及能不能贷到款。"
+      },
+      {
+        "startMs": 169790,
+        "endMs": 174690,
+        "text": "And it's supposed to be objective, a precise, omniscient accounting of your financial health.",
+        "zh": "按理说，这个分数应该是客观的，能准确又全面地反映你的财务状况。"
+      },
+      {
+        "startMs": 175370,
+        "endMs": 180490,
+        "text": "But as I started looking into it, I learned that the credit score is much less objective than it seems.",
+        "zh": "可查下去我才发现，信用评分远没有看起来那么客观。"
+      },
+      {
+        "startMs": 180950,
+        "endMs": 188670,
+        "text": "What started as a simple tool for lenders ended up embedding itself in the lives of most Americans and feeding the same bias it claimed to solve.",
+        "zh": "一开始，它只是放贷人手里一个简单的工具，后来却渗进了大多数美国人的生活，还助长了它原本声称要消除的偏见。"
+      },
+      {
+        "startMs": 192230,
+        "endMs": 196170,
+        "text": "Credit has existed for thousands of years in several forms.",
+        "zh": "赊账和借贷的做法五花八门，几千年前就有了。"
+      },
+      {
+        "startMs": 196610,
+        "endMs": 205550,
+        "text": "But up until the early 19th century, basically the whole first chapter of American history, there were no credit scores because no one really needed them.",
+        "zh": "可一直到十九世纪初，也就是美国历史最早的那一大段时期，根本没有信用评分，因为大家用不着它。"
+      },
+      {
+        "startMs": 206470,
+        "endMs": 213470,
+        "text": "Much of the credit that kept the economy moving was between businesses, like a wholesaler selling goods on credit to a shopkeeper.",
+        "zh": "当时支撑经济运转的赊账，大多发生在商家之间，比如批发商先把货赊给店主。"
+      },
+      {
+        "startMs": 214050,
+        "endMs": 216990,
+        "text": "And in those early days, it was easy to know who to trust.",
+        "zh": "在那个时候，要判断谁可信很容易。"
+      },
+      {
+        "startMs": 217570,
+        "endMs": 223770,
+        "text": "Communities were small, and chances are the wholesaler and the shopkeeper knew each other personally, or at least secondhand.",
+        "zh": "社区都不大，批发商和店主十有八九认识，就算不认识，也能从熟人那里打听到。"
+      },
+      {
+        "startMs": 224490,
+        "endMs": 231910,
+        "text": "For many, many years, it's okay because they're repeat customers. The networks of credit are relatively limited.",
+        "zh": "很长一段时间里，这套办法行得通，因为打交道的都是回头客，能赊账的圈子也就那么大。"
+      },
+      {
+        "startMs": 232150,
+        "endMs": 238170,
+        "text": "So you could write a letter to somebody you know in a nearby town and they could send a letter back and tell you whether they were trustworthy or not.",
+        "zh": "你可以写信给邻镇的熟人，请对方回信，告诉你那个人信不信得过。"
+      },
+      {
+        "startMs": 238850,
+        "endMs": 246130,
+        "text": "This is Josh Lauer, professor of communication and author of Creditworthy: A History of Consumer Surveillance and Financial Identity in America.",
+        "zh": "这位是传播学教授乔希·劳尔。他写过《谁值得信贷》，讲的是美国如何监控消费者，以及个人金融身份是怎么形成的。"
+      },
+      {
+        "startMs": 246810,
+        "endMs": 251550,
+        "text": "And he says that by the 1830s, that credit system built on trust was starting to erode.",
+        "zh": "他说，到了十九世纪三十年代，这套靠熟人信任撑起来的信用体系开始瓦解。"
+      },
+      {
+        "startMs": 252210,
+        "endMs": 254510,
+        "text": "The country was getting bigger and more interconnected.",
+        "zh": "国家越来越大，各地之间的往来也越来越多。"
+      },
+      {
+        "startMs": 255350,
+        "endMs": 263830,
+        "text": "Suddenly, a wholesaler in New York could be selling on credit to a shopkeeper from hundreds of miles away with no way to know if they could be trusted to pay back their debt.",
+        "zh": "突然之间，纽约的批发商也可能要赊货给几百英里外的店主，却无从知道对方会不会还钱。"
+      },
+      {
+        "startMs": 264390,
+        "endMs": 272030,
+        "text": "The problem is that as societies get bigger, modern societies have more strangers, more opportunities to interact with people we don't know.",
+        "zh": "社会越大，陌生人就越多，我们也越常跟不认识的人打交道。"
+      },
+      {
+        "startMs": 272190,
+        "endMs": 277850,
+        "text": "It becomes a problem because you can't identify people, you can't know that you can trust them or not trust them.",
+        "zh": "这就成了个问题：你连对方是谁都弄不清，更不知道该不该信他。"
+      },
+      {
+        "startMs": 279190,
+        "endMs": 281370,
+        "text": "This was an era of industrialization.",
+        "zh": "那是工业化的时代。"
+      },
+      {
+        "startMs": 282010,
+        "endMs": 289970,
+        "text": "Cities were growing rapidly and lenders in places like New York were interacting more and more with brand new borrowers they just didn't know.",
+        "zh": "城市迅速扩大，纽约等地的放贷人越来越常遇到从未打过交道的借款人。"
+      }
+    ]
+  },
+  "episodes": [
+    {
+      "slug": "99-percent-invisible",
+      "number": 1,
+      "title": "Know the Score",
+      "duration": 2221,
+      "pubDate": "Tue, 17 Nov 2026 09:00:00 +0000",
+      "notes": "A credit score is essentially a three digit number that here in the US usually ranges from 300-850. It's a metric that lenders can use to predict your ability to pay back a loan. The higher the number, the more likely you are to be approved for lines of credit. In the United States, your credit score decides where you can live, what car you can drive and whether you can get a loan. It’s supposed to be objective—a precise, omniscient accounting of your financial health, but what started as a simple tool for lenders ended up embedding itself in the lives of most Americans, and feeding the same bias it claimed to solve.\n\nSubscribe to SiriusXM Podcasts+ to listen to new episodes of 99% Invisible ad-free and a whole week early.\n\nStart a free trial now on Apple Podcasts or by visiting siriusxm.com/podcastsplus.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://mgln.ai/e/2/dts.podtrac.com/redirect.mp3/stitcher.simplecastaudio.com/3bb687b0-04af-4257-90f1-39eef4e631b6/episodes/74c9d99e-1e9d-4e40-be72-f1c9e1d374da/audio/128/default.mp3?aid=rss_feed&awCollectionId=3bb687b0-04af-4257-90f1-39eef4e631b6&awEpisodeId=74c9d99e-1e9d-4e40-be72-f1c9e1d374da&feed=BqbsxVfO",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 35883915
+    },
+    {
+      "slug": "99-percent-invisible",
+      "number": 2,
+      "title": "100 Objects #24: White House Solar Panels",
+      "duration": 2367,
+      "pubDate": "Fri, 13 Nov 2026 08:00:00 +0000",
+      "notes": "In 1979, President Jimmy Carter took to the roof of the White House to announce the installation of 32 solar panels. In that speech, he outlined all the things that they could become: a curiosity, a museum piece, one of our nation's most potent and enduring symbols of a road not taken, or the start of a great adventure. They would become all but the last of those things…but why? Journalist and environmental activist Bill McKibben takes Roman Mars through the story of how a president showed the American people a powerful new technology promising abundant cheap energy and why Americans shrugged.\n\nA History of the United States in 100 Objects is a production of 99% Invisible and BBC Studios.\n\nSubscribe to SiriusXM Podcasts+ to listen to new episodes of 99% Invisible ad-free and a whole week early.\n\nStart a free trial now on Apple Podcasts or by visiting siriusxm.com/podcastsplus.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://mgln.ai/e/2/dts.podtrac.com/redirect.mp3/stitcher.simplecastaudio.com/3bb687b0-04af-4257-90f1-39eef4e631b6/episodes/77d3c20e-bf27-4943-a92c-59d3370bd317/audio/128/default.mp3?aid=rss_feed&awCollectionId=3bb687b0-04af-4257-90f1-39eef4e631b6&awEpisodeId=77d3c20e-bf27-4943-a92c-59d3370bd317&feed=BqbsxVfO",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 39244479
+    },
+    {
+      "slug": "99-percent-invisible",
+      "number": 3,
+      "title": "Perfectly Leveraged for the Squat",
+      "duration": 2135,
+      "pubDate": "Tue, 10 Nov 2026 09:00:00 +0000",
+      "notes": "Jan Todd was considered by many to be the strongest woman in the world back in the 1970s. She set world records, lifted the Dinnie Stones in Scotland, and wrote the first rulebook for women's powerlifting. Then she became a historian, and uncovered a lost generation of strong women who came before her.\n\nFor more, check out Bonnie Tsui's book, On Muscle.\n\nSubscribe to SiriusXM Podcasts+ to listen to new episodes of 99% Invisible ad-free and a whole week early.\n\nStart a free trial now on Apple Podcasts or by visiting siriusxm.com/podcastsplus.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://mgln.ai/e/2/dts.podtrac.com/redirect.mp3/stitcher.simplecastaudio.com/3bb687b0-04af-4257-90f1-39eef4e631b6/episodes/532fa21d-9d3e-488d-8f78-72d2885c900b/audio/128/default.mp3?aid=rss_feed&awCollectionId=3bb687b0-04af-4257-90f1-39eef4e631b6&awEpisodeId=532fa21d-9d3e-488d-8f78-72d2885c900b&feed=BqbsxVfO",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 34170367
+    },
+    {
+      "slug": "99-percent-invisible",
+      "number": 4,
+      "title": "100 Objects #23: Coin From the Ship of Gold",
+      "duration": 2434,
+      "pubDate": "Fri, 6 Nov 2026 08:00:00 +0000",
+      "notes": "On August 20th, 1857 a ship set sail from the Port of San Francisco with 600 people and thousands of pounds of gold. That gold was destined for the vaults of New York City banks, but it never made it. Instead, the ship sank to the bottom of the ocean, taking all that gold with it. Executive Producer Annie Brown sits down with Roman Mars to tell the story of the sinking of the SS Central America and the gold that sparked the first global financial panic, helped fuel the Civil War, and—over a century later—ruined one man’s life.\n\nA History of the United States in 100 Objects is a production of 99% Invisible and BBC Studios.\n\nSubscribe to SiriusXM Podcasts+ to listen to new episodes of 99% Invisible ad-free and a whole week early.\n\nStart a free trial now on Apple Podcasts or by visiting siriusxm.com/podcastsplus.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://mgln.ai/e/2/dts.podtrac.com/redirect.mp3/stitcher.simplecastaudio.com/3bb687b0-04af-4257-90f1-39eef4e631b6/episodes/fbde230d-d1db-486c-aeef-2cfb8fd95f54/audio/128/default.mp3?aid=rss_feed&awCollectionId=3bb687b0-04af-4257-90f1-39eef4e631b6&awEpisodeId=fbde230d-d1db-486c-aeef-2cfb8fd95f54&feed=BqbsxVfO",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 40309859
+    },
+    {
+      "slug": "99-percent-invisible",
+      "number": 5,
+      "title": "Zone Zero",
+      "duration": 2247,
+      "pubDate": "Tue, 3 Nov 2026 09:00:00 +0000",
+      "notes": "Across the West, there's a contentious debate playing out over how to adapt homes and neighborhoods to this era of increasingly extreme wildfire risk. In Berkeley, California, it's become a particularly emotional fight because of a very specific architectural history that began all the way back in the 1890s. Emmett Fitzgerald reports on the new rules about what plants you can grow around your house.\n\nCheck out our previous episode on defensible space: Built to Burn\n\nSubscribe to SiriusXM Podcasts+ to listen to new episodes of 99% Invisible ad-free and a whole week early.\n\nStart a free trial now on Apple Podcasts or by visiting siriusxm.com/podcastsplus.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://mgln.ai/e/2/dts.podtrac.com/redirect.mp3/stitcher.simplecastaudio.com/3bb687b0-04af-4257-90f1-39eef4e631b6/episodes/ceee3eec-1f1d-4e08-bca5-9ed2d577b937/audio/128/default.mp3?aid=rss_feed&awCollectionId=3bb687b0-04af-4257-90f1-39eef4e631b6&awEpisodeId=ceee3eec-1f1d-4e08-bca5-9ed2d577b937&feed=BqbsxVfO",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 36132392
+    },
+    {
+      "slug": "the-daily",
+      "number": 1,
+      "title": "How Stable Is the A.I. Industry? We’re About to Find Out.",
+      "duration": 1569,
+      "pubDate": "Wed, 18 Nov 2026 10:48:59 +0000",
+      "notes": "Anthropic is a barometer of the economy at a volatile time. Its initial public offering will have widespread implications.\n\nAs Anthropic prepares for what is expected to be a huge initial public offering this week, the company has been wooing investors with a simple message: Bet on us. But Jensen Huang’s sudden resignation from Nvidia last week raised questions about the stability of the entire artificial intelligence industry.\n\nErin Griffith, a tech reporter for The New York Times, explains why Anthropic’s I.P.O. is a litmus test for the future of A.I.\n\nGuest: Erin Griffith, a technology reporter for The New York Times.\n\nBackground reading:\n\nAnthropic is targeting a valuation of up to $1.4 trillion for its blockbuster I.P.O., a pricing that would make it one of the biggest public listings.\n\nWhat’s riding on Anthropic’s market debut? Nearly everything.\n\nPhoto: Andres Kudacki for The New York Times\n\nFor more information on today’s episode, visit nytimes.com/thedaily. Transcripts of each episode will be made available by the next workday.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/03d8b493-87fc-4bd1-931f-8a8e9b945d8a/episodes/c0d8552f-8a74-4b9d-9cbf-0ba520ea03bd/audio/128/default.mp3?aid=rss_feed&awCollectionId=03d8b493-87fc-4bd1-931f-8a8e9b945d8a&awEpisodeId=c0d8552f-8a74-4b9d-9cbf-0ba520ea03bd&feed=54nAGcIl",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 25109898
+    },
+    {
+      "slug": "the-daily",
+      "number": 2,
+      "title": "Democrats Promised Lower Prices. What Can They Actually Do?",
+      "duration": 2146,
+      "pubDate": "Tue, 17 Nov 2026 10:53:19 +0000",
+      "notes": "The Democratic Party swept the midterm elections by making big promises to Americans about bringing down the high cost of living. But when they take control of Congress in January, they will face a president who can veto anything they put forward.\n\nThe New York Times reporters Rebecca F. Elliot, Margot Sanger-Katz and Ben Casselman each discuss what, if anything, Democrats can really do to fix the key problems that propelled them into office.\n\nGuest:\n\nRebecca F. Elliott, an energy reporter for The New York Times.\n\nMargot Sanger-Katz, a reporter on health care policy and government spending for The New York Times.\n\nBen Casselman, the chief economics correspondent for The New York Times.\n\nBackground reading:\n\nA top Democrat is eyeing a filibuster-proof bill to unlock the affordability agenda.\n\nCould the voter backlash against A.I. help the economy?\n\nPhoto: Sean Rayford for The New York Times, Joe Raedle/Getty Images, Melyssa St. Michael for The New York Times\n\nFor more information on today’s episode, visit nytimes.com/thedaily. Transcripts of each episode will be made available by the next workday.\n\nFor more information on today’s episode, visit nytimes.com/thedaily. Transcripts of each episode will be made available by the next workday.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/03d8b493-87fc-4bd1-931f-8a8e9b945d8a/episodes/9042a32a-36ba-4d03-b121-571c5be560a4/audio/128/default.mp3?aid=rss_feed&awCollectionId=03d8b493-87fc-4bd1-931f-8a8e9b945d8a&awEpisodeId=9042a32a-36ba-4d03-b121-571c5be560a4&feed=54nAGcIl",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 34336765
+    },
+    {
+      "slug": "the-daily",
+      "number": 3,
+      "title": "Finally, a Vaccine for Cancer",
+      "duration": 1358,
+      "pubDate": "Mon, 16 Nov 2026 10:45:00 +0000",
+      "notes": "An experimental vaccine has been found to prevent recurrence of melanoma. Scientists hope it won’t be the last.\n\nA new, experimental vaccine could become the first of its kind to treat cancer.\n\nNina Agrawal, a health reporter for The New York Times, explains how a century-old idea is finally becoming a reality and where this breakthrough could lead next.\n\nGuest: Nina Agrawal, a health reporter for The New York Times.\n\nBackground reading:\n\nThe first-of-its-kind vaccine has ushered in new hope for cancer patients.\n\nDrug makers reported that the cancer vaccine cut the risk of melanoma recurrence.\n\nPhoto: Brendan Mcdermid/Reuters\n\nFor more information on today’s episode, visit nytimes.com/thedaily. Transcripts of each episode will be made available by the next workday.\n\nFor more information on today’s episode, visit nytimes.com/thedaily. Transcripts of each episode will be made available by the next workday.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/03d8b493-87fc-4bd1-931f-8a8e9b945d8a/episodes/cfacb2c0-58cc-4a37-b24f-4fe14fce220e/audio/128/default.mp3?aid=rss_feed&awCollectionId=03d8b493-87fc-4bd1-931f-8a8e9b945d8a&awEpisodeId=cfacb2c0-58cc-4a37-b24f-4fe14fce220e&feed=54nAGcIl",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 21729863
+    },
+    {
+      "slug": "the-daily",
+      "number": 4,
+      "title": "The Ultraviolent, Wildly Successful, Uniquely American Phenomenon of Grand Theft Auto",
+      "duration": 2548,
+      "pubDate": "Sun, 15 Nov 2026 11:00:00 +0000",
+      "notes": "Thursday, Nov. 19 will see the release of one of the biggest, most anticipated entertainment properties of the year: The video game Grand Theft Auto VI.\n\nThe first Grand Theft Auto game was released in 1997, and immediately stoked controversy with its aggressively satirical portrait of amoral, criminal American culture. Over the past 30 years, the franchise has continued to keep a sharp satirical eye on American society, and its often unpleasant excesses. The sixth installment promises to touch on hot-button issues like the war on drugs, police violence, conspiracy theories and influencer culture. And yet, even though the game has already made one billion dollars in pre-order sales, it might be the last time we ever see one of this scale.\n\nIn this episode of “The Sunday Daily,” Michael Barbaro talks with reporter Zachary Small, who covers video games for The Times, about Grand Theft Auto and how it became one of the biggest video game franchises of all time.\n\nOn Today’s Episode\n\nZachary Small is a New York Times reporter writing about the art world’s relationship to money, politics and technology.\n\nPhoto credit: Jeenah Moon for Reuters.\n\nBackground Reading\n\nThe Grand Ambitions of Grand Theft Auto VI\n\nMiami Is Crime Ridden in ‘Grand Theft Auto.’ Should It Market the Myth?\n\nGet Ready for Grand Theft Auto VI and 11 More Games to Play This Fall\n\nFor more information on today’s episode, visit nytimes.com/thedaily. Transcripts of each episode will be made available by the next workday.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/03d8b493-87fc-4bd1-931f-8a8e9b945d8a/episodes/89222de7-90a4-481a-9e4e-db26e4c06bf4/audio/128/default.mp3?aid=rss_feed&awCollectionId=03d8b493-87fc-4bd1-931f-8a8e9b945d8a&awEpisodeId=89222de7-90a4-481a-9e4e-db26e4c06bf4&feed=54nAGcIl",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 40769939
+    },
+    {
+      "slug": "the-daily",
+      "number": 5,
+      "title": "Olivia Wilde Hit Bottom. Here's How She Bounced Back.",
+      "duration": 3050,
+      "pubDate": "Sat, 14 Nov 2026 11:00:00 +0000",
+      "notes": "The actor-director learned a lot about shame, regret and failure — and then made a hit movie.\n\nThoughts? Email us at theinterview@nytimes.com\n\nWatch our show on YouTube: youtube.com/@TheInterviewPodcast\n\nFor transcripts and more, visit: nytimes.com/theinterview\n\nFor more information on today’s episode, visit nytimes.com/thedaily. Transcripts of each episode will be made available by the next workday.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/03d8b493-87fc-4bd1-931f-8a8e9b945d8a/episodes/61a2969e-d107-405b-9ce5-ab96d16ea7cc/audio/128/default.mp3?aid=rss_feed&awCollectionId=03d8b493-87fc-4bd1-931f-8a8e9b945d8a&awEpisodeId=61a2969e-d107-405b-9ce5-ab96d16ea7cc&feed=54nAGcIl",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 55639893
+    },
+    {
+      "slug": "radio-ambulante",
+      "number": 1,
+      "title": "Puerta por puerta",
+      "duration": 2976,
+      "pubDate": "Tue, 17 Nov 2026 08:00:00 +0000",
+      "notes": "Era junio de 1997 cuando Celia Ramos comenzó a recibir las visitas de las enfermeras. Se presentaban en su casa, en una zona rural de Piura, Perú. Querían convencerla de que se sometiera a una operación para no volver a quedar embarazada: una ligadura de trompas. Y lo mismo hicieron con miles de mujeres, en distintas regiones, en lo que se convirtió en uno de los episodios más oscuros de Perú.\n\nGracias al Centro de Derechos Reproductivos por su ayuda en la producción de este episodio.\n\nFe de erratas: En una versión anterior de esta historia se atribuía erróneamente la primera parte del análisis del caso a la Corte Interamericana de Derechos Humanos, cuando, en realidad, corresponde a la Comisión Interamericana de Derechos Humanos, un órgano distinto dentro del Sistema Interamericano. Se ha actualizado el audio para corregir la información.\n\nEn nuestro sitio web puedes encontrar una transcripción del episodio.\n\nOr you can also check this English translation.\n\n♥ Si valoras nuestro trabajo, únete a Deambulantes, nuestro programa de membresías.\n\n★ Si no quieres perderte ningún episodio, suscríbete a nuestro boletín y recibe todos los martes un correo. Además, los viernes te enviaremos cinco recomendaciones inspiradoras del equipo para el fin de semana.\n\n✓ ¿Nos escuchas para mejorar tu español? Tenemos algo extra para ti: prueba nuestra app Jiveworld, diseñada para estudiantes intermedios de la lengua que quieren aprender con nuestros episodios.\n\nEste podcast es propiedad de Radio Ambulante Studios. Cualquier copia, distribución o adaptación está expresamente prohibida sin previa autorización.\n\nIt was June 1997 when Celia Ramos began receiving visits from the nurses. They would show up at her house, in a rural area of Piura, Peru. They wanted to convince her to undergo an operation so she would not get pregnant again: a tubal ligation. And they did the same with thousands of women, in different regions, in what became one of the darkest episodes in Peru.\n\nThanks to the Center For Reproductive Rights for their help in the production of this episode.\n\nAn earlier version of this story erroneously attributed the case analysis to the Inter-American Court of Human Rights, when in fact it was prepared by the Inter-American Commission on Human Rights, a separate body within the Inter-American System. The audio has been updated to correct this information.\n\nThis podcast is the property of Radio Ambulante Studios. Any copy, distribution, or adaptation is expressly prohibited without prior authorization.\n\nSee omnystudio.com/listener for privacy information.",
+      "enclosureUrl": "https://podtrac.com/pts/redirect.mp3/traffic.omny.fm/d/clips/e73c998e-6e60-432f-8610-ae210140c5b1/b3c9b6e7-72ba-45c4-aff9-b1e7012d213b/d90363a0-4c35-453d-a423-b504005288aa/audio.mp3?utm_source=Podcast&in_playlist=092b66a8-4329-4183-bb12-b1e7012d216f",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 47669474
+    },
+    {
+      "slug": "radio-ambulante",
+      "number": 2,
+      "title": "Su pequeño y propio mar",
+      "duration": 2225,
+      "pubDate": "Tue, 10 Nov 2026 08:00:00 +0000",
+      "notes": "Después de muchos años de tomar clases de natación, a los 17, la chilena Bárbara Hernández descubriría que había muchos lugares donde nadar más allá de la piscina. Y ese camino la llevaría a poner su cuerpo a prueba como nunca antes.\n\nEn nuestro sitio web puedes encontrar una transcripción del episodio.\n\nOr you can also check this English translation.\n\nFe de erratas: en una versión anterior de esta historia mencionamos que Bárbara obtuvo su primer récord Guinness en el Cabo de Hornos al nadar 5 kilómetros y medio en 15 minutos 3 segundos. El dato no era correcto y ya lo corregimos. Logró la milla más rápida en 15 minutos 3 segundos y luego siguió nadando hasta completar la mayor distancia en ese lugar: 5 kilómetros y medio.\n\n♥ Si valoras nuestro trabajo, únete a Deambulantes, nuestro programa de membresías.\n\n★ Si no quieres perderte ningún episodio, suscríbete a nuestro boletín y recibe todos los martes un correo. Además, los viernes te enviaremos cinco recomendaciones inspiradoras del equipo para el fin de semana.\n\n✓ ¿Nos escuchas para mejorar tu español? Tenemos algo extra para ti: prueba nuestra app Jiveworld, diseñada para estudiantes intermedios de la lengua que quieren aprender con nuestros episodios.\n\nEste podcast es propiedad de Radio Ambulante Studios. Cualquier copia, distribución o adaptación está expresamente prohibida sin previa autorización.\n\nAfter many years of taking swimming lessons, at age 17, Chilean Bárbara Hernández would discover that there were many places to swim beyond the pool. And that journey would lead her to push her body to its limits like never before.\n\nIn a previous version of this story, we stated that Bárbara set her first Guinness World Record at Cape Horn by swimming 5.5 kilometers in 15 minutes and 3 seconds. That information was incorrect, and we have corrected it. She set the record for the fastest mile in 15 minutes and 3 seconds and then continued swimming until she completed the longest distance at that location: 5.5 kilometers.\n\nThis podcast is the property of Radio Ambulante Studios. Any copy, distribution, or adaptation is expressly prohibited without prior authorization.\n\nSee omnystudio.com/listener for privacy information.",
+      "enclosureUrl": "https://podtrac.com/pts/redirect.mp3/traffic.omny.fm/d/clips/e73c998e-6e60-432f-8610-ae210140c5b1/b3c9b6e7-72ba-45c4-aff9-b1e7012d213b/f1e97591-3c28-423c-9d8b-b4fa01145233/audio.mp3?utm_source=Podcast&in_playlist=092b66a8-4329-4183-bb12-b1e7012d216f",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 35645389
+    },
+    {
+      "slug": "radio-ambulante",
+      "number": 3,
+      "title": "El palabrero. Parte 2: el plan",
+      "duration": 3087,
+      "pubDate": "Tue, 03 Nov 2026 08:00:00 +0000",
+      "notes": "Esta es la segunda parte de El palabrero. Si no has escuchado el episodio anterior, búscalo primero. En este episodio, Rafa idea un plan audaz, arriesgando todo para liberar a su hermana.\n\nEn nuestro sitio web puedes encontrar una transcripción del episodio.\n\nOr you can also check this English translation.\n\nEsta historia es una coproducción con el periódico digital salvadoreño El Faro.\n\n♥ Si valoras nuestro trabajo, únete a Deambulantes, nuestro programa de membresías.\n\n★ Si no quieres perderte ningún episodio, suscríbete a nuestro boletín y recibe todos los martes un correo. Además, los viernes te enviaremos cinco recomendaciones inspiradoras del equipo para el fin de semana.\n\n✓ ¿Nos escuchas para mejorar tu español? Tenemos algo extra para ti: prueba nuestra app Jiveworld, diseñada para estudiantes intermedios de la lengua que quieren aprender con nuestros episodios.\n\nEste podcast es propiedad de Radio Ambulante Studios. Cualquier copia, distribución o adaptación está expresamente prohibida sin previa autorización.\n\nThis is the second part of El palabrero. If you haven't listened to the previous episode, check it out first. In this episode, Rafa devises a daring plan, risking everything to free his sister.\n\nThis podcast is the property of Radio Ambulante Studios. Any copy, distribution, or adaptation is expressly prohibited without prior authorization.\n\nSee omnystudio.com/listener for privacy information.",
+      "enclosureUrl": "https://podtrac.com/pts/redirect.mp3/traffic.omny.fm/d/clips/e73c998e-6e60-432f-8610-ae210140c5b1/b3c9b6e7-72ba-45c4-aff9-b1e7012d213b/0f37f6a1-d31b-4920-8412-b4f30040275d/audio.mp3?utm_source=Podcast&in_playlist=092b66a8-4329-4183-bb12-b1e7012d216f",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 49447894
+    },
+    {
+      "slug": "radio-ambulante",
+      "number": 4,
+      "title": "El palabrero. Parte 1: agente secreto",
+      "duration": 2971,
+      "pubDate": "Tue, 03 Nov 2026 08:00:00 +0000",
+      "notes": "Rafa, un líder de la poderosa pandilla Barrio 18 en El Salvador, fue uno de los pocos cabecillas que había logrado escapar del país después de la embestida contra ellos que hizo el gobierno de Nayib Bukele con el régimen de excepción. Rafa quería volver a ser nadie, mantener un perfil bajo, pero en 2023 una llamada cambió todos sus planes. La policía necesitaba algo de él, y si no lo obtenía, su familia pagaría por sus crímenes.\n\nEsta es la primera parte de la historia. Puedes escuchar la segunda aquí.\n\nEn nuestro sitio web puedes encontrar una transcripción del episodio.\n\nOr you can also check this English translation.\n\nEsta historia es una coproducción con el periódico digital salvadoreño El Faro.\n\n♥ Si valoras nuestro trabajo, únete a Deambulantes, nuestro programa de membresías.\n\n★ Si no quieres perderte ningún episodio, suscríbete a nuestro boletín y recibe todos los martes un correo. Además, los viernes te enviaremos cinco recomendaciones inspiradoras del equipo para el fin de semana.\n\n✓ ¿Nos escuchas para mejorar tu español? Tenemos algo extra para ti: prueba nuestra app Jiveworld, diseñada para estudiantes intermedios de la lengua que quieren aprender con nuestros episodios.\n\nEste podcast es propiedad de Radio Ambulante Studios. Cualquier copia, distribución o adaptación está expresamente prohibida sin previa autorización.\n\nRafa, a leader of the powerful Barrio 18 gang in El Salvador, was one of the few ringleaders who had managed to flee the country after the crackdown against them by Nayib Bukele’s government under a state of emergency. Rafa wanted to go back to being a nobody, to keep a low profile, but in 2023, a phone call changed all his plans. The police needed something from him, and if they didn’t get it, his family would pay for his crimes.\n\nThis podcast is the property of Radio Ambulante Studios. Any copy, distribution, or adaptation is expressly prohibited without prior authorization.\n\nSee omnystudio.com/listener for privacy information.",
+      "enclosureUrl": "https://podtrac.com/pts/redirect.mp3/traffic.omny.fm/d/clips/e73c998e-6e60-432f-8610-ae210140c5b1/b3c9b6e7-72ba-45c4-aff9-b1e7012d213b/f4df5364-2827-4401-8a31-b4f3003db0dc/audio.mp3?utm_source=Podcast&in_playlist=092b66a8-4329-4183-bb12-b1e7012d216f",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 47586154
+    },
+    {
+      "slug": "radio-ambulante",
+      "number": 5,
+      "title": "Partida de nacimiento",
+      "duration": 2577,
+      "pubDate": "Tue, 27 Oct 2026 07:00:00 +0000",
+      "notes": "Durante toda su vida, Mónica, Ricardo y María han buscado descifrar el misterio detrás de sus orígenes. Querían saber algo sobre las circunstancias de sus nacimientos, quiénes fueron sus padres, por qué no pudieron criarlos, de qué manera los entregaron en adopción. En esta búsqueda, terminaron convirtiéndose en detectives amateurs y descubrieron que estaban conectados de una forma mucho más oscura de lo que imaginaban.\n\nEn nuestro sitio web puedes encontrar una transcripción del episodio.\n\nOr you can also check this English translation.\n\n♥ Si valoras nuestro trabajo, únete a Deambulantes, nuestro programa de membresías.\n\n★ Si no quieres perderte ningún episodio, suscríbete a nuestro boletín y recibe todos los martes un correo. Además, los viernes te enviaremos cinco recomendaciones inspiradoras del equipo para el fin de semana.\n\n✓ ¿Nos escuchas para mejorar tu español? Tenemos algo extra para ti: prueba nuestra app Jiveworld, diseñada para estudiantes intermedios de la lengua que quieren aprender con nuestros episodios.\n\nEste podcast es propiedad de Radio Ambulante Studios. Cualquier copia, distribución o adaptación está expresamente prohibida sin previa autorización.\n\nAll their lives, Mónica, Ricardo, and María have sought to unravel the mystery behind their origins. They wanted to know more about the circumstances of their births, who their parents were, why they couldn’t raise them, and how they were given up for adoption. In this quest, they ended up becoming amateur detectives and discovering that they were connected in a much darker way than they had imagined.\n\nThis podcast is the property of Radio Ambulante Studios. Any copy, distribution, or adaptation is expressly prohibited without prior authorization.\n\nSee omnystudio.com/listener for privacy information.",
+      "enclosureUrl": "https://podtrac.com/pts/redirect.mp3/traffic.omny.fm/d/clips/e73c998e-6e60-432f-8610-ae210140c5b1/b3c9b6e7-72ba-45c4-aff9-b1e7012d213b/73c992c9-0dd5-4a49-9d9b-b4ec0166c7dc/audio.mp3?utm_source=Podcast&in_playlist=092b66a8-4329-4183-bb12-b1e7012d216f",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 41329444
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "number": 1,
+      "title": "Season 3-171 やる気が出ない日は外へ｜読書・会話・芸術からもらう元気",
+      "duration": 1117,
+      "pubDate": "Sun, 15 Nov 2026 05:04:00 GMT",
+      "notes": "Transcription\n\nNoriko's instagram\n\nJapanese Together Community\n\nSummary\n\n今回は、のりこさんが秋のリバプールを散歩しながら、最近の読書や日常の出来事について話します。\n\n今読んでいるのは、韓国人作家の短編小説を英語に翻訳した本です。これまであまり読まなかった宇宙や未来の話ですが、登場人物の悩みや価値観は今の人間と変わらないことに気づき、楽しく読んでいます。\n\nまた、日本人女性が経営するパン屋で買い物をした後、エレベーターで知らない女性に話しかけられました。パンやケーキについての短い会話でしたが、温かい気持ちになりました。この経験から、知らない人に話しかけることへの考え方が少し変わり、自分も機会があれば声をかけてみたいと思うようになりました。\n\n秋は疲れがたまり、やる気が出なくなることもあります。のりこさんは、そんなときに外に出て、新しい場所や芸術に触れることを勧めています。最近見たモダンダンスや、好きな音楽を聴きながら歩くことも、気分転換になっています。\n\nJoin Noriko for an autumn walk in Liverpool as she shares recent reading discoveries, an unexpected conversation, and small ways to refresh her motivation.\n\nShe is enjoying an English translation of a Korean author’s science fiction short stories. Although she previously thought science fiction was not her genre, she finds the characters’ worries, values, and inner conflicts surprisingly familiar. Their journeys also prompt questions about space travel and moving to distant planets.\n\nAfter visiting a Japanese-style bakery with her husband, Noriko had a brief conversation with a stranger in a car park lift. A woman noticed her bakery bag and asked what she had bought. This simple exchange left Noriko feeling happy and helped her reconsider the assumption that talking to strangers might be unwelcome. She reflects on her experiences in Japan, Belfast, and Liverpool, and considers trying a conversation herself when the circumstances feel right.\n\nNoriko also discusses autumn tiredness and changing energy levels. A recent modern dance performance exploring healthcare gave her a fresh perspective, while walking to energetic K-pop helps lift her mood. This Japanese podcast offers listening practice through everyday reflections on books, human connection, art, and finding inspiration close to home.",
+      "enclosureUrl": "https://anchor.fm/s/1380f800/podcast/play/127468260/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-9-14%2F434172384-44100-2-7366f2da48367.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 17881128
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "number": 2,
+      "title": "Season 3-170 スーツケースがない！電車が停まらない！ドイツ一人旅のハプニング with Yasuyo",
+      "duration": 1690,
+      "pubDate": "Wed, 11 Nov 2026 05:00:00 GMT",
+      "notes": "Free Transcription\n\nJoin our community Japanese Together.\n\nKey word : 便乗する / びんじょうする / to join someone else’s plans; to tag along\n\nYasuyoさんが訪れた場所\n\nWorld Cup Trip — USA & Mexico\n\nDallas, USA（ダラス）\n\nMonterrey, Mexico（モントレー）\n\nKimbell Art Museum, Fort Worth, USA（キンベル美術館）\n\nModern Art Museum of Fort Worth, Fort Worth, USA（フォートワース近代美術館）\n\nSolo Trip — Germany\n\nBerlin（ベルリン）\n\nHamburg（ハンブルグ）\n\nElbphilharmonie, Hamburg（エルプフィルハーモニー）\n\nBauhaus Dessau, Dessau（バウハウス・デッサウ校）\n\nJapanese summary\n\n今回は、ゲストのやすよさんと、最近の旅行について話します。\n\nやすよさんは、サッカーが大好きな家族と一緒に、ワールドカップの試合を見に行きました。自分は熱心なサッカーファンではありませんが、家族の旅行に「便乗」したそうです。会場では、メキシコの人たちも日本を応援していて、知らない人と喜びを分かち合いました。テレビでは味わえない臨場感や高揚感が、特に心に残っています。美術館も楽しみ、旅行の計画は娘に任せて、気楽に過ごしました。\n\n一方、ドイツへの一人旅では、困ったことが次々に起きました。空港でスーツケースが入れ替わり、その後は電車のチケットが見つからなくなりました。さらに、間違った電車に乗ってしまい、予定より遠い場所まで行くことになりました。帰りの電車に乗るときも、ホームの案内に困り、最後は走って乗りました。それでも、見たかった建築や美術館を訪れることができ、満足できる旅になりました。\n\nのりこさんも、家族と行ったスペイン旅行や、暑さが大変だったパリ旅行について話します。二人は、誰かに任せる旅と、自分で問題を解決する一人旅には、それぞれ違う面白さがあると振り返ります。\n\nEnglish summary\n\nIn this episode of Japanese with Noriko, returning guest Yasuyo shares two very different travel experiences: a family trip to watch World Cup football and a solo adventure in Germany. After chatting about autumn in New York and the UK, they explore useful Japanese expressions through stories of excitement, unexpected problems and personal discovery.\n\nYasuyo describes joining her football-loving family in Dallas and Monterrey, Mexico. Although she is not a die-hard fan, the atmosphere inside the stadium, the shared celebrations and Mexican supporters cheering for Japan made the experience memorable. Museum visits were another highlight, while letting her daughter handle the planning gave her mind a welcome rest.\n\nHer solo trip to Germany required much more independent problem-solving. A suitcase mix-up, a missing train ticket and boarding the wrong train led to a long, expensive detour. Confusing platform information added another challenge. Despite these difficulties, visiting architecture and art destinations made the journey worthwhile.\n\nNoriko also reflects on family travel in Alicante and the challenges of extreme heat in Paris. This natural Japanese conversation offers listening practice and invites learners to consider the differences between travelling alone and with others, including freedom, responsibility and the memories created when plans go wrong.",
+      "enclosureUrl": "https://anchor.fm/s/1380f800/podcast/play/127386265/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-9-13%2F434051393-44100-2-5e9caeb6d16b5.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 27045719
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "number": 3,
+      "title": "Season 3-169 人間関係は効率化できない？孤独と人とのつながりを考える",
+      "duration": 1207,
+      "pubDate": "Wed, 04 Nov 2026 05:00:00 GMT",
+      "notes": "質問\n\n今、人とつながっているなぁと感じていますか?\n\nオンラインで知り合った人と、 本当の意味で深い関係を作ることはできると思いますか?\n\n一人でいることと、孤独であることはどう違いますか?\n\nSummary\n\n今回のテーマは「孤独」と「人とのつながり」です。今はSNS、ビデオコール、Zoom、オンラインコミュニティなどを使って、世界中の人と簡単につながることができます。しかし、つながる方法が増えても、深い人間関係を感じられず、孤独を感じる人もいます。\n\nコロナの後、仕事、勉強、買い物など、多くのことがオンラインでできるようになりました。生活はとても便利になりましたが、お店の人と話したり、近所の人と挨拶したり、知らない人と自然に話したりする小さな交流は減っているのかもしれません。\n\nのりこさんはリバプールに引っ越してから、ブッククラブや哲学のディスカッションクラブなどに参加し、実際に人と会う交流を意識するようになりました。また、太宰治の『人間失格』を読んで、周りに人がたくさんいても、本当の自分を見せられなければ深い孤独を感じることがあると考えました。\n\n一方で、オンラインでも深い関係を作ることはできると考えています。ただ、同じコミュニティに参加するだけでは十分ではありません。相手に興味を持つこと、話を聞くこと、何度も会うこと、コメントや返信をすることなど、小さな努力を続ける必要があります。\n\n人間関係を作るためには時間がかかり、誤解されたり拒絶されたりする可能性もあります。それでも、自分から連絡したり、誘ったり、相手に歩み寄ったりすることが大切です。人間関係には効率化できない「面倒くささ」があり、その面倒くささこそが、人と深くつながるために必要なのではないか、ということを考えるエピソードです。\n\nIn this episode, Noriko explores loneliness and human connection in a world where technology makes it easier than ever to communicate. Social media, video calls, remote work, and online communities allow us to connect with people across the globe, yet many people still struggle with loneliness and a lack of meaningful relationships.\n\nReflecting on life after COVID, Noriko considers how convenience may have reduced some of the small, spontaneous interactions that once happened naturally in everyday life. She shares her experiences of joining a quiet book club and a philosophy discussion group in Liverpool, where in-person conversations have helped her build a stronger sense of local community.\n\nShe also connects the topic to Osamu Dazai’s No Longer Human, examining how someone can be surrounded by people while still experiencing profound loneliness when they cannot reveal their true self.\n\nFinally, Noriko reflects on both online and offline relationships. Meaningful connection, she argues, requires time, curiosity, commitment, courage, and repeated effort. Human relationships cannot be completely optimized for convenience or efficiency. Sometimes, the inconvenient and difficult work of reaching out is exactly what allows deeper relationships to grow.",
+      "enclosureUrl": "https://anchor.fm/s/1380f800/podcast/play/126863086/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-9-5%2F433380118-44100-2-7c17326a9e093.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 19313892
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "number": 4,
+      "title": "Season 3-168 芸術の秋：Frida Kahlo フリーダ・カーロと私のメキシコの思い出",
+      "duration": 859,
+      "pubDate": "Wed, 28 Oct 2026 05:00:00 GMT",
+      "notes": "質問：あなたにも、何年経っても心に残っていて、もう一度見たい作品や、もう一度訪れたい美術館がありますか？それはあなたの人生や思い出とどのようにつながっていますか？\n\nSummary\n\n今回のテーマは「芸術の秋」です。Norikoさんは夫とロンドンのTate Modernへ行き、大好きなメキシコの画家、Frida Kahloの特別展を見ました。\n\nフリーダは1907年にメキシコシティで生まれました。子供の頃に病気になり、18歳のときには大きな交通事故に遭いました。もともとは医者になりたかったそうですが、事故によってその夢を続けることが難しくなりました。長い治療生活の中で絵を描き始め、自画像を通して体の痛み、孤独、愛、怒り、そして自分のアイデンティティを表現しました。\n\nまた、フリーダの人生では、画家ディエゴ・リベラとの複雑な関係も重要でした。二人は芸術や政治的な考え方を通して惹かれ合いましたが、離婚と再婚も経験しました。フリーダの伝統的で色鮮やかなメキシコの服装も、彼女を象徴するものになっています。\n\nNorikoさんがフリーダを好きになった背景には、20代後半に一人でメキシコを旅行した経験があります。メキシコシティの「青い家」を訪れた思い出は今でも強く残っています。今回の展覧会は、フリーダの作品を見るだけではなく、若い頃の自分やメキシコでの思い出ともう一度つながる機会にもなりました。\n\nIn this episode of Japanese with Noriko, Noriko explores the idea of “autumn for the arts” through the life and work of Mexican painter Frida Kahlo. After visiting a special exhibition at Tate Modern in London with her husband, she reflects on Kahlo’s paintings, personal struggles, identity, and lasting influence.\n\nNoriko introduces key moments from Kahlo’s life, including her childhood illness, the serious traffic accident she experienced at eighteen, and the long periods of treatment that followed. Originally interested in medicine, Kahlo began painting while spending extended periods in bed. Her self-portraits became a powerful way to express physical pain, loneliness, love, anger, and questions about identity. Noriko also discusses Kahlo’s complicated relationship with Mexican muralist Diego Rivera and her iconic traditional Mexican fashion.\n\nThe exhibition also brings back Noriko’s memories of traveling alone through Mexico in her twenties. She recalls the vivid colors of Mexican cities and her visit to Kahlo’s famous Blue House in Mexico City. Through art, travel, and memory, this Japanese podcast episode explores how meaningful places and artworks can stay with us for many years.",
+      "enclosureUrl": "https://anchor.fm/s/1380f800/podcast/play/126806036/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-9-4%2F433311779-44100-2-0b1dd2a52458a.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 13756707
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "number": 5,
+      "title": "Season 3-167 お風呂で読書!? 本好きトーク Book Talk with Yuko 14",
+      "duration": 1285,
+      "pubDate": "Wed, 21 Oct 2026 04:00:00 GMT",
+      "notes": "私のサイトにTranscriptionがあります。勉強につかってみてね。\n\nビートたけし『アナログ』\n\n東畑開人『カウンセリングとは何か』\n\n吉本ばななさん『TUGUMI』\n\n村上春樹『ノルウェーの森』\n\n村上春樹『遠い太鼓』\n\nJapanese summary\n\n今回は、いつもの本の紹介とは少し違い、のりこさんが本好きのYukoさんに読書についていろいろな質問をしました。\n\nYukoさんは、ストーリーのある本や情報が入った新書をよく読みます。本を選ぶときは、最初の1ページや1行目を読んで、そのときのフィーリングを大切にしているそうです。しかし最近は、信頼している人から直接おすすめされた本なら、中身をあまり確認しなくても買うことがあると話しました。人からすすめられた本は、その人と一緒に話したいという気持ちもあり、最後まで読みやすくなるそうです。\n\n読書をするお気に入りの場所は、お風呂と階段です。特にお風呂ではタオルを使いながら本を読みます。また、本にメモをするときにはフリクションペンを使い、コーヒーやお茶を飲みながら読むこともあります。\n\n本は図書館で借りるより書店で買うことが多く、本屋さんに行くと店内を一通り歩くのも好きです。また、友達と本を貸し合う楽しさや、中身を隠して本を渡す方法についても話しました。\n\n買った本をすぐ読むこともあれば、「積読」してしまうこともあります。そして、Yukoさんが読書を好きになったきっかけは、学生時代に教科書で吉本ばななさんの『TUGUMI』の一部を読んだことでした。\n\n最後には、Yukoさんが『ノルウェイの森』に再チャレンジしていること、のりこさんが村上春樹さんの旅行エッセイ『遠い太鼓』を読み終えたことについて話しました。二人にとって、本は一人で読むだけではなく、人とつながり、会話を楽しむきっかけにもなっています。\n\n本好きの人に聞いてみよう\n\n- 普段、どんなジャンルの本をよく読んでいますか。- 本を選ぶとき、何を基準にしていますか。- 最初の1ページや1行目を読んでから、買うかどうか決めていますか。- 本の表紙やデザイン、装丁を見て、内容を知らずに思わず買ったことはありますか。- 「この本はやめておこう」と思うのは、どんなときですか。- 本を読むお気に入りの場所はありますか。- 読書をするときの決まった習慣や、お供にしているものはありますか。- 本は書店で買うことが多いですか。それとも図書館で借りることが多いですか。- 図書館に定期的に通っていますか。- 必ず立ち寄る書店はありますか。- 買った本をすぐに読む派ですか。それとも積読する派ですか。- 読書が好きになったきっかけは何ですか。- 今読んでいる本や最近読んだ本を、一冊紹介してもらえますか。",
+      "enclosureUrl": "https://anchor.fm/s/1380f800/podcast/play/126181805/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-8-27%2F432738654-44100-2-0caeee088fdd5.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 20567352
+    },
+    {
+      "slug": "left-right",
+      "number": 1,
+      "title": "517 关陇集团是如何炼成的：「八柱国」与西魏北周政权的崛起",
+      "duration": 5219,
+      "pubDate": "Tue, 17 Nov 2026 09:51:11 GMT",
+      "notes": "- 导语 -\n\n历史学家陈寅恪曾以「关中本位政策」概括西魏宇文泰的政治布局，并提出这一集团的政治影响延续至隋唐，至今仍有争论。八柱国中，李虎为何没有在《周书》中留下本传？宇文泰一面恢复鲜卑姓氏，一面以《周礼》改造官制，究竟在尝试建立怎样的国家？在与东魏的正面交锋中难占上风，西魏如何趁南梁内乱夺取巴蜀，为后来北周灭齐积累国力？请听本期嘉宾赵帅淇老师带来的精彩分享！\n\n- 本期话题成员 -\n\n程衍樑（微博@GrenadierGuard2）\n\n赵帅淇，中国人民大学历史学博士，清华大学人文学院历史系助理研究员，研究方向为北朝隋唐史。著有《妩媚的忠臣：隋唐变局中的魏徵》，译有《西魏北周政权史研究》等。\n\n- 时间轴 -\n\n08:36 陈寅恪的「关陇集团说」及其争论\n\n11:18 改籍贯、赐国姓：一场宇文泰引导的鲜卑化运动\n\n22:07 孝文帝改革埋下「六镇之乱」祸根\n\n24:46 尔朱荣死后的大分裂与宇文泰登场\n\n29:07 北魏孝武帝之死：宇文泰与高欢合法性半斤八两\n\n34:28 「八柱国」为何只配了「十二大将军」？\n\n37:16 柱国们真的与宇文泰平起平坐吗？\n\n41:49 大清洗到来：宇文护时代的赵贵谋反与独孤信自尽\n\n42:46 李渊祖父李虎在八柱国中的次序问题\n\n52:53 鲜卑化与周礼并行：宇文泰的国家形态缝合式创新\n\n01:01:39 东进还是南进：西魏北周与东魏北齐、萧梁的战与和\n\n01:29:37 同为关陇传人，瓦岗寨李密与晋阳李渊在隋末相似的战略构想\n\n- 支持我们的赞助商是对我们最好的支持 -\n\n《忽左忽右》的卖书业务上线了！这次不仅汇集了节目中深入讨论过的书籍，还有主播个人精选书籍，含少量签名版及稀有原版，完整的书目信息及购买方式，前往微信公众号「忽左忽右leftright」，回复「买书」 即可获取。书目将不定期更新，欢迎常来看看。\n\n- 制作团队 -\n\n声音设计 hotair\n\n节目统筹 禾放\n\n节目运营 小米粒\n\n节目制作 思钊 Yo\n\nlogo设计 杨文骥\n\n- 音乐 -\n\nDanse Macabre - Busy Strings - Kevin MacLeod\n\n- 本节目由JustPod出品 © 2026 上海斛律网络科技有限公司 -\n\n- 互动方式 -\n\n商务合作：ad@justpod.fm\n\n微博：@忽左忽右leftright @播客一下 @JustPod\n\n微信公众号：忽左忽右Leftright / JustPod / 播客一下\n\n小红书：JustPod气氛组 / 忽左忽右\n\nB站：忽左忽右leftright\n\n抖音：忽左忽右",
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/5e4ee557418a84a0466737b7/6afc18f3fe62f8f52c4c8ff6/media.xyzcdn.net/5e4ee557418a84a0466737b7/ltXaoST4PGQhjdIRwAS15VizersJ.m4a",
+      "enclosureType": "audio/mp4",
+      "enclosureBytes": 84414345
+    },
+    {
+      "slug": "left-right",
+      "number": 2,
+      "title": "516 从马克·布洛赫入祀先贤祠看年鉴学派与当代法国社会文化思潮",
+      "duration": 5369,
+      "pubDate": "Fri, 13 Nov 2026 10:39:59 GMT",
+      "notes": "- 导语 -\n\n2026年6月，马克龙将历史学家马克·布洛赫与妻子西蒙娜一同迎入先贤祠。这位年鉴学派创始人之一，先后参加两次世界大战，最终因参与里昂抵抗运动被盖世太保逮捕处决。布洛赫为何主张历史学要研究「复数的人」？逆向法、长时段与总体史，如何改变传统的历史研究？从萨科齐到马克龙，法国总统为何不断强调「抵抗记忆」？请听本期嘉宾徐之凯老师带来的精彩分享！\n\n- 本期话题成员 -\n\n程衍樑（微博@GrenadierGuard2）\n\n徐之凯，上海大学文学院历史学系副教授。主要研究领域：世界大战史、欧洲当代史、法德关系史。\n\n- 时间轴 -\n\n04:41 参与过两次世界大战的历史学家\n\n10:12 被主流史学界排斥，在阿尔萨斯与费弗尔推动「年鉴运动」\n\n17:25 《国王神迹》：英法国王「触摸治病」背后的集体信仰\n\n20:27 由近及远的「逆向法」历史研究\n\n23:23 随敦刻尔克撤退，又选择潜回法国\n\n30:02 《奇怪的战败》：军事失败背后的政治与社会危机\n\n43:45 化名「纳博讷」，成为里昂抵抗组织的领导人\n\n52:17 抵抗运动领袖让·穆兰被捕始末\n\n53:32 从宗教建筑到「英灵政治」：先贤祠的历史与政治象征\n\n55:05 萨科齐以来的法国总统为何都强调「抵抗记忆」？\n\n59:36 布洛赫入祀先贤祠的现实政治争议\n\n01:07:22 年鉴学派到底存不存在「代际传承」之争？\n\n01:19:16 财政改革、能源危机与巴黎暴动：法国政治与马克龙的困局\n\n- 制作团队 -\n\n声音设计 hotair\n\n节目统筹 禾放\n\n节目运营 小米粒\n\n节目制作 思钊 Yo\n\nlogo设计 杨文骥\n\n- 音乐 -\n\nDanse Macabre - Busy Strings - Kevin MacLeod\n\n- 本节目由JustPod出品 © 2026 上海斛律网络科技有限公司 -\n\n- 互动方式 -\n\n商务合作：ad@justpod.fm\n\n微博：@忽左忽右leftright @播客一下 @JustPod\n\n微信公众号：忽左忽右Leftright / JustPod / 播客一下\n\n小红书：JustPod气氛组 / 忽左忽右\n\nB站：忽左忽右leftright\n\n抖音：忽左忽右",
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/5e4ee557418a84a0466737b7/6af6e5b03caef3b52f5543d4/media.xyzcdn.net/5e4ee557418a84a0466737b7/lhu6NYRedC2pU2nxvQMrHxW1R6n_.m4a",
+      "enclosureType": "audio/mp4",
+      "enclosureBytes": 86832214
+    },
+    {
+      "slug": "left-right",
+      "number": 3,
+      "title": "515 从铁幕创作到解冻文艺：漫谈世界电影史中的波兰巨匠安杰伊·瓦伊达",
+      "duration": 4967,
+      "pubDate": "Tue, 10 Nov 2026 09:21:41 GMT",
+      "notes": "- 导语 -\n\n今年恰逢波兰电影大师安杰伊·瓦伊达百年诞辰。他生于波兰第二共和国，十三岁时与奔赴战场的父亲告别，父亲此后在卡廷惨案中遇害。半个多世纪间，在《灰烬与钻石》《大理石人》这些载入影史的作品中，瓦伊达用镜头记录并参与了波兰近现代的伤痛与转型。回顾波兰电影史，战后波兰为何能够涌现出一批重要导演？政治解冻如何改变了波兰电影风格？父亲遇难的经历，怎样影响了瓦伊达对《卡廷》的拍摄？从创作路径与表现风格出发，如何定位世界电影史中的瓦伊达？请听本期嘉宾胤祥老师带来的精彩分享！\n\n- 本期话题成员 -\n\n程衍樑（微博@GrenadierGuard2）\n\n胤祥，电影学者，「保留意见」主播，“电影之人：安杰伊·瓦伊达百年诞辰电影回顾展”策展人\n\n- 时间轴 -\n\n09:17 东欧国家为什么愿意出钱拍艺术片？\n\n13:09 冷战期间被国际电影节看见的「波兰学派」\n\n20:01 罗兹电影学院与战后波兰电影\n\n28:31 从「土改片」到现代电影：斯大林去世后的波兰导演风格转向\n\n34:07 让「反派」成为主角的《灰烬与钻石》\n\n39:18 瓦伊达：父亲死于「卡廷惨案」，梦想成为画家\n\n41:11 《铁人》与波兰八十年代政治风云\n\n44:06 冷战时代波兰制片厂体制下的「电影创作组」\n\n47:52 《丹东》：以法国大革命影射波兰社会\n\n51:49 《大理石人》：追查一个劳模的诞生与消失\n\n01:02:40 「卡廷惨案」始末与瓦伊达筹备一生的电影\n\n01:07:00 前新浪潮时期的古典主义导演：世界电影史上的瓦伊达\n\n01:12:06 瓦伊达关注民族史诗，基耶斯洛夫斯基则是拍「高概念」\n\n01:16:48 兼顾经典与冷门的「瓦伊达百年诞辰回顾展」\n\n- 支持我们的赞助商是对我们最好的支持 -\n\n特别感谢波兰驻华大使馆文化处对本集节目的大力支持。\n\n2026年11月至12月，波兰驻华大使馆与中国电影资料馆将联合举办“安杰伊·瓦伊达百年诞辰电影回顾展”，在北京、苏州两地放映横跨瓦伊达60余年创作生涯的12部经典作品，共同纪念这位波兰电影大师的百年诞辰。\n\n本次影展精选《大理石人》《不求麻醉药》《乐团指挥》《丹东》《科扎克医生》《残影余像》等代表作，其中《不求麻醉药》于2026年首次在中国内地公开放映。影展期间还将邀请戴锦华、王垚、孙孟晋、张小迪等电影学者及影评人参与映后交流与专题讲座，与观众共同探讨瓦伊达的电影创作与艺术成就。具体展映场次及排片信息，可以点击「展映排片」了解。\n\n- 本期图片补充 -\n\n安杰伊·瓦伊达在《福地》拍摄现场，1974年。\n\n《灰烬与钻石》（1958）剧照，安杰伊·瓦伊达执导。\n\n《大理石人》（1977）剧照\n\n《丹东》（1983）剧照\n\n《科扎克医生》（1990）剧照\n\n《残影余像》（2016）剧照\n\n- 制作团队 -\n\n声音设计 hotair\n\n节目统筹 禾放\n\n节目运营 小米粒\n\n节目制作 思钊 Yo\n\nlogo设计 杨文骥\n\n- 音乐 -\n\nDanse Macabre - Busy Strings - Kevin MacLeod\n\n- 本节目由JustPod出品 © 2026 上海斛律网络科技有限公司 -\n\n- 互动方式 -\n\n商务合作：ad@justpod.fm\n\n微博：@忽左忽右leftright @播客一下 @JustPod\n\n微信公众号：忽左忽右Leftright / JustPod / 播客一下\n\n小红书：JustPod气氛组 / 忽左忽右\n\nB站：忽左忽右leftright\n\n抖音：忽左忽右",
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/5e4ee557418a84a0466737b7/6af2df3ab4a4e20202f7ae55/media.xyzcdn.net/5e4ee557418a84a0466737b7/lgrIc01Z9_3p6bVhcQwpxK8bS-nm.m4a",
+      "enclosureType": "audio/mp4",
+      "enclosureBytes": 80331684
+    },
+    {
+      "slug": "left-right",
+      "number": 4,
+      "title": "514 高林漫谈帝国巡游、朝圣之路与汽车旅行的兴起",
+      "duration": 5566,
+      "pubDate": "Fri, 06 Nov 2026 08:58:13 GMT",
+      "notes": "- 导语 -\n\n在中世纪的欧洲道路上，都有哪些人在奔走？既有往返领地的皇帝与国王，也有寻找生计的工匠和四处求学的读书人。对他们而言，远行往往出于统治、谋生或求知的需要，而今天人们熟悉的度假与郊游，则是在此后漫长的社会变迁中逐渐普及的。在大多数人活动范围有限的中世纪，人们为何踏上远途？英国贵族为何将「壮游」视为教育的一部分？铁路的发展与工作时间的调整，如何让郊游逐渐融入城市居民的日常？汽车的普及，又为人们的出行带来了怎样的自由？请听本期嘉宾高林老师带来的精彩分享！\n\n- 本期话题成员 -\n\n程衍樑（微博@GrenadierGuard2）\n\n高林，「青年维也纳」主笔、《皇帝圆舞曲》作者\n\n- 时间轴 -\n\n05:13 为了读书走遍欧洲的「魔法师教皇」\n\n10:36 无保护不纳税，亨利四世为何不断「帝国巡游」？\n\n22:24 朝圣之路上的逃债、私奔与匿名聊天\n\n32:49 人文主义与光荣革命：英国贵族为何会兴起「壮游」？\n\n39:00 拜伦当「旅行博主」，写见闻还得押韵\n\n45:25 廉价旅行团让「去意大利净化心灵」不再遥不可及\n\n49:07 休息时间的调整，让郊游逐渐成为可能\n\n54:22 莫泊桑划船、莫奈画画，巴黎中产阶级的周末消遣\n\n56:17 从《八十天环游地球》看工业革命下的旅行标准化\n\n01:03:51 工人、贵族和艺术家对「整齐划一」的抗拒\n\n01:07:27 汽车的出现：能不能让机器围着人转？\n\n01:13:51 二十世纪初，礼服被内燃机熏黑是一种炫富\n\n01:30:50 汽车豪华体验：从少数人专享的闲暇，到更多人工作之余的享乐\n\n- 支持我们的赞助商是对我们最好的支持 -\n\n本期节目是与腾势N8共同呈现的播客企划「给生活腾一方天地」系列节目之一。感谢腾势N8对本期节目的特别支持。汽车不只是代步工具，也可以让生活拥有更多选择，既能走得更远，也能让路上的时间更值得享受。\n\n腾势N8 科技新境宽五座SUV\n\n纯电版CLTC续航1003km | 插混版CLTC纯电续航435km\n\n搭载第二代刀片电池及闪充技术 | 5分钟充好 9分钟充饱\n\n前排双零重力座椅 | 云眠主驾躺平座椅｜后排146°躺角云栖大沙发\n\n后备厢1046L | 电动前备箱205L\n\n1.1m天际屏 30英寸巨幕屏 | 行业首发AI萌宠桌面 | 搭载迪迪虾 | 标配天神之眼B\n\n易三方Evo | 4.5m转弯半径 | 零百加速2.9s级\n\n- 制作团队 -\n\n声音设计 hotair\n\n节目统筹 禾放\n\n节目运营 小米粒\n\n节目制作 思钊 Yo\n\nlogo设计 杨文骥\n\n- 音乐 -\n\nDanse Macabre - Busy Strings - Kevin MacLeod\n\n- 本节目由JustPod出品 © 2026 上海斛律网络科技有限公司 -\n\n- 互动方式 -\n\n商务合作：ad@justpod.fm\n\n微博：@忽左忽右leftright @播客一下 @JustPod\n\n微信公众号：忽左忽右Leftright / JustPod / 播客一下\n\n小红书：JustPod气氛组 / 忽左忽右\n\nB站：忽左忽右leftright\n\n抖音：忽左忽右",
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/5e4ee557418a84a0466737b7/6aed77635b7c4709bfe1fb28/media.xyzcdn.net/5e4ee557418a84a0466737b7/ljdUNiCAdo0t3eSRmj5aL0OlPBp1.m4a",
+      "enclosureType": "audio/mp4",
+      "enclosureBytes": 90025302
+    },
+    {
+      "slug": "left-right",
+      "number": 5,
+      "title": "513 为永明时代作传：林晓光谈南齐武帝萧赜与南朝文学的爆发",
+      "duration": 5724,
+      "pubDate": "Tue, 03 Nov 2026 09:48:19 GMT",
+      "notes": "- 导语 -\n\n「永明末，盛为文章。」在南朝历史中，南齐似乎并不显眼，但永明文学、永明声律与竟陵八友，却在中国文学史上留下了深远影响，也与齐武帝萧赜治下的「永明之治」形成了文学与政治的互文。从刘宋乱世中的地方官到南齐皇帝，萧赜如何一步步崛起？在皇权与士族之间，萧赜如何通过财政、户籍等改革加强中央政府的力量？贵族社会对礼仪与等级的重视，又怎样影响了中国诗歌格律的形成？请听本期嘉宾林晓光老师带来的精彩分享！\n\n- 本期话题成员 -\n\n程衍樑（微博@GrenadierGuard2）\n\n林晓光，大阪大学人文学研究科教授，著有《永明乐：南齐武帝萧赜传》等\n\n- 时间轴 -\n\n03:56 存在感较弱的南齐却为文学史贡献颇丰\n\n08:10 王融：文学家与谋划宫廷政变的贵公子\n\n13:54 寒门、将种、贫穷与外戚：南齐萧家的四重底色\n\n24:27 刘宋泰始内乱与揭阳山游击：萧赜早年的军功与历险\n\n30:46 布防湓口之后，萧赜如何牵制沈攸之？\n\n38:12 从萧氏兄弟的矛盾说起：东宫搜检与张景真之死\n\n50:09 萧赜治下的「永明之治」\n\n55:46 后元嘉时代的宋齐之变：从国贫民富到国富民贫\n\n01:01:10 应对户籍造假，永明时代继续推行「检籍」政策\n\n01:09:43 永明声律运动：汉语四声理论与近体诗的源流\n\n01:14:23 诗律的规则与贵族社会对礼仪等级的重视\n\n01:21:04 「一面批判齐梁，一面继承南朝」的唐人文学\n\n01:31:03 永明文学最终在南梁王朝开花结果走向极盛\n\n- 支持我们的赞助商是对我们最好的支持 -\n\n《忽左忽右》的卖书业务上线了！这次不仅汇集了节目中深入讨论过的书籍，还有主播个人精选书籍，含少量签名版及稀有原版，完整的书目信息及购买方式，前往微信公众号「忽左忽右leftright」，回复「买书」 即可获取。书目将不定期更新，欢迎常来看看。\n\n- 制作团队 -\n\n声音设计 hotair\n\n节目统筹 禾放\n\n节目运营 小米粒\n\n节目制作 思钊 Yo\n\nlogo设计 杨文骥\n\n- 音乐 -\n\nDanse Macabre - Busy Strings - Kevin MacLeod\n\n- 本节目由JustPod出品 © 2026 上海斛律网络科技有限公司 -\n\n- 互动方式 -\n\n商务合作：ad@justpod.fm\n\n微博：@忽左忽右leftright @播客一下 @JustPod\n\n微信公众号：忽左忽右Leftright / JustPod / 播客一下\n\n小红书：JustPod气氛组 / 忽左忽右\n\nB站：忽左忽右leftright\n\n抖音：忽左忽右",
+      "enclosureUrl": "https://dts-api.xiaoyuzhoufm.com/track/5e4ee557418a84a0466737b7/6ae9a8d3c96c8942ec16aeb7/media.xyzcdn.net/5e4ee557418a84a0466737b7/lvyohbNAkaa_iOP9nIRokKKJMhqS.m4a",
+      "enclosureType": "audio/mp4",
+      "enclosureBytes": 92576009
+    },
+    {
+      "slug": "hard-fork",
+      "number": 1,
+      "title": "Jensen Huang Is Out at Nvidia",
+      "duration": 2362,
+      "pubDate": "Thu, 12 Nov 2026 23:02:01 +0000",
+      "notes": "Jensen Huang is out as chief executive of Nvidia. It’s a stunning fall for one the most powerful figures of the A.I. boom.\n\nTo make sense of it all, we’re joined by two of the reporters who’ve been leading the coverage for The New York Times, Ana Swanson and Ryan Mac, alongside Stephen Witt, the author of the Jensen Huang biography “The Thinking Machine.”\n\nWe’ll discuss how we got here, the significance of a Jensen-less Nvidia and what happens next.\n\nGuests:\n\nAna Swanson, a reporter at The New York Times covering international economics and trade\n\nRyan Mac, a technology reporter at The New York Times covering corporate accountability\n\nStephen Witt, author of “The Thinking Machine: Jensen Huang, Nvidia, and the World’s Most Coveted Microchip”\n\nAdditional Reading:\n\nJensen Huang Resigns From Nvidia\n\nJensen Huang Said to Have Had Relationship With Nvidia Executive Who Reports to Him\n\nTrump Officials Clashed Over Megaspeed, Firm at Heart of Nvidia Affair\n\nCommerce Dept. Chip Inquiry Was Halted After Nvidia Intervention\n\nWe want to hear from you. Email us at hardfork@nytimes.com. Find “Hard Fork” on YouTube and TikTok.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/tracking.swap.fm/track/4jdbjyyrkqk96egqozqb/nyt.simplecastaudio.com/3e43d072-f8a5-430f-bc8e-4c70aafdf3c7/episodes/66354d0c-214e-4370-a0df-240d93e522f8/audio/128/default.mp3?aid=rss_feed&awCollectionId=3e43d072-f8a5-430f-bc8e-4c70aafdf3c7&awEpisodeId=66354d0c-214e-4370-a0df-240d93e522f8&feed=l2i9YnTd",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 37794908
+    },
+    {
+      "slug": "hard-fork",
+      "number": 2,
+      "title": "The Jensen Huang Affair",
+      "duration": 1847,
+      "pubDate": "Tue, 10 Nov 2026 11:00:00 +0000",
+      "notes": "Jensen Huang, the chief executive of Nvidia, has admitted to an affair with a top executive at the data center company Megaspeed — a woman going by the name of Alice Huang who the U.S. government alleges is a Chinese spy.\n\nIn this special midweek episode of “Hard Fork,” we sit down with Stephen Witt, who wrote last year’s Jensen Huang biography “The Thinking Machine.”\n\nWe’ll dig into what you need to know about this spiraling scandal and what it means for A.I. and the global economy.\n\nGuests:\n\nStephen Witt, author of “The Thinking Machine: Jensen Huang, Nvidia, and the World’s Most Coveted Microchip”\n\nAdditional Reading:\n\nA Mystery C.E.O. and Billions in Sales: Is China Buying Banned Nvidia Chips?\n\nNvidia Chief, Jensen Huang, Is Seen as Target of Chinese Spy Plot\n\nNvidia Opens Investigation Into Jensen Huang’s Relationship With Suspected Chinese Spy\n\nRubio Warned Officials About Nvidia Chief’s Entanglement With Chinese Spy\n\nCommerce Dept. Chip Inquiry Was Halted After Nvidia Intervention\n\nWe want to hear from you. Email us at hardfork@nytimes.com. Find “Hard Fork” on YouTube and TikTok.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/tracking.swap.fm/track/4jdbjyyrkqk96egqozqb/nyt.simplecastaudio.com/3e43d072-f8a5-430f-bc8e-4c70aafdf3c7/episodes/60b69225-e908-4027-b756-bd9474f00135/audio/128/default.mp3?aid=rss_feed&awCollectionId=3e43d072-f8a5-430f-bc8e-4c70aafdf3c7&awEpisodeId=60b69225-e908-4027-b756-bd9474f00135&feed=l2i9YnTd",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 29567426
+    },
+    {
+      "slug": "hard-fork",
+      "number": 3,
+      "title": "Why the Tech Right Lost Big This Week",
+      "duration": 4099,
+      "pubDate": "Fri, 6 Nov 2026 11:00:00 +0000",
+      "notes": "After watching the historic election results on Tuesday night, we sat down with Erin Griffith and Ezra Klein to make sense of what they mean for the tech industry. We talk about the role of anti-A.I. and anti-data-center sentiment, backlash against billionaires and whether Silicon Valley is experiencing a vibe shift away from the Tech Right. Finally, Max sits down with the reporter Theodore Schleifer to rank midterm tech megadonors from first to worst. Who got the most bang for their buck?\n\nGuests:\n\nErin Griffith, a technology reporter at The New York Times\n\nEzra Klein, a columnist and host of ‘The Ezra Klein Show’\n\nTheodore Schleifer, a reporter for The New York Times covering billionaires and their impact on the world\n\nAdditional Reading:\n\nTech Billionaires Face Tricky Political Waters After Democratic Sweep\n\nThe Bell Tolls for Trumpism\n\nThe Republican Party’s Financial Advantage Wasn’t Enough in the 2026 Midterm Elections\n\nSpaceX and Tesla Stocks Tumble After Elon Musk-Backed Candidates Lose in Texas\n\nSherrod Brown’s Win in Ohio Is a Rare Loss for Crypto Under Trump\n\nWe want to hear from you. Email us at hardfork@nytimes.com. Find “Hard Fork” on YouTube and TikTok.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/tracking.swap.fm/track/4jdbjyyrkqk96egqozqb/nyt.simplecastaudio.com/3e43d072-f8a5-430f-bc8e-4c70aafdf3c7/episodes/38bdaf0f-4886-47b2-82d6-15ecf803abbf/audio/128/default.mp3?aid=rss_feed&awCollectionId=3e43d072-f8a5-430f-bc8e-4c70aafdf3c7&awEpisodeId=38bdaf0f-4886-47b2-82d6-15ecf803abbf&feed=l2i9YnTd",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 65590493
+    },
+    {
+      "slug": "hard-fork",
+      "number": 4,
+      "title": "Are We in an A.I. Bubble? We're About to Find Out.",
+      "duration": 3261,
+      "pubDate": "Fri, 30 Oct 2026 10:00:00 +0000",
+      "notes": "Monday gave us the release of Anthropic’s S-1 filing, providing the clearest view yet into the business side of the A.I. boom and setting the stage for what could be the largest initial public offering in history. We’ll talk to Erin Griffith, who has been reporting on the story, about what it means for the company, the tech industry and the broader economy. Then we’re joined by the tech reporter Mike Isaac and the writer Jasmine Sun to break down the rest of this week’s tech news, including how the midterm elections next week could affect the future of tech policy, as well as the latest round of cybersecurity worries and Microsoft’s offer of buyouts to 60,000 employees.\n\nGuests:\n\nErin Griffith, a technology reporter at The New York Times\n\nMike Isaac, a technology reporter at The New York Times\n\nJasmine Sun, journalist and writer at jasmi.news\n\nAdditional Reading:\n\nAnthropic Reveals Skyrocketing Growth and Spending Plans in I.P.O. Filing\n\nWhat’s Riding on Anthropic’s Market Debut? Nearly Everything.\n\nAnthropic’s I.P.O. Prospectus Spells Out a Future of Promise and Peril\n\nWhy Anger About Data Centers and Energy Prices May Not Swing Votes\n\nWhat Is PHP? Why Are Government and Business Websites Going Offline?\n\nMicrosoft Offers Buyouts to 60,000 Employees as It Spends on A.I.\n\nWe want to hear from you. Email us at hardfork@nytimes.com. Find “Hard Fork” on YouTube and TikTok.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/tracking.swap.fm/track/4jdbjyyrkqk96egqozqb/nyt.simplecastaudio.com/3e43d072-f8a5-430f-bc8e-4c70aafdf3c7/episodes/232dc2df-a6c6-4c9f-a224-74ca57b10c2c/audio/128/default.mp3?aid=rss_feed&awCollectionId=3e43d072-f8a5-430f-bc8e-4c70aafdf3c7&awEpisodeId=232dc2df-a6c6-4c9f-a224-74ca57b10c2c&feed=l2i9YnTd",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 52176465
+    },
+    {
+      "slug": "hard-fork",
+      "number": 5,
+      "title": "What’s the Deal With Billy Evans? A Spoiler-Filled Guide to ‘You Can See Everything’",
+      "duration": 3550,
+      "pubDate": "Fri, 23 Oct 2026 11:00:00 +0000",
+      "notes": "This week, we focus on Billy Evans, the breakout character of the documentary “You Can See Everything,” and his Theranos-esque new blood-testing start-up. Rob Copeland, a New York Times finance reporter, and Erin Griffith, a tech reporter, join Max Read to discuss what Evans is like when the cameras are off, whether his start-up is a real company and how Silicon Valley is reacting to the film. Then, we break down CoreWeave’s debt, a possible SpaceX-Tesla merger and Joel Kaplan’s Meta exit. Finally, a returning guest: John Carreyrou joins us to answer listener questions about Elizabeth Holmes.\n\nGuests:\n\nErin Griffith, a technology reporter at The New York Times\n\nRob Copeland, a finance reporter at The New York Times\n\nJohn Carreyrou, an investigative reporter at The New York Times and author of “Bad Blood”\n\nAdditional Reading:\n\nElizabeth Holmes’s Partner Has a New Blood-Testing Start-Up\n\nThe Elizabeth Holmes Documentary, Through the Eyes of the Reporter Who Exposed Her\n\nWeak Links Start to Show in A.I. Borrowing\n\nSpaceX and Tesla Explore Merger to Create a De Facto Elon Inc.\n\nMeta’s Global Policy Chief to Leave After 15 Years\n\nWe want to hear from you. Email us at hardfork@nytimes.com. Find “Hard Fork” on YouTube and TikTok.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/tracking.swap.fm/track/4jdbjyyrkqk96egqozqb/nyt.simplecastaudio.com/3e43d072-f8a5-430f-bc8e-4c70aafdf3c7/episodes/72852413-419c-4509-90ec-ab167c241f50/audio/128/default.mp3?aid=rss_feed&awCollectionId=3e43d072-f8a5-430f-bc8e-4c70aafdf3c7&awEpisodeId=72852413-419c-4509-90ec-ab167c241f50&feed=l2i9YnTd",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 56812933
+    },
+    {
+      "slug": "planet-money",
+      "number": 1,
+      "title": "Two ways big bets on data centers might affect you (Two Indicators)",
+      "duration": 1108,
+      "pubDate": "Wed, 18 Nov 2026 08:00:00 +0000",
+      "notes": "Your money might be fueling the AI boom … just as some AI data center bets are starting to look riskier. If you own stocks, that money is likely tied up in giant tech companies like Microsoft and Nvidia. And if your 401(k) has money invested in the US bond fund, you might be lending tech companies the money to build data centers.\n\nToday on the show, two stories from our short daily podcast The Indicator from Planet Money on how risky these data center bets are for investors and the companies making them. And, of course, for all of us.\n\nRead:\n\nOur book: Planet Money: A Guide to the Economic Forces That Shape Your Life\n\nOur weekly longform Planet Money newsletter\n\nOur weekly Indicator round-up newsletter\n\nFollow:\n\nInstagram\n\nTikTok\n\nYouTube\n\nFacebook\n\nThe original Indicator episodes were produced by Corey Bridges and Julia Ritchey. They were engineered by Kwesi Lee and Cena Loffredo, fact checked by Sierra Juarez and edited by Kate Concannon. This episode of Planet Money was produced by Vito Emanuel and Emma Peaslee. Alex Goldmark is our executive producer.\n\nMusic: NPR Source Audio - \"Saunter\" and \"Super-Fi\"\n\nSupport public media with NPR+ and enjoy perks for over 25 podcasts like this one. This show’s perks include bonus episodes and sponsor-free listening. Learn more at plus.npr.org.\n\nSee pcm.adswizz.com for information about our collection and use of personal data for sponsorship and to manage your podcast sponsorship preferences.\n\nNPR Privacy Policy",
+      "enclosureUrl": "https://tracking.swap.fm/track/XvDEoI11TR00olTUO8US/prfx.byspotify.com/e/play.podtrac.com/npr-510289/npr.simplecastaudio.com/43b5acee-463e-4612-95ad-d2596d9dd337/episodes/b19ce1fb-95ca-4339-9f74-93cd72d20032/audio/128/default.mp3?awCollectionId=43b5acee-463e-4612-95ad-d2596d9dd337&awEpisodeId=b19ce1fb-95ca-4339-9f74-93cd72d20032&feed=hvWWWzRv&t=podcast&e=nx-s1-6044772&p=510289&d=1108&size=17739090",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 17739090
+    },
+    {
+      "slug": "planet-money",
+      "number": 2,
+      "title": "Are wildfires making the future uninsurable?",
+      "duration": 2470,
+      "pubDate": "Fri, 13 Nov 2026 23:49:12 +0000",
+      "notes": "Over the past decade, increasingly catastrophic wildfires have wrought unprecedented destruction and upended the basic math of the insurance industry. In some of the riskiest parts of the country, homeowners have seen spiking premiums or lost their coverage altogether.\n\nToday on the show, we travel to the forested foothills of Northern California to see how communities in wildfire-prone areas are trying to conjure the private insurance market back into existence. What actually happens when a megafire comes knocking at your door. And what all this means for the biggest question: In the age of climate change, could the future simply become uninsurable?\n\nFor more about how natural disasters are changing the insurance industry:\n\nInsurance in the time of climate change\n\nInside the insurance industry’s destruction lab\n\nEpisode 797: Flood Money\n\nEpisode 570: The Fine Print\n\nRead:\n\nOur book: Planet Money: A Guide to the Economic Forces That Shape Your Life\n\nOur weekly longform Planet Money newsletter\n\nOur weekly Indicator round-up newsletter\n\nFollow:\n\nInstagram\n\nTikTok\n\nYouTube\n\nFacebook\n\nThis episode was produced by Vito Emanuel and edited by Jess Jiang. It was engineered by Travis Hagan and fact-checked by Sierra Juarez. Alex Goldmark is our executive producer.\n\nMusic: NPR Source Audio - \"FasterFasterBrighter,\" \"Country Butter,\" and \"Chrome and Wax\"\n\nSupport public media with NPR+ and enjoy perks for over 25 podcasts like this one. This show’s perks include bonus episodes and sponsor-free listening. Learn more at plus.npr.org.\n\nSee pcm.adswizz.com for information about our collection and use of personal data for sponsorship and to manage your podcast sponsorship preferences.\n\nNPR Privacy Policy",
+      "enclosureUrl": "https://tracking.swap.fm/track/XvDEoI11TR00olTUO8US/prfx.byspotify.com/e/play.podtrac.com/npr-510289/npr.simplecastaudio.com/43b5acee-463e-4612-95ad-d2596d9dd337/episodes/4bb23a81-c77c-46d0-a3bc-f001ff4783d0/audio/128/default.mp3?awCollectionId=43b5acee-463e-4612-95ad-d2596d9dd337&awEpisodeId=4bb23a81-c77c-46d0-a3bc-f001ff4783d0&feed=hvWWWzRv&t=podcast&e=nx-s1-6040434&p=510289&d=2470&size=39525630",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 39525630
+    },
+    {
+      "slug": "planet-money",
+      "number": 3,
+      "title": "How bodegas led to the Yemeni coffeehouse explosion",
+      "duration": 1441,
+      "pubDate": "Wed, 11 Nov 2026 13:03:29 +0000",
+      "notes": "There is a long-standing tradition of different immigrant groups arriving in the U.S. and specializing in one particular type of business. Think, nail salons run by people from Vietnam or Gujarati Indians owning motels and hotels.\n\nYemenis are another immigrant community that has largely clustered around one industry, in their case, bodegas and small grocery stores. There are thousands of these shops all over the country, despite Yemeni-Americans only making up around one-fortieth of one percent of the U.S. population, according to the last census.\n\nIn the past 9 years, a new business success story has been built on top of that foundation: Yemeni coffee houses.\n\nToday on the show, why some immigrant groups concentrate in a single industry, while others spread out to work in all sorts of jobs. And what it’s like for the next generation to try to expand on their parents’ success.\n\nRead:\n\n- Our book: Planet Money: A Guide to the Economic Forces That Shape Your Life\n\n- Our weekly longform Planet Money newsletter\n\n- Our weekly Indicator round-up newsletter\n\nFollow:\n\n- Instagram\n\n- TikTok\n\n- YouTube\n\n- Facebook\n\nSupport public media with NPR+ and enjoy perks for over 25 podcasts like this one. This show’s perks include bonus episodes and sponsor-free listening. Learn more at plus.npr.org.\n\nToday’s episode of Planet Money was hosted by Amanda Aronczyk and Jeff Guo. It was produced by James Sneed, edited by Keith Romer, and fact-checked by Dania Suleman. Engineering by Cena Loffredo and Travis Hagen. Alex Goldmark is Planet Money’s executive producer.\n\nSee pcm.adswizz.com for information about our collection and use of personal data for sponsorship and to manage your podcast sponsorship preferences.\n\nNPR Privacy Policy",
+      "enclosureUrl": "https://tracking.swap.fm/track/XvDEoI11TR00olTUO8US/prfx.byspotify.com/e/play.podtrac.com/npr-510289/npr.simplecastaudio.com/43b5acee-463e-4612-95ad-d2596d9dd337/episodes/2b2b7650-a4cf-405c-89a0-9c4dc4e2daf7/audio/128/default.mp3?awCollectionId=43b5acee-463e-4612-95ad-d2596d9dd337&awEpisodeId=2b2b7650-a4cf-405c-89a0-9c4dc4e2daf7&feed=hvWWWzRv&t=podcast&e=nx-s1-6036839&p=510289&d=1441&size=23060985",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 23060985
+    },
+    {
+      "slug": "planet-money",
+      "number": 4,
+      "title": "Inside the insurance industry’s destruction lab",
+      "duration": 1943,
+      "pubDate": "Fri, 06 Nov 2026 22:30:00 +0000",
+      "notes": "When you think of someone burning down a house for insurance purposes, you don’t imagine it would ever be the insurance company itself lighting the match. But that’s essentially what’s happening inside a giant destruction laboratory, funded by the insurance industry, in the woods of South Carolina. Scientists and engineers there build household structures — from decks to sheds to single family homes — and subject them to literal trials by fire, hail, and hurricane force wind. It’s all in hopes of determining which building materials and techniques will make communities across the country more resilient to natural disasters and make those natural disasters less expensive for insurance companies.\n\nToday on the show, Planet Money goes inside the destruction lab to see that high octane experimentation in action and to learn about how the insurance industry has been quietly shaping the world around us for over a century.\n\nFor more about how natural disasters are changing the insurance industry:\n\nVideo of IBHS Research Center blowing down a house\n\nInsurance in the time of climate change\n\nAre wildfires making the future uninsurable?\n\nEpisode 797: Flood Money\n\nEpisode 570: The Fine Print\n\nRead:\n\nOur book: Planet Money: A Guide to the Economic Forces That Shape Your Life\n\nOur weekly longform Planet Money newsletter\n\nOur weekly Indicator round-up newsletter\n\nFollow:\n\nInstagram\n\nTikTok\n\nYouTube\n\nFacebook\n\nThis episode was produced by Vito Emanuel and edited by Jess Jiang. It was fact-checked by Sierra Juarez with help from Emma Peaslee. It was engineered by Annlie Huang and Travis Hagan. Alex Goldmark is our executive producer.\n\nMusic: NPR Source Audio — “Lone Star Desert Surfer,” “Highride,” “Rumba De Maghreb”\n\nSupport public media with NPR+ and enjoy perks for over 25 podcasts like this one. This show’s perks include bonus episodes and sponsor-free listening. Learn more at plus.npr.org.\n\nSee pcm.adswizz.com for information about our collection and use of personal data for sponsorship and to manage your podcast sponsorship preferences.\n\nNPR Privacy Policy",
+      "enclosureUrl": "https://tracking.swap.fm/track/XvDEoI11TR00olTUO8US/prfx.byspotify.com/e/play.podtrac.com/npr-510289/npr.simplecastaudio.com/43b5acee-463e-4612-95ad-d2596d9dd337/episodes/1e049bd1-7af5-4822-bae2-28d526ef53fd/audio/128/default.mp3?awCollectionId=43b5acee-463e-4612-95ad-d2596d9dd337&awEpisodeId=1e049bd1-7af5-4822-bae2-28d526ef53fd&feed=hvWWWzRv&t=podcast&e=nx-s1-6032860&p=510289&d=1943&size=31091653",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 31091653
+    },
+    {
+      "slug": "planet-money",
+      "number": 5,
+      "title": "The history of light (classic)",
+      "duration": 1266,
+      "pubDate": "Wed, 04 Nov 2026 08:00:00 +0000",
+      "notes": "How do you measure human progress? Light is the answer.\n\nFor thousands of years, getting light was a huge hassle. You had to make candles from scratch. This is not as romantic as it sounds. You had to get a cow, raise the cow, feed the cow, kill the cow, get the fat out of the cow, cook the fat, dip wicks into the fat. All that — for not very much light. Now, if we want to light a whole room, we just flip a switch.\n\nNobel-winning economist Bill Nordhaus passed away last week. He was known for his work on the economics of climate change, but he also came up with this idea that the history of light explains reveals why the world today is the way it is. It explains why we aren't all subsistence farmers, and why we can afford to have artists and massage therapists and plumbers. (And, yes, people who make podcasts about the history of light.) The history of light is the history of economic growth — of things getting faster, cheaper, and more efficient. It shows us the pie can get bigger, sometimes, there can be a type of progress where everyone is better off.\n\nOn today's show, one of our all time favorites: How we got from dim little candles made out of cow fat, to as much light as we want at the flick of a switch, and how that is a measure of what economic progress means.\n\n(Note: This episode originally ran in 2014.)\n\nRead:\n\nOur book: Planet Money: A Guide to the Economic Forces That Shape Your Life\n\nOur weekly longform Planet Money newsletter\n\nOur weekly Indicator round-up newsletter\n\nFollow:\n\nInstagram\n\nTikTok\n\nYouTube\n\nFacebook\n\nSupport public media with NPR+ and enjoy perks for over 25 podcasts like this one. This show’s perks include bonus episodes and sponsor-free listening. Learn more at plus.npr.org.\n\nToday's show was hosted by Jacob Goldstein and David Kestenbaum. It was originally produced by Caitlin Kenney and Damiano Marchetti. Today's rerun was produced by Sam Yellowhorse Kesler. Alex Goldmark is Planet Money's executive producer.\n\nSee pcm.adswizz.com for information about our collection and use of personal data for sponsorship and to manage your podcast sponsorship preferences.\n\nNPR Privacy Policy",
+      "enclosureUrl": "https://tracking.swap.fm/track/XvDEoI11TR00olTUO8US/prfx.byspotify.com/e/play.podtrac.com/npr-510289/npr.simplecastaudio.com/43b5acee-463e-4612-95ad-d2596d9dd337/episodes/df5d68e4-3e3f-4c21-81f1-66dfd11e3193/audio/128/default.mp3?awCollectionId=43b5acee-463e-4612-95ad-d2596d9dd337&awEpisodeId=df5d68e4-3e3f-4c21-81f1-66dfd11e3193&feed=hvWWWzRv&t=podcast&e=nx-s1-6027986&p=510289&d=1266&size=20264002",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 20264002
+    },
+    {
+      "slug": "ted-talks-daily",
+      "number": 1,
+      "title": "The “godfather of AI” on the risks that worry him most | Geoffrey Hinton",
+      "duration": 1759,
+      "pubDate": "Wed, 18 Nov 2026 21:46:01 GMT",
+      "notes": "Geoffrey Hinton helped create the neural networks behind today’s AI, won a Nobel Prize for it — and has spent the years since warning about where it’s headed. In conversation with journalist Nicholas Thompson, Hinton shares the AI risks he’s worried about, sketches out a best-case future for the technology and explores whether or not chatbots have subjective experience. Plus: hear his thoughts on the one rule we must give superintelligent AI.\n\nHosted on Acast. See acast.com/privacy for more information.",
+      "enclosureUrl": "https://sphinx.acast.com/p/open/s/67587e77c705e441797aff96/e/6afc7f5d22c8b5ded545df81/media.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 28150386
+    },
+    {
+      "slug": "ted-talks-daily",
+      "number": 2,
+      "title": "My search for proof aliens exist | Avi Loeb (re-release)",
+      "duration": 1293,
+      "pubDate": "Tue, 17 Nov 2026 15:00:00 GMT",
+      "notes": "Why have we not yet found proof of alien life? According to astrophysicist Avi Loeb, we simply haven't dedicated the proper resources. Diving into unidentified phenomena such as the Oumuamua asteroid, he explores his scientific search for extraterrestrial technology, envisioning a future where a higher interstellar intelligence helps us improve life here on Earth.\n\nHosted on Acast. See acast.com/privacy for more information.",
+      "enclosureUrl": "https://sphinx.acast.com/p/open/s/67587e77c705e441797aff96/e/6afb5767f1fb73f380bc6633/media.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 20696084
+    },
+    {
+      "slug": "ted-talks-daily",
+      "number": 3,
+      "title": "What you hear when you stop talking | John Lloyd",
+      "duration": 765,
+      "pubDate": "Mon, 16 Nov 2026 15:47:13 GMT",
+      "notes": "Scientists have estimated how many colors we can see and how many scents we can smell … but director John Lloyd can’t find anyone who has counted how many sounds we can hear. Drawing on a legendary career in radio, film and TV, he makes a funny case for paying closer attention to sound — and for listening more than you talk. (Plus: find out why almost every frog noise you hear in movies sounds the same.)\n\nHosted on Acast. See acast.com/privacy for more information.",
+      "enclosureUrl": "https://sphinx.acast.com/p/open/s/67587e77c705e441797aff96/e/6af7358772c084b0516a29b5/media.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 12253309
+    },
+    {
+      "slug": "ted-talks-daily",
+      "number": 4,
+      "title": "Sunday Pick: How to challenge your self-limiting beliefs with Shawn Achor | from ReThinking with Adam Grant",
+      "duration": 2447,
+      "pubDate": "Sun, 15 Nov 2026 07:00:00 GMT",
+      "notes": "Your beliefs about yourself and the world have a big impact on your mental health, relationships, and success. As a positive psychology evangelist, Shawn Achor has spent his career studying how to challenge and change the core beliefs that might be holding you back, and shares his insights in his new book, The Power of Beliefs. In this episode, Shawn and Adam dive into the surprising connections between happiness and success, and discuss the science of optimism and pessimism. Shawn also describes seven key important beliefs that underlie happiness, breaks down strategies for shifting beliefs, and asks Adam to weigh in on how to convince leaders to care about the well-being of their people.\n\nLearn more about ReThinking at\n\nHosted on Acast. See acast.com/privacy for more information.",
+      "enclosureUrl": "https://sphinx.acast.com/p/open/s/67587e77c705e441797aff96/e/6aee1ada1ad1a30ae5d0bb39/media.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 39164865
+    },
+    {
+      "slug": "ted-talks-daily",
+      "number": 5,
+      "title": "The digital detectives preserving the truth of war | Hadi Al Khatib",
+      "duration": 2548,
+      "pubDate": "Sat, 14 Nov 2026 07:00:00 GMT",
+      "notes": "A lot of today’s war footage is shot on phones and posted to platforms that were never meant to permanently store it. Digital archivist and TED Fellow Hadi Al Khatib founded Mnemonic to save these photos and videos before they vanish. Learn how his team is turning people’s social media posts into evidence of crimes that holds up in court — and building an archive that ensures the truth outlasts the war. (Note: this film contains disturbing footage of war.)\n\nHosted on Acast. See acast.com/privacy for more information.",
+      "enclosureUrl": "https://sphinx.acast.com/p/open/s/67587e77c705e441797aff96/e/6af5f8aa43d8776fbbb21b36/media.mp3",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 40779859
+    },
+    {
+      "slug": "radiolab",
+      "number": 1,
+      "title": "There and Back Again",
+      "duration": 2729,
+      "pubDate": "Fri, 13 Nov 2026 15:00:00 +0000",
+      "notes": "Today we revisit an episode first aired in 2019. In it we ask a question: When an animal disappears in the winter, where does it go? Oddly enough, this question completely stumped European scientists for thousands of years. And even today, the more we learn about the comings and goings of the animals, the deeper the mystery seems to get. We visit a Bavarian farm with an 11 year old, follow warblers and wildebeests around the world, and get a totally new kind of view of the pulsing flow of animals across the globe.\n\nLATERAL CUTS:\n\nHave kids? Or, are you just one at heart? Do any of those kids want to know more about Monarchs? Check out a whole episode from our sister program, Terrestrials.\n\nThe Hideout: A Monarch Butterfly Mystery (\n\nEPISODE CREDITS:\n\nReported by - Robert Krulwich and Jackson Roach\n\nProduced by - Pat Walters\n\nOriginal music and sound design contributed by - Jeremy Bloom\n\nSign up for our newsletter!! It includes short essays, recommendations, and details about other ways to interact with the show. Signup (\n\nRadiolab is supported by listeners like you. Support Radiolab by becoming a member of The Lab ( today.\n\nFollow our show on Instagram, Twitter and Facebook @radiolab, and share your thoughts with us by emailing radiolab@wnyc.org.\n\nLeadership support for Radiolab’s science programming is provided by the Simons Foundation and the John Templeton Foundation. Foundational support for Radiolab was provided by the Alfred P. Sloan Foundation.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://pscrb.fm/rss/p/mgln.ai/e/14/prfx.byspotify.com/e/dts.podtrac.com/pts/redirect.mp3/waaa.wnyc.org/758af4c0-a2c3-47ec-a2d8-05f41bfbde51/episodes/e7ef9075-6858-4597-9cbf-e2cce4bb4248/audio/128/default.mp3?aid=rss_feed&awCollectionId=758af4c0-a2c3-47ec-a2d8-05f41bfbde51&awEpisodeId=e7ef9075-6858-4597-9cbf-e2cce4bb4248&feed=EmVW7VGp",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 43666047
+    },
+    {
+      "slug": "radiolab",
+      "number": 2,
+      "title": "More Perfect: Cruel and Unusual",
+      "duration": 3346,
+      "pubDate": "Fri, 6 Nov 2026 15:00:00 +0000",
+      "notes": "This week, we’re replaying the inaugural episode of More Perfect (first aired in 2016) we explore three little words embedded in the 8th Amendment of the U.S. Constitution: “cruel and unusual.” America has long wrestled with this concept in the context of our strongest punishment, the death penalty. A majority of “we the people” (61 percent, to be exact) are in favor of having it, but inside the Supreme Court, opinions have evolved over time in surprising ways.\n\nAnd outside of the court, the debate drove one woman in the UK to take on the U.S. death penalty system from Europe. It also caused states to resuscitate old methods used for executing prisoners on death row. And perhaps more than anything, it forced a conversation on what constitutes cruel and unusual punishment.\n\nIn this episode, we also include a new conversation with Harvard law professor Carol Steiker and former death-row inmate Damien Nichols about the moment the death penalty finds itself in now. After the botched execution of Christa Pike, and with the government considering livestreaming a firing squad execution, how do we understand the death penalty in 2026?\n\nSpecial thanks to Claire Phillips, Nina Perry, Stephanie Jenkins, Ralph Dellapiana, Byrd Pinkerton, Elisabeth Semel, Christina Spaulding, Carol Steiker, Damien Nichols, and The Marshall Project\n\nEPISODE CREDITS:\n\nUpdate Reported by - Karen Duffin\n\nUpdate Produced by - Mona Madgavkar, and Matt Kielty\n\nwith mixing help from - Jeremy Bloom and Arianne Wack\n\nFact-checking by - Hilary Elkins\n\nSignup for our newsletter!! It includes short essays, recommendations, and details about other ways to interact with the show. Sign up (\n\nRadiolab is supported by listeners like you. Support Radiolab by becoming a member of The Lab ( today.\n\nFollow our show on Instagram, Twitter and Facebook @radiolab, and share your thoughts with us by emailing radiolab@wnyc.org.\n\nLeadership support for Radiolab’s science programming is provided by the Simons Foundation and the John Templeton Foundation. Foundational support for Radiolab was provided by the Alfred P. Sloan Foundation.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://pscrb.fm/rss/p/mgln.ai/e/14/prfx.byspotify.com/e/dts.podtrac.com/pts/redirect.mp3/waaa.wnyc.org/758af4c0-a2c3-47ec-a2d8-05f41bfbde51/episodes/8f21b76f-b0cd-40f1-ad6b-641804b43a5e/audio/128/default.mp3?aid=rss_feed&awCollectionId=758af4c0-a2c3-47ec-a2d8-05f41bfbde51&awEpisodeId=8f21b76f-b0cd-40f1-ad6b-641804b43a5e&feed=EmVW7VGp",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 53538240
+    },
+    {
+      "slug": "radiolab",
+      "number": 3,
+      "title": "The Buried Bodies Case",
+      "duration": 2968,
+      "pubDate": "Fri, 30 Oct 2026 14:00:00 +0000",
+      "notes": "In 1973, a massive manhunt in New York's Adirondack Mountains ended when police captured a man named Robert Garrow. And that’s when this story really gets started.\n\nIn this episode, that we first released in 2016, we consider a string of barbaric crimes by a hated man, and the attorney who, when called to defend him, also wound up defending a core principle of our legal system. When Frank Armani learned his client’s most gruesome secrets, he made a morally startling decision that stunned the world and goes to the heart of what it means to be a defense attorney - how far should lawyers go to provide the best defense to the worst people?\n\nNOTE: This episode contains graphic descriptions of sexual assault and violence, listener discretion is advised.\n\nSpecial thanks to Tom Alibrandi, author of Privileged Information, with Frank Armani, Laurence Gooley, author of Terror in the Adirondacks: The True Story of Serial Killer Robert F. Garrow, Charl Bader and the students in her Criminal Defense Clinic at Fordham University, Leslie Levin and the students in her Legal Profession class at The University of Connecticut School of Law, Clark D. Cunningham at Georgia State University College of Law, Debra Armani, Mary Armani, Lohr McKinstry, Tom Scozzafava, Stephanie Jenkins, Brian Farrell, Jennifer Brumback and Nick Capodice.\n\nEPISODE CREDITS:\n\nReported by - Brenna Farrell\n\nwith help from - Simon Adler\n\nProduced by - Matt Kielty and Brenna Farrell\n\nEPISODE CITATIONS:\n\nSworn to Silence: The Truth Behind Robert Garrow and the Missing Bodies' Case, by Jim Tracey.\n\nSign up for our newsletter!! It includes short essays, recommendations, and details about other ways to interact with the show. Signup (\n\nRadiolab is supported by listeners like you. Support Radiolab by becoming a member of The Lab ( today.\n\nFollow our show on Instagram, Twitter and Facebook @radiolab, and share your thoughts with us by emailing radiolab@wnyc.org.\n\nLeadership support for Radiolab’s science programming is provided by the Simons Foundation and the John Templeton Foundation. Foundational support for Radiolab was provided by the Alfred P. Sloan Foundation.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://pscrb.fm/rss/p/mgln.ai/e/14/prfx.byspotify.com/e/dts.podtrac.com/pts/redirect.mp3/waaa.wnyc.org/758af4c0-a2c3-47ec-a2d8-05f41bfbde51/episodes/77855718-777e-4118-9227-6b1081ac1ecb/audio/128/default.mp3?aid=rss_feed&awCollectionId=758af4c0-a2c3-47ec-a2d8-05f41bfbde51&awEpisodeId=77855718-777e-4118-9227-6b1081ac1ecb&feed=EmVW7VGp",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 47497919
+    },
+    {
+      "slug": "radiolab",
+      "number": 4,
+      "title": "Octomom",
+      "duration": 2057,
+      "pubDate": "Fri, 23 Oct 2026 14:00:00 +0000",
+      "notes": "First aired back in 2020, this episode follows the story of an octopus living one mile under the ocean as she performs a heroic act of heart and determination.\n\nIn 2007, Bruce Robison’s robot submarine stumbled across an octopus settling in to brood her eggs. It seemed like a small moment, but as he went back to visit her month after month, what began as a simple act of motherhood became a heroic feat that has never been equaled by any known species on Earth.\n\nThis episode was reported and produced by Annie McEwen.\n\nIf you need more ocean in your life, check out the incredible Monterey Bay Aquarium live cams (especially the jellies!):\n\nHere’s a pic of Octomom sitting on her eggs (© 2007 MBARI), Nov. 1, 2007.\n\nIf you need more ocean in your life, check out the incredible Monterey Bay Aquarium live cams (especially the jellies!): Live Cams of Monterey Bay Aquarium!!\n\nSignup for our newsletter!! It includes short essays, recommendations, and details about other ways to interact with the show. Sign up (\n\nRadiolab is supported by listeners like you. Support Radiolab by becoming a member of The Lab ( today.\n\nFollow our show on Instagram, Twitter and Facebook @radiolab, and share your thoughts with us by emailing radiolab@wnyc.org.\n\nLeadership support for Radiolab’s science programming is provided by the Simons Foundation and the John Templeton Foundation. Foundational support for Radiolab was provided by the Alfred P. Sloan Foundation.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://pscrb.fm/rss/p/mgln.ai/e/14/prfx.byspotify.com/e/dts.podtrac.com/pts/redirect.mp3/waaa.wnyc.org/758af4c0-a2c3-47ec-a2d8-05f41bfbde51/episodes/55f11499-9702-4a86-a534-fb5724d5707c/audio/128/default.mp3?aid=rss_feed&awCollectionId=758af4c0-a2c3-47ec-a2d8-05f41bfbde51&awEpisodeId=55f11499-9702-4a86-a534-fb5724d5707c&feed=EmVW7VGp",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 32918620
+    },
+    {
+      "slug": "radiolab",
+      "number": 5,
+      "title": "The Smell of Hell",
+      "duration": 2589,
+      "pubDate": "Fri, 16 Oct 2026 14:00:00 +0000",
+      "notes": "Throughout human history, there’s been one element we’ve always associated with death. Just the smell of it is an alarm bell that says, “something here is dangerous.” But what if our noses have been wrong all along?\n\nIn this episode of our series Viscera: Gripping Tales of the Human Body, we take you to a live performance in Boston where we reveal how this much-maligned element might be better understood as the smell of life.\n\nLATERAL CUTS:\n\nWant to see a Viscera show? Join us for Radiolab Presents: Viscera, live in New York City on Thursday, November 5th. All about the sometimes freaky world of organ transplants, with special guest Mary Roach discussing her upcoming book, Replaceable You: Adventures in Human Anatomy. Get your tickets at wnyc.org/events.\n\nEPISODE CREDITS:\n\nReported by - Avir Mitra and Matt Kielty\n\nwith help from - Mona Madgavkar\n\nProduced by - Mona Madgavkar and Matt Kielty\n\nwith mixing help from - Jeremy Bloom\n\nFact-checking by - Rachel Gross\n\nand Edited by - Pat Walters\n\nLiveshow production support - Natalia Ramirez, Sarah Sandbach, Maia Appleby Melamed, and Jeremy Bloom.\n\nEPISODE CITATIONS:\n\nVideos -\n\nWatch the video of Radiolab Presents: Viscera live at WBUR CitySpace (\n\nArticles -\n\nA possible chemical explanation for the events associated with the death of Gloria Ramirez at Riverside General Hospital ( the paper explaining Livermore Lab’s hypothesis.\n\nBooks -\n\nThe Great Secret ( by Jennet Conant about the birth of chemotherapy in the laboratory of war.\n\nSignup for our newsletter!! It includes short essays, recommendations, and details about other ways to interact with the show. Sign up (\n\nRadiolab is supported by listeners like you. Support Radiolab by becoming a member of The Lab ( today.\n\nFollow our show on Instagram, Twitter and Facebook @radiolab, and share your thoughts with us by emailing radiolab@wnyc.org.\n\nLeadership support for Radiolab’s science programming is provided by the Simons Foundation and the John Templeton Foundation. Foundational support for Radiolab was provided by the Alfred P. Sloan Foundation.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://pscrb.fm/rss/p/mgln.ai/e/14/prfx.byspotify.com/e/dts.podtrac.com/pts/redirect.mp3/waaa.wnyc.org/758af4c0-a2c3-47ec-a2d8-05f41bfbde51/episodes/d77514be-6029-4291-bead-0dcecca30a7c/audio/128/default.mp3?aid=rss_feed&awCollectionId=758af4c0-a2c3-47ec-a2d8-05f41bfbde51&awEpisodeId=d77514be-6029-4291-bead-0dcecca30a7c&feed=EmVW7VGp",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 41434141
+    },
+    {
+      "slug": "ezra-klein",
+      "number": 1,
+      "title": "The Winning Democrat Who Wants to Break Up Political Parties",
+      "duration": 3881,
+      "pubDate": "Tue, 17 Nov 2026 10:00:00 +0000",
+      "notes": "Rob Sand will soon be Iowa’s first Democratic governor in more than 15 years. And he won the race in a walk – trouncing his opponent by 11 points, a 24-point swing from how Kamala Harris performed in the state in 2024. And he ran several points ahead of Iowa’s Democratic senator-elect, Josh Turek.\n\nSand achieved this political feat by running against the two-party system itself. He campaigned relentlessly on the idea that our electoral system is broken, that the two-party “duopoly” breeds corruption and has corroded our politics. So I wanted to have Sand on the show to dig deeper into his critique of our political system, and ask him how he’ll translate his winning campaign message into actual governance.\n\nMentioned:\n\n“Stealth Democracy” by John R. Hibbing and Elizabeth Theiss-Morse\n\n“The Politics Industry” by Katherine Gehl and Michael E. Porter\n\nBook Recommendations:\n\n“Tinkers” by Paul Harding (recommended by Christine Lauridsen Sand)\n\n“Team of Rivals” by Doris Kearns Goodwin (recommended by Christine Lauridsen Sand)\n\nThe Four Gospels\n\nThoughts? Guest suggestions? Email us at ezrakleinshow@nytimes.com.\n\nYou can find the transcript and more episodes of “The Ezra Klein Show” at nytimes.com/ezra-klein-podcast. Book recommendations from all our guests are listed at\n\nThis episode of “The Ezra Klein Show” was produced by Annie Galvin. Fact-checking by Kim Freda with Michelle Harris. Our senior engineer is Jeff Geld, with additional mixing by Aman Sahota and Gautam Srikishan. Our recording engineer is Aman Sahota. Cinematography by Kyle I. Kelley. Video editing by Julian Hackney, Dani Dillon, Kristen Williamson and Steph Khoury. Our executive producer is Claire Gordon. The show’s production team also includes Marie Cascione, Rollin Hu, Kristin Lin, Emma Kehlbeck, Jack McCordick, Marina King and Jan Kobal. Original music by Pat McCusker. Audience strategy by Shannon Busta. The director of New York Times Opinion Shows is Annie-Rose Strasser. Transcript editing by Filipa Pajevic and Marlaine Glicksman.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/3026b665-46df-4d18-98e9-d1ce16bbb1df/episodes/ed5c691c-6843-47fc-a41e-932593163be6/audio/128/default.mp3?aid=rss_feed&awCollectionId=3026b665-46df-4d18-98e9-d1ce16bbb1df&awEpisodeId=ed5c691c-6843-47fc-a41e-932593163be6&feed=82FI35Px",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 62101364
+    },
+    {
+      "slug": "ezra-klein",
+      "number": 2,
+      "title": "Hasan Piker Has Joined the Party",
+      "duration": 5186,
+      "pubDate": "Fri, 13 Nov 2026 10:00:00 +0000",
+      "notes": "“I’m pragmatic,” Hasan Piker says, when it comes to how Democrats wield power.\n\nOur last episode of the show featured a more centrist perspective on what Democrats should learn from their midterm triumph and what they should do when they take control of Congress next year. Today, we wanted to pair that with a perspective from the left.\n\nPiker might be the most prominent leftist commentator in politics right now. The popular Twitch streamer catapulted to main character status in the recent election cycle, as he took on a more hands-on role stumping for candidates like Abdul El-Sayed in Michigan, and the right tried to turn him into a boogeyman in response.\n\nSo I want to talk to Piker about the election and how the Democratic Party should act going forward — especially when it comes to health reform, where I see a synthesis coming into view, and Israel, the issue where Piker is the most personally controversial, and where the Democratic coalition is at the greatest risk of tearing apart.\n\nThis episode contains strong language.\n\nBook Recommendations:\n\n“Mao” by Philip Short\n\n“Blackshirts and Reds” by Michael Parenti\n\n“American Socialist” by Shawn Gude\n\nThoughts? Guest suggestions? Email us at ezrakleinshow@nytimes.com.\n\nYou can find the transcript and more episodes of “The Ezra Klein Show” at nytimes.com/ezra-klein-podcast. Book recommendations from all our guests are listed at\n\nThis episode of “The Ezra Klein Show” was produced by Jack McCordick. Fact-checking by Michelle Harris, with Julie Beer and Kelsey Lannin. Our senior engineer is Jeff Geld, with additional mixing by Isaac Jones and Aman Sahota. Our recording engineer is Aman Sahota. Cinematography by Kyle I. Kelley. Video editing by Brandon Belk-Yee, Britt Shacham Bernstein, Dani Dillon, Arpita Aneja and Steph Khoury. Our executive producer is Claire Gordon. The show’s production team also includes Marie Cascione, Annie Galvin, Rollin Hu, Kristin Lin, Emma Kehlbeck, Marina King and Jan Kobal. Original music by Pat McCusker. Audience strategy by Shannon Busta. The director of New York Times Opinion Shows is Annie-Rose Strasser.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/3026b665-46df-4d18-98e9-d1ce16bbb1df/episodes/063cfbaa-9228-4fb5-a876-6dac25e308bc/audio/128/default.mp3?aid=rss_feed&awCollectionId=3026b665-46df-4d18-98e9-d1ce16bbb1df&awEpisodeId=063cfbaa-9228-4fb5-a876-6dac25e308bc&feed=82FI35Px",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 82990562
+    },
+    {
+      "slug": "ezra-klein",
+      "number": 3,
+      "title": "The Path to a Democratic Supermajority",
+      "duration": 3273,
+      "pubDate": "Tue, 10 Nov 2026 10:00:00 +0000",
+      "notes": "Democrats are on track to have more power in the next Congress than they’ve had since 2009. How can they navigate the divides in a party that now stretches from Abdul El-Sayed in Michigan to Adam Hamilton in Kansas? How do they prevent all their new voters in this election from flipping back in the next one? Can they turn this victory into a springboard to an even bigger and more durable Democratic majority in 2028 and beyond?\n\nWe will have two episodes that try to answer these questions from different angles, one from the center of the party and one from the left. First, representing the more center view, we have Adam Jentleson, the founder and president of the Searchlight Institute, a Washington think tank. Jentleson is a veteran of the Senate; he served as deputy chief of staff to the former Senate majority leader Harry Reid and chief of staff to Senator John Fetterman. He’s also the author of two books, “Kill Switch: The Rise of the Modern Senate and the Crippling of American Democracy,” and “Supermajority: How Democrats Can Build Lasting Power,” which came out in September.\n\nNote: An earlier version of this episode misstated the religious denomination of Adam Hamilton. He is a United Methodist minister, not an Episcopal minister.\n\nMentioned:\n\nSearchlight 2026 Entrance Poll\n\nBlue Dog and D.S.A. Chart\n\nBook Recommendations:\n\n“Bernie for Burlington” by Dan Chiasson\n\n“The Hollow Parties” by Daniel Schlozman and Sam Rosenfeld\n\n“The Gay Place” by Billy Lee Brammer\n\nThoughts? Guest suggestions? Email us at ezrakleinshow@nytimes.com.\n\nYou can find a transcript and more episodes of “The Ezra Klein Show” at nytimes.com/ezra-klein-podcast. Book recommendations from all our guests are listed at\n\nThis episode of “The Ezra Klein Show” was produced by Rollin Hu. Fact-checking by Kim Freda, with Kate Sinclair. Our senior engineer is Jeff Geld, with additional mixing by Aman Sahota and Gautam Srikishan. Our recording engineer is Aman Sahota. Cinematography by Kyle I. Kelley. Video editing by Steph Khoury, Dani Dillon, Arpita Aneja and Kristen Williamson. Our executive producer is Claire Gordon. The show’s production team also includes Marie Cascione, Annie Galvin, Kristin Lin, Emma Kehlbeck, Jack McCordick, Marina King and Jan Kobal. Original music by Pat McCusker. Audience strategy by Shannon Busta. The director of New York Times Opinion Shows is Annie-Rose Strasser.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/3026b665-46df-4d18-98e9-d1ce16bbb1df/episodes/86058bb0-f2b9-4aaa-bbb3-2dc556c6d206/audio/128/default.mp3?aid=rss_feed&awCollectionId=3026b665-46df-4d18-98e9-d1ce16bbb1df&awEpisodeId=86058bb0-f2b9-4aaa-bbb3-2dc556c6d206&feed=82FI35Px",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 52378819
+    },
+    {
+      "slug": "ezra-klein",
+      "number": 4,
+      "title": "How the Democrats Did It",
+      "duration": 4040,
+      "pubDate": "Sat, 7 Nov 2026 12:00:00 +0000",
+      "notes": "President Trump is primarily responsible for the Republican shellacking on Tuesday. But to get over the finish line in so many places — across the Midwest and deep into the South – Democrats had to run the right candidates, and those candidates ran very different campaigns.\n\nSo how exactly did those Democrats do it? Michelle Goldberg, my colleague at New York Times Opinion, did amazing work this past year covering the biggest races — traveling to Texas, Michigan, Maine and other states, meeting with the candidates, and getting a sense of their campaigns on the ground. She joins me for a deep dive into the most exciting — and shocking — wins, and what they reveal about the new Democratic Party that will emerge out of this election.\n\nMentioned:\n\n“Republicans Are Worried About Gina Hinojosa. In Texas, I Saw Why.” by Michelle Goldberg\n\n“He’s Young, Talented and Openly Religious. Is He the Savior Democrats Have Been Waiting For?” by Michelle Goldberg\n\n“Why Everyone Wants Jon Ossoff to Run for President” by Michelle Goldberg\n\n“The Populist Left Has a Theory. We’re All About to Test It.” by Michelle Goldberg\n\nBook Recommendations:\n\n“Good People” by Patmeena Sabit\n\n“The Feast of the Goat” by Mario Vargas Llosa\n\n“The Man Who Loved Dogs” by Leonardo Padura\n\nThoughts? Guest suggestions? Email us at ezrakleinshow@nytimes.com.\n\nYou can find transcripts (posted midday) and more episodes of “The Ezra Klein Show” at nytimes.com/ezra-klein-podcast, and you can find Ezra on Twitter @ezraklein. Book recommendations from all our guests are listed at\n\nThis episode of “The Ezra Klein Show” was produced by Annie Galvin. Fact-checking by Michelle Harris with Kate Sinclair and Julie Beer. Our senior engineer is Jeff Geld, with additional mixing by Aman Sahota and Gautam Srikishan. Our recording engineer is Aman Sahota. Cinematography by Bets Wilkins. Video editing by Steph Khoury, Dani Dillon, Brandon Belk-Yee and Julian Hackney. Our executive producer is Claire Gordon. The show’s production team also includes Marie Cascione, Rollin Hu, Jack McCordick, Kristin Lin, Emma Kehlbeck, Marina King and Jan Kobal. Original music by Pat McCusker. Audience strategy by Shannon Busta. The director of New York Times Opinion Shows is Annie-Rose Strasser.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/3026b665-46df-4d18-98e9-d1ce16bbb1df/episodes/881d9663-8713-4a17-8415-99451e0ef854/audio/128/default.mp3?aid=rss_feed&awCollectionId=3026b665-46df-4d18-98e9-d1ce16bbb1df&awEpisodeId=881d9663-8713-4a17-8415-99451e0ef854&feed=82FI35Px",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 64655522
+    },
+    {
+      "slug": "ezra-klein",
+      "number": 5,
+      "title": "The End of Trumpism",
+      "duration": 3004,
+      "pubDate": "Wed, 4 Nov 2026 21:43:35 +0000",
+      "notes": "Tuesday night, a blue tsunami crashed across the political map. Democrats won control of the House and the Senate with room to spare, flipping seats in states that once seemed unimaginable: South Carolina, Kansas, Texas. Ezra Klein sits down with his editor Aaron Retica to survey the wreckage of Trump’s 2024 coalition, and what Democrats can learn from their victories.\n\nMentioned:\n\n“Kansas Senator Goes Rogue With Video Response to Medical Debt Lawsuits” by Sarah Kliff\n\nThoughts? Guest suggestions? Email us at ezrakleinshow@nytimes.com.\n\nYou can find the transcript and more episodes of “The Ezra Klein Show” at\n\nBook recommendations from all our guests are listed at\n\nThis episode of “The Ezra Klein Show” was produced by Rollin Hu and Jack McCordick. Fact-checking by Michelle Harris with Kate Sinclair, Mary Marge Locker, Julie Beer and Jordyn Flaherty. Our senior engineer is Jeff Geld, with additional mixing by Aman Sahota, Gautam Srikishan and Pat McCusker. Our recording engineer is Aman Sahota. Cinematography by Marina King. Video editing by Steph Khoury, Dani Dillon, Kristen Williamson, Julian Hackney and Jan Kobal. Our executive producer is Claire Gordon. The show’s production team also includes Marie Cascione, Annie Galvin, Kristin Lin, Emma Kehlbeck, Marina King and Jan Kobal. Original music by Pat McCusker. Audience strategy by Shannon Busta. The director of New York Times Opinion Shows is Annie-Rose Strasser.\n\nSubscribe today at nytimes.com/podcasts or on Apple Podcasts, Spotify and Amazon Music. You can also subscribe via your favorite podcast app here For more podcasts and narrated articles, download The New York Times app at nytimes.com/app.\n\nHosted by Simplecast, an AdsWizz company. See pcm.adswizz.com for information about our collection and use of personal data for advertising.",
+      "enclosureUrl": "https://dts.podtrac.com/redirect.mp3/pdst.fm/e/pfx.vpixl.com/6qj4J/pscrb.fm/rss/p/tracking.swap.fm/track/4jdbJYYRKqK96EGqOzQb/nyt.simplecastaudio.com/3026b665-46df-4d18-98e9-d1ce16bbb1df/episodes/c4b2aeef-c679-4933-adc4-3e7f5750d89a/audio/128/default.mp3?aid=rss_feed&awCollectionId=3026b665-46df-4d18-98e9-d1ce16bbb1df&awEpisodeId=c4b2aeef-c679-4933-adc4-3e7f5750d89a&feed=82FI35Px",
+      "enclosureType": "audio/mpeg",
+      "enclosureBytes": 48067980
+    }
+  ],
+  "inbox": [
+    {
+      "slug": "the-daily",
+      "number": 1
+    },
+    {
+      "slug": "planet-money",
+      "number": 1
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "number": 1
+    },
+    {
+      "slug": "left-right",
+      "number": 1
+    },
+    {
+      "slug": "99-percent-invisible",
+      "number": 1
+    },
+    {
+      "slug": "radio-ambulante",
+      "number": 1
+    },
+    {
+      "slug": "hard-fork",
+      "number": 1
+    },
+    {
+      "slug": "ted-talks-daily",
+      "number": 1
+    },
+    {
+      "slug": "radiolab",
+      "number": 1
+    },
+    {
+      "slug": "ezra-klein",
+      "number": 1
+    },
+    {
+      "slug": "99-percent-invisible",
+      "number": 2
+    },
+    {
+      "slug": "left-right",
+      "number": 2
+    },
+    {
+      "slug": "radiolab",
+      "number": 2
+    },
+    {
+      "slug": "radio-ambulante",
+      "number": 2
+    },
+    {
+      "slug": "the-daily",
+      "number": 2
+    },
+    {
+      "slug": "planet-money",
+      "number": 2
+    }
+  ],
+  "queue": [
+    {
+      "slug": "99-percent-invisible",
+      "number": 1
+    },
+    {
+      "slug": "the-daily",
+      "number": 1,
+      "playedSeconds": 445
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "number": 1
+    },
+    {
+      "slug": "radiolab",
+      "number": 1,
+      "playedSeconds": 612
+    },
+    {
+      "slug": "left-right",
+      "number": 1,
+      "playedSeconds": 251
+    },
+    {
+      "slug": "radio-ambulante",
+      "number": 1
+    }
+  ],
+  "history": [
+    {
+      "slug": "99-percent-invisible",
+      "number": 2
+    },
+    {
+      "slug": "planet-money",
+      "number": 2
+    },
+    {
+      "slug": "radio-ambulante",
+      "number": 2
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "number": 2
+    },
+    {
+      "slug": "left-right",
+      "number": 2
+    },
+    {
+      "slug": "hard-fork",
+      "number": 2
+    }
+  ],
+  "downloads": [
+    {
+      "slug": "99-percent-invisible",
+      "number": 1
+    },
+    {
+      "slug": "the-daily",
+      "number": 1
+    },
+    {
+      "slug": "japanese-with-noriko",
+      "number": 1
+    }
+  ],
+  "categories": [
+    {
+      "name": "Society",
+      "id": "society"
+    },
+    {
+      "name": "Language",
+      "id": "language"
+    },
+    {
+      "name": "Stories",
+      "id": "stories"
+    },
+    {
+      "name": "Science",
+      "id": "science"
+    },
+    {
+      "name": "Culture",
+      "id": "culture"
+    },
+    {
+      "name": "Technology",
+      "id": "tech"
+    }
+  ],
+  "charts": {
+    "top": [
+      "the-daily",
+      "ezra-klein",
+      "99-percent-invisible",
+      "radiolab",
+      "planet-money",
+      "ted-talks-daily",
+      "hard-fork",
+      "radio-ambulante",
+      "left-right",
+      "japanese-with-noriko"
+    ],
+    "language": [
+      "japanese-with-noriko",
+      "radio-ambulante"
+    ],
+    "stories": [
+      "radio-ambulante",
+      "99-percent-invisible",
+      "radiolab"
+    ],
+    "science": [
+      "radiolab",
+      "ted-talks-daily",
+      "planet-money"
+    ],
+    "culture": [
+      "99-percent-invisible",
+      "left-right",
+      "ted-talks-daily",
+      "radio-ambulante"
+    ],
+    "tech": [
+      "hard-fork",
+      "ted-talks-daily",
+      "radiolab",
+      "99-percent-invisible"
+    ],
+    "society": [
+      "the-daily",
+      "ezra-klein",
+      "radio-ambulante",
+      "left-right",
+      "planet-money",
+      "ted-talks-daily",
+      "99-percent-invisible"
+    ]
+  },
+  "chat": {
+    "followUpQuestion": "Why did lenders need a new way to judge trust?",
+    "replies": [
+      {
+        "match": "Summarize",
+        "result": "A dealership voicemail tipped producer Vivian Le off to identity theft ({t:3}). As she worked to repair her credit, she learned how much a three-digit score can shape where you live, what you drive, and whether you can borrow ({t:29}).\n\nThe episode traces how lending moved from personal trust ({t:37}) to credit scoring, and asks why a tool meant to reduce bias can still reinforce it."
+      },
+      {
+        "match": "new way to judge trust",
+        "result": "When wholesalers and shopkeepers knew each other, they could extend credit on reputation or ask a mutual contact ({t:37}). By the 1830s, businesses were lending to people hundreds of miles away. A wholesaler needed a way to judge whether a stranger would pay them back ({t:43})."
+      },
+      {
+        "match": "takeaway",
+        "result": "A credit score helps lenders estimate whether a borrower will repay a loan ({t:23}). Vivian shows how that same number became a gatekeeper for decisions beyond lending, including where people can live ({t:29})."
+      },
+      {
+        "match": "Explain",
+        "result": "Vivian traces the attempted car purchase back to a data breach ({t:14}). She found that people had also been using her identity to apply for loans, utilities, insurance, and rentals ({t:15})."
+      }
+    ],
+    "fallback": "The episode starts with Vivian Le discovering that someone tried to buy a car under her name ({t:8}). Her experience leads into a look at how credit scores came to govern everyday decisions ({t:29})."
+  }
+}

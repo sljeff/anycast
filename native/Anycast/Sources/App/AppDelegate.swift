@@ -1,4 +1,6 @@
 import UIKit
+import AnycastKit
+import Kingfisher
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -15,6 +17,11 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         // Startup DAG (docs/migration/06 §4 / 08 §2.3). Sentry is attached
         // before anything else can fail. First frame does NOT wait for the
         // chain; the UI renders a placeholder until the environment is ready.
+        #if DEBUG && targetEnvironment(simulator)
+        if DemoMode.isActive {
+            KingfisherManager.shared.downloader.sessionConfiguration = DemoMode.sessionConfiguration()
+        }
+        #endif
         environment.startup.start()
         Motion.installReduceMotionObserverIfNeeded()
         return true

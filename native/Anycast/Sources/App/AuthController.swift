@@ -1,4 +1,5 @@
 import Foundation
+import AnycastKit
 import FirebaseAuth
 import FirebaseCore
 import GoogleSignIn
@@ -67,6 +68,9 @@ final class AuthController {
     /// Token for @Sendable contexts — captures nothing, hops nothing: safe
     /// to reference directly from any closure.
     nonisolated static func currentToken() async throws -> String? {
+        #if DEBUG && targetEnvironment(simulator)
+        if DemoMode.isActive { return DemoMode.token }
+        #endif
         // Bool set-once at startup; the only possible race reads `false`
         // early, which degrades to the signed-out synthetic 401 — never a
         // crash, never a wrong token.

@@ -67,6 +67,10 @@ public final class HTTPClient: Sendable {
     public init(protocolClasses: [AnyClass]? = nil) {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.waitsForConnectivity = false
+        var protocolClasses = protocolClasses
+        #if DEBUG && targetEnvironment(simulator)
+        if protocolClasses == nil, DemoMode.isActive { protocolClasses = DemoMode.protocolClasses }
+        #endif
         if let protocolClasses {
             configuration.protocolClasses = protocolClasses
         }

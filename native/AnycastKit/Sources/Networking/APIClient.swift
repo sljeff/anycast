@@ -26,7 +26,12 @@ public struct APIClient: Sendable {
         client: HTTPClient,
         tokenProvider: @escaping @Sendable () async throws -> String?
     ) {
+        #if DEBUG && targetEnvironment(simulator)
+        self.host = DemoMode.isActive && host.host == "anycast.website"
+            ? URL(string: "https://\(DemoMode.host)")! : host
+        #else
         self.host = host
+        #endif
         self.client = client
         self.tokenProvider = tokenProvider
     }

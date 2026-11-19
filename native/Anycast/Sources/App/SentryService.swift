@@ -1,4 +1,5 @@
 import Foundation
+import AnycastKit
 import Sentry
 
 /// sentry-cocoa bootstrap, config transplanted 1:1 from the Flutter line
@@ -11,6 +12,9 @@ final class SentryService {
 
     func start() {
         guard !started else { return }
+        #if DEBUG && targetEnvironment(simulator)
+        if DemoMode.isActive { return }
+        #endif
         started = true
         SentrySDK.start { options in
             options.dsn = AppConfiguration.sentryDSN
